@@ -4,116 +4,314 @@
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
 <title>Certificate Verification | Medi Fella Beauty School</title>
+
 <style>
+@import url('https://fonts.googleapis.com/css2?family=Noto+Sans+Khmer:wght@400;500;600;700&family=Noto+Sans+KR:wght@400;500;600;700&display=swap');
+
 *{box-sizing:border-box}
-body{margin:0;font-family:Arial,sans-serif;background:#f4fbfd;color:#263746}
-header{background:#fff;padding:16px 6%;display:flex;align-items:center;gap:14px;border-bottom:1px solid #e5eef1}
-header img{width:55px;height:55px;object-fit:contain;border-radius:50%}
-header strong{font-size:20px}
-.container{max-width:760px;margin:40px auto;padding:20px}
-.card{background:#fff;padding:35px;border-radius:20px;box-shadow:0 10px 35px rgba(0,0,0,.08)}
-h1{text-align:center;margin:0 0 10px}
-.description{text-align:center;color:#687780;margin-bottom:25px}
-.search{display:flex;gap:10px}
-input{flex:1;padding:15px;border:1px solid #ccd9de;border-radius:10px;font-size:16px}
-button{padding:15px 22px;border:0;border-radius:10px;background:#2aaec5;color:#fff;font-weight:bold;cursor:pointer}
-.result{display:none;margin-top:25px;padding:25px;border-radius:15px}
-.valid{background:#effaf5;border:1px solid #b8e4d1}
-.invalid{background:#fff2f2;border:1px solid #edc1c1}
-.status{text-align:center;font-weight:bold;font-size:22px;margin-bottom:20px}
-.student-photo{display:block;width:140px;height:170px;object-fit:cover;margin:0 auto 20px;border-radius:10px}
-.info-row{display:flex;justify-content:space-between;gap:20px;padding:12px 0;border-bottom:1px solid #e5eeee}
-.label{font-weight:bold}
-footer{text-align:center;padding:30px;color:#71808a}
-@media(max-width:600px){.search{flex-direction:column}.info-row{flex-direction:column;gap:4px}}
+body{
+  margin:0;
+  font-family:Arial,'Noto Sans Khmer','Noto Sans KR',sans-serif;
+  background:#f4fbfd;
+  color:#263746;
+}
+header{
+  background:#fff;
+  padding:18px 6%;
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:15px;
+  border-bottom:1px solid #e5eef1;
+}
+.brand{
+  display:flex;
+  align-items:center;
+  gap:14px;
+  font-size:20px;
+  font-weight:700;
+}
+.brand img{
+  width:55px;
+  height:55px;
+  object-fit:contain;
+  border-radius:50%;
+}
+.languages{display:flex;gap:7px;flex-wrap:wrap}
+.languages button{
+  border:1px solid #ccd9de;
+  background:#fff;
+  color:#52656f;
+  padding:8px 13px;
+  border-radius:20px;
+  cursor:pointer;
+  font-weight:600;
+}
+.languages button.active{
+  background:#2aaec5;
+  color:#fff;
+  border-color:#2aaec5;
+}
+.container{
+  max-width:750px;
+  margin:50px auto;
+  padding:20px;
+}
+.card{
+  background:#fff;
+  padding:35px;
+  border-radius:20px;
+  box-shadow:0 10px 35px rgba(0,0,0,.08);
+}
+h1{text-align:center;margin:0 0 8px;font-size:36px}
+.subtitle{text-align:center;color:#687780;margin-bottom:28px}
+.valid{
+  display:none;
+  background:#effaf5;
+  border:1px solid #b8e4d1;
+  border-radius:15px;
+  padding:25px;
+}
+.invalid{
+  display:none;
+  background:#fff2f2;
+  border:1px solid #edc1c1;
+  border-radius:15px;
+  padding:25px;
+  text-align:center;
+}
+.status{
+  text-align:center;
+  font-size:25px;
+  font-weight:700;
+  margin-bottom:20px;
+}
+.student-photo{
+  display:block;
+  width:140px;
+  height:170px;
+  object-fit:cover;
+  margin:0 auto 20px;
+  border-radius:10px;
+  border:3px solid #fff;
+  box-shadow:0 3px 12px rgba(0,0,0,.12);
+}
+.info-row{
+  padding:14px 0;
+  border-bottom:1px solid #dfe9ec;
+}
+.label{
+  font-weight:700;
+  font-size:16px;
+  margin-bottom:5px;
+}
+.value{font-size:18px}
+footer{
+  text-align:center;
+  padding:30px;
+  color:#71808a;
+}
+@media(max-width:600px){
+  header{padding:14px 18px;align-items:flex-start}
+  .brand{font-size:16px}
+  .brand img{width:48px;height:48px}
+  .container{margin:25px auto;padding:12px}
+  .card{padding:24px 18px}
+  h1{font-size:32px}
+  .languages button{padding:7px 10px;font-size:13px}
+}
 </style>
 </head>
+
 <body>
 <header>
-<img src="logo.jpeg" alt="Medi Fella Beauty School">
-<strong>Medi Fella Beauty School</strong>
+  <div class="brand">
+    <img src="logo.jpeg" alt="Medi Fella Beauty School">
+    <span>Medi Fella Beauty School</span>
+  </div>
+
+  <div class="languages">
+    <button id="kmBtn" onclick="setLanguage('km')">🇰🇭 ខ្មែរ</button>
+    <button id="enBtn" onclick="setLanguage('en')">🇬🇧 English</button>
+    <button id="koBtn" onclick="setLanguage('ko')">🇰🇷 한국어</button>
+  </div>
 </header>
 
-<div class="container">
-<div class="card">
-<h1>Certificate Verification</h1>
-<div class="description" id="description">Checking certificate...</div>
+<main class="container">
+  <div class="card">
+    <h1 id="pageTitle">Certificate Verification</h1>
+    <div class="subtitle" id="pageSubtitle">Certificate information</div>
 
-<div class="search" id="searchBox">
-<input id="certificateId" placeholder="Example: MFS-2026-0001">
-<button onclick="verifyCertificate()">Verify Certificate</button>
-</div>
+    <div id="valid" class="valid">
+      <div class="status" id="verified">✅ Certificate Verified</div>
 
-<div id="result" class="result"></div>
-</div>
-</div>
+      <img id="studentPhoto" class="student-photo" src="" alt="Student photo">
+
+      <div class="info-row">
+        <div class="label" id="idLabel">Certificate ID</div>
+        <div class="value" id="idValue"></div>
+      </div>
+
+      <div class="info-row">
+        <div class="label" id="nameLabel">Student Name</div>
+        <div class="value" id="nameValue"></div>
+      </div>
+
+      <div class="info-row">
+        <div class="label" id="courseLabel">Course</div>
+        <div class="value" id="courseValue"></div>
+      </div>
+
+      <div class="info-row">
+        <div class="label" id="durationLabel">Duration</div>
+        <div class="value" id="durationValue"></div>
+      </div>
+
+      <div class="info-row">
+        <div class="label" id="issueLabel">Issue Date</div>
+        <div class="value" id="issueValue"></div>
+      </div>
+
+      <div class="info-row">
+        <div class="label" id="completionLabel">Completion Date</div>
+        <div class="value" id="completionValue"></div>
+      </div>
+    </div>
+
+    <div id="invalid" class="invalid">
+      <div class="status">❌ <span id="invalidTitle">Certificate Not Found</span></div>
+      <div id="invalidText">Please check the certificate number.</div>
+    </div>
+  </div>
+</main>
 
 <footer>© 2026 Medi Fella Beauty School</footer>
 
 <script>
-function escapeHtml(value){
- return String(value ?? "").replace(/[&<>"']/g,function(ch){
-  return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch];
- });
+const translations = {
+  km: {
+    title:"ការផ្ទៀងផ្ទាត់វិញ្ញាបនបត្រ",
+    subtitle:"ព័ត៌មានវិញ្ញាបនបត្រ",
+    verified:"✅ វិញ្ញាបនបត្រត្រូវបានផ្ទៀងផ្ទាត់",
+    id:"លេខវិញ្ញាបនបត្រ",
+    name:"ឈ្មោះសិស្ស",
+    course:"វគ្គសិក្សា",
+    duration:"រយៈពេលសិក្សា",
+    issue:"កាលបរិច្ឆេទចេញ",
+    completion:"កាលបរិច្ឆេទបញ្ចប់",
+    notFound:"រកមិនឃើញវិញ្ញាបនបត្រ",
+    check:"សូមពិនិត្យលេខវិញ្ញាបនបត្រម្តងទៀត។"
+  },
+  en: {
+    title:"Certificate Verification",
+    subtitle:"Certificate information",
+    verified:"✅ Certificate Verified",
+    id:"Certificate ID",
+    name:"Student Name",
+    course:"Course",
+    duration:"Duration",
+    issue:"Issue Date",
+    completion:"Completion Date",
+    notFound:"Certificate Not Found",
+    check:"Please check the certificate number."
+  },
+  ko: {
+    title:"수료증 인증",
+    subtitle:"수료증 정보",
+    verified:"✅ 수료증이 인증되었습니다",
+    id:"수료증 번호",
+    name:"학생 이름",
+    course:"교육 과정",
+    duration:"교육 기간",
+    issue:"발급일",
+    completion:"수료일",
+    notFound:"수료증을 찾을 수 없습니다",
+    check:"수료증 번호를 다시 확인해 주세요."
+  }
+};
+
+let currentLanguage = localStorage.getItem("language") || "en";
+
+function setLanguage(language){
+  currentLanguage = language;
+  localStorage.setItem("language", language);
+  const t = translations[language];
+
+  document.documentElement.lang = language === "km" ? "km" : language;
+  document.getElementById("pageTitle").textContent = t.title;
+  document.getElementById("pageSubtitle").textContent = t.subtitle;
+  document.getElementById("verified").textContent = t.verified;
+  document.getElementById("idLabel").textContent = t.id;
+  document.getElementById("nameLabel").textContent = t.name;
+  document.getElementById("courseLabel").textContent = t.course;
+  document.getElementById("durationLabel").textContent = t.duration;
+  document.getElementById("issueLabel").textContent = t.issue;
+  document.getElementById("completionLabel").textContent = t.completion;
+  document.getElementById("invalidTitle").textContent = t.notFound;
+  document.getElementById("invalidText").textContent = t.check;
+
+  ["km","en","ko"].forEach(x =>
+    document.getElementById(x+"Btn").classList.toggle("active", x === language)
+  );
 }
 
-async function verifyCertificate(){
- const id=document.getElementById("certificateId").value.trim();
- const result=document.getElementById("result");
+function formatCourse(c){
+  if(!c) return "";
+  if(typeof c === "string") return c;
+  return c[currentLanguage] || c.en || c.km || c.ko || "";
+}
 
- if(!id){
-  result.className="result invalid";
-  result.style.display="block";
-  result.innerHTML="<div class='status'>Please enter a certificate ID.</div>";
-  return;
- }
+function formatDuration(d){
+  if(!d) return "";
+  if(typeof d === "string") return d;
+  return d[currentLanguage] || d.en || d.km || d.ko || "";
+}
 
- result.className="result";
- result.style.display="block";
- result.innerHTML="<div class='status'>Checking certificate...</div>";
+async function loadCertificate(){
+  const params = new URLSearchParams(window.location.search);
+  const id = params.get("id");
 
- try{
-  const response=await fetch("./certificates.json?"+Date.now());
-  if(!response.ok) throw new Error("certificates.json not found");
-  const certificates=await response.json();
-  const certificate=certificates.find(c=>String(c.id).toLowerCase()===id.toLowerCase());
-
-  if(!certificate){
-   result.className="result invalid";
-   result.innerHTML="<div class='status'>❌ Certificate Not Found</div><p style='text-align:center'>Certificate ID: "+escapeHtml(id)+"</p>";
-   return;
+  if(!id){
+    document.getElementById("invalid").style.display = "block";
+    return;
   }
 
-  result.className="result valid";
-  result.innerHTML=
-   "<div class='status'>✅ Certificate Verified</div>"+
-   "<img class='student-photo' src='"+escapeHtml(certificate.photo)+"' alt='Student photo' onerror=\"this.style.display='none'\">"+
-   "<div class='info-row'><span class='label'>Certificate ID</span><span>"+escapeHtml(certificate.id)+"</span></div>"+
-   "<div class='info-row'><span class='label'>Student Name</span><span>"+escapeHtml(certificate.name)+"</span></div>"+
-   "<div class='info-row'><span class='label'>Course</span><span>"+escapeHtml(certificate.course)+"</span></div>"+
-   "<div class='info-row'><span class='label'>Duration</span><span>"+escapeHtml(certificate.duration)+"</span></div>"+
-   "<div class='info-row'><span class='label'>Issue Date</span><span>"+escapeHtml(certificate.issueDate)+"</span></div>"+
-   "<div class='info-row'><span class='label'>Completion Date</span><span>"+escapeHtml(certificate.completionDate)+"</span></div>";
- }catch(error){
-  result.className="result invalid";
-  result.style.display="block";
-  result.innerHTML="<div class='status'>⚠️ Verification system error</div><p style='text-align:center'>Please check that certificates.json is uploaded in the same repository.</p>";
- }
+  try{
+    const response = await fetch("certificates.json?cache=" + Date.now());
+    if(!response.ok) throw new Error("Unable to load certificates");
+    const certificates = await response.json();
+
+    const certificate = certificates.find(
+      item => String(item.id).toUpperCase() === String(id).toUpperCase()
+    );
+
+    if(!certificate){
+      document.getElementById("invalid").style.display = "block";
+      return;
+    }
+
+    document.getElementById("valid").style.display = "block";
+    document.getElementById("idValue").textContent = certificate.id || "";
+    document.getElementById("nameValue").textContent = certificate.name || "";
+    document.getElementById("courseValue").textContent = formatCourse(certificate.course);
+    document.getElementById("durationValue").textContent = formatDuration(certificate.duration);
+    document.getElementById("issueValue").textContent = certificate.issueDate || "";
+    document.getElementById("completionValue").textContent = certificate.completionDate || "";
+
+    if(certificate.photo){
+      document.getElementById("studentPhoto").src = certificate.photo;
+      document.getElementById("studentPhoto").style.display = "block";
+    }else{
+      document.getElementById("studentPhoto").style.display = "none";
+    }
+  }catch(error){
+    console.error(error);
+    document.getElementById("invalid").style.display = "block";
+  }
 }
 
-window.addEventListener("DOMContentLoaded",function(){
- const params=new URLSearchParams(window.location.search);
- const id=params.get("id");
-
- if(id){
-  document.getElementById("description").textContent="Certificate information";
-  document.getElementById("searchBox").style.display="none";
-  document.getElementById("certificateId").value=id;
-  verifyCertificate();
- }else{
-  document.getElementById("description").textContent="Enter the certificate number printed on the certificate to verify its authenticity.";
- }
-});
+setLanguage(currentLanguage);
+loadCertificate();
 </script>
 </body>
 </html>
