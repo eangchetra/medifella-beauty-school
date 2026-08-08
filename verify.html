@@ -7,21 +7,21 @@
 <style>
 *{box-sizing:border-box}
 body{margin:0;font-family:Arial,sans-serif;background:#f4fbfd;color:#263746}
-header{background:#fff;padding:18px 6%;display:flex;align-items:center;gap:14px;border-bottom:1px solid #e5eef1}
+header{background:#fff;padding:16px 6%;display:flex;align-items:center;gap:14px;border-bottom:1px solid #e5eef1}
 header img{width:55px;height:55px;object-fit:contain;border-radius:50%}
 header strong{font-size:20px}
-.container{max-width:750px;margin:60px auto;padding:20px}
+.container{max-width:760px;margin:50px auto;padding:20px}
 .card{background:#fff;padding:35px;border-radius:20px;box-shadow:0 10px 35px rgba(0,0,0,.08)}
-h1{text-align:center;margin-bottom:10px}
+h1{text-align:center;margin:0 0 10px}
 .description{text-align:center;color:#687780;margin-bottom:30px}
 .search{display:flex;gap:10px}
 input{flex:1;padding:15px;border:1px solid #ccd9de;border-radius:10px;font-size:16px}
-button{padding:15px 22px;border:none;border-radius:10px;background:#2aaec5;color:#fff;font-weight:bold;cursor:pointer}
+button{padding:15px 22px;border:0;border-radius:10px;background:#2aaec5;color:#fff;font-weight:bold;cursor:pointer}
 .result{display:none;margin-top:30px;padding:25px;border-radius:15px}
-.valid{display:block;background:#effaf5;border:1px solid #b8e4d1}
-.invalid{display:block;background:#fff2f2;border:1px solid #edc1c1}
-.student-photo{display:block;width:140px;height:170px;object-fit:cover;margin:0 auto 20px;border-radius:10px;border:3px solid #2aaec5}
-.info{margin-top:15px}
+.valid{background:#effaf5;border:1px solid #b8e4d1}
+.invalid{background:#fff2f2;border:1px solid #edc1c1}
+.student-photo{display:block;width:140px;height:170px;object-fit:cover;margin:0 auto 20px;border-radius:10px;border:3px solid #fff}
+.status{text-align:center;font-weight:bold;font-size:20px;margin-bottom:20px}
 .info-row{display:flex;justify-content:space-between;gap:20px;padding:12px 0;border-bottom:1px solid #e5eeee}
 .label{font-weight:bold}
 footer{text-align:center;padding:30px;color:#71808a}
@@ -29,66 +29,97 @@ footer{text-align:center;padding:30px;color:#71808a}
 </style>
 </head>
 <body>
+
 <header>
-<img src="logo.jpeg" alt="Medi Fella Beauty School">
-<strong>Medi Fella Beauty School</strong>
+  <img src="logo.jpeg" alt="Medi Fella Beauty School">
+  <strong>Medi Fella Beauty School</strong>
 </header>
 
 <div class="container">
-<div class="card">
-<h1>Certificate Verification</h1>
-<p class="description">Enter the certificate number printed on the certificate to verify its authenticity.</p>
+  <div class="card">
+    <h1>Certificate Verification</h1>
+    <div class="description">
+      Enter the certificate ID to verify the student's certificate.
+    </div>
 
-<div class="search">
-<input id="certificateId" type="text" placeholder="Example: MFS-2026-0001">
-<button onclick="verifyCertificate()">Verify Certificate</button>
+    <div class="search">
+      <input id="certificateId" placeholder="Example: MFS-2026-0001">
+      <button onclick="verifyCertificate()">Verify</button>
+    </div>
+
+    <div id="result" class="result"></div>
+  </div>
 </div>
 
-<div id="result" class="result"></div>
-</div>
-</div>
-
-<footer>© 2026 Medi Fella Beauty School</footer>
+<footer>
+  Medi Fella Beauty School • Phnom Penh, Cambodia
+</footer>
 
 <script>
 async function verifyCertificate(){
-const id=document.getElementById("certificateId").value.trim().toUpperCase();
-const result=document.getElementById("result");
+  const id=document.getElementById("certificateId").value.trim();
+  const result=document.getElementById("result");
 
-if(!id){
-result.className="result invalid";
-result.innerHTML="<strong>Please enter a certificate number.</strong>";
-return;
+  if(!id){
+    result.className="result invalid";
+    result.style.display="block";
+    result.innerHTML="<div class='status'>Please enter a certificate ID.</div>";
+    return;
+  }
+
+  result.className="result";
+  result.style.display="block";
+  result.innerHTML="<div class='status'>Checking certificate...</div>";
+
+  try{
+    const response=await fetch("certificates.json");
+    if(!response.ok) throw new Error("Could not load certificates.");
+    const certificates=await response.json();
+
+    const certificate=certificates.find(c => c.id.toLowerCase() === id.toLowerCase());
+
+    if(!certificate){
+      result.className="result invalid";
+      result.innerHTML=
+        "<div class='status'>❌ Certificate Not Found</div>" +
+        "<p style='text-align:center'>Please check the certificate ID and try again.</p>";
+      return;
+    }
+
+    result.className="result valid";
+    result.innerHTML=`
+      <div class="status">✅ Certificate Verified</div>
+      <img class="student-photo"
+           src="${certificate.photo}"
+           alt="Student photo"
+           onerror="this.style.display='none'">
+
+      <div class="info-row"><span class="label">Certificate ID</span><span>${escapeHtml(certificate.id)}</span></div>
+      <div class="info-row"><span class="label">Student Name</span><span>${escapeHtml(certificate.name)}</span></div>
+      <div class="info-row"><span class="label">Course</span><span>${escapeHtml(certificate.course)}</span></div>
+      <div class="info-row"><span class="label">Duration</span><span>${escapeHtml(certificate.duration)}</span></div>
+      <div class="info-row"><span class="label">Issue Date</span><span>${escapeHtml(certificate.issueDate)}</span></div>
+      <div class="info-row"><span class="label">Completion Date</span><span>${escapeHtml(certificate.completionDate)}</span></div>
+    `;
+  }catch(error){
+    result.className="result invalid";
+    result.innerHTML="<div class='status'>Unable to verify</div><p style='text-align:center'>Please try again later.</p>";
+  }
 }
 
-try{
-const response=await fetch("certificates.json?"+Date.now());
-const certificates=await response.json();
-const certificate=certificates.find(c=>c.id.toUpperCase()===id);
+function escapeHtml(value){
+  return String(value ?? "").replace(/[&<>"']/g, function(ch){
+    return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[ch];
+  });
+}
 
-if(certificate){
-result.className="result valid";
-result.innerHTML=`
-<h2 style="text-align:center;color:#238b68;">✓ Certificate Verified</h2>
-<img class="student-photo" src="${certificate.photo}" alt="Student Photo">
-<div class="info">
-<div class="info-row"><span class="label">Student Name</span><span>${certificate.name}</span></div>
-<div class="info-row"><span class="label">Certificate No.</span><span>${certificate.id}</span></div>
-<div class="info-row"><span class="label">Course</span><span>${certificate.course}</span></div>
-<div class="info-row"><span class="label">Duration</span><span>${certificate.duration}</span></div>
-<div class="info-row"><span class="label">Issue Date</span><span>${certificate.issueDate}</span></div>
-<div class="info-row"><span class="label">Completion Date</span><span>${certificate.completionDate}</span></div>
-<div class="info-row"><span class="label">Status</span><span style="color:#238b68;font-weight:bold;">VALID</span></div>
-</div>`;
-}else{
-result.className="result invalid";
-result.innerHTML="<strong>Certificate Not Found</strong><p>Please check the certificate number and try again.</p>";
-}
-}catch(error){
-result.className="result invalid";
-result.innerHTML="<strong>Verification service unavailable.</strong><p>Please try again later.</p>";
-}
-}
+window.addEventListener("DOMContentLoaded",()=>{
+  const id=new URLSearchParams(location.search).get("id");
+  if(id){
+    document.getElementById("certificateId").value=id;
+    verifyCertificate();
+  }
+});
 </script>
 </body>
 </html>
