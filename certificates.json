@@ -1,0 +1,11 @@
+[
+  {
+    "id": "MFS-2026-0001",
+    "name": "Example Student",
+    "photo": "students/MFS-2026-0001.jpg",
+    "course": "Professional Beauty Therapy",
+    "duration": "6 Months",
+    "issueDate": "2026-08-08",
+    "completionDate": "2027-02-08"
+  }
+]
