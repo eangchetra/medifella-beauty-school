@@ -1,11 +1,11 @@
 [
   {
-    "id": "MFS-2026-0001",
-    "name": "Example Student",
+    "id": "Medifella2026001",
+    "name": "Eang Chetra",
     "photo": "students/MFS-2026-0001.jpg",
-    "course": "Professional Beauty Therapy",
-    "duration": "6 Months",
+    "course": "Diploma of Beauty Care",
+    "duration": "12 Months",
     "issueDate": "2026-08-08",
-    "completionDate": "2027-02-08"
+    "completionDate": "2027-08-08"
   }
 ]
