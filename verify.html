@@ -6,12 +6,17 @@
 <title>Certificate Verification | Medi Fella Beauty School</title>
 <style>
 *{box-sizing:border-box}
-body{margin:0;background:#f4fafb;color:#17384e;font-family:Arial,sans-serif}
+body{margin:0;background:#f4fafb;color:#17384e;font-family:Arial,"Noto Sans Khmer","Noto Sans KR",sans-serif}
 header{background:#fff;border-bottom:1px solid #dcebed;padding:15px 20px}
 .head{max-width:850px;margin:auto;display:flex;align-items:center;gap:12px}
 .logo{width:55px;height:55px;object-fit:contain;border-radius:50%}
 .brand{font-size:18px;font-weight:700}.brand small{display:block;color:#1595a3;font-size:11px;margin-top:3px}
 .wrap{max-width:800px;margin:28px auto;padding:0 18px}
+.search{background:#fff;border:1px solid #d7e7ea;border-radius:18px;padding:18px;margin-bottom:20px;box-shadow:0 8px 22px rgba(20,60,75,.06)}
+.search-title{text-align:center;font-weight:700;font-size:18px;margin-bottom:12px}
+.search-row{display:flex;gap:10px}
+.search input{flex:1;padding:13px 15px;border:1px solid #cbdde1;border-radius:10px;font-size:16px}
+.search button{padding:13px 20px;border:0;border-radius:10px;background:#1598a6;color:white;font-weight:700;cursor:pointer}
 .card{display:none;background:#fff;border:1px solid #d7e7ea;border-radius:24px;overflow:hidden;box-shadow:0 12px 35px rgba(20,60,75,.09)}
 .line{height:6px;background:#1598a6}
 .top{text-align:center;padding:30px 22px 20px}
@@ -36,6 +41,7 @@ footer{text-align:center;color:#748992;font-size:12px;padding:25px}
 @media(max-width:650px){
  .wrap{margin:18px auto}.body{padding:0 18px 22px}h1{font-size:25px}
  .profile{grid-template-columns:1fr;text-align:center}.photo{margin:auto}
+ .search-row{flex-direction:column}.search button{width:100%}
 }
 </style>
 </head>
@@ -46,6 +52,14 @@ footer{text-align:center;color:#748992;font-size:12px;padding:25px}
 </div></header>
 
 <main class="wrap">
+<section class="search" id="searchBox">
+<div class="search-title">ស្វែងរកវិញ្ញាបនបត្រ · Search Certificate · 수료증 검색</div>
+<div class="search-row">
+<input id="certInput" placeholder="Enter Certificate ID / បញ្ចូលលេខ / 인증서 번호">
+<button onclick="manualSearch()">Verify · ផ្ទៀងផ្ទាត់ · 확인</button>
+</div>
+</section>
+
 <section id="card" class="card">
 <div class="line"></div>
 <div class="top">
@@ -83,67 +97,105 @@ This certificate is authentic and officially verified.<br>
 
 <div class="official">
 <b>
-<span style="display:block;">ស្ថាប័នបញ្ជាក់ជាផ្លូវការ</span>
-<span style="display:block;">OFFICIAL CERTIFICATION INSTITUTION</span>
-<span style="display:block;">공식 인증 기관</span>
+<span style="display:block">ស្ថាប័នបញ្ជាក់ជាផ្លូវការ</span>
+<span style="display:block">OFFICIAL CERTIFICATION INSTITUTION</span>
+<span style="display:block">공식 인증 기관</span>
 </b>
-<div style="margin-top:12px;">Medi Fella Beauty School<br>Phnom Penh, Cambodia</div>
+<div style="margin-top:12px">Medi Fella Beauty School<br>Phnom Penh, Cambodia</div>
 </div>
 </div>
 </section>
 
 <div id="error" class="error">
-<strong>Unable to load this certificate.</strong><br>
-Please check that the certificate record and student photo are uploaded correctly.
+<strong>Certificate not found · រកមិនឃើញវិញ្ញាបនបត្រ · 수료증을 찾을 수 없습니다</strong>
 </div>
 </main>
+
 <footer>© 2026 Medi Fella Beauty School · Certificate Verification</footer>
 
 <script>
-function val(v){
+let records=[];
+
+function text(v){
  if(typeof v==="string") return v;
  if(v && typeof v==="object") return v.en||v.km||v.ko||"";
  return "";
 }
-function first(obj, keys){
- for(const k of keys){ if(obj[k]!==undefined && obj[k]!==null && String(obj[k]).trim()!=="") return obj[k]; }
+
+function getDate(obj, keys){
+ for(const key of keys){
+  if(obj[key]!==undefined && obj[key]!==null && String(obj[key]).trim()!=="") return String(obj[key]);
+ }
  return "";
 }
-async function loadCertificate(){
- const id=new URLSearchParams(location.search).get("id");
- if(!id){document.getElementById("error").style.display="block";return;}
+
+function showError(){
+ document.getElementById("card").style.display="none";
+ document.getElementById("error").style.display="block";
+}
+
+function showCertificate(student){
+ document.getElementById("error").style.display="none";
+ document.getElementById("card").style.display="block";
+
+ document.getElementById("name").textContent=text(student.name);
+ document.getElementById("id").textContent=text(student.id);
+ document.getElementById("course").textContent=text(student.course);
+ document.getElementById("duration").textContent=text(student.duration);
+
+ const from=getDate(student,["issueDate","startDate","fromDate","courseStartDate"]);
+ const to=getDate(student,["completionDate","endDate","toDate","courseEndDate"]);
+ document.getElementById("period").textContent =
+   from && to ? from+"  →  "+to : (from || to || "");
+
+ if(student.photo){
+   document.getElementById("photo").src =
+     new URL(String(student.photo).replace(/^\/+/,""),location.href).href;
+ }
+
+ document.getElementById("certInput").value=student.id || "";
+}
+
+function findCertificate(id){
+ return records.find(x=>String(x.id).toLowerCase()===String(id).trim().toLowerCase());
+}
+
+function manualSearch(){
+ const id=document.getElementById("certInput").value.trim();
+ if(!id){showError();return;}
+ const student=findCertificate(id);
+ if(!student){showError();return;}
+
+ history.replaceState(null,"",location.pathname);
+ showCertificate(student);
+}
+
+async function start(){
  try{
-  const r=await fetch("./certificates.json?v="+Date.now(),{cache:"no-store"});
-  if(!r.ok) throw Error("JSON");
-  const records=await r.json();
-  const s=records.find(x=>String(x.id).toLowerCase()===id.toLowerCase());
-  if(!s) throw Error("ID");
+  const response=await fetch("./certificates.json?v="+Date.now(),{cache:"no-store"});
+  if(!response.ok) throw new Error("Cannot load certificates");
+  records=await response.json();
 
-  document.getElementById("name").textContent=val(s.name);
-  document.getElementById("id").textContent=val(s.id);
-  document.getElementById("course").textContent=val(s.course);
-  document.getElementById("duration").textContent=val(s.duration);
+  const id=new URLSearchParams(location.search).get("id");
 
-  const from=first(s,["issueDate","startDate","fromDate","courseStartDate"]);
-  const to=first(s,["completionDate","endDate","toDate","courseEndDate"]);
-  document.getElementById("period").textContent=from && to ? from+"  →  "+to : (from||to||"");
-
-  // Build photo URL safely from the repository root.
-  const photo=val(s.photo);
-  if(photo){
-   const src=new URL(photo.replace(/^\/+/,""),location.href).href;
-   document.getElementById("photo").src=src;
-  }else{
-   document.getElementById("photo").alt="No student photo";
+  // QR mode: hide search and open the certificate automatically.
+  if(id){
+    const student=findCertificate(id);
+    if(!student){showError();return;}
+    document.getElementById("searchBox").style.display="none";
+    showCertificate(student);
+    return;
   }
 
-  document.getElementById("card").style.display="block";
+  // Normal website mode: show search box.
+  document.getElementById("searchBox").style.display="block";
  }catch(e){
   console.error(e);
-  document.getElementById("error").style.display="block";
+  showError();
  }
 }
-loadCertificate();
+
+start();
 </script>
 </body>
 </html>
