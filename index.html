@@ -1,110 +1,197 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Medi Fella Beauty School</title>
-  <meta name="description" content="Medi Fella Beauty School — Professional beauty education in Cambodia.">
-  <link rel="stylesheet" href="style.css">
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>Medi Fella Beauty School</title>
+<meta name="description" content="Medi Fella Beauty School - Professional Beauty Education in Cambodia">
+<link rel="stylesheet" href="style.css">
+<style>
+.language-selector{display:flex;gap:6px;align-items:center;margin-left:15px}
+.language-selector button{border:1px solid #ddd;background:white;border-radius:20px;padding:7px 10px;cursor:pointer;font-size:13px}
+.language-selector button.active{background:#45aeca;color:white;border-color:#45aeca}
+@media(max-width:700px){.language-selector{margin-top:10px;margin-left:0}}
+</style>
 </head>
 <body>
-  <header class="nav">
-    <a class="brand" href="#home">
-      <img src="logo.jpeg" alt="Medi Fella Beauty School logo">
-      <span>Medi Fella Beauty School</span>
-    </a>
-    <button class="menu" onclick="document.querySelector('.links').classList.toggle('open')">☰</button>
-    <nav class="links">
-      <a href="#home">Home</a>
-      <a href="#about">About</a>
-      <a href="#courses">Courses</a>
-      <a href="#scholarship">Scholarship</a>
-      <a href="#gallery">Gallery</a>
-      <a href="#contact">Contact</a>
-    </nav>
-  </header>
 
-  <main>
-    <section id="home" class="hero">
-      <div class="hero-copy">
-        <p class="eyebrow">BEAUTY EDUCATION • CAMBODIA</p>
-        <h1>Learn Beauty.<br><span>Build Your Future.</span></h1>
-        <p>Professional beauty training designed to help students gain practical skills, confidence and knowledge for a successful beauty career.</p>
-        <div class="buttons">
-          <a class="btn primary" href="#courses">Explore Courses</a>
-          <a class="btn secondary" href="#contact">Register Now</a>
-        </div>
-      </div>
-      <div class="hero-logo">
-        <img src="logo.jpeg" alt="Medi Fella Beauty School">
-      </div>
-    </section>
+<header class="nav">
+<a class="brand" href="#home">
+<img src="logo.jpeg" alt="Medi Fella Beauty School Logo">
+<span>Medi Fella Beauty School</span>
+</a>
+<button class="menu" onclick="document.querySelector('.links').classList.toggle('open')">☰</button>
+<nav class="links">
+<a href="#home" data-i18n="home">Home</a>
+<a href="#about" data-i18n="about">About</a>
+<a href="#courses" data-i18n="courses">Courses</a>
+<a href="#scholarship" data-i18n="scholarship">Scholarship</a>
+<a href="#gallery" data-i18n="gallery">Gallery</a>
+<a href="#contact" data-i18n="contact">Contact</a>
+<div class="language-selector">
+<button onclick="setLanguage('km')" id="kmBtn">🇰🇭 ខ្មែរ</button>
+<button onclick="setLanguage('en')" id="enBtn" class="active">🇬🇧 English</button>
+<button onclick="setLanguage('ko')" id="koBtn">🇰🇷 한국어</button>
+</div>
+</nav>
+</header>
 
-    <section id="about" class="section">
-      <p class="eyebrow">ABOUT US</p>
-      <h2>Professional Beauty Education</h2>
-      <p class="lead">Medi Fella Beauty School is dedicated to providing quality beauty education with a strong focus on practical training, professional techniques and business-ready skills.</p>
-      <div class="cards">
-        <div class="card"><b>🎓 Practical Training</b><p>Hands-on learning focused on real beauty-service techniques.</p></div>
-        <div class="card"><b>👩‍🏫 Professional Trainers</b><p>Learn through structured lessons, demonstrations and practice.</p></div>
-        <div class="card"><b>💼 Career & Business</b><p>Build skills that can support employment or your own beauty business.</p></div>
-      </div>
-    </section>
+<main>
+<section id="home" class="hero">
+<div class="hero-copy">
+<p class="eyebrow" data-i18n="eyebrow">BEAUTY EDUCATION • CAMBODIA</p>
+<h1 data-i18n="heroTitle">Learn Beauty.<br><span>Build Your Future.</span></h1>
+<p data-i18n="heroText">Professional beauty training designed to help students gain practical skills, confidence and knowledge for a successful beauty career.</p>
+<div class="actions">
+<a class="btn primary" href="#courses" data-i18n="explore">Explore Courses</a>
+<a class="btn secondary" href="https://t.me/medifellabeautyschool" target="_blank" rel="noopener" data-i18n="register">Register Now</a>
+</div>
+</div>
+<div class="hero-image">
+<img src="logo.jpeg" alt="Medi Fella Beauty School">
+</div>
+</section>
 
-    <section id="courses" class="section tinted">
-      <p class="eyebrow">OUR COURSES</p>
-      <h2>Beauty Training Programs</h2>
-      <div class="course-grid">
-        <article class="course"><span>01</span><h3>Beauty Therapy</h3><p>Professional facial and beauty-care fundamentals.</p><a href="#contact">Learn more →</a></article>
-        <article class="course"><span>02</span><h3>Advanced Skin Care</h3><p>Advanced techniques for modern skin-care services.</p><a href="#contact">Learn more →</a></article>
-        <article class="course"><span>03</span><h3>Beauty Device Training</h3><p>Practical training on professional beauty devices and techniques.</p><a href="#contact">Learn more →</a></article>
-        <article class="course"><span>04</span><h3>Professional Beauty Business</h3><p>Learn skills for working in or building a beauty business.</p><a href="#contact">Learn more →</a></article>
-      </div>
-      <p class="note">*Course names, duration and fees can be updated with your official information.</p>
-    </section>
+<section id="about" class="section">
+<div class="container">
+<p class="eyebrow" data-i18n="aboutEyebrow">ABOUT US</p>
+<h2 data-i18n="aboutTitle">Professional Beauty Education</h2>
+<p data-i18n="aboutText">Medi Fella Beauty School is a professional beauty education center in Phnom Penh, Cambodia. We focus on practical training, professional knowledge and modern beauty techniques to help students build confidence and a successful career in the beauty industry.</p>
+</div>
+</section>
 
-    <section id="scholarship" class="section scholarship">
-      <div>
-        <p class="eyebrow">SCHOLARSHIP</p>
-        <h2>Invest in Your Future</h2>
-        <p>Ask our admissions team about current scholarship opportunities, eligibility and application requirements.</p>
-        <a class="btn primary" href="#contact">Ask About Scholarship</a>
-      </div>
-      <div class="quote">“Learn today. Create your future.”</div>
-    </section>
+<section id="courses" class="section">
+<div class="container">
+<p class="eyebrow" data-i18n="coursesEyebrow">OUR COURSES</p>
+<h2 data-i18n="coursesTitle">Learn Professional Beauty Skills</h2>
+<div class="course-grid">
+<div class="course"><h3 data-i18n="course1Title">Beauty Therapy</h3><p data-i18n="course1Text">Professional beauty foundations and practical techniques.</p></div>
+<div class="course"><h3 data-i18n="course2Title">Facial &amp; Skincare</h3><p data-i18n="course2Text">Learn facial treatment, skincare knowledge and professional techniques.</p></div>
+<div class="course"><h3 data-i18n="course3Title">Acne &amp; Skin Care</h3><p data-i18n="course3Text">Learn professional approaches to common skin concerns.</p></div>
+<div class="course"><h3 data-i18n="course4Title">Korean Beauty Techniques</h3><p data-i18n="course4Text">Learn modern Korean-inspired beauty and skincare techniques.</p></div>
+<div class="course"><h3 data-i18n="course5Title">Massage</h3><p data-i18n="course5Text">Develop practical professional massage skills.</p></div>
+<div class="course"><h3 data-i18n="course6Title">Advanced Aesthetic Training</h3><p data-i18n="course6Text">Advanced beauty and aesthetic training according to available programs.</p></div>
+</div>
+</div>
+</section>
 
-    <section id="gallery" class="section">
-      <p class="eyebrow">GALLERY</p>
-      <h2>School Life & Training</h2>
-      <div class="gallery">
-        <div>Training Photo</div><div>Students</div><div>Beauty Class</div><div>Graduation</div>
-      </div>
-      <p class="note">Replace these boxes with your school photos when ready.</p>
-    </section>
+<section id="scholarship" class="section">
+<div class="container">
+<p class="eyebrow" data-i18n="scholarshipEyebrow">SCHOLARSHIP</p>
+<h2 data-i18n="scholarshipTitle">Opportunities for Future Beauty Professionals</h2>
+<p data-i18n="scholarshipText">Medi Fella Beauty School provides opportunities and special programs for students who want to develop their professional beauty skills and build a career in the beauty industry.</p>
+<a class="btn primary" href="https://t.me/medifellabeautyschool" target="_blank" rel="noopener" data-i18n="scholarshipButton">Ask About Scholarship</a>
+</div>
+</section>
 
-    <section id="contact" class="section contact">
-      <div>
-        <p class="eyebrow">CONTACT US</p>
-        <h2>Start Your Beauty Career</h2>
-        <p>Contact Medi Fella Beauty School for course information, registration and scholarship details.</p>
-      </div>
-      <form onsubmit="event.preventDefault(); alert('Thank you! Please connect this form to your preferred registration service.');">
-        <input type="text" placeholder="Full name" required>
-        <input type="tel" placeholder="Phone / Telegram" required>
-        <input type="email" placeholder="Email">
-        <select><option>Select a course</option><option>Beauty Therapy</option><option>Advanced Skin Care</option><option>Beauty Device Training</option><option>Professional Beauty Business</option></select>
-        <button class="btn primary" type="submit">Send Registration</button>
-      </form>
-    </section>
-  </main>
+<section id="gallery" class="section">
+<div class="container">
+<p class="eyebrow" data-i18n="galleryEyebrow">STUDENT LIFE</p>
+<h2 data-i18n="galleryTitle">Training • Practice • Experience</h2>
+<p data-i18n="galleryText">Our gallery will showcase classroom training, practical sessions, students, graduation ceremonies and school activities.</p>
+</div>
+</section>
 
-  <footer>
-    <img src="logo.jpeg" alt="Logo">
-    <div><b>Medi Fella Beauty School</b><br><small>Professional Beauty Education in Cambodia</small></div>
-    <div class="social">Facebook • TikTok • Telegram</div>
-  </footer>
-  <script>
-    document.querySelectorAll('.links a').forEach(a => a.addEventListener('click', () => document.querySelector('.links').classList.remove('open')));
-  </script>
+<section id="contact" class="section">
+<div class="container">
+<p class="eyebrow" data-i18n="contactEyebrow">CONTACT US</p>
+<h2 data-i18n="contactTitle">Medi Fella Beauty School</h2>
+<p data-i18n="address">#S35, St. Silver, Tomnoubteuk, Boeung Keng Kang, Phnom Penh, Cambodia</p>
+<p>📞 <a href="tel:+85586454353">086 454 353</a></p>
+<p>💬 <a href="https://t.me/medifellabeautyschool" target="_blank" rel="noopener">Telegram</a></p>
+<p>📘 <a href="https://www.facebook.com/share/1EqDHSZ1Lu/?mibextid=wwXIfr" target="_blank" rel="noopener">Facebook</a></p>
+<p>🎵 <a href="https://www.tiktok.com/@medifellabeautyschool" target="_blank" rel="noopener">TikTok</a></p>
+</div>
+</section>
+</main>
+
+<footer><div class="container"><p>© 2026 Medi Fella Beauty School</p></div></footer>
+
+<script>
+const translations={
+en:{
+home:"Home",about:"About",courses:"Courses",scholarship:"Scholarship",gallery:"Gallery",contact:"Contact",
+eyebrow:"BEAUTY EDUCATION • CAMBODIA",
+heroTitle:"Learn Beauty.<br><span>Build Your Future.</span>",
+heroText:"Professional beauty training designed to help students gain practical skills, confidence and knowledge for a successful beauty career.",
+explore:"Explore Courses",register:"Register Now",
+aboutEyebrow:"ABOUT US",aboutTitle:"Professional Beauty Education",
+aboutText:"Medi Fella Beauty School is a professional beauty education center in Phnom Penh, Cambodia. We focus on practical training, professional knowledge and modern beauty techniques to help students build confidence and a successful career in the beauty industry.",
+coursesEyebrow:"OUR COURSES",coursesTitle:"Learn Professional Beauty Skills",
+course1Title:"Beauty Therapy",course1Text:"Professional beauty foundations and practical techniques.",
+course2Title:"Facial & Skincare",course2Text:"Learn facial treatment, skincare knowledge and professional techniques.",
+course3Title:"Acne & Skin Care",course3Text:"Learn professional approaches to common skin concerns.",
+course4Title:"Korean Beauty Techniques",course4Text:"Learn modern Korean-inspired beauty and skincare techniques.",
+course5Title:"Massage",course5Text:"Develop practical professional massage skills.",
+course6Title:"Advanced Aesthetic Training",course6Text:"Advanced beauty and aesthetic training according to available programs.",
+scholarshipEyebrow:"SCHOLARSHIP",scholarshipTitle:"Opportunities for Future Beauty Professionals",
+scholarshipText:"Medi Fella Beauty School provides opportunities and special programs for students who want to develop their professional beauty skills and build a career in the beauty industry.",
+scholarshipButton:"Ask About Scholarship",
+galleryEyebrow:"STUDENT LIFE",galleryTitle:"Training • Practice • Experience",
+galleryText:"Our gallery will showcase classroom training, practical sessions, students, graduation ceremonies and school activities.",
+contactEyebrow:"CONTACT US",contactTitle:"Medi Fella Beauty School",
+address:"#S35, St. Silver, Tomnoubteuk, Boeung Keng Kang, Phnom Penh, Cambodia"
+},
+km:{
+home:"ទំព័រដើម",about:"អំពីសាលា",courses:"វគ្គសិក្សា",scholarship:"អាហារូបករណ៍",gallery:"វិចិត្រសាល",contact:"ទំនាក់ទំនង",
+eyebrow:"ការអប់រំជំនាញសម្ផស្ស • កម្ពុជា",
+heroTitle:"រៀនជំនាញសម្ផស្ស។<br><span>បង្កើតអនាគតរបស់អ្នក។</span>",
+heroText:"ការបណ្តុះបណ្តាលជំនាញសម្ផស្សប្រកបដោយវិជ្ជាជីវៈ ដើម្បីជួយសិស្សទទួលបានជំនាញអនុវត្ត បង្កើនទំនុកចិត្ត និងចំណេះដឹងសម្រាប់អាជីពសម្ផស្សដ៏ជោគជ័យ។",
+explore:"មើលវគ្គសិក្សា",register:"ចុះឈ្មោះឥឡូវនេះ",
+aboutEyebrow:"អំពីសាលា",aboutTitle:"ការអប់រំជំនាញសម្ផស្សប្រកបដោយវិជ្ជាជីវៈ",
+aboutText:"សាលា Medi Fella Beauty School គឺជាមជ្ឈមណ្ឌលអប់រំជំនាញសម្ផស្សនៅរាជធានីភ្នំពេញ ប្រទេសកម្ពុជា។ យើងផ្តោតលើការអនុវត្តជាក់ស្តែង ចំណេះដឹងវិជ្ជាជីវៈ និងបច្ចេកទេសសម្ផស្សទំនើប ដើម្បីជួយសិស្សបង្កើនទំនុកចិត្ត និងកសាងអាជីពជោគជ័យក្នុងវិស័យសម្ផស្ស។",
+coursesEyebrow:"វគ្គសិក្សារបស់យើង",coursesTitle:"រៀនជំនាញសម្ផស្សប្រកបដោយវិជ្ជាជីវៈ",
+course1Title:"ថែរក្សាសម្ផស្ស",course1Text:"រៀនមូលដ្ឋានគ្រឹះ និងបច្ចេកទេសថែរក្សាសម្ផស្សជាក់ស្តែង។",
+course2Title:"ថែរក្សាមុខ និងស្បែក",course2Text:"រៀនអំពីការថែរក្សាមុខ ចំណេះដឹងអំពីស្បែក និងបច្ចេកទេសវិជ្ជាជីវៈ។",
+course3Title:"មុន និងការថែរក្សាស្បែក",course3Text:"រៀនអំពីវិធីសាស្ត្រវិជ្ជាជីវៈសម្រាប់បញ្ហាស្បែកទូទៅ។",
+course4Title:"បច្ចេកទេសសម្ផស្សកូរ៉េ",course4Text:"រៀនបច្ចេកទេសថែរក្សាសម្ផស្ស និងស្បែកតាមបែបទំនើបរបស់កូរ៉េ។",
+course5Title:"ម៉ាស្សា",course5Text:"អភិវឌ្ឍជំនាញម៉ាស្សាជាក់ស្តែងសម្រាប់ការងារវិជ្ជាជីវៈ។",
+course6Title:"វគ្គបណ្តុះបណ្តាលសោភ័ណភាពកម្រិតខ្ពស់",course6Text:"ការបណ្តុះបណ្តាលជំនាញសោភ័ណភាពកម្រិតខ្ពស់ តាមកម្មវិធីដែលមាន។",
+scholarshipEyebrow:"អាហារូបករណ៍",scholarshipTitle:"ឱកាសសម្រាប់អ្នកជំនាញសម្ផស្សជំនាន់ថ្មី",
+scholarshipText:"Medi Fella Beauty School ផ្តល់ឱកាស និងកម្មវិធីពិសេសសម្រាប់សិស្សដែលចង់អភិវឌ្ឍជំនាញសម្ផស្ស និងកសាងអាជីពក្នុងវិស័យសម្ផស្ស។",
+scholarshipButton:"សាកសួរអំពីអាហារូបករណ៍",
+galleryEyebrow:"ជីវិតសិស្ស",galleryTitle:"ការបណ្តុះបណ្តាល • ការអនុវត្ត • បទពិសោធន៍",
+galleryText:"វិចិត្រសាលរបស់យើងនឹងបង្ហាញពីការបណ្តុះបណ្តាលក្នុងថ្នាក់ ការអនុវត្ត សកម្មភាពសិស្ស ពិធីបញ្ចប់ការសិក្សា និងសកម្មភាពរបស់សាលា។",
+contactEyebrow:"ទំនាក់ទំនង",contactTitle:"សាលា Medi Fella Beauty School",
+address:"#S35, ផ្លូវ Silver, តំបន់ទួលទំពូង, ខណ្ឌបឹងកេងកង, រាជធានីភ្នំពេញ, ប្រទេសកម្ពុជា"
+},
+ko:{
+home:"홈",about:"학교 소개",courses:"교육 과정",scholarship:"장학금",gallery:"갤러리",contact:"문의하기",
+eyebrow:"뷰티 교육 • 캄보디아",
+heroTitle:"뷰티를 배우고<br><span>미래를 만들어보세요.</span>",
+heroText:"전문적인 뷰티 교육을 통해 실무 능력과 자신감, 전문 지식을 배우고 성공적인 뷰티 커리어를 준비할 수 있습니다.",
+explore:"교육 과정 보기",register:"지금 등록하기",
+aboutEyebrow:"학교 소개",aboutTitle:"전문 뷰티 교육",
+aboutText:"Medi Fella Beauty School은 캄보디아 프놈펜에 위치한 전문 뷰티 교육 기관입니다. 실무 교육과 전문 지식, 현대적인 뷰티 기술을 중심으로 학생들이 자신감을 갖고 뷰티 산업에서 성공적인 커리어를 만들 수 있도록 교육합니다.",
+coursesEyebrow:"교육 과정",coursesTitle:"전문적인 뷰티 기술을 배워보세요",
+course1Title:"뷰티 테라피",course1Text:"전문적인 뷰티 기초 지식과 실무 기술을 배웁니다.",
+course2Title:"페이셜 & 스킨케어",course2Text:"페이셜 관리, 피부 지식 및 전문적인 스킨케어 기술을 배웁니다.",
+course3Title:"여드름 & 피부 관리",course3Text:"일반적인 피부 문제에 대한 전문적인 관리 방법을 배웁니다.",
+course4Title:"한국 뷰티 기술",course4Text:"현대적인 한국식 뷰티 및 스킨케어 기술을 배웁니다.",
+course5Title:"마사지",course5Text:"전문적인 마사지 실무 능력을 개발합니다.",
+course6Title:"고급 에스테틱 교육",course6Text:"제공되는 프로그램에 따라 고급 뷰티 및 에스테틱 교육을 진행합니다.",
+scholarshipEyebrow:"장학금",scholarshipTitle:"미래의 뷰티 전문가를 위한 기회",
+scholarshipText:"Medi Fella Beauty School은 전문적인 뷰티 기술을 배우고 뷰티 산업에서 커리어를 만들고자 하는 학생들을 위한 다양한 기회와 특별 프로그램을 제공합니다.",
+scholarshipButton:"장학금 문의",
+galleryEyebrow:"학생 생활",galleryTitle:"교육 • 실습 • 경험",
+galleryText:"갤러리에서는 수업, 실습, 학생 활동, 졸업식 및 학교의 다양한 활동을 소개합니다.",
+contactEyebrow:"문의하기",contactTitle:"Medi Fella Beauty School",
+address:"#S35, St. Silver, Tomnoubteuk, Boeung Keng Kang, Phnom Penh, Cambodia"
+}};
+
+function setLanguage(language){
+document.documentElement.lang=language;
+const texts=translations[language];
+document.querySelectorAll("[data-i18n]").forEach(element=>{
+const key=element.getAttribute("data-i18n");
+if(texts[key]) element.innerHTML=texts[key];
+});
+["km","en","ko"].forEach(code=>document.getElementById(code+"Btn").classList.remove("active"));
+document.getElementById(language+"Btn").classList.add("active");
+localStorage.setItem("language",language);
+}
+setLanguage(localStorage.getItem("language")||"en");
+</script>
+
 </body>
 </html>
