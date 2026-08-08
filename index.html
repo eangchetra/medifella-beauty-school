@@ -1,0 +1,110 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Medi Fella Beauty School</title>
+  <meta name="description" content="Medi Fella Beauty School — Professional beauty education in Cambodia.">
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+  <header class="nav">
+    <a class="brand" href="#home">
+      <img src="logo.jpeg" alt="Medi Fella Beauty School logo">
+      <span>Medi Fella Beauty School</span>
+    </a>
+    <button class="menu" onclick="document.querySelector('.links').classList.toggle('open')">☰</button>
+    <nav class="links">
+      <a href="#home">Home</a>
+      <a href="#about">About</a>
+      <a href="#courses">Courses</a>
+      <a href="#scholarship">Scholarship</a>
+      <a href="#gallery">Gallery</a>
+      <a href="#contact">Contact</a>
+    </nav>
+  </header>
+
+  <main>
+    <section id="home" class="hero">
+      <div class="hero-copy">
+        <p class="eyebrow">BEAUTY EDUCATION • CAMBODIA</p>
+        <h1>Learn Beauty.<br><span>Build Your Future.</span></h1>
+        <p>Professional beauty training designed to help students gain practical skills, confidence and knowledge for a successful beauty career.</p>
+        <div class="buttons">
+          <a class="btn primary" href="#courses">Explore Courses</a>
+          <a class="btn secondary" href="#contact">Register Now</a>
+        </div>
+      </div>
+      <div class="hero-logo">
+        <img src="logo.jpeg" alt="Medi Fella Beauty School">
+      </div>
+    </section>
+
+    <section id="about" class="section">
+      <p class="eyebrow">ABOUT US</p>
+      <h2>Professional Beauty Education</h2>
+      <p class="lead">Medi Fella Beauty School is dedicated to providing quality beauty education with a strong focus on practical training, professional techniques and business-ready skills.</p>
+      <div class="cards">
+        <div class="card"><b>🎓 Practical Training</b><p>Hands-on learning focused on real beauty-service techniques.</p></div>
+        <div class="card"><b>👩‍🏫 Professional Trainers</b><p>Learn through structured lessons, demonstrations and practice.</p></div>
+        <div class="card"><b>💼 Career & Business</b><p>Build skills that can support employment or your own beauty business.</p></div>
+      </div>
+    </section>
+
+    <section id="courses" class="section tinted">
+      <p class="eyebrow">OUR COURSES</p>
+      <h2>Beauty Training Programs</h2>
+      <div class="course-grid">
+        <article class="course"><span>01</span><h3>Beauty Therapy</h3><p>Professional facial and beauty-care fundamentals.</p><a href="#contact">Learn more →</a></article>
+        <article class="course"><span>02</span><h3>Advanced Skin Care</h3><p>Advanced techniques for modern skin-care services.</p><a href="#contact">Learn more →</a></article>
+        <article class="course"><span>03</span><h3>Beauty Device Training</h3><p>Practical training on professional beauty devices and techniques.</p><a href="#contact">Learn more →</a></article>
+        <article class="course"><span>04</span><h3>Professional Beauty Business</h3><p>Learn skills for working in or building a beauty business.</p><a href="#contact">Learn more →</a></article>
+      </div>
+      <p class="note">*Course names, duration and fees can be updated with your official information.</p>
+    </section>
+
+    <section id="scholarship" class="section scholarship">
+      <div>
+        <p class="eyebrow">SCHOLARSHIP</p>
+        <h2>Invest in Your Future</h2>
+        <p>Ask our admissions team about current scholarship opportunities, eligibility and application requirements.</p>
+        <a class="btn primary" href="#contact">Ask About Scholarship</a>
+      </div>
+      <div class="quote">“Learn today. Create your future.”</div>
+    </section>
+
+    <section id="gallery" class="section">
+      <p class="eyebrow">GALLERY</p>
+      <h2>School Life & Training</h2>
+      <div class="gallery">
+        <div>Training Photo</div><div>Students</div><div>Beauty Class</div><div>Graduation</div>
+      </div>
+      <p class="note">Replace these boxes with your school photos when ready.</p>
+    </section>
+
+    <section id="contact" class="section contact">
+      <div>
+        <p class="eyebrow">CONTACT US</p>
+        <h2>Start Your Beauty Career</h2>
+        <p>Contact Medi Fella Beauty School for course information, registration and scholarship details.</p>
+      </div>
+      <form onsubmit="event.preventDefault(); alert('Thank you! Please connect this form to your preferred registration service.');">
+        <input type="text" placeholder="Full name" required>
+        <input type="tel" placeholder="Phone / Telegram" required>
+        <input type="email" placeholder="Email">
+        <select><option>Select a course</option><option>Beauty Therapy</option><option>Advanced Skin Care</option><option>Beauty Device Training</option><option>Professional Beauty Business</option></select>
+        <button class="btn primary" type="submit">Send Registration</button>
+      </form>
+    </section>
+  </main>
+
+  <footer>
+    <img src="logo.jpeg" alt="Logo">
+    <div><b>Medi Fella Beauty School</b><br><small>Professional Beauty Education in Cambodia</small></div>
+    <div class="social">Facebook • TikTok • Telegram</div>
+  </footer>
+  <script>
+    document.querySelectorAll('.links a').forEach(a => a.addEventListener('click', () => document.querySelector('.links').classList.remove('open')));
+  </script>
+</body>
+</html>
