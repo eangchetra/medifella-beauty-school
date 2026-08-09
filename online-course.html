@@ -1,0 +1,901 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Online Courses | Medi Fella Beauty School</title>
+  <meta name="description" content="Medi Fella Beauty School online courses - lectures, quizzes, exams and certificates.">
+  <link rel="stylesheet" href="style.css?v=5">
+
+  <style>
+    /* =====================================================
+       MEDI FELLA ONLINE COURSE PAGE
+       Responsive: desktop / tablet / mobile
+       ===================================================== */
+
+    .online-page {
+      background: #f7f6f1;
+      min-height: 100vh;
+    }
+
+    .online-nav {
+      background: #063f45;
+      color: #fff;
+      padding: 12px 5%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .online-nav a {
+      color: #fff;
+      font-size: 12px;
+    }
+
+    .online-brand {
+      display: flex;
+      align-items: center;
+      gap: 10px;
+      font-family: Georgia, serif;
+      font-size: 18px;
+    }
+
+    .online-brand img {
+      width: 42px;
+      height: 42px;
+      object-fit: contain;
+      border-radius: 50%;
+    }
+
+    .online-languages {
+      display: flex;
+      gap: 5px;
+      flex-wrap: wrap;
+    }
+
+    .online-languages button {
+      border: 1px solid rgba(255,255,255,.45);
+      background: transparent;
+      color: #fff;
+      border-radius: 15px;
+      padding: 5px 9px;
+      cursor: pointer;
+      font-size: 10px;
+    }
+
+    .online-languages button.active {
+      background: #c8a15a;
+      border-color: #c8a15a;
+    }
+
+    .online-hero {
+      background:
+        linear-gradient(120deg, rgba(4,61,67,.96), rgba(7,94,102,.88)),
+        url("hero_training.jpg") center/cover;
+      color: #fff;
+      padding: 75px 7%;
+      display: grid;
+      grid-template-columns: 1.3fr .7fr;
+      gap: 50px;
+      align-items: center;
+    }
+
+    .online-hero .eyebrow {
+      color: #d7b66d;
+      font-size: 11px;
+      letter-spacing: 2px;
+      font-weight: bold;
+    }
+
+    .online-hero h1 {
+      font: 46px/1.2 Georgia, serif;
+      margin: 14px 0;
+    }
+
+    .online-hero p {
+      max-width: 650px;
+      color: #e1eeee;
+      line-height: 1.8;
+      font-size: 14px;
+    }
+
+    .online-hero-card {
+      background: rgba(255,255,255,.1);
+      border: 1px solid rgba(255,255,255,.25);
+      border-radius: 14px;
+      padding: 28px;
+      backdrop-filter: blur(5px);
+    }
+
+    .online-hero-card strong {
+      display: block;
+      font: 30px Georgia, serif;
+      color: #fff;
+      margin: 8px 0;
+    }
+
+    .online-hero-card span {
+      font-size: 11px;
+      color: #d9e7e7;
+    }
+
+    .online-container {
+      width: 86%;
+      max-width: 1400px;
+      margin: auto;
+      padding: 65px 0;
+    }
+
+    .online-title {
+      text-align: center;
+      margin-bottom: 35px;
+    }
+
+    .online-title span {
+      color: #c8a15a;
+      font-size: 11px;
+      letter-spacing: 2px;
+      font-weight: bold;
+    }
+
+    .online-title h2 {
+      font: 35px Georgia, serif;
+      color: #043d43;
+      margin: 10px 0;
+    }
+
+    .online-title p {
+      color: #687679;
+      font-size: 13px;
+    }
+
+    .course-list {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 22px;
+    }
+
+    .online-course-card {
+      background: #fff;
+      border-radius: 12px;
+      overflow: hidden;
+      border: 1px solid #e5e0d6;
+      box-shadow: 0 8px 25px rgba(0,0,0,.06);
+      transition: transform .2s, box-shadow .2s;
+    }
+
+    .online-course-card:hover {
+      transform: translateY(-4px);
+      box-shadow: 0 14px 30px rgba(0,0,0,.1);
+    }
+
+    .course-cover {
+      height: 190px;
+      overflow: hidden;
+      position: relative;
+    }
+
+    .course-cover img {
+      width: 100%;
+      height: 100%;
+      object-fit: cover;
+    }
+
+    .course-badge {
+      position: absolute;
+      top: 12px;
+      left: 12px;
+      background: #075e66;
+      color: #fff;
+      border-radius: 15px;
+      padding: 5px 9px;
+      font-size: 9px;
+      font-weight: bold;
+    }
+
+    .course-card-body {
+      padding: 20px;
+    }
+
+    .course-card-body .category {
+      color: #c8a15a;
+      font-size: 10px;
+      font-weight: bold;
+      letter-spacing: 1px;
+    }
+
+    .course-card-body h3 {
+      color: #043d43;
+      font-size: 19px;
+      margin: 8px 0;
+    }
+
+    .course-card-body p {
+      color: #687679;
+      font-size: 11px;
+      line-height: 1.7;
+      min-height: 55px;
+    }
+
+    .course-meta {
+      display: flex;
+      justify-content: space-between;
+      border-top: 1px solid #eee8dc;
+      padding-top: 14px;
+      margin-top: 14px;
+      color: #687679;
+      font-size: 10px;
+    }
+
+    .course-price {
+      color: #075e66;
+      font: bold 21px Georgia, serif;
+    }
+
+    .course-action {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      gap: 10px;
+      margin-top: 16px;
+    }
+
+    .course-action a {
+      flex: 1;
+      text-align: center;
+      border-radius: 20px;
+      padding: 10px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .btn-preview {
+      border: 1px solid #075e66;
+      color: #075e66;
+    }
+
+    .btn-buy {
+      background: #075e66;
+      color: #fff;
+    }
+
+    .learning-system {
+      margin-top: 70px;
+      background: #fff;
+      border-radius: 14px;
+      padding: 38px;
+      border: 1px solid #e5e0d6;
+    }
+
+    .learning-system h2 {
+      color: #043d43;
+      font: 28px Georgia, serif;
+      margin-top: 0;
+    }
+
+    .learning-steps {
+      display: grid;
+      grid-template-columns: repeat(5, 1fr);
+      gap: 15px;
+      margin-top: 25px;
+    }
+
+    .learning-step {
+      text-align: center;
+      padding: 20px 10px;
+      background: #f7f6f1;
+      border-radius: 10px;
+    }
+
+    .learning-step b {
+      width: 40px;
+      height: 40px;
+      display: grid;
+      place-items: center;
+      margin: auto;
+      border-radius: 50%;
+      background: #075e66;
+      color: #fff;
+      font-size: 14px;
+    }
+
+    .learning-step strong {
+      display: block;
+      color: #043d43;
+      margin-top: 10px;
+      font-size: 12px;
+    }
+
+    .learning-step span {
+      display: block;
+      color: #687679;
+      font-size: 9px;
+      margin-top: 5px;
+      line-height: 1.5;
+    }
+
+    .student-area {
+      margin-top: 35px;
+      background: #043d43;
+      color: #fff;
+      border-radius: 14px;
+      padding: 30px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 20px;
+    }
+
+    .student-area h2 {
+      margin: 0 0 8px;
+      font: 25px Georgia, serif;
+    }
+
+    .student-area p {
+      margin: 0;
+      color: #d5e3e3;
+      font-size: 11px;
+    }
+
+    .student-buttons {
+      display: flex;
+      gap: 10px;
+    }
+
+    .student-buttons a {
+      padding: 11px 18px;
+      border-radius: 22px;
+      font-size: 11px;
+      font-weight: bold;
+    }
+
+    .login-btn {
+      background: #fff;
+      color: #043d43;
+    }
+
+    .register-btn {
+      background: #c8a15a;
+      color: #fff;
+    }
+
+    .online-footer {
+      background: #052f35;
+      color: #fff;
+      text-align: center;
+      padding: 25px;
+      font-size: 10px;
+    }
+
+    /* Khmer mode: use Khmer OS Battambang */
+    html[lang="km"] .online-page,
+    html[lang="km"] .online-page h1,
+    html[lang="km"] .online-page h2,
+    html[lang="km"] .online-page h3,
+    html[lang="km"] .online-page p,
+    html[lang="km"] .online-page a,
+    html[lang="km"] .online-page span,
+    html[lang="km"] .online-page strong,
+    html[lang="km"] .online-page button,
+    html[lang="km"] .online-page div {
+      font-family: "Khmer OS Battambang", "Battambang", sans-serif !important;
+    }
+
+    @media (max-width: 1000px) {
+      .course-list {
+        grid-template-columns: repeat(2, 1fr);
+      }
+
+      .learning-steps {
+        grid-template-columns: repeat(3, 1fr);
+      }
+
+      .online-hero {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    @media (max-width: 700px) {
+      .online-nav {
+        flex-wrap: wrap;
+      }
+
+      .online-hero {
+        padding: 55px 6%;
+      }
+
+      .online-hero h1 {
+        font-size: 34px;
+      }
+
+      .online-container {
+        width: 90%;
+        padding: 50px 0;
+      }
+
+      .online-title h2 {
+        font-size: 28px;
+      }
+
+      .course-list {
+        grid-template-columns: 1fr;
+      }
+
+      .learning-system {
+        padding: 25px 18px;
+      }
+
+      .learning-steps {
+        grid-template-columns: 1fr 1fr;
+      }
+
+      .student-area {
+        display: block;
+      }
+
+      .student-buttons {
+        margin-top: 20px;
+        flex-direction: column;
+      }
+
+      .student-buttons a {
+        text-align: center;
+      }
+    }
+
+    @media (max-width: 420px) {
+      .learning-steps {
+        grid-template-columns: 1fr;
+      }
+
+      .online-hero h1 {
+        font-size: 29px;
+      }
+    }
+  </style>
+</head>
+
+<body class="online-page">
+
+<nav class="online-nav">
+  <a href="index.html" class="online-brand">
+    <img src="logo.jpeg" alt="Medi Fella">
+    <span>Medi Fella Beauty School</span>
+  </a>
+
+  <div class="online-languages">
+    <button class="active" data-lang="km" onclick="setOnlineLanguage('km')">ខ្មែរ</button>
+    <button data-lang="en" onclick="setOnlineLanguage('en')">English</button>
+    <button data-lang="ko" onclick="setOnlineLanguage('ko')">한국어</button>
+  </div>
+</nav>
+
+
+<section class="online-hero">
+
+  <div>
+    <div class="eyebrow" data-t="eyebrow">ONLINE BEAUTY EDUCATION</div>
+
+    <h1 data-t="heroTitle">
+      Learn Beauty Skills.<br>
+      Build Your Future.
+    </h1>
+
+    <p data-t="heroText">
+      Learn professional Korean-inspired beauty techniques online
+      from anywhere. Watch lectures, complete quizzes, take exams,
+      and earn your certificate.
+    </p>
+  </div>
+
+  <div class="online-hero-card">
+    <span data-t="learnAtYourPace">LEARN AT YOUR OWN PACE</span>
+    <strong>24/7</strong>
+    <span data-t="access">Course access anytime, anywhere</span>
+  </div>
+
+</section>
+
+
+<main class="online-container">
+
+  <div class="online-title">
+    <span data-t="available">ONLINE COURSES</span>
+    <h2 data-t="chooseCourse">Choose Your Professional Course</h2>
+    <p data-t="chooseText">
+      Purchase a course and learn step by step through lectures,
+      quizzes and a final examination.
+    </p>
+  </div>
+
+
+  <section class="course-list">
+
+    <!-- COURSE 1 -->
+    <article class="online-course-card">
+
+      <div class="course-cover">
+        <img src="course_skin_care.jpg" alt="Korean Skin Care Online Course">
+        <div class="course-badge" data-t="popular">POPULAR</div>
+      </div>
+
+      <div class="course-card-body">
+        <div class="category">KOREAN BEAUTY</div>
+
+        <h3 data-t="course1Title">
+          Korean Skin Care Professional
+        </h3>
+
+        <p data-t="course1Text">
+          Skin analysis, Korean facial techniques, skin care
+          protocols and professional treatment knowledge.
+        </p>
+
+        <div class="course-meta">
+          <span>12 Lessons • 12 Quizzes • 1 Exam</span>
+          <strong class="course-price">$99</strong>
+        </div>
+
+        <div class="course-action">
+          <a class="btn-preview" href="#" data-t="preview">Preview</a>
+          <a class="btn-buy" href="#" data-t="buy">BUY COURSE</a>
+        </div>
+      </div>
+
+    </article>
+
+
+    <!-- COURSE 2 -->
+    <article class="online-course-card">
+
+      <div class="course-cover">
+        <img src="course_body_face_massage.jpg" alt="Korean Massage Online Course">
+      </div>
+
+      <div class="course-card-body">
+        <div class="category">MASSAGE</div>
+
+        <h3 data-t="course2Title">
+          Korean Face & Body Massage
+        </h3>
+
+        <p data-t="course2Text">
+          Learn Korean-inspired facial and body massage techniques,
+          preparation and professional practice.
+        </p>
+
+        <div class="course-meta">
+          <span>10 Lessons • 10 Quizzes • 1 Exam</span>
+          <strong class="course-price">$79</strong>
+        </div>
+
+        <div class="course-action">
+          <a class="btn-preview" href="#" data-t="preview">Preview</a>
+          <a class="btn-buy" href="#" data-t="buy">BUY COURSE</a>
+        </div>
+      </div>
+
+    </article>
+
+
+    <!-- COURSE 3 -->
+    <article class="online-course-card">
+
+      <div class="course-cover">
+        <img src="course_advanced_laser.jpg" alt="Advanced Laser Online Course">
+      </div>
+
+      <div class="course-card-body">
+        <div class="category">AESTHETIC TECHNOLOGY</div>
+
+        <h3 data-t="course3Title">
+          Advanced Laser & Skin Rejuvenation
+        </h3>
+
+        <p data-t="course3Text">
+          Learn professional concepts of laser technology,
+          skin rejuvenation and treatment planning.
+        </p>
+
+        <div class="course-meta">
+          <span>15 Lessons • 15 Quizzes • 1 Exam</span>
+          <strong class="course-price">$129</strong>
+        </div>
+
+        <div class="course-action">
+          <a class="btn-preview" href="#" data-t="preview">Preview</a>
+          <a class="btn-buy" href="#" data-t="buy">BUY COURSE</a>
+        </div>
+      </div>
+
+    </article>
+
+
+    <!-- COURSE 4 -->
+    <article class="online-course-card">
+
+      <div class="course-cover">
+        <img src="course_makeup_pmu.jpg" alt="Makeup PMU Online Course">
+      </div>
+
+      <div class="course-card-body">
+        <div class="category">MAKEUP & PMU</div>
+
+        <h3 data-t="course4Title">
+          Professional Makeup & PMU
+        </h3>
+
+        <p data-t="course4Text">
+          Learn professional makeup concepts, design principles
+          and PMU theory.
+        </p>
+
+        <div class="course-meta">
+          <span>10 Lessons • 10 Quizzes • 1 Exam</span>
+          <strong class="course-price">$89</strong>
+        </div>
+
+        <div class="course-action">
+          <a class="btn-preview" href="#" data-t="preview">Preview</a>
+          <a class="btn-buy" href="#" data-t="buy">BUY COURSE</a>
+        </div>
+      </div>
+
+    </article>
+
+
+    <!-- COURSE 5 -->
+    <article class="online-course-card">
+
+      <div class="course-cover">
+        <img src="course_aesthetic_injection.jpg" alt="Aesthetic Beauty Online Course">
+      </div>
+
+      <div class="course-card-body">
+        <div class="category">AESTHETIC BEAUTY</div>
+
+        <h3 data-t="course5Title">
+          Aesthetic Beauty Professional
+        </h3>
+
+        <p data-t="course5Text">
+          Professional aesthetic concepts, client assessment,
+          treatment planning and safety principles.
+        </p>
+
+        <div class="course-meta">
+          <span>14 Lessons • 14 Quizzes • 1 Exam</span>
+          <strong class="course-price">$149</strong>
+        </div>
+
+        <div class="course-action">
+          <a class="btn-preview" href="#" data-t="preview">Preview</a>
+          <a class="btn-buy" href="#" data-t="buy">BUY COURSE</a>
+        </div>
+      </div>
+
+    </article>
+
+  </section>
+
+
+  <!-- HOW THE ONLINE SCHOOL WORKS -->
+  <section class="learning-system">
+
+    <div class="online-title">
+      <span data-t="how">HOW IT WORKS</span>
+      <h2 data-t="learningTitle">Your Online Learning Journey</h2>
+    </div>
+
+    <div class="learning-steps">
+
+      <div class="learning-step">
+        <b>1</b>
+        <strong data-t="step1">BUY COURSE</strong>
+        <span data-t="step1Text">Choose and purchase your course.</span>
+      </div>
+
+      <div class="learning-step">
+        <b>2</b>
+        <strong data-t="step2">LECTURES</strong>
+        <span data-t="step2Text">Watch video lessons and study materials.</span>
+      </div>
+
+      <div class="learning-step">
+        <b>3</b>
+        <strong data-t="step3">QUIZZES</strong>
+        <span data-t="step3Text">Complete quizzes after lessons.</span>
+      </div>
+
+      <div class="learning-step">
+        <b>4</b>
+        <strong data-t="step4">FINAL EXAM</strong>
+        <span data-t="step4Text">Complete the final examination.</span>
+      </div>
+
+      <div class="learning-step">
+        <b>5</b>
+        <strong data-t="step5">CERTIFICATE</strong>
+        <span data-t="step5Text">Pass and receive your certificate.</span>
+      </div>
+
+    </div>
+
+  </section>
+
+
+  <!-- STUDENT LOGIN -->
+  <section class="student-area">
+
+    <div>
+      <h2 data-t="studentTitle">Already a student?</h2>
+      <p data-t="studentText">
+        Login to continue your lessons, quizzes and exams.
+      </p>
+    </div>
+
+    <div class="student-buttons">
+      <a href="#" class="login-btn" data-t="login">STUDENT LOGIN</a>
+      <a href="#" class="register-btn" data-t="register">CREATE ACCOUNT</a>
+    </div>
+
+  </section>
+
+</main>
+
+
+<footer class="online-footer">
+  © 2026 Medi Fella Beauty School • Online Beauty Education
+</footer>
+
+
+<script>
+const onlineTranslations = {
+
+  km: {
+    eyebrow: "ការអប់រំសម្រស់តាមអនឡាញ",
+    heroTitle: "សិក្សាជំនាញសម្រស់។<br>កសាងអនាគតរបស់អ្នក។",
+    heroText: "សិក្សាបច្ចេកទេសសម្រស់តាមបែបកូរ៉េតាមអនឡាញ ពីគ្រប់ទីកន្លែង។ មើលមេរៀន ធ្វើ Quiz ប្រឡង និងទទួលបានវិញ្ញាបនបត្រ។",
+    learnAtYourPace: "សិក្សាតាមល្បឿនរបស់អ្នក",
+    access: "ចូលរៀនបានគ្រប់ពេល គ្រប់ទីកន្លែង",
+    available: "វគ្គសិក្សាអនឡាញ",
+    chooseCourse: "ជ្រើសរើសវគ្គសិក្សាជំនាញរបស់អ្នក",
+    chooseText: "ទិញវគ្គសិក្សា ហើយសិក្សាតាមជំហានតាមរយៈមេរៀន Quiz និងការប្រឡងចុងក្រោយ។",
+    popular: "ពេញនិយម",
+    course1Title: "ជំនាញថែរក្សាស្បែកបែបកូរ៉េ",
+    course1Text: "សិក្សាការវិភាគស្បែក បច្ចេកទេស Facial បែបកូរ៉េ និងចំណេះដឹងអំពីការព្យាបាលស្បែក។",
+    course2Title: "ម៉ាស្សាមុខ និងរាងកាយបែបកូរ៉េ",
+    course2Text: "រៀនបច្ចេកទេសម៉ាស្សាមុខ និងរាងកាយតាមបែបកូរ៉េ និងការអនុវត្តប្រកបដោយវិជ្ជាជីវៈ។",
+    course3Title: "ឡាស៊ែរ និងការស្តារស្បែកកម្រិតខ្ពស់",
+    course3Text: "សិក្សាគោលការណ៍បច្ចេកវិទ្យាឡាស៊ែរ ការស្តារស្បែក និងការរៀបចំផែនការព្យាបាល។",
+    course4Title: "តុបតែងមុខ និង PMU ជំនាញ",
+    course4Text: "សិក្សាគោលការណ៍តុបតែងមុខ ការរចនា និងទ្រឹស្តី PMU។",
+    course5Title: "សោភ័ណភាពជំនាញ",
+    course5Text: "សិក្សាការវាយតម្លៃអតិថិជន ការរៀបចំផែនការព្យាបាល និងគោលការណ៍សុវត្ថិភាព។",
+    preview: "មើលជាមុន",
+    buy: "ទិញវគ្គសិក្សា",
+    how: "របៀបសិក្សា",
+    learningTitle: "ដំណើរការសិក្សាអនឡាញរបស់អ្នក",
+    step1: "ទិញវគ្គសិក្សា",
+    step1Text: "ជ្រើសរើស និងទិញវគ្គសិក្សា។",
+    step2: "មេរៀន",
+    step2Text: "មើលវីដេអូមេរៀន និងឯកសារសិក្សា។",
+    step3: "QUIZ",
+    step3Text: "ធ្វើ Quiz បន្ទាប់ពីមេរៀន។",
+    step4: "ការប្រឡងចុងក្រោយ",
+    step4Text: "ធ្វើការប្រឡងចុងក្រោយ។",
+    step5: "វិញ្ញាបនបត្រ",
+    step5Text: "ប្រឡងជាប់ និងទទួលបានវិញ្ញាបនបត្រ។",
+    studentTitle: "អ្នកជាសិស្សរួចហើយមែនទេ?",
+    studentText: "ចូលគណនីដើម្បីបន្តមេរៀន Quiz និងការប្រឡង។",
+    login: "ចូលគណនីសិស្ស",
+    register: "បង្កើតគណនី"
+  },
+
+  en: {
+    eyebrow: "ONLINE BEAUTY EDUCATION",
+    heroTitle: "Learn Beauty Skills.<br>Build Your Future.",
+    heroText: "Learn professional Korean-inspired beauty techniques online from anywhere. Watch lectures, complete quizzes, take exams, and earn your certificate.",
+    learnAtYourPace: "LEARN AT YOUR OWN PACE",
+    access: "Course access anytime, anywhere",
+    available: "ONLINE COURSES",
+    chooseCourse: "Choose Your Professional Course",
+    chooseText: "Purchase a course and learn step by step through lectures, quizzes and a final examination.",
+    popular: "POPULAR",
+    course1Title: "Korean Skin Care Professional",
+    course1Text: "Skin analysis, Korean facial techniques, skin care protocols and professional treatment knowledge.",
+    course2Title: "Korean Face & Body Massage",
+    course2Text: "Learn Korean-inspired facial and body massage techniques, preparation and professional practice.",
+    course3Title: "Advanced Laser & Skin Rejuvenation",
+    course3Text: "Learn professional concepts of laser technology, skin rejuvenation and treatment planning.",
+    course4Title: "Professional Makeup & PMU",
+    course4Text: "Learn professional makeup concepts, design principles and PMU theory.",
+    course5Title: "Aesthetic Beauty Professional",
+    course5Text: "Professional aesthetic concepts, client assessment, treatment planning and safety principles.",
+    preview: "Preview",
+    buy: "BUY COURSE",
+    how: "HOW IT WORKS",
+    learningTitle: "Your Online Learning Journey",
+    step1: "BUY COURSE",
+    step1Text: "Choose and purchase your course.",
+    step2: "LECTURES",
+    step2Text: "Watch video lessons and study materials.",
+    step3: "QUIZZES",
+    step3Text: "Complete quizzes after lessons.",
+    step4: "FINAL EXAM",
+    step4Text: "Complete the final examination.",
+    step5: "CERTIFICATE",
+    step5Text: "Pass and receive your certificate.",
+    studentTitle: "Already a student?",
+    studentText: "Login to continue your lessons, quizzes and exams.",
+    login: "STUDENT LOGIN",
+    register: "CREATE ACCOUNT"
+  },
+
+  ko: {
+    eyebrow: "온라인 뷰티 교육",
+    heroTitle: "뷰티 기술을 배우고<br>미래를 디자인하세요.",
+    heroText: "어디서나 온라인으로 한국식 전문 뷰티 기술을 배워보세요. 강의를 보고 퀴즈와 시험을 완료하면 수료증을 받을 수 있습니다.",
+    learnAtYourPace: "내 속도에 맞춰 학습",
+    access: "언제 어디서나 강의 이용",
+    available: "온라인 과정",
+    chooseCourse: "전문 뷰티 과정을 선택하세요",
+    chooseText: "과정을 구매하고 강의, 퀴즈, 최종 시험을 단계별로 학습하세요.",
+    popular: "인기 과정",
+    course1Title: "한국식 피부관리 전문가",
+    course1Text: "피부 분석, 한국식 페이셜 테크닉, 피부관리 프로토콜 및 전문 관리 지식을 배웁니다.",
+    course2Title: "한국식 얼굴 & 바디 마사지",
+    course2Text: "한국식 얼굴 및 바디 마사지 기술과 준비 과정, 실무 방법을 배웁니다.",
+    course3Title: "고급 레이저 & 피부재생",
+    course3Text: "레이저 기술, 피부재생 및 전문적인 트리트먼트 계획의 기본을 배웁니다.",
+    course4Title: "전문 메이크업 & PMU",
+    course4Text: "전문 메이크업의 기본, 디자인 원칙 및 PMU 이론을 배웁니다.",
+    course5Title: "에스테틱 뷰티 전문가",
+    course5Text: "고객 분석, 트리트먼트 계획 및 안전 원칙 등 전문 에스테틱 지식을 배웁니다.",
+    preview: "미리보기",
+    buy: "과정 구매",
+    how: "학습 방법",
+    learningTitle: "온라인 학습 과정",
+    step1: "과정 구매",
+    step1Text: "원하는 과정을 선택하고 구매합니다.",
+    step2: "강의",
+    step2Text: "영상 강의와 학습 자료를 확인합니다.",
+    step3: "퀴즈",
+    step3Text: "각 강의 후 퀴즈를 완료합니다.",
+    step4: "최종 시험",
+    step4Text: "최종 시험을 완료합니다.",
+    step5: "수료증",
+    step5Text: "합격 후 수료증을 받습니다.",
+    studentTitle: "이미 학생이신가요?",
+    studentText: "로그인하여 강의, 퀴즈 및 시험을 계속하세요.",
+    login: "학생 로그인",
+    register: "계정 만들기"
+  }
+};
+
+function setOnlineLanguage(lang) {
+  document.documentElement.lang = lang;
+
+  document.querySelectorAll("[data-t]").forEach(function(el) {
+    const key = el.dataset.t;
+    if (onlineTranslations[lang] && onlineTranslations[lang][key]) {
+      el.innerHTML = onlineTranslations[lang][key];
+    }
+  });
+
+  document.querySelectorAll(".online-languages button").forEach(function(btn) {
+    btn.classList.toggle("active", btn.dataset.lang === lang);
+  });
+
+  localStorage.setItem("medifellaOnlineLanguage", lang);
+}
+
+document.addEventListener("DOMContentLoaded", function() {
+  const saved = localStorage.getItem("medifellaOnlineLanguage") || "km";
+  setOnlineLanguage(saved);
+});
+</script>
+
+</body>
+</html>
