@@ -1,34 +1,254 @@
-/* Medi Fella Beauty School - Khmer OS Battambang Font */
+/* Medi Fella Beauty School - corrected stylesheet */
 
 @import url('https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&display=swap');
 
-/* Khmer text */
 .khmer,
 .khmer-text,
 [lang="km"] {
-    font-family: "Battambang", sans-serif !important;
-:root{--teal:#075e66;--deep:#043d43;--gold:#c8a15a;--cream:#f7f5ef;--ink:#172b30;--muted:#687679;--line:#e5e0d6}
-*{box-sizing:border-box}html{scroll-behavior:smooth}body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:#fff}a{text-decoration:none}.top-strip{height:38px;background:#05373d;color:#fff;padding:8px 4%;display:flex;gap:25px;font-size:12px}.follow{margin-left:auto}.header{height:92px;display:flex;align-items:center;justify-content:space-between;padding:0 4%;background:#fff;border-bottom:1px solid #eee;position:sticky;top:0;z-index:10}.brand{display:flex;align-items:center;gap:12px;color:var(--deep)}.brand img{width:62px;height:62px;object-fit:contain}.brand-name{font:27px Georgia,serif}.brand-sub{letter-spacing:3px;font-size:11px;color:var(--teal)}.brand-kh{font-size:8px;color:#999;margin-top:3px}.nav-links{display:flex;align-items:center;gap:25px}.nav-links>a{font-size:12px;text-align:center;color:#26383c;line-height:1.2}.nav-links small{font-size:9px;color:#777}.nav-links .active{color:var(--teal);border-bottom:2px solid var(--teal);padding-bottom:10px}.enroll{background:var(--teal);color:#fff!important;border-radius:24px;padding:10px 18px}.enroll small{color:#fff}.hamburger{display:none;border:0;background:none;font-size:26px}.hero{min-height:570px;display:grid;grid-template-columns:45% 55%;background:linear-gradient(120deg,#faf9f5 0%,#fff 52%,#e9f1ef 100%)}.hero-copy{padding:65px 7% 45px 8%;display:flex;flex-direction:column;justify-content:center}.gold-label,.section-title>div>span,.about-copy>span,.scholarship>div>span,.verify>div>span,.contact>div>span{color:var(--gold);font-size:12px;letter-spacing:2px;font-weight:bold}.hero h1{font:48px/1.12 Georgia,serif;margin:18px 0;color:#172b30}.hero h1 span{color:var(--teal)}.kr-copy{font-size:14px;color:#59686b;line-height:1.8}.en-tag{letter-spacing:2px;font-size:12px;margin-top:10px}.hero-buttons{display:flex;gap:14px;margin:18px 0 25px}.btn{display:inline-block;border-radius:25px;padding:12px 22px;font-size:12px;font-weight:bold}.filled{background:var(--teal);color:#fff;border:1px solid var(--teal)}.outline{border:1px solid var(--teal);color:var(--teal);background:#fff}.gold{background:var(--gold);color:#fff}.light{background:#fff;color:var(--deep)}.feature-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.feature-row div{font-size:9px}.feature-row b{font-size:20px;color:var(--teal);display:block;margin-bottom:4px}.feature-row strong{font-size:9px}.feature-row small{display:block;color:#777;margin-top:4px}.hero-visual{display:grid;grid-template-columns:1fr 230px}.training-photo{min-height:570px;position:relative;background:linear-gradient(135deg,#dbe8e4,#fff 65%,#d6e7e3);overflow:hidden}.training-photo:before{content:"";position:absolute;inset:0;background:radial-gradient(circle at 65% 38%,rgba(255,255,255,.95),transparent 35%),linear-gradient(120deg,transparent 45%,rgba(255,255,255,.55));}.photo-overlay{position:absolute;inset:auto 30px 40px;text-align:center;color:#28535a;background:rgba(255,255,255,.82);padding:16px;border-radius:8px}.photo-overlay span{font:30px Georgia,serif;display:block}.photo-overlay small{letter-spacing:2px;color:var(--gold)}.photo-overlay em{display:block;font-size:10px;color:#888;margin-top:8px}.hero-side{background:linear-gradient(160deg,#075f67,#043d43);color:#fff;padding:45px 20px;text-align:center;display:flex;align-items:center;flex-direction:column;justify-content:center}.hero-side img{width:100px;height:100px;object-fit:contain;border-radius:50%}.hero-side h2{font:22px/1.15 Georgia,serif}.hero-side p{font-size:11px}.side-line{width:55px;border-top:2px solid var(--gold);margin:10px}.hero-side .quote{font-family:Georgia,serif}.hero-side strong{font-size:10px;letter-spacing:1px}.slide-number{margin-top:40px;font-size:10px;color:var(--gold2)}.slide-number span{letter-spacing:0}.stats{width:86%;margin:0 auto;transform:translateY(-22px);position:relative;z-index:2;background:#fff;border-radius:10px;box-shadow:0 12px 35px rgba(0,0,0,.1);display:grid;grid-template-columns:repeat(4,1fr);padding:22px}.stats>div{display:flex;align-items:center;justify-content:center;gap:13px;border-right:1px solid var(--line)}.stats>div:last-child{border:0}.stats b{font-size:27px;color:var(--gold)}.stats strong{font:30px Georgia,serif;color:var(--teal)}.stats span{font-size:9px;color:#697678}.section{padding:80px 7%;max-width:1450px;margin:auto}.section-title{display:grid;grid-template-columns:1fr 1fr auto;gap:30px;align-items:end;margin-bottom:32px}.section-title h2,.about h2,.scholarship h2,.verify h2,.contact h2{font:34px/1.15 Georgia,serif;color:var(--deep);margin:9px 0}.section-title p{font-size:12px;color:var(--muted);line-height:1.8}.section-title>a{border:1px solid #9eb1b2;border-radius:22px;padding:9px 18px;font-size:11px;color:var(--teal)}.courses-section{max-width:none;background:#fbfaf7}.course-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}.course-grid article{background:#fff;border:1px solid #e6e1d8;box-shadow:0 4px 15px rgba(0,0,0,.03)}.course-art{height:150px;display:grid;place-items:center;font:26px Georgia,serif;color:#fff;letter-spacing:2px}.art1{background:linear-gradient(135deg,#c5dcd6,#5b9a98)}.art2{background:linear-gradient(135deg,#e4c9b7,#9c7c69)}.art3{background:linear-gradient(135deg,#d7e0e4,#65828b)}.art4{background:linear-gradient(135deg,#dfc7ad,#a57d5e)}.art5{background:linear-gradient(135deg,#d6c6ba,#7e6b64)}.course-body{padding:15px}.course-body small{color:var(--teal);font-weight:bold}.course-body h3{font-size:14px;margin:6px 0}.course-body p{font-size:10px;color:var(--muted);line-height:1.6}.about{display:grid;grid-template-columns:35% 65%;gap:45px}.about-copy>span{display:block}.about-copy ul{padding:0;list-style:none;font-size:13px;line-height:2.2;color:#4d5d60}.about-visual{display:grid;grid-template-columns:1.4fr .7fr .9fr;gap:8px}.school-photo,.small-photo{min-height:260px;background:linear-gradient(145deg,#d9e5e1,#f4eee4);display:grid;place-items:center;text-align:center;font:23px Georgia,serif;color:#426066}.small-photo{font-size:16px}.education-card{background:var(--deep);color:#fff;padding:25px}.education-card span{font-size:9px;color:var(--gold)}.education-card h3{font-size:21px;line-height:1.3}.education-card p{font-size:10px;border-bottom:1px solid rgba(255,255,255,.15);padding-bottom:7px}.scholarship{max-width:none;background:linear-gradient(120deg,var(--deep),#08737a);color:#fff;display:flex;justify-content:space-between;align-items:center}.scholarship h2{color:#fff}.scholarship p{font-size:13px;color:#d6e5e5}.scholarship-mark{font:42px Georgia,serif;letter-spacing:5px;text-align:right;color:rgba(255,255,255,.2)}.gallery-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}.gallery-grid div{height:200px;display:grid;place-items:center;background:linear-gradient(135deg,#e0e9e5,#f7f2e9);color:#607174;font:18px Georgia,serif}.verify{margin:0 7% 70px;padding:35px 45px;background:var(--deep);color:#fff;border-radius:12px;display:flex;align-items:center;justify-content:space-between}.verify h2{color:#fff}.verify p{font-size:12px;color:#d2e0e1}.contact{background:#faf9f5;max-width:none;display:grid;grid-template-columns:1fr 1fr;gap:70px}.contact>div>span{display:block}.contact p{color:var(--muted);font-size:13px}.contact form{display:grid;gap:10px}.contact input,.contact select{padding:13px;border:1px solid #ddd7ca;border-radius:7px;font:inherit;background:#fff}.contact button{border:0}.footer-brand{display:flex;align-items:center;gap:12px}.footer-brand img{width:60px;height:60px;object-fit:contain}.footer-brand strong{font:21px Georgia,serif}.footer-brand small{font-size:9px;letter-spacing:2px;color:#b9cccc}footer{background:#052f35;color:#fff;padding:40px 7%;display:grid;grid-template-columns:2fr 1fr 1fr;gap:30px;font-size:12px;line-height:2}.copyright{grid-column:1/-1;text-align:center;color:#8ea9aa;border-top:1px solid rgba(255,255,255,.1);padding-top:15px}@media(max-width:1050px){.nav-links{gap:12px}.hero h1{font-size:40px}.course-grid{grid-template-columns:repeat(3,1fr)}.section-title{grid-template-columns:1fr 1fr}.section-title>a{justify-self:start}.about{grid-template-columns:1fr}.about-visual{grid-template-columns:1fr 1fr 1fr}}@media(max-width:760px){.top-strip{display:none}.header{height:72px}.hamburger{display:block}.nav-links{display:none;position:absolute;top:72px;left:0;right:0;background:#fff;padding:20px;flex-direction:column;align-items:stretch;box-shadow:0 12px 25px rgba(0,0,0,.1)}.nav-links.open{display:flex}.nav-links>a{text-align:left;padding:8px}.hero{grid-template-columns:1fr}.hero-copy{padding:55px 7%}.hero-visual{grid-template-columns:1fr}.hero-side{display:none}.training-photo{min-height:350px}.feature-row{grid-template-columns:1fr 1fr}.stats{grid-template-columns:1fr 1fr;width:90%}.stats>div{border:0}.section-title{display:block}.section-title>p{margin:12px 0}.course-grid{grid-template-columns:1fr 1fr}.gallery-grid{grid-template-columns:1fr 1fr}.verify{margin:0 7% 55px;display:block}.verify .btn{margin-top:15px}.contact{grid-template-columns:1fr}.scholarship{display:block}.scholarship-mark{margin-top:30px;text-align:left}.about-visual{grid-template-columns:1fr}}@media(max-width:480px){.brand-name{font-size:20px}.brand img{width:48px;height:48px}.hero h1{font-size:36px}.course-grid,.gallery-grid{grid-template-columns:1fr}.stats{grid-template-columns:1fr}.stats>div{border-bottom:1px solid var(--line);padding:10px}.section{padding:60px 6%}footer{grid-template-columns:1fr}}
+  font-family: "Battambang", sans-serif !important;
+}
 
-/* ===== TEMPLATE PHOTOS ===== */
+:root{
+  --teal:#075e66;
+  --deep:#043d43;
+  --gold:#c8a15a;
+  --cream:#f7f5ef;
+  --ink:#172b30;
+  --muted:#687679;
+  --line:#e5e0d6;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:#fff}
+a{text-decoration:none}
+
+.top-strip{
+  height:38px;background:#05373d;color:#fff;padding:8px 4%;
+  display:flex;gap:25px;font-size:12px
+}
+.follow{margin-left:auto}
+
+.header{
+  height:92px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 4%;background:#fff;border-bottom:1px solid #eee;
+  position:sticky;top:0;z-index:10
+}
+
+.brand{display:flex;align-items:center;gap:12px;color:var(--deep)}
+.brand img{width:62px;height:62px;object-fit:contain}
+.brand-name{font:27px Georgia,serif}
+.brand-sub{letter-spacing:3px;font-size:11px;color:var(--teal)}
+.brand-kh{font-size:8px;color:#999;margin-top:3px}
+
+.nav-links{display:flex;align-items:center;gap:25px}
+.nav-links>a{font-size:12px;text-align:center;color:#26383c;line-height:1.2}
+.nav-links small{font-size:9px;color:#777}
+.nav-links .active{color:var(--teal);border-bottom:2px solid var(--teal);padding-bottom:10px}
+.enroll{background:var(--teal);color:#fff!important;border-radius:24px;padding:10px 18px}
+.enroll small{color:#fff}
+.hamburger{display:none;border:0;background:none;font-size:26px}
+
+.hero{
+  min-height:570px;display:grid;grid-template-columns:45% 55%;
+  background:linear-gradient(120deg,#faf9f5 0%,#fff 52%,#e9f1ef 100%)
+}
+.hero-copy{
+  padding:65px 7% 45px 8%;display:flex;flex-direction:column;justify-content:center
+}
+.gold-label,.section-title>div>span,.about-copy>span,.scholarship>div>span,.verify>div>span,.contact>div>span{
+  color:var(--gold);font-size:12px;letter-spacing:2px;font-weight:bold
+}
+.hero h1{font:48px/1.12 Georgia,serif;margin:18px 0;color:#172b30}
+.hero h1 span{color:var(--teal)}
+.kr-copy{font-size:14px;color:#59686b;line-height:1.8}
+.en-tag{letter-spacing:2px;font-size:12px;margin-top:10px}
+.hero-buttons{display:flex;gap:14px;margin:18px 0 25px}
+
+.btn{display:inline-block;border-radius:25px;padding:12px 22px;font-size:12px;font-weight:bold}
+.filled{background:var(--teal);color:#fff;border:1px solid var(--teal)}
+.outline{border:1px solid var(--teal);color:var(--teal);background:#fff}
+.gold{background:var(--gold);color:#fff}
+.light{background:#fff;color:var(--deep)}
+
+.feature-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.feature-row div{font-size:9px}
+.feature-row b{font-size:20px;color:var(--teal);display:block;margin-bottom:4px}
+.feature-row strong{font-size:9px}
+.feature-row small{display:block;color:#777;margin-top:4px}
+
+.hero-visual{display:grid;grid-template-columns:1fr 230px}
+.training-photo{
+  min-height:570px;position:relative;background:#e9f1ef;overflow:hidden
+}
 .training-photo img{
-  width:100%;
-  height:100%;
-  min-height:570px;
-  object-fit:cover;
-  display:block;
+  width:100%;height:100%;min-height:570px;object-fit:cover;display:block
 }
-.course-art{
-  height:150px;
-  overflow:hidden;
-  background:#eee;
+.hero-side{
+  background:linear-gradient(160deg,#075f67,#043d43);color:#fff;
+  padding:45px 20px;text-align:center;display:flex;align-items:center;
+  flex-direction:column;justify-content:center
 }
-.course-art img{
-  width:100%;
-  height:100%;
-  object-fit:cover;
-  display:block;
+.hero-side img{width:100px;height:100px;object-fit:contain;border-radius:50%}
+.hero-side h2{font:22px/1.15 Georgia,serif}
+.hero-side p{font-size:11px}
+.side-line{width:55px;border-top:2px solid var(--gold);margin:10px}
+.hero-side .quote{font-family:Georgia,serif}
+.hero-side strong{font-size:10px;letter-spacing:1px}
+.slide-number{margin-top:40px;font-size:10px;color:var(--gold)}
+.slide-number span{letter-spacing:0}
+
+.stats{
+  width:86%;margin:0 auto;transform:translateY(-22px);position:relative;z-index:2;
+  background:#fff;border-radius:10px;box-shadow:0 12px 35px rgba(0,0,0,.1);
+  display:grid;grid-template-columns:repeat(4,1fr);padding:22px
 }
+.stats>div{
+  display:flex;align-items:center;justify-content:center;gap:13px;
+  border-right:1px solid var(--line)
+}
+.stats>div:last-child{border:0}
+.stats b{font-size:27px;color:var(--gold)}
+.stats strong{font:30px Georgia,serif;color:var(--teal)}
+.stats span{font-size:9px;color:#697678}
+
+.section{padding:80px 7%;max-width:1450px;margin:auto}
+.section-title{
+  display:grid;grid-template-columns:1fr 1fr auto;gap:30px;
+  align-items:end;margin-bottom:32px
+}
+.section-title h2,.about h2,.scholarship h2,.verify h2,.contact h2{
+  font:34px/1.15 Georgia,serif;color:var(--deep);margin:9px 0
+}
+.section-title p{font-size:12px;color:var(--muted);line-height:1.8}
+.section-title>a{
+  border:1px solid #9eb1b2;border-radius:22px;padding:9px 18px;
+  font-size:11px;color:var(--teal)
+}
+
+.courses-section{max-width:none;background:#fbfaf7}
+.course-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.course-grid article{background:#fff;border:1px solid #e6e1d8;box-shadow:0 4px 15px rgba(0,0,0,.03)}
+.course-art{height:150px;overflow:hidden;background:#eee}
+.course-art img{width:100%;height:100%;object-fit:cover;display:block}
+.course-body{padding:15px}
+.course-body small{color:var(--teal);font-weight:bold}
+.course-body h3{font-size:14px;margin:6px 0}
+.course-body p{font-size:10px;color:var(--muted);line-height:1.6}
+
+.about{display:grid;grid-template-columns:35% 65%;gap:45px}
+.about-copy>span{display:block}
+.about-copy ul{padding:0;list-style:none;font-size:13px;line-height:2.2;color:#4d5d60}
+.about-visual{display:grid;grid-template-columns:1.4fr .7fr .9fr;gap:8px}
+.school-photo,.small-photo{
+  min-height:260px;background:linear-gradient(145deg,#d9e5e1,#f4eee4);
+  display:grid;place-items:center;text-align:center;font:23px Georgia,serif;color:#426066
+}
+.small-photo{font-size:16px}
+.education-card{background:var(--deep);color:#fff;padding:25px}
+.education-card span{font-size:9px;color:var(--gold)}
+.education-card h3{font-size:21px;line-height:1.3}
+.education-card p{font-size:10px;border-bottom:1px solid rgba(255,255,255,.15);padding-bottom:7px}
+
+.scholarship{
+  max-width:none;background:linear-gradient(120deg,var(--deep),#08737a);
+  color:#fff;display:flex;justify-content:space-between;align-items:center
+}
+.scholarship h2{color:#fff}
+.scholarship p{font-size:13px;color:#d6e5e5}
+.scholarship-mark{
+  font:42px Georgia,serif;letter-spacing:5px;text-align:right;color:rgba(255,255,255,.2)
+}
+
+.gallery-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.gallery-grid div{
+  height:200px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#e0e9e5,#f7f2e9);
+  color:#607174;font:18px Georgia,serif
+}
+
+.verify{
+  margin:0 7% 70px;padding:35px 45px;background:var(--deep);color:#fff;
+  border-radius:12px;display:flex;align-items:center;justify-content:space-between
+}
+.verify h2{color:#fff}
+.verify p{font-size:12px;color:#d2e0e1}
+
+.contact{
+  background:#faf9f5;max-width:none;display:grid;grid-template-columns:1fr 1fr;gap:70px
+}
+.contact>div>span{display:block}
+.contact p{color:var(--muted);font-size:13px}
+.contact form{display:grid;gap:10px}
+.contact input,.contact select{
+  padding:13px;border:1px solid #ddd7ca;border-radius:7px;
+  font:inherit;background:#fff
+}
+.contact button{border:0}
+
+.footer-brand{display:flex;align-items:center;gap:12px}
+.footer-brand img{width:60px;height:60px;object-fit:contain}
+.footer-brand strong{font:21px Georgia,serif}
+.footer-brand small{font-size:9px;letter-spacing:2px;color:#b9cccc}
+
+footer{
+  background:#052f35;color:#fff;padding:40px 7%;display:grid;
+  grid-template-columns:2fr 1fr 1fr;gap:30px;font-size:12px;line-height:2
+}
+.copyright{
+  grid-column:1/-1;text-align:center;color:#8ea9aa;
+  border-top:1px solid rgba(255,255,255,.1);padding-top:15px
+}
+
+@media(max-width:1050px){
+  .nav-links{gap:12px}
+  .hero h1{font-size:40px}
+  .course-grid{grid-template-columns:repeat(3,1fr)}
+  .section-title{grid-template-columns:1fr 1fr}
+  .section-title>a{justify-self:start}
+  .about{grid-template-columns:1fr}
+  .about-visual{grid-template-columns:1fr 1fr 1fr}
+}
+
 @media(max-width:760px){
+  .top-strip{display:none}
+  .header{height:72px}
+  .hamburger{display:block}
+  .nav-links{
+    display:none;position:absolute;top:72px;left:0;right:0;background:#fff;
+    padding:20px;flex-direction:column;align-items:stretch;
+    box-shadow:0 12px 25px rgba(0,0,0,.1)
+  }
+  .nav-links.open{display:flex}
+  .nav-links>a{text-align:left;padding:8px}
+  .hero{grid-template-columns:1fr}
+  .hero-copy{padding:55px 7%}
+  .hero-visual{grid-template-columns:1fr}
+  .hero-side{display:none}
+  .training-photo{min-height:350px}
   .training-photo img{min-height:350px}
+  .feature-row{grid-template-columns:1fr 1fr}
+  .stats{grid-template-columns:1fr 1fr;width:90%}
+  .stats>div{border:0}
+  .section-title{display:block}
+  .section-title>p{margin:12px 0}
+  .course-grid{grid-template-columns:1fr 1fr}
+  .gallery-grid{grid-template-columns:1fr 1fr}
+  .verify{margin:0 7% 55px;display:block}
+  .verify .btn{margin-top:15px}
+  .contact{grid-template-columns:1fr}
+  .scholarship{display:block}
+  .scholarship-mark{margin-top:30px;text-align:left}
+  .about-visual{grid-template-columns:1fr}
+}
+
+@media(max-width:480px){
+  .brand-name{font-size:20px}
+  .brand img{width:48px;height:48px}
+  .hero h1{font-size:36px}
+  .course-grid,.gallery-grid{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr}
+  .stats>div{border-bottom:1px solid var(--line);padding:10px}
+  .section{padding:60px 6%}
+  footer{grid-template-columns:1fr}
 }
