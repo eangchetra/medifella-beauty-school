@@ -16,6 +16,44 @@
     .online-course-link small {
       color: #075e66 !important;
     }
+
+    .language-switcher {
+      display: flex;
+      align-items: center;
+      gap: 5px;
+      flex-wrap: nowrap;
+    }
+
+    .language-switcher button {
+      border: 1px solid #d7d2c7;
+      background: #fff;
+      color: #334b4f;
+      border-radius: 18px;
+      padding: 6px 9px;
+      font-size: 11px;
+      line-height: 1;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .language-switcher button.selected {
+      background: #075e66;
+      color: #fff;
+      border-color: #075e66;
+    }
+
+    @media (max-width: 900px) {
+      .language-switcher {
+        flex-wrap: wrap;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .language-switcher button {
+        padding: 7px 10px;
+        font-size: 10px;
+      }
+    }
   </style>
 </head>
 
@@ -45,10 +83,10 @@
     <a href="#gallery">វិចិត្រសាល<br><small>GALLERY</small></a>
     <a href="#contact">ទំនាក់ទំនង<br><small>CONTACT</small></a>
 
-    <div class="language-switcher">
-      <button onclick="setLanguage('km')">ខ្មែរ</button>
-      <button onclick="setLanguage('en')">English</button>
-      <button onclick="setLanguage('ko')">한국어</button>
+    <div class="language-switcher" aria-label="Language selection">
+      <button type="button" onclick="setLanguage('km')" data-lang="km">ខ្មែរ</button>
+      <button type="button" onclick="setLanguage('en')" data-lang="en">English</button>
+      <button type="button" onclick="setLanguage('ko')" data-lang="ko">한국어</button>
     </div>
 
     <a class="enroll" href="#contact">ចុះឈ្មោះឥឡូវនេះ<br><small>ENROLL NOW →</small></a>
@@ -670,19 +708,10 @@ function setLanguage(lang) {
   document
     .querySelectorAll(".language-switcher button")
     .forEach(button => {
-
-      button.classList.remove("selected");
-
-      if (
-        (lang === "km" && button.textContent.trim() === "ខ្មែរ") ||
-        (lang === "en" && button.textContent.trim() === "English") ||
-        (lang === "ko" && button.textContent.trim() === "한국어")
-      ) {
-
-        button.classList.add("selected");
-
-      }
-
+      button.classList.toggle(
+        "selected",
+        button.dataset.lang === lang
+      );
     });
 
 }
