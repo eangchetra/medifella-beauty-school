@@ -1,136 +1,506 @@
 <!DOCTYPE html>
 <html lang="en">
 <head>
-<meta charset="UTF-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Student Login | Medi Fella Beauty School</title>
-<link rel="stylesheet" href="student.css">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Student Login | Medi Fella Beauty School</title>
+
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+
+  <style>
+    * { box-sizing: border-box; }
+    body {
+      margin: 0;
+      min-height: 100vh;
+      font-family: Arial, sans-serif;
+      background: linear-gradient(135deg, #064b4b, #0c7770);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      padding: 20px;
+    }
+    .auth-card {
+      width: 100%;
+      max-width: 440px;
+      background: rgba(255,255,255,.97);
+      border-radius: 24px;
+      padding: 30px;
+      box-shadow: 0 20px 60px rgba(0,0,0,.25);
+    }
+    .brand {
+      text-align: center;
+      font-size: 20px;
+      font-weight: 700;
+      color: #075d5c;
+      margin-bottom: 20px;
+    }
+    .lang {
+      display: flex;
+      justify-content: center;
+      gap: 7px;
+      margin-bottom: 18px;
+    }
+    .lang button {
+      border: 1px solid #bbb;
+      background: white;
+      border-radius: 7px;
+      padding: 6px 10px;
+      cursor: pointer;
+    }
+    h1 { text-align:center; margin: 8px 0; font-size: 28px; color:#263b3b; }
+    .subtitle { text-align:center; color:#666; margin-bottom:22px; }
+    label { display:block; margin:14px 0 6px; font-weight:600; color:#445; }
+    input {
+      width:100%;
+      padding:13px 14px;
+      border:1px solid #ccc;
+      border-radius:10px;
+      font-size:16px;
+      outline:none;
+    }
+    input:focus { border-color:#087c78; }
+    button.primary {
+      width:100%;
+      margin-top:18px;
+      padding:14px;
+      border:0;
+      border-radius:28px;
+      background:#087c78;
+      color:white;
+      font-size:16px;
+      font-weight:700;
+      cursor:pointer;
+    }
+    button.secondary {
+      width:100%;
+      margin-top:10px;
+      padding:13px;
+      border:1px solid #999;
+      border-radius:28px;
+      background:white;
+      color:#555;
+      font-size:15px;
+      cursor:pointer;
+    }
+    .message {
+      margin-top:14px;
+      padding:10px;
+      border-radius:9px;
+      display:none;
+      text-align:center;
+      line-height:1.45;
+    }
+    .success { background:#e8f8ee; color:#176b3a; }
+    .error { background:#fdecec; color:#a52525; }
+    .hidden { display:none !important; }
+    .small { font-size:13px; color:#777; text-align:center; margin-top:15px; }
+    .demo-note {
+      font-size:12px;
+      color:#777;
+      text-align:center;
+      margin-top:16px;
+      line-height:1.4;
+    }
+  </style>
 </head>
+
 <body>
-<div class="auth-page">
   <div class="auth-card">
-    <a href="index.html" class="brand">Medi Fella Beauty School</a>
+
+    <div class="brand">Medi Fella Beauty School</div>
+
     <div class="lang">
-      <button onclick="setLang('km')">ខ្មែរ</button>
-      <button onclick="setLang('en')">English</button>
-      <button onclick="setLang('ko')">한국어</button>
+      <button type="button" onclick="setLang('km')">ខ្មែរ</button>
+      <button type="button" onclick="setLang('en')">English</button>
+      <button type="button" onclick="setLang('ko')">한국어</button>
     </div>
 
-    <div id="loginBox">
-      <h1 data-t="loginTitle">Student Login</h1>
-      <p data-t="loginSub">Login to access your online courses.</p>
+    <!-- LOGIN -->
+    <section id="loginBox">
+      <h1 id="loginTitle">Student Login</h1>
+      <p class="subtitle" id="loginSub">Login to access your online courses.</p>
 
-      <label data-t="email">Email</label>
-      <input id="email" type="email" placeholder="Email">
+      <label id="emailLabel">Email</label>
+      <input id="loginEmail" type="email" placeholder="Email" autocomplete="email">
 
-      <label data-t="password">Password</label>
-      <input id="password" type="password" placeholder="Password">
+      <label id="passwordLabel">Password</label>
+      <input id="loginPassword" type="password" placeholder="Password" autocomplete="current-password">
 
-      <button class="primary" onclick="login()" data-t="login">LOGIN</button>
-      <button class="secondary" onclick="showRegister()" data-t="create">CREATE ACCOUNT</button>
-      <button class="secondary" onclick="demoLogin()" data-t="demo">DEMO LOGIN</button>
+      <button class="primary" id="loginBtn" onclick="login()">LOGIN</button>
+      <button class="secondary" id="createBtn" onclick="showRegister()">CREATE ACCOUNT</button>
+    </section>
+
+    <!-- REGISTER -->
+    <section id="registerBox" class="hidden">
+      <h1 id="registerTitle">Create Student Account</h1>
+      <p class="subtitle" id="registerSub">Create your student account to continue.</p>
+
+      <label id="nameLabel">Full Name</label>
+      <input id="fullName" type="text" placeholder="Full Name" autocomplete="name">
+
+      <label>Email</label>
+      <input id="registerEmail" type="email" placeholder="Email" autocomplete="email">
+
+      <label id="regPasswordLabel">Password</label>
+      <input id="registerPassword" type="password" placeholder="Password" autocomplete="new-password">
+
+      <button class="primary" id="registerBtn" onclick="register()">CREATE ACCOUNT</button>
+      <button class="secondary" id="backBtn" onclick="showLogin()">BACK TO LOGIN</button>
+    </section>
+
+    <!-- VERIFY EMAIL -->
+    <section id="verifyBox" class="hidden">
+      <h1 id="verifyTitle">Verify Your Email</h1>
+      <p class="subtitle" id="verifySub">
+        We sent a verification code to your email.
+      </p>
+
+      <label id="codeLabel">6-Digit Verification Code</label>
+      <input id="verificationCode"
+             type="text"
+             inputmode="numeric"
+             maxlength="6"
+             placeholder="Enter 6-digit code"
+             autocomplete="one-time-code">
+
+      <button class="primary" id="verifyBtn" onclick="verifyEmail()">VERIFY EMAIL</button>
+      <button class="secondary" id="resendBtn" onclick="resendCode()">RESEND CODE</button>
+      <button class="secondary" onclick="showLogin()">BACK TO LOGIN</button>
+    </section>
+
+    <div id="message" class="message"></div>
+
+    <div class="demo-note">
+      Your account is securely stored in Supabase. Email verification is required before access.
     </div>
-
-    <div id="registerBox" style="display:none">
-      <h1 data-t="registerTitle">Create Student Account</h1>
-      <p data-t="registerSub">Create your student account to continue.</p>
-
-      <label data-t="name">Full Name</label>
-      <input id="regName" type="text" placeholder="Full Name">
-
-      <label data-t="regEmail">Email</label>
-      <input id="regEmail" type="email" placeholder="Email">
-
-      <label data-t="regPassword">Password</label>
-      <input id="regPassword" type="password" placeholder="Password">
-
-      <button class="primary" onclick="register()" data-t="register">CREATE ACCOUNT</button>
-      <button class="secondary" onclick="showLogin()" data-t="backLogin">BACK TO LOGIN</button>
-    </div>
-
-    <p class="small" data-t="demoNote">
-      Demo registration is stored only in this browser for testing. A secure online account database will be connected before real paid enrollment.
-    </p>
-    <div id="msg"></div>
   </div>
-</div>
-<script>
-const T={
-km:{
-loginTitle:"ចូលគណនីសិស្ស",loginSub:"ចូលគណនីដើម្បីចូលរៀនវគ្គសិក្សាអនឡាញ។",
-registerTitle:"បង្កើតគណនីសិស្ស",registerSub:"បង្កើតគណនីសិស្សរបស់អ្នកដើម្បីបន្ត។",
-email:"អ៊ីមែល",password:"ពាក្យសម្ងាត់",name:"ឈ្មោះពេញ",regEmail:"អ៊ីមែល",regPassword:"ពាក្យសម្ងាត់",
-login:"ចូលគណនី",create:"បង្កើតគណនី",register:"បង្កើតគណនី",backLogin:"ត្រឡប់ទៅចូលគណនី",
-demo:"ចូលសាកល្បង",demoNote:"ការចុះឈ្មោះនេះសម្រាប់សាកល្បងក្នុង Browser ប៉ុណ្ណោះ។ មុនពេលលក់វគ្គសិក្សាពិត យើងនឹងភ្ជាប់ Database ដែលមានសុវត្ថិភាព។"
-},
-en:{
-loginTitle:"Student Login",loginSub:"Login to access your online courses.",
-registerTitle:"Create Student Account",registerSub:"Create your student account to continue.",
-email:"Email",password:"Password",name:"Full Name",regEmail:"Email",regPassword:"Password",
-login:"LOGIN",create:"CREATE ACCOUNT",register:"CREATE ACCOUNT",backLogin:"BACK TO LOGIN",
-demo:"DEMO LOGIN",demoNote:"Demo registration is stored only in this browser for testing. A secure online account database will be connected before real paid enrollment."
-},
-ko:{
-loginTitle:"학생 로그인",loginSub:"온라인 과정에 접속하려면 로그인하세요.",
-registerTitle:"학생 계정 만들기",registerSub:"계속하려면 학생 계정을 만드세요.",
-email:"이메일",password:"비밀번호",name:"이름",regEmail:"이메일",regPassword:"비밀번호",
-login:"로그인",create:"계정 만들기",register:"계정 만들기",backLogin:"로그인으로 돌아가기",
-demo:"데모 로그인",demoNote:"현재 등록은 브라우저에서만 저장되는 테스트용입니다. 실제 유료 등록 전에는 안전한 데이터베이스를 연결합니다."
-}};
 
-function setLang(l){
-  document.documentElement.lang=l;
-  document.querySelectorAll("[data-t]").forEach(e=>{
-    if(T[l][e.dataset.t]) e.textContent=T[l][e.dataset.t];
-  });
-  localStorage.setItem("mfLang",l);
+<script>
+/*
+  ============================================================
+  SUPABASE SETTINGS
+  ============================================================
+  Replace ONLY SUPABASE_ANON_KEY with your Supabase Publishable key.
+
+  Project URL from your Supabase project:
+*/
+const SUPABASE_URL = "https://dwrpriwxbjgxpsvhclai.supabase.co";
+
+/*
+  Paste your Supabase Publishable key here.
+  It starts with: sb_publishable_
+*/
+const SUPABASE_ANON_KEY = "PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE";
+
+const supabaseClient = window.supabase.createClient(
+  SUPABASE_URL,
+  SUPABASE_ANON_KEY
+);
+
+let currentEmail = "";
+let currentName = "";
+let currentPassword = "";
+
+/* ---------------- LANGUAGE ---------------- */
+
+const translations = {
+  en: {
+    loginTitle:"Student Login",
+    loginSub:"Login to access your online courses.",
+    email:"Email",
+    password:"Password",
+    login:"LOGIN",
+    create:"CREATE ACCOUNT",
+    registerTitle:"Create Student Account",
+    registerSub:"Create your student account to continue.",
+    name:"Full Name",
+    createAccount:"CREATE ACCOUNT",
+    back:"BACK TO LOGIN",
+    verifyTitle:"Verify Your Email",
+    verifySub:"We sent a verification code to your email.",
+    code:"6-Digit Verification Code",
+    verify:"VERIFY EMAIL",
+    resend:"RESEND CODE",
+    sent:"A verification code has been sent to your email.",
+    verified:"Email verified successfully!",
+    loginSuccess:"Login successful.",
+    invalidCode:"Invalid or expired verification code.",
+    fill:"Please fill in all required fields.",
+    registerSuccess:"Account created. Check your email for the 6-digit verification code.",
+    resendSuccess:"A new verification code has been sent.",
+    wrongLogin:"Incorrect email or password."
+  },
+  km: {
+    loginTitle:"ចូលប្រព័ន្ធសិស្ស",
+    loginSub:"ចូលដើម្បីប្រើប្រាស់វគ្គសិក្សាអនឡាញ។",
+    email:"អ៊ីមែល",
+    password:"ពាក្យសម្ងាត់",
+    login:"ចូលប្រព័ន្ធ",
+    create:"បង្កើតគណនី",
+    registerTitle:"បង្កើតគណនីសិស្ស",
+    registerSub:"បង្កើតគណនីសិស្សរបស់អ្នកដើម្បីបន្ត។",
+    name:"ឈ្មោះពេញ",
+    createAccount:"បង្កើតគណនី",
+    back:"ត្រឡប់ទៅចូលប្រព័ន្ធ",
+    verifyTitle:"ផ្ទៀងផ្ទាត់អ៊ីមែល",
+    verifySub:"យើងបានផ្ញើលេខកូដផ្ទៀងផ្ទាត់ទៅអ៊ីមែលរបស់អ្នក។",
+    code:"លេខកូដផ្ទៀងផ្ទាត់ ៦ ខ្ទង់",
+    verify:"ផ្ទៀងផ្ទាត់អ៊ីមែល",
+    resend:"ផ្ញើលេខកូដម្តងទៀត",
+    sent:"លេខកូដផ្ទៀងផ្ទាត់ត្រូវបានផ្ញើទៅអ៊ីមែលរបស់អ្នក។",
+    verified:"អ៊ីមែលត្រូវបានផ្ទៀងផ្ទាត់ដោយជោគជ័យ!",
+    loginSuccess:"ចូលប្រព័ន្ធបានជោគជ័យ។",
+    invalidCode:"លេខកូដមិនត្រឹមត្រូវ ឬបានផុតកំណត់។",
+    fill:"សូមបំពេញព័ត៌មានដែលត្រូវការ។",
+    registerSuccess:"គណនីត្រូវបានបង្កើត។ សូមពិនិត្យអ៊ីមែលរបស់អ្នកសម្រាប់លេខកូដ ៦ ខ្ទង់។",
+    resendSuccess:"លេខកូដថ្មីត្រូវបានផ្ញើ។",
+    wrongLogin:"អ៊ីមែល ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវ។"
+  },
+  ko: {
+    loginTitle:"학생 로그인",
+    loginSub:"온라인 강좌에 접속하려면 로그인하세요.",
+    email:"이메일",
+    password:"비밀번호",
+    login:"로그인",
+    create:"계정 만들기",
+    registerTitle:"학생 계정 만들기",
+    registerSub:"계속하려면 학생 계정을 만드세요.",
+    name:"이름",
+    createAccount:"계정 만들기",
+    back:"로그인으로 돌아가기",
+    verifyTitle:"이메일 인증",
+    verifySub:"이메일로 인증 코드를 보냈습니다.",
+    code:"6자리 인증 코드",
+    verify:"이메일 인증",
+    resend:"코드 다시 보내기",
+    sent:"인증 코드가 이메일로 전송되었습니다.",
+    verified:"이메일 인증이 완료되었습니다!",
+    loginSuccess:"로그인되었습니다.",
+    invalidCode:"인증 코드가 올바르지 않거나 만료되었습니다.",
+    fill:"필수 정보를 입력해 주세요.",
+    registerSuccess:"계정이 생성되었습니다. 이메일에서 6자리 인증 코드를 확인하세요.",
+    resendSuccess:"새 인증 코드를 보냈습니다.",
+    wrongLogin:"이메일 또는 비밀번호가 올바르지 않습니다."
+  }
+};
+
+let currentLang = "en";
+
+function setLang(lang) {
+  currentLang = lang;
+  const t = translations[lang];
+
+  document.getElementById("loginTitle").textContent = t.loginTitle;
+  document.getElementById("loginSub").textContent = t.loginSub;
+  document.getElementById("emailLabel").textContent = t.email;
+  document.getElementById("passwordLabel").textContent = t.password;
+  document.getElementById("loginBtn").textContent = t.login;
+  document.getElementById("createBtn").textContent = t.create;
+
+  document.getElementById("registerTitle").textContent = t.registerTitle;
+  document.getElementById("registerSub").textContent = t.registerSub;
+  document.getElementById("nameLabel").textContent = t.name;
+  document.getElementById("regPasswordLabel").textContent = t.password;
+  document.getElementById("registerBtn").textContent = t.createAccount;
+  document.getElementById("backBtn").textContent = t.back;
+
+  document.getElementById("verifyTitle").textContent = t.verifyTitle;
+  document.getElementById("verifySub").textContent = t.verifySub;
+  document.getElementById("codeLabel").textContent = t.code;
+  document.getElementById("verifyBtn").textContent = t.verify;
+  document.getElementById("resendBtn").textContent = t.resend;
 }
-function showRegister(){
-  document.getElementById("loginBox").style.display="none";
-  document.getElementById("registerBox").style.display="block";
-  document.getElementById("msg").textContent="";
+
+function showMessage(text, type="success") {
+  const box = document.getElementById("message");
+  box.textContent = text;
+  box.className = "message " + type;
+  box.style.display = "block";
 }
-function showLogin(){
-  document.getElementById("registerBox").style.display="none";
-  document.getElementById("loginBox").style.display="block";
-  document.getElementById("msg").textContent="";
+
+function clearMessage() {
+  const box = document.getElementById("message");
+  box.style.display = "none";
 }
-function register(){
-  const name=document.getElementById("regName").value.trim();
-  const email=document.getElementById("regEmail").value.trim().toLowerCase();
-  const password=document.getElementById("regPassword").value;
-  const msg=document.getElementById("msg");
-  if(!name || !email || !password){
-    msg.textContent="Please fill in all fields.";
+
+function showLogin() {
+  clearMessage();
+  document.getElementById("loginBox").classList.remove("hidden");
+  document.getElementById("registerBox").classList.add("hidden");
+  document.getElementById("verifyBox").classList.add("hidden");
+}
+
+function showRegister() {
+  clearMessage();
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("registerBox").classList.remove("hidden");
+  document.getElementById("verifyBox").classList.add("hidden");
+}
+
+function showVerify() {
+  clearMessage();
+  document.getElementById("loginBox").classList.add("hidden");
+  document.getElementById("registerBox").classList.add("hidden");
+  document.getElementById("verifyBox").classList.remove("hidden");
+}
+
+/* ---------------- REGISTER ---------------- */
+
+async function register() {
+  clearMessage();
+
+  const name = document.getElementById("fullName").value.trim();
+  const email = document.getElementById("registerEmail").value.trim();
+  const password = document.getElementById("registerPassword").value;
+
+  if (!name || !email || !password) {
+    showMessage(translations[currentLang].fill, "error");
     return;
   }
-  if(password.length<6){
-    msg.textContent="Password must be at least 6 characters.";
+
+  if (password.length < 6) {
+    showMessage("Password must be at least 6 characters.", "error");
     return;
   }
-  const account={name,email,password};
-  localStorage.setItem("mfAccount",JSON.stringify(account));
-  localStorage.setItem("mfStudent",JSON.stringify({name,email}));
-  location.href="student-dashboard.html";
+
+  currentEmail = email;
+  currentName = name;
+  currentPassword = password;
+
+  try {
+    const { data, error } = await supabaseClient.auth.signUp({
+      email: email,
+      password: password,
+      options: {
+        data: {
+          full_name: name
+        }
+      }
+    });
+
+    if (error) throw error;
+
+    showVerify();
+    showMessage(translations[currentLang].registerSuccess, "success");
+
+  } catch (error) {
+    console.error(error);
+    showMessage(error.message || "Registration failed.", "error");
+  }
 }
-function login(){
-  const email=document.getElementById("email").value.trim().toLowerCase();
-  const password=document.getElementById("password").value;
-  const account=JSON.parse(localStorage.getItem("mfAccount")||"null");
-  const msg=document.getElementById("msg");
-  if(!email || !password){msg.textContent="Please enter your email and password.";return;}
-  if(account && account.email===email && account.password===password){
-    localStorage.setItem("mfStudent",JSON.stringify({name:account.name,email:account.email}));
-    location.href="student-dashboard.html";
+
+/* ---------------- VERIFY EMAIL CODE ---------------- */
+
+async function verifyEmail() {
+  clearMessage();
+
+  const token = document.getElementById("verificationCode").value.trim();
+
+  if (!currentEmail || !token) {
+    showMessage(translations[currentLang].fill, "error");
     return;
   }
-  msg.textContent=account ? "Email or password is incorrect." : "Please create an account first.";
+
+  try {
+    const { data, error } = await supabaseClient.auth.verifyOtp({
+      email: currentEmail,
+      token: token,
+      type: "signup"
+    });
+
+    if (error) throw error;
+
+    showMessage(translations[currentLang].verified, "success");
+
+    /*
+      Save basic student information locally only for displaying it
+      on your existing dashboard. The real authentication is Supabase.
+    */
+    localStorage.setItem("studentName", currentName);
+    localStorage.setItem("studentEmail", currentEmail);
+
+    setTimeout(() => {
+      window.location.href = "student-dashboard.html";
+    }, 900);
+
+  } catch (error) {
+    console.error(error);
+    showMessage(
+      error.message || translations[currentLang].invalidCode,
+      "error"
+    );
+  }
 }
-function demoLogin(){
-  localStorage.setItem("mfStudent",JSON.stringify({name:"Demo Student",email:"demo@medifella.test"}));
-  location.href="student-dashboard.html";
+
+/* ---------------- RESEND ---------------- */
+
+async function resendCode() {
+  clearMessage();
+
+  if (!currentEmail) {
+    showMessage("Please create an account first.", "error");
+    return;
+  }
+
+  try {
+    const { error } = await supabaseClient.auth.signInWithOtp({
+      email: currentEmail,
+      options: {
+        shouldCreateUser: false
+      }
+    });
+
+    if (error) throw error;
+
+    showMessage(translations[currentLang].resendSuccess, "success");
+
+  } catch (error) {
+    console.error(error);
+    showMessage(error.message || "Could not resend code.", "error");
+  }
 }
-setLang(localStorage.getItem("mfLang")||"km");
+
+/* ---------------- LOGIN ---------------- */
+
+async function login() {
+  clearMessage();
+
+  const email = document.getElementById("loginEmail").value.trim();
+  const password = document.getElementById("loginPassword").value;
+
+  if (!email || !password) {
+    showMessage(translations[currentLang].fill, "error");
+    return;
+  }
+
+  try {
+    const { data, error } = await supabaseClient.auth.signInWithPassword({
+      email: email,
+      password: password
+    });
+
+    if (error) throw error;
+
+    localStorage.setItem(
+      "studentName",
+      data.user.user_metadata?.full_name || ""
+    );
+    localStorage.setItem("studentEmail", data.user.email || email);
+
+    showMessage(translations[currentLang].loginSuccess, "success");
+
+    setTimeout(() => {
+      window.location.href = "student-dashboard.html";
+    }, 700);
+
+  } catch (error) {
+    console.error(error);
+    showMessage(error.message || translations[currentLang].wrongLogin, "error");
+  }
+}
+
+/* Start in English */
+setLang("en");
 </script>
 </body>
 </html>
