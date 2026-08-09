@@ -27,7 +27,7 @@ h1{margin:0;font-size:29px;line-height:1.45}
 .profile{display:grid;grid-template-columns:160px 1fr;gap:24px;padding:22px;background:#f7fcfc;border:1px solid #cbe4e7;border-radius:18px}
 .photo{width:160px;height:190px;object-fit:cover;border-radius:12px;background:#e8f1f3;border:1px solid #d5e4e7}
 .label{display:block;color:#117f8c;font-size:15px;font-weight:700;margin-bottom:7px;line-height:1.4}
-.name{font-size:29px;font-weight:700;margin-bottom:19px}
+.name{font-size:29px;font-weight:700;margin-bottom:19px}.value{font-size:20px;font-weight:700;margin:0 0 16px}
 .id{display:inline-block;font-family:monospace;background:#fff;border:1px solid #d9e6e9;border-radius:8px;padding:9px 12px}
 .details{margin-top:20px;border:1px solid #d8e6e9;border-radius:15px;overflow:hidden}
 .detail{padding:18px 20px;border-bottom:1px solid #d8e6e9}
@@ -75,10 +75,13 @@ This certificate is authentic and officially verified.<br>
 <div>
 <span class="label">ឈ្មោះសិស្ស · STUDENT NAME · 학생 이름</span>
 <div id="name" class="name"></div>
+
 <span class="label">ភេទ · SEX · 성별</span>
-<div id="sex" class="name" style="font-size:20px;margin-bottom:16px"></div>
+<div id="sex" class="value"></div>
+
 <span class="label">ថ្ងៃខែឆ្នាំកំណើត · DATE OF BIRTH · 생년월일</span>
-<div id="dateOfBirth" class="name" style="font-size:20px;margin-bottom:19px"></div>
+<div id="dateOfBirth" class="value"></div>
+
 <span class="label">លេខវិញ្ញាបនបត្រ · CERTIFICATE ID · 인증서 번호</span>
 <div id="id" class="id"></div>
 </div>
@@ -143,9 +146,11 @@ function showCertificate(student){
  document.getElementById("card").style.display="block";
 
  document.getElementById("name").textContent=text(student.name);
- document.getElementById("id").textContent=text(student.id);
  document.getElementById("sex").textContent=text(student.sex);
- document.getElementById("dateOfBirth").textContent=text(student.dateOfBirth);
+ document.getElementById("dateOfBirth").textContent=text(
+   student.dateOfBirth ?? student["date of birth"] ?? student.dob
+ );
+ document.getElementById("id").textContent=text(student.id);
  document.getElementById("course").textContent=text(student.course);
  document.getElementById("duration").textContent=text(student.duration);
 
@@ -163,7 +168,8 @@ function showCertificate(student){
 }
 
 function findCertificate(id){
- return records.find(x=>String(x.id).toLowerCase()===String(id).trim().toLowerCase());
+ const target=String(id||"").trim().toLowerCase();
+ return records.find(x=>String(x.id||"").trim().toLowerCase()===target);
 }
 
 function manualSearch(){
@@ -178,9 +184,15 @@ function manualSearch(){
 
 async function start(){
  try{
-  const response=await fetch("./certificates.json?v="+Date.now(),{cache:"no-store"});
-  if(!response.ok) throw new Error("Cannot load certificates");
-  records=await response.json();
+  const jsonUrl=new URL("certificates.json",location.href);
+  jsonUrl.searchParams.set("v",Date.now());
+
+  const response=await fetch(jsonUrl.href,{cache:"no-store"});
+  if(!response.ok) throw new Error("Cannot load certificates.json ("+response.status+")");
+
+  const data=await response.json();
+  if(!Array.isArray(data)) throw new Error("certificates.json must contain an array");
+  records=data;
 
   const id=new URLSearchParams(location.search).get("id");
 
@@ -196,7 +208,7 @@ async function start(){
   // Normal website mode: show search box.
   document.getElementById("searchBox").style.display="block";
  }catch(e){
-  console.error(e);
+  console.error("Certificate data error:",e);
   showError();
  }
 }
