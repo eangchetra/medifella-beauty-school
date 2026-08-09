@@ -20,5 +20,14 @@
     "duration": "12 Months",
     "issueDate": "2026-08-08",
     "completionDate": "2027-08-08"
-  }
-]
+ },
+  {
+    "id": "MEDIFELLA02202547",
+    "name": "ឡាយ ធូ LAY THOU",
+    "sex": "Male",
+    "dateOfBirth": "03 November 1990",
+    "photo": "students/MEDIFELLA02202547.jpg",
+    "course": "ម៉ាស្សាមុខទូទៅ(កម្រិតមធ្យម) General Facial Massage (Medium)",
+    "duration": "2 Months",
+    "issueDate": "04-06-2026",
+    "completionDate": "04-08-2026"
