@@ -2,6 +2,37 @@
 
 @import url('https://fonts.googleapis.com/css2?family=Battambang:wght@400;700&display=swap');
 
+/* IMPORTANT: When Khmer is selected, apply Battambang to Khmer page text.
+   The language switcher changes <html lang="km">, so this selector catches
+   headings and other elements that previously overrode the body font. */
+html[lang="km"] body,
+html[lang="km"] body .brand-kh,
+html[lang="km"] body .nav-links,
+html[lang="km"] body .hero-copy,
+html[lang="km"] body .section-title,
+html[lang="km"] body .about-copy,
+html[lang="km"] body .scholarship,
+html[lang="km"] body .verify,
+html[lang="km"] body .contact,
+html[lang="km"] body footer {
+  font-family: "Battambang", sans-serif !important;
+}
+
+/* These elements have their own Georgia/Arial declarations, so explicitly
+   override them when Khmer is selected. */
+html[lang="km"] .hero h1,
+html[lang="km"] .section-title h2,
+html[lang="km"] .about h2,
+html[lang="km"] .scholarship h2,
+html[lang="km"] .verify h2,
+html[lang="km"] .contact h2,
+html[lang="km"] .hero-side h2,
+html[lang="km"] .education-card h3,
+html[lang="km"] .school-photo,
+html[lang="km"] .small-photo {
+  font-family: "Battambang", sans-serif !important;
+}
+
 .khmer,
 .khmer-text,
 [lang="km"] {
