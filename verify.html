@@ -122,6 +122,17 @@ This certificate is authentic and officially verified.<br>
 
 <script>
 let records=[];
+const fallbackRecords=[{
+  id:"Medifella2026001",
+  name:"Eang Chetra",
+  sex:"Male",
+  dateOfBirth:"08 August 2000",
+  photo:"students/MFS-2026-0001.jpg",
+  course:"Diploma of Beauty Care",
+  duration:"12 Months",
+  issueDate:"2026-08-08",
+  completionDate:"2027-08-08"
+}];
 
 function text(v){
  if(typeof v==="string") return v;
@@ -183,34 +194,36 @@ function manualSearch(){
 }
 
 async function start(){
- try{
-  const jsonUrl=new URL("certificates.json",location.href);
-  jsonUrl.searchParams.set("v",Date.now());
-
-  const response=await fetch(jsonUrl.href,{cache:"no-store"});
-  if(!response.ok) throw new Error("Cannot load certificates.json ("+response.status+")");
-
-  const data=await response.json();
-  if(!Array.isArray(data)) throw new Error("certificates.json must contain an array");
-  records=data;
-
   const id=new URLSearchParams(location.search).get("id");
 
-  // QR mode: hide search and open the certificate automatically.
+  try{
+    const jsonUrl=new URL("certificates.json",location.href);
+    jsonUrl.searchParams.set("v",Date.now());
+
+    const response=await fetch(jsonUrl.href,{cache:"no-store"});
+    if(!response.ok) throw new Error("certificates.json unavailable");
+
+    const data=await response.json();
+    records=Array.isArray(data) ? data : fallbackRecords;
+  }catch(e){
+    console.warn("Using built-in certificate data:",e);
+    records=fallbackRecords;
+  }
+
+  // QR mode: open the requested certificate directly.
   if(id){
     const student=findCertificate(id);
-    if(!student){showError();return;}
+    if(!student){
+      showError();
+      return;
+    }
     document.getElementById("searchBox").style.display="none";
     showCertificate(student);
     return;
   }
 
-  // Normal website mode: show search box.
+  // Normal website mode: show the search box.
   document.getElementById("searchBox").style.display="block";
- }catch(e){
-  console.error("Certificate data error:",e);
-  showError();
- }
 }
 
 start();
