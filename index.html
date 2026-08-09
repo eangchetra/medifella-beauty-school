@@ -8,6 +8,15 @@
 
   <!-- IMPORTANT: CSS stays in style.css, not inside this HTML file -->
   <link rel="stylesheet" href="style.css?v=4">
+  <style>
+    .online-course-link {
+      color: #075e66 !important;
+      font-weight: 700;
+    }
+    .online-course-link small {
+      color: #075e66 !important;
+    }
+  </style>
 </head>
 
 <body>
@@ -28,6 +37,10 @@
     <a href="#home">ទំព័រដើម<br><small>HOME</small></a>
     <a href="#about">អំពីសាលា<br><small>ABOUT US</small></a>
     <a href="#courses">វគ្គសិក្សា<br><small>COURSES</small></a>
+    <a class="online-course-link" href="online-course.html">
+      <span data-online-course-km>វគ្គសិក្សាអនឡាញ</span><br>
+      <small data-online-course-en>ONLINE COURSE</small>
+    </a>
     <a href="#scholarship">អាហារូបករណ៍<br><small>SCHOLARSHIP</small></a>
     <a href="#gallery">វិចិត្រសាល<br><small>GALLERY</small></a>
     <a href="#contact">ទំនាក់ទំនង<br><small>CONTACT</small></a>
@@ -494,6 +507,25 @@
 
 
 <script>
+const onlineCourseLabels = {
+  km: { title: "វគ្គសិក្សាអនឡាញ", subtitle: "វគ្គសិក្សាអនឡាញ" },
+  en: { title: "Online Course", subtitle: "ONLINE COURSE" },
+  ko: { title: "온라인 과정", subtitle: "ONLINE COURSE" }
+};
+
+
+function updateOnlineCourseLabel(lang) {
+  const title = document.querySelector("[data-online-course-km]");
+  const subtitle = document.querySelector("[data-online-course-en]");
+
+  if (!title || !subtitle) return;
+
+  const labels = onlineCourseLabels[lang] || onlineCourseLabels.km;
+  title.textContent = labels.title;
+  subtitle.textContent = labels.subtitle;
+}
+
+
 const translations = {
 
   en: {
@@ -626,6 +658,8 @@ function setLanguage(lang) {
 
 
   document.documentElement.lang = lang;
+
+  updateOnlineCourseLabel(lang);
 
   localStorage.setItem(
     "medifellaLanguage",
