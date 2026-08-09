@@ -75,6 +75,10 @@ This certificate is authentic and officially verified.<br>
 <div>
 <span class="label">ឈ្មោះសិស្ស · STUDENT NAME · 학생 이름</span>
 <div id="name" class="name"></div>
+<span class="label">ភេទ · SEX · 성별</span>
+<div id="sex" class="name" style="font-size:20px;margin-bottom:16px"></div>
+<span class="label">ថ្ងៃខែឆ្នាំកំណើត · DATE OF BIRTH · 생년월일</span>
+<div id="dateOfBirth" class="name" style="font-size:20px;margin-bottom:19px"></div>
 <span class="label">លេខវិញ្ញាបនបត្រ · CERTIFICATE ID · 인증서 번호</span>
 <div id="id" class="id"></div>
 </div>
@@ -140,6 +144,8 @@ function showCertificate(student){
 
  document.getElementById("name").textContent=text(student.name);
  document.getElementById("id").textContent=text(student.id);
+ document.getElementById("sex").textContent=text(student.sex);
+ document.getElementById("dateOfBirth").textContent=text(student.dateOfBirth);
  document.getElementById("course").textContent=text(student.course);
  document.getElementById("duration").textContent=text(student.duration);
 
