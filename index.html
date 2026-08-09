@@ -18,10 +18,33 @@
     }
 
     .language-switcher {
+      display: none !important;
+    }
+
+    .nav-links > a {
       display: flex;
+      flex-direction: column;
       align-items: center;
-      gap: 5px;
-      flex-wrap: nowrap;
+      justify-content: center;
+      line-height: 1.25;
+      text-align: center;
+    }
+
+    .nav-links > a > span {
+      font-family: "Khmer OS Battambang", "Battambang", sans-serif !important;
+      font-size: 13px;
+    }
+
+    .nav-links > a > small {
+      display: block;
+      font-size: 8px;
+      line-height: 1.35;
+      letter-spacing: .3px;
+      font-weight: 600;
+    }
+
+    .nav-links > a > small:last-child {
+      font-family: Arial, "Noto Sans KR", sans-serif;
     }
 
     .language-switcher button {
@@ -72,16 +95,27 @@
   <button class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
 
   <nav class="nav-links">
-    <a href="#home">ទំព័រដើម<br><small>HOME</small></a>
-    <a href="#about">អំពីសាលា<br><small>ABOUT US</small></a>
-    <a href="#courses">វគ្គសិក្សា<br><small>COURSES</small></a>
-    <a class="online-course-link" href="online-course.html">
-      <span data-online-course-km>វគ្គសិក្សាអនឡាញ</span><br>
-      <small data-online-course-en>ONLINE COURSE</small>
+    <a href="#home">
+      <span>ទំព័រដើម</span><small>HOME</small><small>홈</small>
     </a>
-    <a href="#scholarship">អាហារូបករណ៍<br><small>SCHOLARSHIP</small></a>
-    <a href="#gallery">វិចិត្រសាល<br><small>GALLERY</small></a>
-    <a href="#contact">ទំនាក់ទំនង<br><small>CONTACT</small></a>
+    <a href="#about">
+      <span>អំពីសាលា</span><small>ABOUT US</small><small>학교소개</small>
+    </a>
+    <a href="#courses">
+      <span>វគ្គសិក្សា</span><small>COURSES</small><small>과정</small>
+    </a>
+    <a class="online-course-link" href="online-course.html">
+      <span>វគ្គសិក្សាអនឡាញ</span><small>ONLINE COURSE</small><small>온라인 과정</small>
+    </a>
+    <a href="#scholarship">
+      <span>អាហារូបករណ៍</span><small>SCHOLARSHIP</small><small>장학제도</small>
+    </a>
+    <a href="#gallery">
+      <span>វិចិត្រសាល</span><small>GALLERY</small><small>갤러리</small>
+    </a>
+    <a href="#contact">
+      <span>ទំនាក់ទំនង</span><small>CONTACT</small><small>문의하기</small>
+    </a>
 
     <div class="language-switcher" aria-label="Language selection">
       <button type="button" onclick="setLanguage('km')" data-lang="km">ខ្មែរ</button>
