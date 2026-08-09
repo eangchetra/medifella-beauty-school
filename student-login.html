@@ -1,0 +1,37 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Student Login | Medi Fella Beauty School</title>
+<link rel="stylesheet" href="student.css">
+</head>
+<body>
+<div class="auth-page">
+  <div class="auth-card">
+    <a href="index.html" class="brand">Medi Fella Beauty School</a>
+    <div class="lang"><button onclick="setLang('km')">ខ្មែរ</button><button onclick="setLang('en')">English</button><button onclick="setLang('ko')">한국어</button></div>
+    <h1 data-t="title">Student Login</h1>
+    <p data-t="sub">Login to access your online courses.</p>
+    <label data-t="email">Email</label>
+    <input id="email" type="email" placeholder="Email">
+    <label data-t="password">Password</label>
+    <input id="password" type="password" placeholder="Password">
+    <button class="primary" onclick="login()" data-t="login">LOGIN</button>
+    <button class="secondary" onclick="demoLogin()" data-t="demo">DEMO LOGIN</button>
+    <p class="small" data-t="demoNote">Demo mode is for testing only. Real secure accounts will be connected to a database in the next stage.</p>
+    <div id="msg"></div>
+  </div>
+</div>
+<script>
+const T={
+km:{title:"ចូលគណនីសិស្ស",sub:"ចូលគណនីដើម្បីចូលរៀនវគ្គសិក្សាអនឡាញ។",email:"អ៊ីមែល",password:"ពាក្យសម្ងាត់",login:"ចូលគណនី",demo:"ចូលសាកល្បង",demoNote:"នេះជារបៀបសាកល្បងប៉ុណ្ណោះ។ ប្រព័ន្ធគណនីពិតនឹងភ្ជាប់ជាមួយ Database នៅដំណាក់កាលបន្ទាប់។"},
+en:{title:"Student Login",sub:"Login to access your online courses.",email:"Email",password:"Password",login:"LOGIN",demo:"DEMO LOGIN",demoNote:"Demo mode is for testing only. Real secure accounts will be connected to a database in the next stage."},
+ko:{title:"학생 로그인",sub:"온라인 과정에 접속하려면 로그인하세요.",email:"이메일",password:"비밀번호",login:"로그인",demo:"데모 로그인",demoNote:"현재는 테스트용 데모입니다. 실제 보안 계정은 다음 단계에서 데이터베이스와 연결합니다."}};
+function setLang(l){document.documentElement.lang=l;document.querySelectorAll("[data-t]").forEach(e=>e.textContent=T[l][e.dataset.t]);localStorage.setItem("mfLang",l)}
+function login(){const email=document.getElementById("email").value.trim();if(!email){document.getElementById("msg").textContent="Please enter your email.";return}localStorage.setItem("mfStudent",{name:email.split("@")[0],email});location.href="student-dashboard.html"}
+function demoLogin(){localStorage.setItem("mfStudent",JSON.stringify({name:"Demo Student",email:"demo@medifella.test"}));location.href="student-dashboard.html"}
+setLang(localStorage.getItem("mfLang")||"km");
+</script>
+</body>
+</html>

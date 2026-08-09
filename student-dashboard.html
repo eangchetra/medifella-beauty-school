@@ -1,0 +1,33 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Student Dashboard | Medi Fella</title>
+<link rel="stylesheet" href="student.css">
+</head>
+<body>
+<header class="top"><a class="brand" href="index.html">Medi Fella Beauty School</a><div><button onclick="setLang('km')">ខ្មែរ</button><button onclick="setLang('en')">English</button><button onclick="setLang('ko')">한국어</button><button onclick="logout()">Logout</button></div></header>
+<main class="dash">
+<section class="welcome"><div><span data-t="student">STUDENT AREA</span><h1 data-t="welcome">Welcome to your classroom</h1><p id="studentName"></p></div></section>
+<section class="course-card">
+<div class="course-head"><div><span class="badge" data-t="active">ACTIVE COURSE</span><h2 data-t="course">Facial Massage Beginner</h2><p>$299 • 5 Lessons • Quiz • Final Exam • Certificate</p></div><div class="progress"><b id="progress">0%</b><small data-t="progress">Course progress</small></div></div>
+<div id="lessons"></div>
+</section>
+</main>
+<script>
+const T={km:{student:"តំបន់សិស្ស",welcome:"សូមស្វាគមន៍មកកាន់ថ្នាក់រៀនរបស់អ្នក",active:"វគ្គកំពុងសិក្សា",course:"វគ្គម៉ាស្សាមុខកម្រិតដំបូង",progress:"វឌ្ឍនភាពវគ្គសិក្សា",lesson:"មេរៀន",locked:"ចាក់សោ",open:"ចូលរៀន",quiz:"Quiz",exam:"ការប្រឡងចុងក្រោយ"},en:{student:"STUDENT AREA",welcome:"Welcome to your classroom",active:"ACTIVE COURSE",course:"Facial Massage Beginner",progress:"Course progress",lesson:"Lesson",locked:"LOCKED",open:"OPEN LESSON",quiz:"Quiz",exam:"Final Exam"},ko:{student:"학생 영역",welcome:"온라인 강의실에 오신 것을 환영합니다",active:"수강 중인 과정",course:"페이셜 마사지 초급 과정",progress:"학습 진행률",lesson:"레슨",locked:"잠김",open:"레슨 열기",quiz:"퀴즈",exam:"최종 시험"}};
+const lessons=[
+["Basic of Facial Massage","មូលដ្ឋាននៃការម៉ាស្សាមុខ"],
+["Basic of Facial Massage Service Preparation","មូលដ្ឋាននៃការរៀបចំសេវាម៉ាស្សាមុខ"],
+["Clients Selection and Facial Massage Products","ការជ្រើសរើសអតិថិជន និងផលិតផលម៉ាស្សាមុខ"],
+["Basic of Facial Cleansing","មូលដ្ឋាននៃការសម្អាតមុខ"],
+["General Facial Massage","ការម៉ាស្សាមុខទូទៅ"]];
+function setLang(l){document.documentElement.lang=l;document.querySelectorAll("[data-t]").forEach(e=>e.textContent=T[l][e.dataset.t]);localStorage.setItem("mfLang",l);render(l)}
+function render(l){const done=JSON.parse(localStorage.getItem("mfDone")||"[]");document.getElementById("progress").textContent=Math.round(done.length/5*100)+"%";document.getElementById("lessons").innerHTML=lessons.map((x,i)=>{const unlocked=i===0||done.includes(i);return `<div class="lesson-row"><span class="num">${i+1}</span><div class="lesson-text"><b>${l==="km"?x[1]:l==="ko"?["페이셜 마사지 기초","페이셜 마사지 서비스 준비 기초","고객 선정 및 페이셜 마사지 제품","페이셜 클렌징 기초","기본 페이셜 마사지"][i]:x[0]}</b><small>${T[l].lesson} ${i+1} • ${T[l].quiz}</small></div><a class="${unlocked?"open":"locked"}" href="${unlocked?"lesson-"+(i+1)+".html":"#"}">${unlocked?T[l].open:T[l].locked}</a></div>`}).join("")+`<div class="exam-row"><b>${T[l].exam}</b><span>100% ${l==="km"?"ត្រូវការ":l==="ko"?"필요":"required"}</span></div>`}
+function logout(){localStorage.removeItem("mfStudent");location.href="student-login.html"}
+const s=JSON.parse(localStorage.getItem("mfStudent")||"null");if(!s)location.href="student-login.html";else document.getElementById("studentName").textContent=s.name+" • "+s.email;
+setLang(localStorage.getItem("mfLang")||"km");
+</script>
+</body>
+</html>
