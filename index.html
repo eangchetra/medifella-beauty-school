@@ -1,328 +1,322 @@
-<!DOCTYPE html>
-<html lang="en">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Medi Fella Beauty School | Korean Beauty Education</title>
-  <meta name="description" content="Medi Fella Beauty School — Korean Beauty Education in Cambodia.">
-  <link rel="stylesheet" href="style.css?v=2">
-  <style>
-    .language-switcher{display:flex;gap:4px;align-items:center}
-    .language-switcher button{border:1px solid #d8d5cc;background:#fff;color:#536467;border-radius:16px;padding:6px 9px;font-size:10px;cursor:pointer}
-    .language-switcher button.selected{background:#075e66;color:#fff;border-color:#075e66}
-    @media(max-width:760px){.language-switcher{margin:5px 0}.language-switcher button{font-size:10px}}
-  </style>
-</head>
-<body>
+/* Medi Fella Beauty School - corrected stylesheet */
 
-<div class="top-strip">
-  <span>⌖ Phnom Penh, Cambodia</span>
-  <span>✈ Telegram: 086 454 353</span>
-  <span>✉ info@medifellabeautyschool.com</span>
-  <span class="follow">Follow Us &nbsp; ◎ &nbsp; ◉ &nbsp; ♪ &nbsp; ◍ &nbsp; 🇰🇷 English⌄</span>
-</div>
-
-<header class="header">
-  <a href="#home" class="brand">
-    <img src="logo.jpeg" alt="Medi Fella Beauty School">
-    <div>
-      <div class="brand-name">Medi Fella</div>
-      <div class="brand-sub">BEAUTY SCHOOL</div>
-      <div class="brand-kh">BEAUTY EDUCATION • CAMBODIA</div>
-    </div>
-  </a>
-
-  <button class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
-
-  <nav class="nav-links">
-    <a class="active" href="#home">홈<br><small>HOME</small></a>
-    <a href="#about">학교소개<br><small>ABOUT US</small></a>
-    <a href="#courses">과정안내<br><small>COURSES</small></a>
-    <a href="#scholarship">장학제도<br><small>SCHOLARSHIP</small></a>
-    <a href="#gallery">갤러리<br><small>GALLERY</small></a>
-    <a href="#contact">문의하기<br><small>CONTACT</small></a>
-
-    <div class="language-switcher">
-      <button onclick="setLanguage('km')">ខ្មែរ</button>
-      <button class="selected" onclick="setLanguage('en')">English</button>
-      <button onclick="setLanguage('ko')">한국어</button>
-    </div>
-
-    <a class="enroll" href="#contact">ENROLL NOW<br><small>상담 신청하기 →</small></a>
-  </nav>
-</header>
-
-<main>
-
-<section id="home" class="hero">
-  <div class="hero-copy">
-    <div class="gold-label"><span data-i18n="label">KOREAN BEAUTY EDUCATION</span></div>
-
-    <h1>
-      <span data-i18n="heroTitle">
-        Learn Korean Beauty.<br><span>Build Your Future.</span>
-      </span>
-    </h1>
-
-    <p class="kr-copy">
-      <span data-i18n="heroText">
-        Professional Korean-inspired beauty education designed to develop practical skills, confidence and modern beauty techniques.
-      </span>
-    </p>
-
-    <p class="en-tag">
-      <span data-i18n="tag">LEARN BEAUTY. BUILD YOUR FUTURE.</span>
-    </p>
-
-    <div class="hero-buttons">
-      <a href="#courses" class="btn filled"><span data-i18n="explore">Explore Courses →</span></a>
-      <a href="#about" class="btn outline"><span data-i18n="about">About Our School</span></a>
-    </div>
-
-    <div class="feature-row">
-      <div><b>♙</b><strong>KOREAN EXPERT<br>INSTRUCTORS</strong><small>한국 전문가 교육</small></div>
-      <div><b>▣</b><strong>INTERNATIONAL<br>CERTIFICATION</strong><small>국제 인증 과정</small></div>
-      <div><b>♧</b><strong>100% PRACTICAL<br>TRAINING</strong><small>실무 중심 교육</small></div>
-      <div><b>◎</b><strong>GLOBAL BEAUTY<br>CAREER</strong><small>글로벌 취업 지원</small></div>
-    </div>
-  </div>
-
-  <div class="hero-visual">
-    <div class="training-photo">
-      <img src="hero_training.jpg?v=2" alt="Medi Fella Beauty School Korean beauty training">
-    </div>
-
-    <aside class="hero-side">
-      <img src="logo.jpeg" alt="Medi Fella logo">
-      <h2>MEDI FELLA<br>BEAUTY SCHOOL</h2>
-      <p>메디 펠라 뷰티 스쿨</p>
-      <div class="side-line"></div>
-      <p class="quote">“아름다움을 가르치고,<br>미래를 디자인합니다.”</p>
-      <strong>DESIGN YOUR BEAUTY.<br>DESIGN YOUR FUTURE.</strong>
-      <div class="slide-number">01 <span>────────</span> 02 &nbsp; 03</div>
-    </aside>
-  </div>
-</section>
-
-<section class="stats">
-  <div><b>♙</b><strong>500+</strong><span>GRADUATES<br>수료생</span></div>
-  <div><b>▤</b><strong>20+</strong><span>PROFESSIONAL COURSES<br>전문 과정</span></div>
-  <div><b>☆</b><strong>98%</strong><span>STUDENT SATISFACTION<br>학생 만족도</span></div>
-  <div><b>♜</b><strong>🇰🇷</strong><span>PARTNERSHIP WITH KOREA<br>한국 기관 협력</span></div>
-</section>
-
-<section class="verify">
-  <div>
-    <span>STUDENT VERIFICATION</span>
-    <h2><span data-i18n="verify">Certificate / Student Verification</span></h2>
-    <p><span data-i18n="verifyText">Enter a Student ID or scan a QR code to verify student information.</span></p>
-  </div>
-  <a class="btn light" href="verify.html">VERIFY STUDENT →</a>
-</section>
-
-<section id="courses" class="section courses-section">
-  <div class="section-title">
-    <div>
-      <span>OUR COURSES</span>
-      <h2><span data-i18n="coursesTitle">Professional Beauty Education Programs</span></h2>
-    </div>
-    <p>기초부터 심화까지, 최신 트렌드에 맞춘<br>체계적인 커리큘럼으로 여러분의 실력을 완성합니다.</p>
-    <a href="#contact"><span data-i18n="allCourses">View All Courses →</span></a>
-  </div>
-
-  <div class="course-grid">
-    <article>
-      <div class="course-art"><img src="course_skin_care.jpg" alt="Korean Skin Care"></div>
-      <div class="course-body"><small>피부관리</small><h3>KOREAN SKIN CARE</h3><p>피부 분석부터 전문적인 피부 관리까지 한국식 피부관리 테크닉</p></div>
-    </article>
-
-    <article>
-      <div class="course-art"><img src="course_aesthetic_injection.jpg" alt="Aesthetic Injection"></div>
-      <div class="course-body"><small>에스테틱</small><h3>AESTHETIC BEAUTY</h3><p>안전하고 전문적인 실무 테크닉과 해부학적 이해</p></div>
-    </article>
-
-    <article>
-      <div class="course-art"><img src="course_advanced_laser.jpg" alt="Advanced Laser and Skin Rejuvenation"></div>
-      <div class="course-body"><small>레이저 & 피부재생</small><h3>LASER & SKIN REJUVENATION</h3><p>최신 레이저 장비와 피부 재생 프로그램 실습</p></div>
-    </article>
-
-    <article>
-      <div class="course-art"><img src="course_body_face_massage.jpg" alt="Korean Body and Face Massage"></div>
-      <div class="course-body"><small>바디 & 얼굴 마사지</small><h3>BODY & FACE MASSAGE</h3><p>한국식 테라피 테크닉으로 건강과 아름다움을 케어</p></div>
-    </article>
-
-    <article>
-      <div class="course-art"><img src="course_makeup_pmu.jpg" alt="Makeup and PMU"></div>
-      <div class="course-body"><small>메이크업 & 반영구</small><h3>MAKEUP & PMU</h3><p>트렌디한 메이크업과 반영구 디자인 실무 과정</p></div>
-    </article>
-  </div>
-</section>
-
-<section id="about" class="about section">
-  <div class="about-copy">
-    <span>ABOUT MEDI FELLA</span>
-    <h2>왜 메디 펠라<br>뷰티 스쿨인가?</h2>
-    <ul>
-      <li>한국 교육 시스템과 커리큘럼 도입</li>
-      <li>현직 한국 전문가의 1:1 밀착 지도</li>
-      <li>최신 장비와 실무 중심 교육</li>
-      <li>국내외 취업 및 창업 지원</li>
-      <li>체계적인 사후 관리 시스템</li>
-    </ul>
-    <a href="#contact" class="btn outline">학교소개 더보기 →</a>
-  </div>
-
-  <div class="about-visual">
-    <div class="school-photo">MEDI FELLA<br><small>School / Training Photo</small></div>
-    <div class="small-photo">STUDENTS<br><small>Training</small></div>
-    <div class="education-card">
-      <span>KOREAN EDUCATION SYSTEM</span>
-      <h3>한국의 교육 시스템을<br>캄보디아에서</h3>
-      <p>이론 + 실습 병행 교육</p>
-      <p>소수정예 맞춤형 지도</p>
-      <p>평가 & 피드백 시스템</p>
-      <p>수료 후 지속적인 지원</p>
-    </div>
-  </div>
-</section>
-
-<section id="scholarship" class="scholarship section">
-  <div>
-    <span>SCHOLARSHIP</span>
-    <h2><span data-i18n="scholarship">Invest in Your Future<br>Through Beauty Education</span></h2>
-    <p>현재 장학 프로그램과 지원 자격을 상담해 보세요.</p>
-    <a href="#contact" class="btn gold">장학제도 문의 →</a>
-  </div>
-  <div class="scholarship-mark">KOREAN<br>BEAUTY<br>EDUCATION</div>
-</section>
-
-<section id="gallery" class="section gallery-section">
-  <div class="section-title">
-    <div><span>GALLERY</span><h2>School Life & Training</h2></div>
-  </div>
-  <div class="gallery-grid">
-    <div>Training</div>
-    <div>Students</div>
-    <div>Classroom</div>
-    <div>Graduation</div>
-  </div>
-</section>
-
-
-<section id="contact" class="contact section">
-  <div>
-    <span>CONTACT US</span>
-    <h2>Start Your Beauty Career</h2>
-    <p>Course registration, scholarship and school information.</p>
-    <p>📍 Phnom Penh, Cambodia</p>
-    <p>✈ Telegram: 086 454 353</p>
-  </div>
-
-  <form onsubmit="event.preventDefault();alert('Thank you! Please contact Medi Fella Beauty School to complete registration.');">
-    <input placeholder="Full name" required>
-    <input placeholder="Phone / Telegram" required>
-    <input type="email" placeholder="Email">
-    <select>
-      <option>Select a course</option>
-      <option>Korean Skin Care</option>
-      <option>Aesthetic Beauty</option>
-      <option>Laser & Skin Rejuvenation</option>
-      <option>Body & Face Massage</option>
-      <option>Makeup & PMU</option>
-    </select>
-    <button class="btn filled">Send Registration</button>
-  </form>
-</section>
-
-</main>
-
-<footer>
-  <div class="footer-brand">
-    <img src="logo.jpeg" alt="Medi Fella Beauty School">
-    <strong>Medi Fella<br><small>BEAUTY SCHOOL</small></strong>
-  </div>
-  <div>학교소개<br>과정안내<br>학생지원<br>갤러리</div>
-  <div>CONTACT US<br>Telegram: 086 454 353<br>Phnom Penh, Cambodia</div>
-  <div class="copyright">© 2026 Medi Fella Beauty School. All rights reserved.</div>
-</footer>
-
-<script>
-document.querySelectorAll('.nav-links a').forEach(a =>
-  a.addEventListener('click', () =>
-    document.querySelector('.nav-links').classList.remove('open')
-  )
-);
-
-const T = {
-  en: {
-    label:"KOREAN BEAUTY EDUCATION",
-    heroTitle:"Learn Korean Beauty.<br><span>Build Your Future.</span>",
-    heroText:"Professional Korean-inspired beauty education designed to develop practical skills, confidence and modern beauty techniques.",
-    tag:"LEARN BEAUTY. BUILD YOUR FUTURE.",
-    explore:"Explore Courses →",
-    about:"About Our School",
-    coursesTitle:"Professional Beauty Education Programs",
-    allCourses:"View All Courses →",
-    scholarship:"Invest in Your Future<br>Through Beauty Education",
-    verify:"Certificate / Student Verification",
-    verifyText:"Enter a Student ID or scan a QR code to verify student information."
-  },
-  km: {
-    label:"ការអប់រំសម្រស់បែបកូរ៉េ",
-    heroTitle:"សិក្សាជំនាញសម្រស់កូរ៉េ។<br><span>កសាងអនាគតរបស់អ្នក។</span>",
-    heroText:"ការអប់រំផ្នែកសម្រស់តាមបែបកូរ៉េ ផ្តោតលើជំនាញអនុវត្ត ទំនុកចិត្ត និងបច្ចេកទេសសម្រស់ទំនើប។",
-    tag:"សិក្សាសម្រស់។ កសាងអនាគត។",
-    explore:"មើលវគ្គសិក្សា →",
-    about:"អំពីសាលារបស់យើង",
-    coursesTitle:"កម្មវិធីអប់រំជំនាញសម្រស់",
-    allCourses:"មើលវគ្គសិក្សាទាំងអស់ →",
-    scholarship:"វិនិយោគលើអនាគតរបស់អ្នក<br>តាមរយៈការអប់រំសម្រស់",
-    verify:"ផ្ទៀងផ្ទាត់វិញ្ញាបនបត្រ / ព័ត៌មានសិស្ស",
-    verifyText:"បញ្ចូល Student ID ឬស្កេន QR Code ដើម្បីផ្ទៀងផ្ទាត់ព័ត៌មានសិស្ស។"
-  },
-  ko: {
-    label:"KOREAN BEAUTY EDUCATION",
-    heroTitle:"한국의 뷰티 기술을 배우고,<br><span>당신의 미래를 디자인하세요.</span>",
-    heroText:"실무 능력과 자신감, 최신 뷰티 기술을 배울 수 있는 한국식 전문 뷰티 교육을 제공합니다.",
-    tag:"BEAUTY를 배우고, 미래를 만드세요.",
-    explore:"과정 둘러보기 →",
-    about:"학교소개 보기",
-    coursesTitle:"실무 중심의 전문 뷰티 교육",
-    allCourses:"모든 과정 보기 →",
-    scholarship:"당신의 미래에 투자하세요<br>뷰티 교육으로",
-    verify:"수료증 / 학생 정보 확인",
-    verifyText:"Student ID를 입력하거나 QR 코드를 스캔하여 학생 정보를 확인하세요."
-  }
-};
-
-function setLanguage(lang){
-  document.querySelectorAll("[data-i18n]").forEach(e => {
-    const k = e.dataset.i18n;
-    if(T[lang][k]) e.innerHTML = T[lang][k];
-  });
-
-  document.querySelectorAll(".language-switcher button").forEach(b =>
-    b.classList.remove("selected")
-  );
-
-  document.querySelectorAll(".language-switcher button").forEach(b => {
-    if(
-      (lang==="km" && b.textContent==="ខ្មែរ") ||
-      (lang==="en" && b.textContent==="English") ||
-      (lang==="ko" && b.textContent==="한국어")
-    ){
-      b.classList.add("selected");
-    }
-  });
-
-  localStorage.setItem("medifellaLanguage",lang);
-  document.documentElement.lang=lang;
+/* IMPORTANT: When Khmer is selected, apply Battambang to Khmer page text.
+   The language switcher changes <html lang="km">, so this selector catches
+   headings and other elements that previously overrode the body font. */
+html[lang="km"] body,
+html[lang="km"] body .brand-kh,
+html[lang="km"] body .nav-links,
+html[lang="km"] body .hero-copy,
+html[lang="km"] body .section-title,
+html[lang="km"] body .about-copy,
+html[lang="km"] body .scholarship,
+html[lang="km"] body .verify,
+html[lang="km"] body .contact,
+html[lang="km"] body footer {
+  font-family: "Battambang", sans-serif !important;
 }
 
-document.addEventListener("DOMContentLoaded",() =>
-  setLanguage(localStorage.getItem("medifellaLanguage") || "en")
-);
-</script>
+/* These elements have their own Georgia/Arial declarations, so explicitly
+   override them when Khmer is selected. */
+html[lang="km"] .hero h1,
+html[lang="km"] .section-title h2,
+html[lang="km"] .about h2,
+html[lang="km"] .scholarship h2,
+html[lang="km"] .verify h2,
+html[lang="km"] .contact h2,
+html[lang="km"] .hero-side h2,
+html[lang="km"] .education-card h3,
+html[lang="km"] .school-photo,
+html[lang="km"] .small-photo {
+  font-family: "Battambang", sans-serif !important;
+}
 
-</body>
-</html>
+/* Khmer language: always use Khmer OS Battambang */
+html[lang="km"],
+html[lang="km"] body,
+html[lang="km"] h1,
+html[lang="km"] h2,
+html[lang="km"] h3,
+html[lang="km"] h4,
+html[lang="km"] h5,
+html[lang="km"] h6,
+html[lang="km"] p,
+html[lang="km"] a,
+html[lang="km"] button,
+html[lang="km"] input,
+html[lang="km"] select,
+html[lang="km"] option,
+html[lang="km"] span,
+html[lang="km"] strong,
+html[lang="km"] small,
+html[lang="km"] li,
+html[lang="km"] label,
+html[lang="km"] div {
+  font-family: "Khmer OS Battambang", "Battambang", sans-serif !important;
+}
+
+/* Any element explicitly marked as Khmer also uses Khmer OS Battambang */
+.khmer,
+.khmer-text {
+  font-family: "Khmer OS Battambang", "Battambang", sans-serif !important;
+}
+
+:root{
+  --teal:#075e66;
+  --deep:#043d43;
+  --gold:#c8a15a;
+  --cream:#f7f5ef;
+  --ink:#172b30;
+  --muted:#687679;
+  --line:#e5e0d6;
+}
+
+*{box-sizing:border-box}
+html{scroll-behavior:smooth}
+body{margin:0;font-family:Arial,Helvetica,sans-serif;color:var(--ink);background:#fff}
+a{text-decoration:none}
+
+.top-strip{
+  height:38px;background:#05373d;color:#fff;padding:8px 4%;
+  display:flex;gap:25px;font-size:12px
+}
+.follow{margin-left:auto}
+
+.header{
+  height:92px;display:flex;align-items:center;justify-content:space-between;
+  padding:0 4%;background:#fff;border-bottom:1px solid #eee;
+  position:sticky;top:0;z-index:10
+}
+
+.brand{display:flex;align-items:center;gap:12px;color:var(--deep)}
+.brand img{width:62px;height:62px;object-fit:contain}
+.brand-name{font:27px Georgia,serif}
+.brand-sub{letter-spacing:3px;font-size:11px;color:var(--teal)}
+.brand-kh{font-size:8px;color:#999;margin-top:3px}
+
+.nav-links{display:flex;align-items:center;gap:25px}
+.nav-links>a{font-size:12px;text-align:center;color:#26383c;line-height:1.2}
+.nav-links small{font-size:9px;color:#777}
+.nav-links .active{color:var(--teal);border-bottom:2px solid var(--teal);padding-bottom:10px}
+.enroll{background:var(--teal);color:#fff!important;border-radius:24px;padding:10px 18px}
+.enroll small{color:#fff}
+.hamburger{display:none;border:0;background:none;font-size:26px}
+
+.hero{
+  min-height:570px;display:grid;grid-template-columns:45% 55%;
+  background:linear-gradient(120deg,#faf9f5 0%,#fff 52%,#e9f1ef 100%)
+}
+.hero-copy{
+  padding:65px 7% 45px 8%;display:flex;flex-direction:column;justify-content:center
+}
+.gold-label,.section-title>div>span,.about-copy>span,.scholarship>div>span,.verify>div>span,.contact>div>span{
+  color:var(--gold);font-size:12px;letter-spacing:2px;font-weight:bold
+}
+.hero h1{font:48px/1.12 Georgia,serif;margin:18px 0;color:#172b30}
+.hero h1 span{color:var(--teal)}
+.kr-copy{font-size:14px;color:#59686b;line-height:1.8}
+.en-tag{letter-spacing:2px;font-size:12px;margin-top:10px}
+.hero-buttons{display:flex;gap:14px;margin:18px 0 25px}
+
+.btn{display:inline-block;border-radius:25px;padding:12px 22px;font-size:12px;font-weight:bold}
+.filled{background:var(--teal);color:#fff;border:1px solid var(--teal)}
+.outline{border:1px solid var(--teal);color:var(--teal);background:#fff}
+.gold{background:var(--gold);color:#fff}
+.light{background:#fff;color:var(--deep)}
+
+.feature-row{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.feature-row div{font-size:9px}
+.feature-row b{font-size:20px;color:var(--teal);display:block;margin-bottom:4px}
+.feature-row strong{font-size:9px}
+.feature-row small{display:block;color:#777;margin-top:4px}
+
+.hero-visual{display:grid;grid-template-columns:1fr 230px}
+.training-photo{
+  min-height:570px;position:relative;background:#e9f1ef;overflow:hidden
+}
+.training-photo img{
+  width:100%;height:100%;min-height:570px;object-fit:cover;display:block
+}
+.hero-side{
+  background:linear-gradient(160deg,#075f67,#043d43);color:#fff;
+  padding:45px 20px;text-align:center;display:flex;align-items:center;
+  flex-direction:column;justify-content:center
+}
+.hero-side img{width:100px;height:100px;object-fit:contain;border-radius:50%}
+.hero-side h2{font:22px/1.15 Georgia,serif}
+.hero-side p{font-size:11px}
+.side-line{width:55px;border-top:2px solid var(--gold);margin:10px}
+.hero-side .quote{font-family:Georgia,serif}
+.hero-side strong{font-size:10px;letter-spacing:1px}
+.slide-number{margin-top:40px;font-size:10px;color:var(--gold)}
+.slide-number span{letter-spacing:0}
+
+.stats{
+  width:86%;margin:0 auto;transform:translateY(-22px);position:relative;z-index:2;
+  background:#fff;border-radius:10px;box-shadow:0 12px 35px rgba(0,0,0,.1);
+  display:grid;grid-template-columns:repeat(4,1fr);padding:22px
+}
+.stats>div{
+  display:flex;align-items:center;justify-content:center;gap:13px;
+  border-right:1px solid var(--line)
+}
+.stats>div:last-child{border:0}
+.stats b{font-size:27px;color:var(--gold)}
+.stats strong{font:30px Georgia,serif;color:var(--teal)}
+.stats span{font-size:9px;color:#697678}
+
+.section{padding:80px 7%;max-width:1450px;margin:auto}
+.section-title{
+  display:grid;grid-template-columns:1fr 1fr auto;gap:30px;
+  align-items:end;margin-bottom:32px
+}
+.section-title h2,.about h2,.scholarship h2,.verify h2,.contact h2{
+  font:34px/1.15 Georgia,serif;color:var(--deep);margin:9px 0
+}
+.section-title p{font-size:12px;color:var(--muted);line-height:1.8}
+.section-title>a{
+  border:1px solid #9eb1b2;border-radius:22px;padding:9px 18px;
+  font-size:11px;color:var(--teal)
+}
+
+.courses-section{max-width:none;background:#fbfaf7}
+.course-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:12px}
+.course-grid article{background:#fff;border:1px solid #e6e1d8;box-shadow:0 4px 15px rgba(0,0,0,.03)}
+.course-art{height:150px;overflow:hidden;background:#eee}
+.course-art img{width:100%;height:100%;object-fit:cover;display:block}
+.course-body{padding:15px}
+.course-body small{color:var(--teal);font-weight:bold}
+.course-body h3{font-size:14px;margin:6px 0}
+.course-body p{font-size:10px;color:var(--muted);line-height:1.6}
+
+.about{display:grid;grid-template-columns:35% 65%;gap:45px}
+.about-copy>span{display:block}
+.about-copy ul{padding:0;list-style:none;font-size:13px;line-height:2.2;color:#4d5d60}
+.about-visual{display:grid;grid-template-columns:1.4fr .7fr .9fr;gap:8px}
+.school-photo,.small-photo{
+  min-height:260px;background:linear-gradient(145deg,#d9e5e1,#f4eee4);
+  display:grid;place-items:center;text-align:center;font:23px Georgia,serif;color:#426066
+}
+.small-photo{font-size:16px}
+.education-card{background:var(--deep);color:#fff;padding:25px}
+.education-card span{font-size:9px;color:var(--gold)}
+.education-card h3{font-size:21px;line-height:1.3}
+.education-card p{font-size:10px;border-bottom:1px solid rgba(255,255,255,.15);padding-bottom:7px}
+
+.scholarship{
+  max-width:none;background:linear-gradient(120deg,var(--deep),#08737a);
+  color:#fff;display:flex;justify-content:space-between;align-items:center
+}
+.scholarship h2{color:#fff}
+.scholarship p{font-size:13px;color:#d6e5e5}
+.scholarship-mark{
+  font:42px Georgia,serif;letter-spacing:5px;text-align:right;color:rgba(255,255,255,.2)
+}
+
+.gallery-grid{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+.gallery-grid div{
+  height:200px;display:grid;place-items:center;
+  background:linear-gradient(135deg,#e0e9e5,#f7f2e9);
+  color:#607174;font:18px Georgia,serif
+}
+
+.verify{
+  margin:0 7% 70px;padding:35px 45px;background:var(--deep);color:#fff;
+  border-radius:12px;display:flex;align-items:center;justify-content:space-between
+}
+.verify h2{color:#fff}
+.verify p{font-size:12px;color:#d2e0e1}
+
+.contact{
+  background:#faf9f5;max-width:none;display:grid;grid-template-columns:1fr 1fr;gap:70px
+}
+.contact>div>span{display:block}
+.contact p{color:var(--muted);font-size:13px}
+.contact form{display:grid;gap:10px}
+.contact input,.contact select{
+  padding:13px;border:1px solid #ddd7ca;border-radius:7px;
+  font:inherit;background:#fff
+}
+.contact button{border:0}
+
+.footer-brand{display:flex;align-items:center;gap:12px}
+.footer-brand img{width:60px;height:60px;object-fit:contain}
+.footer-brand strong{font:21px Georgia,serif}
+.footer-brand small{font-size:9px;letter-spacing:2px;color:#b9cccc}
+
+footer{
+  background:#052f35;color:#fff;padding:40px 7%;display:grid;
+  grid-template-columns:2fr 1fr 1fr;gap:30px;font-size:12px;line-height:2
+}
+.copyright{
+  grid-column:1/-1;text-align:center;color:#8ea9aa;
+  border-top:1px solid rgba(255,255,255,.1);padding-top:15px
+}
+
+@media(max-width:1050px){
+  .nav-links{gap:12px}
+  .hero h1{font-size:40px}
+  .course-grid{grid-template-columns:repeat(3,1fr)}
+  .section-title{grid-template-columns:1fr 1fr}
+  .section-title>a{justify-self:start}
+  .about{grid-template-columns:1fr}
+  .about-visual{grid-template-columns:1fr 1fr 1fr}
+}
+
+@media(max-width:760px){
+  .top-strip{display:none}
+  .header{height:72px}
+  .hamburger{display:block}
+  .nav-links{
+    display:none;position:absolute;top:72px;left:0;right:0;background:#fff;
+    padding:20px;flex-direction:column;align-items:stretch;
+    box-shadow:0 12px 25px rgba(0,0,0,.1)
+  }
+  .nav-links.open{display:flex}
+  .nav-links>a{text-align:left;padding:8px}
+  .hero{grid-template-columns:1fr}
+  .hero-copy{padding:55px 7%}
+  .hero-visual{grid-template-columns:1fr}
+  .hero-side{display:none}
+  .training-photo{min-height:350px}
+  .training-photo img{min-height:350px}
+  .feature-row{grid-template-columns:1fr 1fr}
+  .stats{grid-template-columns:1fr 1fr;width:90%}
+  .stats>div{border:0}
+  .section-title{display:block}
+  .section-title>p{margin:12px 0}
+  .course-grid{grid-template-columns:1fr 1fr}
+  .gallery-grid{grid-template-columns:1fr 1fr}
+  .verify{margin:0 7% 55px;display:block}
+  .verify .btn{margin-top:15px}
+  .contact{grid-template-columns:1fr}
+  .scholarship{display:block}
+  .scholarship-mark{margin-top:30px;text-align:left}
+  .about-visual{grid-template-columns:1fr}
+}
+
+@media(max-width:480px){
+  .brand-name{font-size:20px}
+  .brand img{width:48px;height:48px}
+  .hero h1{font-size:36px}
+  .course-grid,.gallery-grid{grid-template-columns:1fr}
+  .stats{grid-template-columns:1fr}
+  .stats>div{border-bottom:1px solid var(--line);padding:10px}
+  .section{padding:60px 6%}
+  footer{grid-template-columns:1fr}
+}
+
+
+/* Prevent Georgia/Arial heading rules from overriding Khmer OS Battambang */
+html[lang="km"] .hero h1,
+html[lang="km"] .section-title h2,
+html[lang="km"] .about h2,
+html[lang="km"] .scholarship h2,
+html[lang="km"] .verify h2,
+html[lang="km"] .contact h2,
+html[lang="km"] .hero-side h2,
+html[lang="km"] .education-card h3,
+html[lang="km"] .scholarship-mark,
+html[lang="km"] .brand-name {
+  font-family: "Khmer OS Battambang", "Battambang", sans-serif !important;
+}
