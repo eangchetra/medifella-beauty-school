@@ -20,7 +20,7 @@
     "duration": "12 Months",
     "issueDate": "08/08/2026",
     "completionDate": "08/08/2027"
- },
+  },
   {
     "id": "MEDIFELLA02202547",
     "name": "ឡាយ ធូ LAY THOU",
@@ -31,5 +31,16 @@
     "duration": "2 Months",
     "issueDate": "04/06/2026",
     "completionDate": "04/08/2026"
+    },
+    {
+    "id": "MEDIFELLA21072605",
+    "name": "ឡមុីន សាលីហា MIN SALYHA",
+    "sex": "Female",
+    "dateOfBirth": "01 February 1992",
+    "photo": "students/MEDIFELLA21072605.jpg",
+    "course": "ម៉ាស្សាមុខទូទៅ(កម្រិតមធ្យម) General Facial Massage (Medium)",
+    "duration": "2 Months",
+    "issueDate": "21/05/2026",
+    "completionDate": "21/07/2026"
     }
     ]
