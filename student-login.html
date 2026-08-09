@@ -10,27 +10,126 @@
 <div class="auth-page">
   <div class="auth-card">
     <a href="index.html" class="brand">Medi Fella Beauty School</a>
-    <div class="lang"><button onclick="setLang('km')">ខ្មែរ</button><button onclick="setLang('en')">English</button><button onclick="setLang('ko')">한국어</button></div>
-    <h1 data-t="title">Student Login</h1>
-    <p data-t="sub">Login to access your online courses.</p>
-    <label data-t="email">Email</label>
-    <input id="email" type="email" placeholder="Email">
-    <label data-t="password">Password</label>
-    <input id="password" type="password" placeholder="Password">
-    <button class="primary" onclick="login()" data-t="login">LOGIN</button>
-    <button class="secondary" onclick="demoLogin()" data-t="demo">DEMO LOGIN</button>
-    <p class="small" data-t="demoNote">Demo mode is for testing only. Real secure accounts will be connected to a database in the next stage.</p>
+    <div class="lang">
+      <button onclick="setLang('km')">ខ្មែរ</button>
+      <button onclick="setLang('en')">English</button>
+      <button onclick="setLang('ko')">한국어</button>
+    </div>
+
+    <div id="loginBox">
+      <h1 data-t="loginTitle">Student Login</h1>
+      <p data-t="loginSub">Login to access your online courses.</p>
+
+      <label data-t="email">Email</label>
+      <input id="email" type="email" placeholder="Email">
+
+      <label data-t="password">Password</label>
+      <input id="password" type="password" placeholder="Password">
+
+      <button class="primary" onclick="login()" data-t="login">LOGIN</button>
+      <button class="secondary" onclick="showRegister()" data-t="create">CREATE ACCOUNT</button>
+      <button class="secondary" onclick="demoLogin()" data-t="demo">DEMO LOGIN</button>
+    </div>
+
+    <div id="registerBox" style="display:none">
+      <h1 data-t="registerTitle">Create Student Account</h1>
+      <p data-t="registerSub">Create your student account to continue.</p>
+
+      <label data-t="name">Full Name</label>
+      <input id="regName" type="text" placeholder="Full Name">
+
+      <label data-t="regEmail">Email</label>
+      <input id="regEmail" type="email" placeholder="Email">
+
+      <label data-t="regPassword">Password</label>
+      <input id="regPassword" type="password" placeholder="Password">
+
+      <button class="primary" onclick="register()" data-t="register">CREATE ACCOUNT</button>
+      <button class="secondary" onclick="showLogin()" data-t="backLogin">BACK TO LOGIN</button>
+    </div>
+
+    <p class="small" data-t="demoNote">
+      Demo registration is stored only in this browser for testing. A secure online account database will be connected before real paid enrollment.
+    </p>
     <div id="msg"></div>
   </div>
 </div>
 <script>
 const T={
-km:{title:"ចូលគណនីសិស្ស",sub:"ចូលគណនីដើម្បីចូលរៀនវគ្គសិក្សាអនឡាញ។",email:"អ៊ីមែល",password:"ពាក្យសម្ងាត់",login:"ចូលគណនី",demo:"ចូលសាកល្បង",demoNote:"នេះជារបៀបសាកល្បងប៉ុណ្ណោះ។ ប្រព័ន្ធគណនីពិតនឹងភ្ជាប់ជាមួយ Database នៅដំណាក់កាលបន្ទាប់។"},
-en:{title:"Student Login",sub:"Login to access your online courses.",email:"Email",password:"Password",login:"LOGIN",demo:"DEMO LOGIN",demoNote:"Demo mode is for testing only. Real secure accounts will be connected to a database in the next stage."},
-ko:{title:"학생 로그인",sub:"온라인 과정에 접속하려면 로그인하세요.",email:"이메일",password:"비밀번호",login:"로그인",demo:"데모 로그인",demoNote:"현재는 테스트용 데모입니다. 실제 보안 계정은 다음 단계에서 데이터베이스와 연결합니다."}};
-function setLang(l){document.documentElement.lang=l;document.querySelectorAll("[data-t]").forEach(e=>e.textContent=T[l][e.dataset.t]);localStorage.setItem("mfLang",l)}
-function login(){const email=document.getElementById("email").value.trim();if(!email){document.getElementById("msg").textContent="Please enter your email.";return}localStorage.setItem("mfStudent",{name:email.split("@")[0],email});location.href="student-dashboard.html"}
-function demoLogin(){localStorage.setItem("mfStudent",JSON.stringify({name:"Demo Student",email:"demo@medifella.test"}));location.href="student-dashboard.html"}
+km:{
+loginTitle:"ចូលគណនីសិស្ស",loginSub:"ចូលគណនីដើម្បីចូលរៀនវគ្គសិក្សាអនឡាញ។",
+registerTitle:"បង្កើតគណនីសិស្ស",registerSub:"បង្កើតគណនីសិស្សរបស់អ្នកដើម្បីបន្ត។",
+email:"អ៊ីមែល",password:"ពាក្យសម្ងាត់",name:"ឈ្មោះពេញ",regEmail:"អ៊ីមែល",regPassword:"ពាក្យសម្ងាត់",
+login:"ចូលគណនី",create:"បង្កើតគណនី",register:"បង្កើតគណនី",backLogin:"ត្រឡប់ទៅចូលគណនី",
+demo:"ចូលសាកល្បង",demoNote:"ការចុះឈ្មោះនេះសម្រាប់សាកល្បងក្នុង Browser ប៉ុណ្ណោះ។ មុនពេលលក់វគ្គសិក្សាពិត យើងនឹងភ្ជាប់ Database ដែលមានសុវត្ថិភាព។"
+},
+en:{
+loginTitle:"Student Login",loginSub:"Login to access your online courses.",
+registerTitle:"Create Student Account",registerSub:"Create your student account to continue.",
+email:"Email",password:"Password",name:"Full Name",regEmail:"Email",regPassword:"Password",
+login:"LOGIN",create:"CREATE ACCOUNT",register:"CREATE ACCOUNT",backLogin:"BACK TO LOGIN",
+demo:"DEMO LOGIN",demoNote:"Demo registration is stored only in this browser for testing. A secure online account database will be connected before real paid enrollment."
+},
+ko:{
+loginTitle:"학생 로그인",loginSub:"온라인 과정에 접속하려면 로그인하세요.",
+registerTitle:"학생 계정 만들기",registerSub:"계속하려면 학생 계정을 만드세요.",
+email:"이메일",password:"비밀번호",name:"이름",regEmail:"이메일",regPassword:"비밀번호",
+login:"로그인",create:"계정 만들기",register:"계정 만들기",backLogin:"로그인으로 돌아가기",
+demo:"데모 로그인",demoNote:"현재 등록은 브라우저에서만 저장되는 테스트용입니다. 실제 유료 등록 전에는 안전한 데이터베이스를 연결합니다."
+}};
+
+function setLang(l){
+  document.documentElement.lang=l;
+  document.querySelectorAll("[data-t]").forEach(e=>{
+    if(T[l][e.dataset.t]) e.textContent=T[l][e.dataset.t];
+  });
+  localStorage.setItem("mfLang",l);
+}
+function showRegister(){
+  document.getElementById("loginBox").style.display="none";
+  document.getElementById("registerBox").style.display="block";
+  document.getElementById("msg").textContent="";
+}
+function showLogin(){
+  document.getElementById("registerBox").style.display="none";
+  document.getElementById("loginBox").style.display="block";
+  document.getElementById("msg").textContent="";
+}
+function register(){
+  const name=document.getElementById("regName").value.trim();
+  const email=document.getElementById("regEmail").value.trim().toLowerCase();
+  const password=document.getElementById("regPassword").value;
+  const msg=document.getElementById("msg");
+  if(!name || !email || !password){
+    msg.textContent="Please fill in all fields.";
+    return;
+  }
+  if(password.length<6){
+    msg.textContent="Password must be at least 6 characters.";
+    return;
+  }
+  const account={name,email,password};
+  localStorage.setItem("mfAccount",JSON.stringify(account));
+  localStorage.setItem("mfStudent",JSON.stringify({name,email}));
+  location.href="student-dashboard.html";
+}
+function login(){
+  const email=document.getElementById("email").value.trim().toLowerCase();
+  const password=document.getElementById("password").value;
+  const account=JSON.parse(localStorage.getItem("mfAccount")||"null");
+  const msg=document.getElementById("msg");
+  if(!email || !password){msg.textContent="Please enter your email and password.";return;}
+  if(account && account.email===email && account.password===password){
+    localStorage.setItem("mfStudent",JSON.stringify({name:account.name,email:account.email}));
+    location.href="student-dashboard.html";
+    return;
+  }
+  msg.textContent=account ? "Email or password is incorrect." : "Please create an account first.";
+}
+function demoLogin(){
+  localStorage.setItem("mfStudent",JSON.stringify({name:"Demo Student",email:"demo@medifella.test"}));
+  location.href="student-dashboard.html";
+}
 setLang(localStorage.getItem("mfLang")||"km");
 </script>
 </body>
