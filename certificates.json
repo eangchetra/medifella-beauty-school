@@ -42,5 +42,16 @@
     "duration": "2 Months",
     "issueDate": "21/05/2026",
     "completionDate": "21/07/2026"
+    },
+    {
+    "id": "MEDIFELLA01202344",
+    "name": "អុឹង សៀមពៅ MIN SALYHA",
+    "sex": "Female",
+    "dateOfBirth": "30 October 1991",
+    "photo": "students/MEDIFELLA01202344.jpg",
+    "course": "ថែរក្សាសម្ផស្ស BEAUTY CARE",
+    "duration": "12 Months",
+    "issueDate": "01/01/2024",
+    "completionDate": "31/12/2024"
     }
     ]
