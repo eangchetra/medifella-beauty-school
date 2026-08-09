@@ -7,8 +7,8 @@
     "photo": "students/MFS-2026-0001.jpg",
     "course": "Diploma of Beauty Care",
     "duration": "12 Months",
-    "issueDate": "2026-08-08",
-    "completionDate": "2027-08-08"
+    "issueDate": "08/08/2026",
+    "completionDate": "08/08/2027"
   },
   {
     "id": "MEDIFELLA01202547",
@@ -18,8 +18,8 @@
     "photo": "students/MEDIFELLA01202547.jpg",
     "course": "Diploma of Beauty Care",
     "duration": "12 Months",
-    "issueDate": "2026-08-08",
-    "completionDate": "2027-08-08"
+    "issueDate": "08/08/2026",
+    "completionDate": "08/08/2027"
  },
   {
     "id": "MEDIFELLA02202547",
@@ -29,5 +29,7 @@
     "photo": "students/MEDIFELLA02202547.jpg",
     "course": "ម៉ាស្សាមុខទូទៅ(កម្រិតមធ្យម) General Facial Massage (Medium)",
     "duration": "2 Months",
-    "issueDate": "04-06-2026",
-    "completionDate": "04-08-2026"
+    "issueDate": "04/06/2026",
+    "completionDate": "04/08/2026"
+    }
+    ]
