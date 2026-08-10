@@ -5,6 +5,24 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Student Dashboard | Medi Fella</title>
 <link rel="stylesheet" href="student.css">
+<style>
+.online-course-link {
+  margin: 22px 0;
+}
+.online-course-button {
+  display: inline-block;
+  padding: 13px 22px;
+  border-radius: 24px;
+  background: #075e66;
+  color: #fff;
+  text-decoration: none;
+  font-weight: bold;
+  font-size: 13px;
+}
+.online-course-button:hover {
+  opacity: .9;
+}
+</style>
 </head>
 
 <body>
@@ -28,6 +46,12 @@
       <h1 data-t="welcome">Welcome to your classroom</h1>
       <p id="studentInfo"></p>
     </div>
+  </section>
+
+  <section class="online-course-link">
+    <a href="online-course.html" class="online-course-button">
+      🎓 <span data-t="onlineCourses">ONLINE COURSES</span>
+    </a>
   </section>
 
   <section class="course-card">
@@ -54,6 +78,7 @@ const T = {
     active: "វគ្គសិក្សាកំពុងសិក្សា",
     course: "ម៉ាស្សាមុខ",
     logout: "ចាកចេញ",
+    onlineCourses: "វគ្គសិក្សាអនឡាញ",
     lesson: "មេរៀន",
     open: "បើកមេរៀន",
     completed: "បានបញ្ចប់"
@@ -64,6 +89,7 @@ const T = {
     active: "ACTIVE COURSE",
     course: "Facial Massage",
     logout: "LOGOUT",
+    onlineCourses: "ONLINE COURSES",
     lesson: "Lesson",
     open: "OPEN LESSON",
     completed: "COMPLETED"
@@ -74,6 +100,7 @@ const T = {
     active: "수강 중인 과정",
     course: "페이셜 마사지",
     logout: "로그아웃",
+    onlineCourses: "온라인 과정",
     lesson: "레슨",
     open: "레슨 열기",
     completed: "완료"
