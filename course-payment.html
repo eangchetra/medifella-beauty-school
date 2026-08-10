@@ -1,0 +1,190 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Course Payment | Medi Fella Beauty School</title>
+  <meta name="description" content="Secure course payment for Medi Fella Beauty School.">
+  <link rel="stylesheet" href="style.css?v=5">
+  <style>
+    body {
+      margin: 0;
+      background: #f7f6f1;
+      color: #043d43;
+      font-family: Arial, sans-serif;
+    }
+    .pay-nav {
+      background: #063f45;
+      color: #fff;
+      padding: 14px 6%;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+    .pay-nav a { color: #fff; text-decoration: none; }
+    .pay-brand { display:flex; align-items:center; gap:10px; font: 18px Georgia, serif; }
+    .pay-brand img { width:42px; height:42px; object-fit:contain; border-radius:50%; }
+    .pay-wrap {
+      width: 92%;
+      max-width: 900px;
+      margin: 55px auto;
+    }
+    .pay-card {
+      background:#fff;
+      border:1px solid #e5e0d6;
+      border-radius:16px;
+      box-shadow:0 10px 30px rgba(0,0,0,.07);
+      overflow:hidden;
+    }
+    .pay-head {
+      background:#043d43;
+      color:#fff;
+      padding:30px;
+    }
+    .pay-head small { color:#d7b66d; letter-spacing:2px; font-weight:bold; }
+    .pay-head h1 { margin:10px 0 0; font:32px Georgia,serif; }
+    .pay-body { padding:30px; }
+    .summary {
+      display:flex;
+      justify-content:space-between;
+      gap:20px;
+      align-items:flex-start;
+      border-bottom:1px solid #eee8dc;
+      padding-bottom:20px;
+      margin-bottom:25px;
+    }
+    .summary h2 { margin:0 0 8px; font:24px Georgia,serif; }
+    .summary p { margin:0; color:#687679; font-size:13px; line-height:1.7; }
+    .price { font:bold 30px Georgia,serif; color:#075e66; white-space:nowrap; }
+    .features { margin:0 0 25px; padding-left:20px; color:#536467; line-height:1.9; font-size:13px; }
+    .secure {
+      background:#f7f6f1;
+      border-radius:10px;
+      padding:14px;
+      font-size:12px;
+      color:#687679;
+      margin-bottom:20px;
+    }
+    .pay-btn {
+      display:block;
+      width:100%;
+      box-sizing:border-box;
+      border:0;
+      border-radius:26px;
+      padding:14px 20px;
+      background:#075e66;
+      color:#fff;
+      font-size:14px;
+      font-weight:bold;
+      cursor:pointer;
+      text-align:center;
+      text-decoration:none;
+    }
+    .pay-btn:hover { opacity:.92; }
+    .back {
+      display:block;
+      text-align:center;
+      margin-top:15px;
+      color:#075e66;
+      font-size:12px;
+      text-decoration:none;
+    }
+    .notice {
+      margin-top:20px;
+      padding:14px;
+      border-left:4px solid #c8a15a;
+      background:#fffaf0;
+      color:#665a3f;
+      font-size:12px;
+      line-height:1.6;
+    }
+    @media(max-width:600px) {
+      .summary { display:block; }
+      .price { margin-top:15px; }
+      .pay-head h1 { font-size:27px; }
+      .pay-body, .pay-head { padding:22px; }
+    }
+    html[lang="km"] body { font-family:"Khmer OS Battambang","Battambang",Arial,sans-serif; }
+  </style>
+</head>
+<body>
+
+<nav class="pay-nav">
+  <a href="online-course.html" class="pay-brand">
+    <img src="logo.jpeg" alt="Medi Fella">
+    <span>Medi Fella Beauty School</span>
+  </a>
+  <a href="online-course.html">← Back to Courses</a>
+</nav>
+
+<main class="pay-wrap">
+  <section class="pay-card">
+    <div class="pay-head">
+      <small>ONLINE COURSE PAYMENT</small>
+      <h1>Complete Your Enrollment</h1>
+    </div>
+
+    <div class="pay-body">
+      <div class="summary">
+        <div>
+          <h2 id="courseName">Basic of Facial Massage</h2>
+          <p>Online course • 5 Lessons • 5 Quizzes • 1 Final Exam</p>
+        </div>
+        <div class="price" id="coursePrice">$299 USD</div>
+      </div>
+
+      <ul class="features">
+        <li>Access to the full course after successful payment</li>
+        <li>Video lessons and learning materials</li>
+        <li>Quizzes and final examination</li>
+        <li>Certificate after meeting the course requirements</li>
+      </ul>
+
+      <div class="secure">
+        🔒 <strong>Secure payment:</strong>
+        Your card details should be entered only on the official ABA PayWay secure checkout.
+        This page does not collect or store card numbers.
+      </div>
+
+      <a class="pay-btn" id="payButton" href="#">
+        Continue to ABA PayWay Sandbox
+      </a>
+
+      <a class="back" href="online-course.html">Return to Online Courses</a>
+
+      <div class="notice">
+        <strong>Sandbox test mode:</strong>
+        The PayWay connection is not activated in this HTML file yet.
+        The next step is to connect this button to your secure backend and ABA PayWay Sandbox.
+        Never place your RSA private key in this page.
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+  // Course information can be passed in the URL:
+  // course-payment.html?course=facial-massage&price=299
+  const params = new URLSearchParams(window.location.search);
+  const course = params.get("course") || "facial-massage";
+  const price = params.get("price") || "299";
+
+  const courseNames = {
+    "facial-massage": "Basic of Facial Massage"
+  };
+
+  document.getElementById("courseName").textContent =
+    courseNames[course] || "Basic of Facial Massage";
+
+  document.getElementById("coursePrice").textContent =
+    "$" + Number(price).toFixed(0) + " USD";
+
+  /*
+    IMPORTANT:
+    Do not put ABA Merchant API keys, RSA private keys, or signatures here.
+    The PayWay transaction must be created by your secure backend.
+  */
+</script>
+
+</body>
+</html>
