@@ -86,5 +86,16 @@
     "duration": "6 Months",
     "issueDate": "01/01/2026",
     "completionDate": "30/06/2026"
+    },
+    {
+    "id": "MEDIFELLA01202581",
+    "name": "អ៊ាន រង្សី EAN RAINGSEY",
+    "sex": "Female",
+    "dateOfBirth": "08 September 1990",
+    "photo": "students/MEDIFELLA01202581.jpg",
+    "course": "ថែរក្សាសម្ផស្ស Beauty Care",
+    "duration": "12 Months",
+    "issueDate": "01/01/2025",
+    "completionDate": "31/12/2025"
     }
     ]
