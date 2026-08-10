@@ -75,5 +75,16 @@
     "duration": "12 Months",
     "issueDate": "01/06/2024",
     "completionDate": "01/06/2025"
+    },
+    {
+    "id": "MEDIFELLA01202558",
+    "name": "នេត ស្រីនុច NET SREYNUCH",
+    "sex": "Female",
+    "dateOfBirth": "05 June 1994",
+    "photo": "students/MEDIFELLA01202558.jpg",
+    "course": "ថែរក្សាសម្ផស្សកម្រិត១ Beauty Care Level1",
+    "duration": "6 Months",
+    "issueDate": "01/01/2026",
+    "completionDate": "30/06/2026"
     }
     ]
