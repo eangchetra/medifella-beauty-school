@@ -6,7 +6,6 @@
   <title>Student Login | Medi Fella Beauty School</title>
 
   <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-
   <style>
     * { box-sizing: border-box; }
     body {
@@ -103,7 +102,6 @@
     }
   </style>
 </head>
-
 <body>
   <div class="auth-card">
 
@@ -119,7 +117,6 @@
     <section id="loginBox">
       <h1 id="loginTitle">Student Login</h1>
       <p class="subtitle" id="loginSub">Login to access your online courses.</p>
-
       <label id="emailLabel">Email</label>
       <input id="loginEmail" type="email" placeholder="Email" autocomplete="email">
 
@@ -140,7 +137,6 @@
 
       <label>Email</label>
       <input id="registerEmail" type="email" placeholder="Email" autocomplete="email">
-
       <label id="regPasswordLabel">Password</label>
       <input id="registerPassword" type="password" placeholder="Password" autocomplete="new-password">
 
@@ -162,7 +158,6 @@
              maxlength="8"
              placeholder="Enter 8-digit code"
              autocomplete="one-time-code">
-
       <button class="primary" id="verifyBtn" onclick="verifyEmail()">VERIFY EMAIL</button>
       <button class="secondary" id="resendBtn" onclick="resendCode()">RESEND CODE</button>
       <button class="secondary" onclick="showLogin()">BACK TO LOGIN</button>
@@ -191,7 +186,6 @@ const SUPABASE_URL = "https://dwrpriwxbjgxpsvhclai.supabase.co";
   It starts with: sb_publishable_
 */
 const SUPABASE_ANON_KEY = "sb_publishable_gwLGNpQg4mo-Ae_OvlGiMQ_rZVx7S3I";
-
 const supabaseClient = window.supabase.createClient(
   SUPABASE_URL,
   SUPABASE_ANON_KEY
@@ -202,7 +196,6 @@ let currentName = "";
 let currentPassword = "";
 
 /* ---------------- LANGUAGE ---------------- */
-
 const translations = {
   en: {
     loginTitle:"Student Login",
@@ -230,6 +223,7 @@ const translations = {
     resendSuccess:"A new verification code has been sent.",
     wrongLogin:"Incorrect email or password."
   },
+
   km: {
     loginTitle:"ចូលប្រព័ន្ធសិស្ស",
     loginSub:"ចូលដើម្បីប្រើប្រាស់វគ្គសិក្សាអនឡាញ។",
@@ -256,6 +250,7 @@ const translations = {
     resendSuccess:"លេខកូដថ្មីត្រូវបានផ្ញើ។",
     wrongLogin:"អ៊ីមែល ឬពាក្យសម្ងាត់មិនត្រឹមត្រូវ។"
   },
+
   ko: {
     loginTitle:"학생 로그인",
     loginSub:"온라인 강좌에 접속하려면 로그인하세요.",
@@ -296,14 +291,12 @@ function setLang(lang) {
   document.getElementById("passwordLabel").textContent = t.password;
   document.getElementById("loginBtn").textContent = t.login;
   document.getElementById("createBtn").textContent = t.create;
-
   document.getElementById("registerTitle").textContent = t.registerTitle;
   document.getElementById("registerSub").textContent = t.registerSub;
   document.getElementById("nameLabel").textContent = t.name;
   document.getElementById("regPasswordLabel").textContent = t.password;
   document.getElementById("registerBtn").textContent = t.createAccount;
   document.getElementById("backBtn").textContent = t.back;
-
   document.getElementById("verifyTitle").textContent = t.verifyTitle;
   document.getElementById("verifySub").textContent = t.verifySub;
   document.getElementById("codeLabel").textContent = t.code;
@@ -345,10 +338,8 @@ function showVerify() {
 }
 
 /* ---------------- REGISTER ---------------- */
-
 async function register() {
   clearMessage();
-
   const name = document.getElementById("fullName").value.trim();
   const email = document.getElementById("registerEmail").value.trim();
   const password = document.getElementById("registerPassword").value;
@@ -390,7 +381,6 @@ async function register() {
 }
 
 /* ---------------- VERIFY EMAIL CODE ---------------- */
-
 async function verifyEmail() {
   clearMessage();
 
@@ -433,7 +423,6 @@ async function verifyEmail() {
 }
 
 /* ---------------- RESEND ---------------- */
-
 async function resendCode() {
   clearMessage();
 
@@ -453,7 +442,6 @@ async function resendCode() {
     if (error) throw error;
 
     showMessage(translations[currentLang].resendSuccess, "success");
-
   } catch (error) {
     console.error(error);
     showMessage(error.message || "Could not resend code.", "error");
@@ -461,7 +449,6 @@ async function resendCode() {
 }
 
 /* ---------------- LOGIN ---------------- */
-
 async function login() {
   clearMessage();
 
