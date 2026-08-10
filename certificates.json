@@ -97,5 +97,16 @@
     "duration": "12 Months",
     "issueDate": "01/01/2025",
     "completionDate": "31/12/2025"
+    },
+    {
+    "id": "MEDIFELLA01202571",
+    "name": "សេង សក្កណា SENG SAKANA",
+    "sex": "Female",
+    "dateOfBirth": "25 November 1989",
+    "photo": "students/MEDIFELLA01202571.jpg",
+    "course": "ថែរក្សាសម្ផស្សកម្រិត១ Beauty Care level1",
+    "duration": "6 Months",
+    "issueDate": "01/01/2025",
+    "completionDate": "01/07/2025"
     }
     ]
