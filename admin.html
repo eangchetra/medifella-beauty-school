@@ -61,6 +61,25 @@
         <h2>Published / Draft Posts</h2>
         <div id="posts">Loading...</div>
       </div>
+
+      <div class="card" style="grid-column:1/-1">
+        <h2>Student Management</h2>
+        <p class="muted">Review registrations, verify students, and manage student status.</p>
+
+        <div class="row" style="margin-bottom:12px">
+          <input id="studentSearch" placeholder="Search name, email, phone, or course">
+          <select id="studentFilter">
+            <option value="all">All students</option>
+            <option value="pending">Pending</option>
+            <option value="verified">Verified</option>
+            <option value="rejected">Rejected</option>
+          </select>
+          <button id="refreshStudents" class="btn light">Refresh</button>
+        </div>
+
+        <div id="studentStatus"></div>
+        <div id="students">Loading students...</div>
+      </div>
     </div>
   </section>
 </main>
@@ -126,7 +145,8 @@ async function checkAdmin(){
     }
 
     await showDashboard();
-    return true;
+  await loadStudents();
+  return true;
   } catch (e) {
     console.error("Admin check error:", e);
     msg($("loginStatus"), e.message || "Unable to check administrator access.", true);
@@ -229,6 +249,115 @@ function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":
 function attr(s){return String(s).replace(/"/g,"&quot;")}
 async function togglePost(id,published){const {error}=await sb.from("posts").update({published}).eq("id",id);if(error)alert(error.message);else loadPosts()}
 async function deletePost(id){if(!confirm("Delete this post?"))return;const {error}=await sb.from("posts").delete().eq("id",id);if(error)alert(error.message);else loadPosts()}
+
+
+let studentRows = [];
+
+async function loadStudents(){
+  clearMsg($("studentStatus"));
+  $("students").textContent = "Loading students...";
+
+  const {data, error} = await sb
+    .from("students")
+    .select("*")
+    .order("created_at",{ascending:false});
+
+  if(error){
+    console.error("Students query error:", error);
+    $("students").innerHTML = "";
+    msg(
+      $("studentStatus"),
+      "Student table is not ready yet, or access is blocked. " +
+      "Create the students table and its RLS policies first. Details: " + error.message,
+      true
+    );
+    return;
+  }
+
+  studentRows = data || [];
+  renderStudents();
+}
+
+function renderStudents(){
+  const q = $("studentSearch").value.trim().toLowerCase();
+  const filter = $("studentFilter").value;
+
+  const rows = studentRows.filter(s=>{
+    const status = String(s.status || (s.verified ? "verified" : "pending")).toLowerCase();
+    const matchesFilter =
+      filter === "all" ||
+      (filter === "verified" && (status === "verified" || s.verified === true)) ||
+      status === filter;
+
+    const haystack = [
+      s.full_name, s.name, s.email, s.phone, s.course, s.student_id
+    ].map(v=>String(v ?? "").toLowerCase()).join(" ");
+
+    return matchesFilter && haystack.includes(q);
+  });
+
+  if(!rows.length){
+    $("students").innerHTML = '<p class="muted">No students found.</p>';
+    return;
+  }
+
+  $("students").innerHTML = rows.map(s=>{
+    const status = String(s.status || (s.verified ? "verified" : "pending")).toLowerCase();
+    const safeStatus = escapeHtml(status);
+    const name = escapeHtml(s.full_name || s.name || "Unnamed student");
+    const email = escapeHtml(s.email || "");
+    const phone = escapeHtml(s.phone || "");
+    const course = escapeHtml(s.course || "");
+    const studentId = escapeHtml(s.student_id || "");
+    const created = s.created_at ? new Date(s.created_at).toLocaleString() : "";
+
+    return `
+      <article class="post">
+        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
+          <div>
+            <strong>${name}</strong>
+            ${studentId ? `<div class="muted">Student ID: ${studentId}</div>` : ""}
+            ${email ? `<div class="muted">${email}</div>` : ""}
+            ${phone ? `<div class="muted">${phone}</div>` : ""}
+            ${course ? `<div class="muted">Course: ${course}</div>` : ""}
+            ${created ? `<div class="muted">Registered: ${created}</div>` : ""}
+          </div>
+          <div><strong>Status: ${safeStatus}</strong></div>
+        </div>
+
+        <div class="actions">
+          <button class="btn gold" onclick="setStudentStatus('${attr(s.id)}','verified')">Verify</button>
+          <button class="btn light" onclick="setStudentStatus('${attr(s.id)}','pending')">Pending</button>
+          <button class="btn" onclick="setStudentStatus('${attr(s.id)}','rejected')">Reject</button>
+        </div>
+      </article>`;
+  }).join("");
+}
+
+async function setStudentStatus(id,status){
+  clearMsg($("studentStatus"));
+
+  const {error} = await sb
+    .from("students")
+    .update({
+      status,
+      verified: status === "verified"
+    })
+    .eq("id",id);
+
+  if(error){
+    console.error("Student status update error:", error);
+    msg($("studentStatus"), error.message, true);
+    return;
+  }
+
+  msg($("studentStatus"), "Student status updated.");
+  await loadStudents();
+}
+
+$("studentSearch").addEventListener("input", renderStudents);
+$("studentFilter").addEventListener("change", renderStudents);
+$("refreshStudents").onclick = loadStudents;
 
 if(SUPABASE_URL.includes("PASTE_")) {
   msg($("loginStatus"),"First add your Supabase Project URL and anon/publishable key to this file.",true);
