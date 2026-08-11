@@ -102,7 +102,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </select>
 
 <label>Date of Birth <span style="color:#9d2d2d">*</span></label>
-<input id="certDob" type="date" required>
+<input id="certDob" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" required>
 
 <label>Course <span style="color:#9d2d2d">*</span></label>
 <input id="certCourse" placeholder="Diploma of Beauty Care" required>
@@ -111,10 +111,10 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <input id="certDuration" placeholder="12 Months" required>
 
 <label>Issue Date <span style="color:#9d2d2d">*</span></label>
-<input id="certDate" type="date" required>
+<input id="certDate" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" required>
 
 <label>Completion Date <span style="color:#9d2d2d">*</span></label>
-<input id="certCompletionDate" type="date" required>
+<input id="certCompletionDate" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" required>
 
 <label>Certificate Photo</label>
 <input id="certFile" type="file" accept="image/jpeg,image/png,image/webp">
@@ -293,6 +293,34 @@ ${certPhoto(c)?`<div style="margin-top:8px"><a href="${attr(certPhoto(c))}" targ
 }
 $("certSearch").oninput=renderCertificates;
 
+function normalizeDate(value){
+  const v=String(value||"").trim();
+  if(!v)return null;
+  if(/^\d{2}\/\d{2}\/\d{4}$/.test(v))return v;
+  if(/^\d{4}-\d{2}-\d{2}$/.test(v)){
+    const [y,m,d]=v.split("-");
+    return `${d}/${m}/${y}`;
+  }
+  return null;
+}
+function dateToNumber(value){
+  const v=normalizeDate(value);
+  if(!v)return NaN;
+  const [d,m,y]=v.split("/").map(Number);
+  const dt=new Date(y,m-1,d);
+  if(dt.getFullYear()!==y || dt.getMonth()!==m-1 || dt.getDate()!==d)return NaN;
+  return dt.getTime();
+}
+function formatDateField(el){
+  let v=el.value.replace(/[^\d]/g,"").slice(0,8);
+  if(v.length>4)v=v.slice(0,2)+"/"+v.slice(2,4)+"/"+v.slice(4);
+  else if(v.length>2)v=v.slice(0,2)+"/"+v.slice(2);
+  el.value=v;
+}
+["certDob","certDate","certCompletionDate"].forEach(id=>{
+  $(id).addEventListener("input",()=>formatDateField($(id)));
+});
+
 async function deleteCert(certificateId){
  if(!confirm("Delete this certificate?"))return;
  const{error}=await sb.from("certificates").delete().eq("id",certificateId);
@@ -306,15 +334,20 @@ $("certCreate").onclick=async()=>{
  const no=$("certNo").value.trim(),
        name=$("certName").value.trim(),
        sex=$("certSex").value,
-       dob=$("certDob").value,
+       dob=normalizeDate($("certDob").value),
        course=$("certCourse").value.trim(),
        duration=$("certDuration").value.trim(),
-       issueDate=$("certDate").value,
-       completionDate=$("certCompletionDate").value,
+       issueDate=normalizeDate($("certDate").value),
+       completionDate=normalizeDate($("certCompletionDate").value),
        file=$("certFile").files[0];
 
  if(!no||!name||!sex||!dob||!course||!duration||!issueDate||!completionDate){
    msg($("certStatus"),"Please complete all required certificate fields.",true);
+   return
+ }
+
+ if(Number.isNaN(dateToNumber(dob)) || Number.isNaN(dateToNumber(issueDate)) || Number.isNaN(dateToNumber(completionDate))){
+   msg($("certStatus"),"Please enter dates in DD/MM/YYYY format.",true);
    return
  }
 
@@ -323,7 +356,7 @@ $("certCreate").onclick=async()=>{
    return
  }
 
- if(completionDate<issueDate){
+ if(dateToNumber(completionDate)<dateToNumber(issueDate)){
    msg($("certStatus"),"Completion Date cannot be earlier than Issue Date.",true);
    return
  }
