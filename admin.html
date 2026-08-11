@@ -1,0 +1,152 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Medi Fella Admin | News Feed</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    :root{--teal:#075e66;--turq:#4fc3d4;--gold:#c9a24e;--bg:#f7faf9;--text:#243d40}
+    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,"Noto Sans",sans-serif}
+    .top{background:var(--teal);color:white;padding:18px 22px;display:flex;justify-content:space-between;align-items:center}
+    .brand{font-weight:800;letter-spacing:.4px}.brand span{color:#d8bd72}
+    button{border:0;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer}
+    .btn{background:var(--teal);color:#fff}.btn.gold{background:var(--gold);color:#fff}.btn.light{background:#e8f1f2;color:var(--teal)}
+    .wrap{max-width:1050px;margin:28px auto;padding:0 18px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
+    .card{background:#fff;border:1px solid #dce8e9;border-radius:18px;padding:22px;box-shadow:0 8px 25px rgba(7,94,102,.07)}
+    h1,h2{margin-top:0;color:var(--teal)} label{display:block;font-weight:700;margin:13px 0 7px}
+    input,textarea,select{width:100%;padding:12px;border:1px solid #cbdadc;border-radius:10px;font:inherit}
+    textarea{min-height:130px;resize:vertical}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}
+    .muted{color:#687779;font-size:13px}.hidden{display:none!important}.post{border-top:1px solid #e3ecec;padding:16px 0}.post:first-child{border-top:0}
+    .post img,.post video{width:100%;max-height:420px;object-fit:cover;border-radius:12px;margin-top:12px}.actions{display:flex;gap:8px;margin-top:10px}
+    .status{margin-top:12px;padding:10px;border-radius:10px;background:#eef7f6}.error{background:#fff0f0;color:#9d2d2d}
+    @media(max-width:800px){.grid{grid-template-columns:1fr}.top{gap:10px;flex-wrap:wrap}}
+  </style>
+</head>
+<body>
+<header class="top">
+  <div class="brand">MEDI FELLA <span>ADMIN</span></div>
+  <button id="logout" class="btn light hidden">Log out</button>
+</header>
+
+<main class="wrap">
+  <section id="loginCard" class="card">
+    <h1>Admin Login</h1>
+    <p class="muted">Medi Fella Beauty School News Feed</p>
+    <label>Email</label><input id="email" type="email" autocomplete="username">
+    <label>Password</label><input id="password" type="password" autocomplete="current-password">
+    <button id="login" class="btn" style="margin-top:16px">Log in</button>
+    <div id="loginStatus"></div>
+  </section>
+
+  <section id="dashboard" class="hidden">
+    <div class="grid">
+      <div class="card">
+        <h2>Create New Post</h2>
+        <label>Title</label>
+        <input id="title" placeholder="Khmer / English title">
+        <label>Post text</label>
+        <textarea id="content" placeholder="Write your announcement..."></textarea>
+        <label>Photo or video</label>
+        <input id="media" type="file" accept="image/*,video/*">
+        <p class="muted">For large course videos, use dedicated video hosting rather than this News Feed bucket.</p>
+        <div class="row">
+          <button id="publish" class="btn gold">Publish Post</button>
+          <button id="clear" class="btn light">Clear</button>
+        </div>
+        <div id="postStatus"></div>
+      </div>
+
+      <div class="card">
+        <h2>Published / Draft Posts</h2>
+        <div id="posts">Loading...</div>
+      </div>
+    </div>
+  </section>
+</main>
+
+<script>
+const SUPABASE_URL = "PASTE_YOUR_SUPABASE_PROJECT_URL_HERE";
+const SUPABASE_ANON_KEY = "PASTE_YOUR_SUPABASE_ANON_KEY_HERE";
+const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+const $ = id => document.getElementById(id);
+function msg(el, text, error=false){el.className="status"+(error?" error":"");el.textContent=text}
+function clearMsg(el){el.className="";el.textContent=""}
+
+async function checkAdmin(){
+  const {data:{user}} = await sb.auth.getUser();
+  if(!user){$("loginCard").classList.remove("hidden");$("dashboard").classList.add("hidden");$("logout").classList.add("hidden");return}
+  const {data:profile,error} = await sb.from("profiles").select("role").eq("id",user.id).single();
+  if(error || !profile || profile.role!=="admin"){
+    await sb.auth.signOut();
+    msg($("loginStatus"),"This account is not an administrator.",true); return;
+  }
+  $("loginCard").classList.add("hidden");$("dashboard").classList.remove("hidden");$("logout").classList.remove("hidden");
+  loadPosts();
+}
+
+$("login").onclick=async()=>{
+  clearMsg($("loginStatus"));
+  const {error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
+  if(error) msg($("loginStatus"),error.message,true); else checkAdmin();
+};
+$("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};
+
+$("clear").onclick=()=>{
+  $("title").value="";$("content").value="";$("media").value="";clearMsg($("postStatus"));
+};
+
+$("publish").onclick=async()=>{
+  clearMsg($("postStatus"));
+  const {data:{user}}=await sb.auth.getUser();
+  if(!user){msg($("postStatus"),"Please log in again.",true);return}
+  const title=$("title").value.trim(), content=$("content").value.trim(), file=$("media").files[0];
+  if(!content){msg($("postStatus"),"Please write the post text.",true);return}
+  $("publish").disabled=true;
+  try{
+    let media_url=null, media_type="none";
+    if(file){
+      const safe=file.name.toLowerCase().replace(/[^a-z0-9._-]/g,"-");
+      const path=`${user.id}/${Date.now()}-${safe}`;
+      const up=await sb.storage.from("news-media").upload(path,file,{upsert:false});
+      if(up.error) throw up.error;
+      const pub=sb.storage.from("news-media").getPublicUrl(path);
+      media_url=pub.data.publicUrl;
+      media_type=file.type.startsWith("video/")?"video":"image";
+    }
+    const ins=await sb.from("posts").insert({
+      author_id:user.id,title:title||null,content,media_url,media_type,published:true
+    });
+    if(ins.error) throw ins.error;
+    msg($("postStatus"),"Published successfully.");
+    $("title").value="";$("content").value="";$("media").value="";
+    loadPosts();
+  }catch(e){msg($("postStatus"),e.message||"Could not publish.",true)}
+  finally{$("publish").disabled=false}
+};
+
+async function loadPosts(){
+  const {data,error}=await sb.from("posts").select("*").order("created_at",{ascending:false});
+  if(error){$("posts").textContent=error.message;return}
+  if(!data.length){$("posts").innerHTML='<p class="muted">No posts yet.</p>';return}
+  $("posts").innerHTML=data.map(p=>`
+    <article class="post">
+      <strong>${escapeHtml(p.title||"Untitled post")}</strong>
+      <p>${escapeHtml(p.content)}</p>
+      ${p.media_url ? (p.media_type==="video" ? `<video src="${attr(p.media_url)}" controls playsinline></video>` : `<img src="${attr(p.media_url)}" alt="">`) : ""}
+      <div class="muted">${new Date(p.created_at).toLocaleString()} · ${p.published?"Published":"Draft"}</div>
+      <div class="actions"><button class="btn light" onclick="togglePost('${p.id}',${!p.published})">${p.published?"Unpublish":"Publish"}</button><button class="btn" onclick="deletePost('${p.id}')">Delete</button></div>
+    </article>`).join("");
+}
+function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+function attr(s){return String(s).replace(/"/g,"&quot;")}
+async function togglePost(id,published){const {error}=await sb.from("posts").update({published}).eq("id",id);if(error)alert(error.message);else loadPosts()}
+async function deletePost(id){if(!confirm("Delete this post?"))return;const {error}=await sb.from("posts").delete().eq("id",id);if(error)alert(error.message);else loadPosts()}
+
+sb.auth.onAuthStateChange(()=>checkAdmin());
+if(SUPABASE_URL.includes("PASTE_")) msg($("loginStatus"),"First add your Supabase Project URL and anon/publishable key to this file.",true);
+else checkAdmin();
+</script>
+</body>
+</html>
