@@ -1,384 +1,206 @@
 <!doctype html>
 <html lang="en">
 <head>
-  <meta charset="utf-8">
-  <meta name="viewport" content="width=device-width,initial-scale=1">
-  <title>Medi Fella Admin | News Feed</title>
-  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-  <style>
-    :root{--teal:#075e66;--turq:#4fc3d4;--gold:#c9a24e;--bg:#f7faf9;--text:#243d40}
-    *{box-sizing:border-box} body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,"Noto Sans",sans-serif}
-    .top{background:var(--teal);color:white;padding:18px 22px;display:flex;justify-content:space-between;align-items:center}
-    .brand{font-weight:800;letter-spacing:.4px}.brand span{color:#d8bd72}
-    button{border:0;border-radius:10px;padding:11px 16px;font-weight:700;cursor:pointer}
-    .btn{background:var(--teal);color:#fff}.btn.gold{background:var(--gold);color:#fff}.btn.light{background:#e8f1f2;color:var(--teal)}
-    .wrap{max-width:1050px;margin:28px auto;padding:0 18px}.grid{display:grid;grid-template-columns:1fr 1fr;gap:22px}
-    .card{background:#fff;border:1px solid #dce8e9;border-radius:18px;padding:22px;box-shadow:0 8px 25px rgba(7,94,102,.07)}
-    h1,h2{margin-top:0;color:var(--teal)} label{display:block;font-weight:700;margin:13px 0 7px}
-    input,textarea,select{width:100%;padding:12px;border:1px solid #cbdadc;border-radius:10px;font:inherit}
-    textarea{min-height:130px;resize:vertical}.row{display:flex;gap:10px;align-items:center}.row>*{flex:1}
-    .muted{color:#687779;font-size:13px}.hidden{display:none!important}.post{border-top:1px solid #e3ecec;padding:16px 0}.post:first-child{border-top:0}
-    .post img,.post video{width:100%;max-height:420px;object-fit:cover;border-radius:12px;margin-top:12px}.actions{display:flex;gap:8px;margin-top:10px}
-    .status{margin-top:12px;padding:10px;border-radius:10px;background:#eef7f6}.error{background:#fff0f0;color:#9d2d2d}
-    @media(max-width:800px){.grid{grid-template-columns:1fr}.top{gap:10px;flex-wrap:wrap}}
-  </style>
+<meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Medi Fella Admin Dashboard</title>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<style>
+:root{--teal:#075e66;--gold:#c9a24e;--bg:#f5f8f8;--text:#203a3d;--muted:#6c7b7d;--line:#dce7e8;--danger:#9d2d2d}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,"Noto Sans",sans-serif}
+button,input,textarea,select{font:inherit}button{border:0;border-radius:10px;padding:10px 14px;font-weight:700;cursor:pointer}
+.btn{background:var(--teal);color:#fff}.gold{background:var(--gold);color:#fff}.light{background:#e8f1f2;color:var(--teal)}.danger{background:var(--danger);color:#fff}
+.hidden{display:none!important}.status{margin-top:12px;padding:10px;border-radius:10px;background:#eef7f6}.error{background:#fff0f0;color:#9d2d2d}
+.login-wrap{min-height:100vh;display:grid;place-items:center;padding:20px}.login{width:min(430px,100%);background:#fff;border:1px solid var(--line);border-radius:20px;padding:28px;box-shadow:0 12px 40px #075e6615}
+label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{width:100%;padding:11px;border:1px solid #cbdadc;border-radius:10px;background:#fff}textarea{min-height:100px;resize:vertical}
+.top{height:64px;background:var(--teal);color:#fff;display:flex;align-items:center;justify-content:space-between;padding:0 20px;position:sticky;top:0;z-index:5}.brand{font-weight:900}.brand span{color:#d8bd72}
+.layout{display:flex;min-height:calc(100vh - 64px)}.side{width:235px;background:#fff;border-right:1px solid var(--line);padding:16px 12px;flex-shrink:0}.nav{width:100%;text-align:left;background:transparent;color:var(--text);margin:3px 0}.nav.active,.nav:hover{background:#e8f1f2;color:var(--teal)}
+.main{flex:1;padding:24px;max-width:1450px}.section{display:none}.section.active{display:block}.grid{display:grid;grid-template-columns:repeat(5,1fr);gap:15px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 5px 20px #075e6609}.metric{font-size:28px;font-weight:900;color:var(--teal)}.muted{color:var(--muted);font-size:13px}
+.two{display:grid;grid-template-columns:1fr 1fr;gap:18px}.row{display:flex;gap:10px;align-items:end}.row>*{flex:1}.toolbar{display:flex;gap:10px;margin-bottom:15px}.toolbar>*{flex:1}
+.table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.table th{color:var(--teal);font-size:13px;white-space:nowrap}
+.actions{display:flex;gap:6px;flex-wrap:wrap}.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800;background:#edf3f3}.verified,.published,.open{background:#e5f5ee;color:#176b49}.pending{background:#fff6dc;color:#8b6510}.rejected,.closed{background:#ffe8e8;color:#9d2d2d}
+.post{border-top:1px solid var(--line);padding:14px 0}.post:first-child{border-top:0}.post img,.post video{width:100%;max-height:300px;object-fit:cover;border-radius:10px;margin-top:10px}
+@media(max-width:1100px){.grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:850px){.two{grid-template-columns:1fr}.side{width:190px}.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.layout{display:block}.side{width:100%;display:flex;overflow:auto}.nav{min-width:max-content}.main{padding:15px}.grid{grid-template-columns:1fr}.toolbar{display:grid}.row{display:grid}.top{height:auto;padding:14px}}
+</style>
 </head>
 <body>
-<header class="top">
-  <div class="brand">MEDI FELLA <span>ADMIN</span></div>
-  <button id="logout" class="btn light hidden">Log out</button>
-</header>
 
-<main class="wrap">
-  <section id="loginCard" class="card">
-    <h1>Admin Login</h1>
-    <p class="muted">Medi Fella Beauty School News Feed</p>
-    <label>Email</label><input id="email" type="email" autocomplete="username">
-    <label>Password</label><input id="password" type="password" autocomplete="current-password">
-    <button id="login" class="btn" style="margin-top:16px">Log in</button>
+<div id="loginView" class="login-wrap">
+  <div class="login">
+    <h1>MEDI FELLA ADMIN</h1><p class="muted">Central management dashboard</p>
+    <label>Email</label><input id="loginEmail" type="email" autocomplete="username">
+    <label>Password</label><input id="loginPassword" type="password" autocomplete="current-password">
+    <button id="loginBtn" class="btn" style="width:100%;margin-top:16px">Log in</button>
     <div id="loginStatus"></div>
-  </section>
+  </div>
+</div>
 
-  <section id="dashboard" class="hidden">
-    <div class="grid">
-      <div class="card">
-        <h2>Create New Post</h2>
-        <label>Title</label>
-        <input id="title" placeholder="Khmer / English title">
-        <label>Post text</label>
-        <textarea id="content" placeholder="Write your announcement..."></textarea>
-        <label>Photo or video</label>
-        <input id="media" type="file" accept="image/*,video/*">
-        <p class="muted">For large course videos, use dedicated video hosting rather than this News Feed bucket.</p>
-        <div class="row">
-          <button id="publish" class="btn gold">Publish Post</button>
-          <button id="clear" class="btn light">Clear</button>
-        </div>
-        <div id="postStatus"></div>
-      </div>
+<div id="appView" class="hidden">
+<header class="top"><div class="brand">MEDI FELLA <span>ADMIN</span></div><button id="logoutBtn" class="light">Log out</button></header>
+<div class="layout">
+<aside class="side">
+<button class="nav active" data-section="dashboard">🏠 Dashboard</button>
+<button class="nav" data-section="students">👨‍🎓 Student Registration</button>
+<button class="nav" data-section="certificates">📜 Certificate Management</button>
+<button class="nav" data-section="posts">📰 News Feed</button>
+<button class="nav" data-section="courses">📚 Course Management</button>
+<button class="nav" data-section="admins">👤 Admin / Users</button>
+</aside>
+<main class="main">
 
-      <div class="card">
-        <h2>Published / Draft Posts</h2>
-        <div id="posts">Loading...</div>
-      </div>
+<section id="dashboard" class="section active">
+<h1>Dashboard</h1>
+<div class="grid">
+<div class="card"><div class="muted">Total Students</div><div id="mStudents" class="metric">—</div></div>
+<div class="card"><div class="muted">Pending Registrations</div><div id="mPending" class="metric">—</div></div>
+<div class="card"><div class="muted">Verified Students</div><div id="mVerifiedStudents" class="metric">—</div></div>
+<div class="card"><div class="muted">Total Courses</div><div id="mCourses" class="metric">—</div></div>
+<div class="card"><div class="muted">Certificates Issued</div><div id="mCertificates" class="metric">—</div></div>
+</div>
+<div class="two" style="margin-top:18px"><div class="card"><h2>Recent Students</h2><div id="recentStudents">Loading...</div></div><div class="card"><h2>Recent Certificates</h2><div id="recentCertificates">Loading...</div></div></div>
+</section>
 
-      <div class="card" style="grid-column:1/-1">
-        <h2>Student Management</h2>
-        <p class="muted">Review registrations, verify students, and manage student status.</p>
+<section id="students" class="section">
+<h1>Student Registration</h1><div class="card">
+<div class="toolbar"><input id="studentSearch" placeholder="Search name, email, phone, course, ID"><select id="studentFilter"><option value="all">All</option><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option></select><button id="studentRefresh" class="light">Refresh</button></div>
+<div id="studentStatus"></div><div id="studentList">Loading...</div></div>
+</section>
 
-        <div class="row" style="margin-bottom:12px">
-          <input id="studentSearch" placeholder="Search name, email, phone, or course">
-          <select id="studentFilter">
-            <option value="all">All students</option>
-            <option value="pending">Pending</option>
-            <option value="verified">Verified</option>
-            <option value="rejected">Rejected</option>
-          </select>
-          <button id="refreshStudents" class="btn light">Refresh</button>
-        </div>
+<section id="certificates" class="section">
+<h1>Certificate Management</h1>
+<div class="two">
+<div class="card"><h2>Create / Upload Certificate</h2>
+<label>Certificate Number</label><input id="certNo" placeholder="MF-2026-0001">
+<label>Student Name</label><input id="certStudent"><label>Student ID</label><input id="certStudentId">
+<label>Course</label><input id="certCourse"><label>Issue Date</label><input id="certDate" type="date">
+<label>Certificate File</label><input id="certFile" type="file" accept="image/*,.pdf">
+<button id="certCreate" class="gold" style="margin-top:14px">Create Certificate</button><div id="certStatus"></div></div>
+<div class="card"><h2>Search Certificates</h2><input id="certSearch" placeholder="Certificate number or student name"><div id="certList">Loading...</div></div>
+</div>
+</section>
 
-        <div id="studentStatus"></div>
-        <div id="students">Loading students...</div>
-      </div>
-    </div>
-  </section>
-</main>
+<section id="posts" class="section">
+<h1>News Feed</h1><div class="two">
+<div class="card"><h2>Create Post</h2><label>Title</label><input id="postTitle"><label>Post text</label><textarea id="postContent"></textarea><label>Photo / Video</label><input id="postFile" type="file" accept="image/*,video/*"><button id="postCreate" class="gold" style="margin-top:14px">Publish Post</button><div id="postStatus"></div></div>
+<div class="card"><h2>Published / Draft Posts</h2><div id="postList">Loading...</div></div></div>
+</section>
+
+<section id="courses" class="section">
+<h1>Course Management</h1><div class="two">
+<div class="card"><h2>Add / Edit Course</h2><input type="hidden" id="courseId">
+<label>Course Name</label><input id="courseName"><label>Description</label><textarea id="courseDescription"></textarea>
+<div class="row"><div><label>Price</label><input id="coursePrice" type="number" min="0" step="0.01"></div><div><label>Duration</label><input id="courseDuration" placeholder="3 days / 1 month"></div></div>
+<label>Course Image</label><input id="courseFile" type="file" accept="image/*">
+<label>Registration</label><select id="courseOpen"><option value="true">Open</option><option value="false">Closed</option></select>
+<div class="row" style="margin-top:14px"><button id="courseSave" class="gold">Save Course</button><button id="courseClear" class="light">Clear</button></div><div id="courseStatus"></div></div>
+<div class="card"><h2>Courses</h2><div id="courseList">Loading...</div></div></div>
+</section>
+
+<section id="admins" class="section">
+<h1>Admin / Users</h1><div class="card"><h2>Admin Account</h2><p class="muted">Your current account</p><div id="currentAdmin">Loading...</div><p class="muted" style="margin-top:18px">Admin permissions are controlled by the <code>profiles.role</code> field in Supabase.</p></div>
+</section>
+
+</main></div></div>
 
 <script>
-const SUPABASE_URL = "https://dwrpriwxbjgxpsvhclai.supabase.co";
-const SUPABASE_ANON_KEY = "sb_publishable_gwLGNpQg4mo-Ae_OvlGiMQ_rZVx7S3I";
-const sb = supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
-
-const $ = id => document.getElementById(id);
-function msg(el, text, error=false){el.className="status"+(error?" error":"");el.textContent=text}
+const SUPABASE_URL="https://dwrpriwxbjgxpsvhclai.supabase.co";
+const SUPABASE_ANON_KEY="sb_publishable_gwLGNpQg4mo-Ae_OvlGiMQ_rZVx7S3I";
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+const $=id=>document.getElementById(id);
+function msg(el,text,error=false){el.className="status"+(error?" error":"");el.textContent=text}
 function clearMsg(el){el.className="";el.textContent=""}
+function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
+function attr(v){return String(v??"").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
+let adminUser=null,students=[],certificates=[],courses=[],posts=[];
 
-
-let checkingAdmin = false;
-
-async function showLogin(){
-  $("loginCard").classList.remove("hidden");
-  $("dashboard").classList.add("hidden");
-  $("logout").classList.add("hidden");
+async function getAdmin(){
+ const {data:{session},error}=await sb.auth.getSession();
+ if(error||!session?.user)return null;
+ const user=session.user;
+ const {data:profile,error:e}=await sb.from("profiles").select("id,role").eq("id",user.id).maybeSingle();
+ if(e||!profile||String(profile.role).toLowerCase()!=="admin")return null;
+ return user;
 }
-
-async function showDashboard(){
-  $("loginCard").classList.add("hidden");
-  $("dashboard").classList.remove("hidden");
-  $("logout").classList.remove("hidden");
-  await loadPosts();
-  await loadStudents();
+async function boot(){
+ adminUser=await getAdmin();
+ if(!adminUser){$("loginView").classList.remove("hidden");$("appView").classList.add("hidden");return}
+ $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("currentAdmin").textContent=adminUser.email||adminUser.id;
+ await refreshAll();
 }
+$("loginBtn").onclick=async()=>{
+ clearMsg($("loginStatus"));$("loginBtn").disabled=true;$("loginBtn").textContent="Logging in...";
+ try{
+  const {error}=await sb.auth.signInWithPassword({email:$("loginEmail").value.trim(),password:$("loginPassword").value});
+  if(error)throw error;
+  adminUser=await getAdmin();
+  if(!adminUser){await sb.auth.signOut();throw new Error("This account is not an administrator.");}
+  $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("currentAdmin").textContent=adminUser.email||adminUser.id;await refreshAll();
+ }catch(e){msg($("loginStatus"),e.message||"Login failed.",true)}
+ finally{$("loginBtn").disabled=false;$("loginBtn").textContent="Log in"}
+};
+$("logoutBtn").onclick=async()=>{await sb.auth.signOut();location.reload()};
+document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));$(b.dataset.section).classList.add("active")});
 
-async function checkAdmin(){
-  if (checkingAdmin) return false;
-  checkingAdmin = true;
+async function refreshAll(){await Promise.all([loadStudents(),loadCertificates(),loadCourses(),loadPosts()]);updateMetrics()}
 
-  try {
-    const { data: { session }, error: sessionError } = await sb.auth.getSession();
-
-    if (sessionError) {
-      console.error("Session check error:", sessionError);
-      await showLogin();
-      msg($("loginStatus"), sessionError.message || "Session check failed.", true);
-      return false;
-    }
-
-    if (!session || !session.user) {
-      await showLogin();
-      clearMsg($("loginStatus"));
-      return false;
-    }
-
-    const user = session.user;
-
-    const { data: profile, error: profileError } = await sb
-      .from("profiles")
-      .select("id, role")
-      .eq("id", user.id)
-      .maybeSingle();
-
-    if (profileError) {
-      console.error("Profile check error:", profileError);
-      await sb.auth.signOut();
-      await showLogin();
-      msg($("loginStatus"), "Could not check administrator permission: " + profileError.message, true);
-      return false;
-    }
-
-    if (!profile) {
-      await sb.auth.signOut();
-      await showLogin();
-      msg($("loginStatus"), "No profile was found for this account.", true);
-      return false;
-    }
-
-    if (String(profile.role || "").toLowerCase() !== "admin") {
-      await sb.auth.signOut();
-      await showLogin();
-      msg($("loginStatus"), "This account is not an administrator.", true);
-      return false;
-    }
-
-    await showDashboard();
-    return true;
-  } catch (e) {
-    console.error("Admin check error:", e);
-    await showLogin();
-    msg($("loginStatus"), e.message || "Unable to check administrator access.", true);
-    return false;
-  } finally {
-    checkingAdmin = false;
-  }
+async function loadStudents(){
+ const {data,error}=await sb.from("students").select("*").order("created_at",{ascending:false});
+ if(error){$("studentList").textContent=error.message;return} students=data||[];renderStudents();
 }
+function renderStudents(){
+ const q=$("studentSearch").value.trim().toLowerCase(),f=$("studentFilter").value;
+ const rows=students.filter(s=>{const st=String(s.status||"pending").toLowerCase();const hay=[s.full_name,s.email,s.phone,s.course,s.student_id].join(" ").toLowerCase();return(f==="all"||st===f)&&hay.includes(q)});
+ $("studentList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Name</th><th>Email</th><th>Course</th><th>Status</th><th>Action</th></tr>${rows.map(s=>`<tr><td>${esc(s.full_name)}</td><td>${esc(s.email)}</td><td>${esc(s.course)}</td><td><span class="badge ${esc(s.status||"pending")}">${esc(s.status||"pending")}</span></td><td><div class="actions"><button class="gold" onclick="setStudent('${attr(s.id)}','verified')">Approve</button><button class="light" onclick="setStudent('${attr(s.id)}','pending')">Pending</button><button class="danger" onclick="setStudent('${attr(s.id)}','rejected')">Reject</button><button class="light" onclick="editStudent('${attr(s.id)}')">Edit</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No students found.</p>';
+ $("recentStudents").innerHTML=students.slice(0,5).map(s=>`<div class="post"><strong>${esc(s.full_name||"Unnamed")}</strong><div class="muted">${esc(s.email||"")} · ${esc(s.status||"pending")}</div></div>`).join("")||'<p class="muted">No students.</p>';
+}
+$("studentSearch").oninput=renderStudents;$("studentFilter").onchange=renderStudents;$("studentRefresh").onclick=loadStudents;
+async function setStudent(id,status){const{error}=await sb.from("students").update({status,verified:status==="verified"}).eq("id",id);if(error)msg($("studentStatus"),error.message,true);else{msg($("studentStatus"),"Student updated.");await loadStudents();updateMetrics()}}
+function editStudent(id){const s=students.find(x=>x.id===id);if(!s)return;alert("Student: "+(s.full_name||"")+"\nEmail: "+(s.email||"")+"\nPhone: "+(s.phone||"")+"\nCourse: "+(s.course||"")+"\n\nFor full editing, we can add an edit form next.");}
 
-$("login").onclick=async()=>{
-  clearMsg($("loginStatus"));
-
-  const email = $("email").value.trim();
-  const password = $("password").value;
-
-  if (!email || !password) {
-    msg($("loginStatus"), "Please enter your email and password.", true);
-    return;
-  }
-
-  $("login").disabled = true;
-  $("login").textContent = "Logging in...";
-
-  try {
-    const {error} = await sb.auth.signInWithPassword({
-      email,
-      password
-    });
-
-    if (error) {
-      msg($("loginStatus"), error.message, true);
-      return;
-    }
-
-    await checkAdmin();
-  } catch (e) {
-    console.error(e);
-    msg($("loginStatus"), e.message || "Login failed.", true);
-  } finally {
-    $("login").disabled = false;
-    $("login").textContent = "Log in";
-  }
-};
-
-$("logout").onclick=async()=>{
-  await sb.auth.signOut();
-  await showLogin();
-  clearMsg($("loginStatus"));
-  $("password").value="";
-};
-
-$("clear").onclick=()=>{
-  $("title").value="";$("content").value="";$("media").value="";clearMsg($("postStatus"));
-};
-
-$("publish").onclick=async()=>{
-  clearMsg($("postStatus"));
-  const {data:{user}}=await sb.auth.getUser();
-  if(!user){msg($("postStatus"),"Please log in again.",true);return}
-  const title=$("title").value.trim(), content=$("content").value.trim(), file=$("media").files[0];
-  if(!content){msg($("postStatus"),"Please write the post text.",true);return}
-  $("publish").disabled=true;
-  try{
-    let media_url=null, media_type="none";
-    if(file){
-      const safe=file.name.toLowerCase().replace(/[^a-z0-9._-]/g,"-");
-      const path=`${user.id}/${Date.now()}-${safe}`;
-      const up=await sb.storage.from("news-media").upload(path,file,{upsert:false});
-      if(up.error) throw up.error;
-      const pub=sb.storage.from("news-media").getPublicUrl(path);
-      media_url=pub.data.publicUrl;
-      media_type=file.type.startsWith("video/")?"video":"image";
-    }
-    const ins=await sb.from("posts").insert({
-      author_id:user.id,title:title||null,content,media_url,media_type,published:true
-    });
-    if(ins.error) throw ins.error;
-    msg($("postStatus"),"Published successfully.");
-    $("title").value="";$("content").value="";$("media").value="";
-    loadPosts();
-  }catch(e){msg($("postStatus"),e.message||"Could not publish.",true)}
-  finally{$("publish").disabled=false}
+async function loadCertificates(){
+ const{data,error}=await sb.from("certificates").select("*").order("issue_date",{ascending:false});if(error){$("certList").textContent=error.message;return}certificates=data||[];renderCertificates();
+}
+function renderCertificates(){
+ const q=$("certSearch").value.trim().toLowerCase();const rows=certificates.filter(c=>(`${c.certificate_no||""} ${c.student_name||""} ${c.student_id||""}`).toLowerCase().includes(q));
+ $("certList").innerHTML=rows.length?rows.map(c=>`<div class="post"><strong>${esc(c.certificate_no)}</strong><div>${esc(c.student_name)} · ${esc(c.course||"")}</div><div class="muted">${esc(c.issue_date||"")} · ${c.verified?'<span class="badge verified">Verified</span>':'<span class="badge pending">Pending</span>'}</div><div class="actions" style="margin-top:8px"><button class="gold" onclick="setCert('${attr(c.id)}',true)">Verify</button><button class="danger" onclick="setCert('${attr(c.id)}',false)">Revoke</button><button class="light" onclick="deleteCert('${attr(c.id)}')">Delete</button></div></div>`).join(""):'<p class="muted">No certificates found.</p>';
+ $("recentCertificates").innerHTML=certificates.slice(0,5).map(c=>`<div class="post"><strong>${esc(c.certificate_no)}</strong><div class="muted">${esc(c.student_name)} · ${c.verified?"Verified":"Pending"}</div></div>`).join("")||'<p class="muted">No certificates.</p>';
+}
+$("certSearch").oninput=renderCertificates;
+async function setCert(id,verified){const{error}=await sb.from("certificates").update({verified}).eq("id",id);if(error)msg($("certStatus"),error.message,true);else{msg($("certStatus"),verified?"Certificate verified.":"Certificate revoked.");await loadCertificates();updateMetrics()}}
+async function deleteCert(id){if(!confirm("Delete this certificate?"))return;const{error}=await sb.from("certificates").delete().eq("id",id);if(error)alert(error.message);else loadCertificates()}
+$("certCreate").onclick=async()=>{
+ clearMsg($("certStatus"));const no=$("certNo").value.trim(),name=$("certStudent").value.trim(),sid=$("certStudentId").value.trim(),course=$("certCourse").value.trim(),date=$("certDate").value||null,file=$("certFile").files[0];
+ if(!no||!name||!course){msg($("certStatus"),"Certificate number, student name and course are required.",true);return}
+ try{let file_url=null;if(file){const path=`${adminUser.id}/${Date.now()}-${file.name.replace(/[^a-z0-9._-]/gi,"-")}`;const up=await sb.storage.from("certificates").upload(path,file);if(up.error)throw up.error;file_url=sb.storage.from("certificates").getPublicUrl(path).data.publicUrl}
+ const{error}=await sb.from("certificates").insert({certificate_no:no,student_name:name,student_id:sid||null,course,issue_date:date,file_url,verified:true});if(error)throw error;msg($("certStatus"),"Certificate created.");["certNo","certStudent","certStudentId","certCourse","certDate"].forEach(id=>$(id).value="");$("certFile").value="";await loadCertificates();updateMetrics()}catch(e){msg($("certStatus"),e.message,true)}
 };
 
 async function loadPosts(){
-  const {data,error}=await sb.from("posts").select("*").order("created_at",{ascending:false});
-  if(error){$("posts").textContent=error.message;return}
-  if(!data.length){$("posts").innerHTML='<p class="muted">No posts yet.</p>';return}
-  $("posts").innerHTML=data.map(p=>`
-    <article class="post">
-      <strong>${escapeHtml(p.title||"Untitled post")}</strong>
-      <p>${escapeHtml(p.content)}</p>
-      ${p.media_url ? (p.media_type==="video" ? `<video src="${attr(p.media_url)}" controls playsinline></video>` : `<img src="${attr(p.media_url)}" alt="">`) : ""}
-      <div class="muted">${new Date(p.created_at).toLocaleString()} · ${p.published?"Published":"Draft"}</div>
-      <div class="actions"><button class="btn light" onclick="togglePost('${p.id}',${!p.published})">${p.published?"Unpublish":"Publish"}</button><button class="btn" onclick="deletePost('${p.id}')">Delete</button></div>
-    </article>`).join("");
+ const{data,error}=await sb.from("posts").select("*").order("created_at",{ascending:false});if(error){$("postList").textContent=error.message;return}posts=data||[];renderPosts();
 }
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
-function attr(s){return String(s).replace(/"/g,"&quot;")}
-async function togglePost(id,published){const {error}=await sb.from("posts").update({published}).eq("id",id);if(error)alert(error.message);else loadPosts()}
-async function deletePost(id){if(!confirm("Delete this post?"))return;const {error}=await sb.from("posts").delete().eq("id",id);if(error)alert(error.message);else loadPosts()}
+function renderPosts(){$("postList").innerHTML=posts.map(p=>`<article class="post"><strong>${esc(p.title||"Untitled")}</strong><p>${esc(p.content)}</p>${p.media_url?(p.media_type==="video"?`<video src="${attr(p.media_url)}" controls></video>`:`<img src="${attr(p.media_url)}" alt="">`):""}<div class="muted">${p.created_at?new Date(p.created_at).toLocaleString():""} · ${p.published?"Published":"Draft"}</div><div class="actions"><button class="light" onclick="togglePost('${attr(p.id)}',${!p.published})">${p.published?"Unpublish":"Publish"}</button><button class="danger" onclick="deletePost('${attr(p.id)}')">Delete</button></div></article>`).join("")||'<p class="muted">No posts.</p>'}
+$("postCreate").onclick=async()=>{
+ clearMsg($("postStatus"));const title=$("postTitle").value.trim(),content=$("postContent").value.trim(),file=$("postFile").files[0];if(!content){msg($("postStatus"),"Post content is required.",true);return}
+ try{let media_url=null,media_type="none";if(file){const path=`${adminUser.id}/${Date.now()}-${file.name.replace(/[^a-z0-9._-]/gi,"-")}`;const up=await sb.storage.from("news-media").upload(path,file);if(up.error)throw up.error;media_url=sb.storage.from("news-media").getPublicUrl(path).data.publicUrl;media_type=file.type.startsWith("video/")?"video":"image"}const{error}=await sb.from("posts").insert({author_id:adminUser.id,title:title||null,content,media_url,media_type,published:true});if(error)throw error;msg($("postStatus"),"Published successfully.");$("postTitle").value="";$("postContent").value="";$("postFile").value="";loadPosts()}catch(e){msg($("postStatus"),e.message,true)}
+};
+async function togglePost(id,published){const{error}=await sb.from("posts").update({published}).eq("id",id);if(error)alert(error.message);else loadPosts()}
+async function deletePost(id){if(!confirm("Delete this post?"))return;const{error}=await sb.from("posts").delete().eq("id",id);if(error)alert(error.message);else loadPosts()}
 
-
-let studentRows = [];
-
-async function loadStudents(){
-  clearMsg($("studentStatus"));
-  $("students").textContent = "Loading students...";
-
-  const {data, error} = await sb
-    .from("students")
-    .select("*")
-    .order("created_at",{ascending:false});
-
-  if(error){
-    console.error("Students query error:", error);
-    $("students").innerHTML = "";
-    msg(
-      $("studentStatus"),
-      "Student table is not ready yet, or access is blocked. " +
-      "Create the students table and its RLS policies first. Details: " + error.message,
-      true
-    );
-    return;
-  }
-
-  studentRows = data || [];
-  renderStudents();
+async function loadCourses(){
+ const{data,error}=await sb.from("courses").select("*").order("created_at",{ascending:false});if(error){$("courseList").textContent=error.message;return}courses=data||[];renderCourses();
 }
+function renderCourses(){$("courseList").innerHTML=courses.map(c=>`<div class="post"><strong>${esc(c.name)}</strong><div>${esc(c.description||"")}</div><div class="muted">$${Number(c.price||0).toFixed(2)} · ${esc(c.duration||"")} · <span class="badge ${c.registration_open?"open":"closed"}">${c.registration_open?"Open":"Closed"}</span></div><div class="actions"><button class="light" onclick="editCourse('${attr(c.id)}')">Edit</button><button class="danger" onclick="deleteCourse('${attr(c.id)}')">Delete</button></div></div>`).join("")||'<p class="muted">No courses yet.</p>'}
+$("courseSave").onclick=async()=>{
+ clearMsg($("courseStatus"));const id=$("courseId").value,name=$("courseName").value.trim(),description=$("courseDescription").value.trim(),price=Number($("coursePrice").value||0),duration=$("courseDuration").value.trim(),registration_open=$("courseOpen").value==="true",file=$("courseFile").files[0];if(!name){msg($("courseStatus"),"Course name is required.",true);return}
+ try{let image_url=null;if(file){const path=`${adminUser.id}/${Date.now()}-${file.name.replace(/[^a-z0-9._-]/gi,"-")}`;const up=await sb.storage.from("course-media").upload(path,file);if(up.error)throw up.error;image_url=sb.storage.from("course-media").getPublicUrl(path).data.publicUrl}
+ const payload={name,description,price,duration,registration_open};if(image_url)payload.image_url=image_url;let result=id?await sb.from("courses").update(payload).eq("id",id):await sb.from("courses").insert(payload);if(result.error)throw result.error;msg($("courseStatus"),id?"Course updated.":"Course created.");clearCourse();await loadCourses();updateMetrics()}catch(e){msg($("courseStatus"),e.message,true)}
+};
+function editCourse(id){const c=courses.find(x=>x.id===id);if(!c)return;$("courseId").value=c.id;$("courseName").value=c.name||"";$("courseDescription").value=c.description||"";$("coursePrice").value=c.price??"";$("courseDuration").value=c.duration||"";$("courseOpen").value=String(c.registration_open!==false)}
+function clearCourse(){$("courseId").value="";$("courseName").value="";$("courseDescription").value="";$("coursePrice").value="";$("courseDuration").value="";$("courseOpen").value="true";$("courseFile").value=""}
+$("courseClear").onclick=clearCourse;
+async function deleteCourse(id){if(!confirm("Delete this course?"))return;const{error}=await sb.from("courses").delete().eq("id",id);if(error)alert(error.message);else{loadCourses();updateMetrics()}}
 
-function renderStudents(){
-  const q = $("studentSearch").value.trim().toLowerCase();
-  const filter = $("studentFilter").value;
-
-  const rows = studentRows.filter(s=>{
-    const status = String(s.status || (s.verified ? "verified" : "pending")).toLowerCase();
-    const matchesFilter =
-      filter === "all" ||
-      (filter === "verified" && (status === "verified" || s.verified === true)) ||
-      status === filter;
-
-    const haystack = [
-      s.full_name, s.name, s.email, s.phone, s.course, s.student_id
-    ].map(v=>String(v ?? "").toLowerCase()).join(" ");
-
-    return matchesFilter && haystack.includes(q);
-  });
-
-  if(!rows.length){
-    $("students").innerHTML = '<p class="muted">No students found.</p>';
-    return;
-  }
-
-  $("students").innerHTML = rows.map(s=>{
-    const status = String(s.status || (s.verified ? "verified" : "pending")).toLowerCase();
-    const safeStatus = escapeHtml(status);
-    const name = escapeHtml(s.full_name || s.name || "Unnamed student");
-    const email = escapeHtml(s.email || "");
-    const phone = escapeHtml(s.phone || "");
-    const course = escapeHtml(s.course || "");
-    const studentId = escapeHtml(s.student_id || "");
-    const created = s.created_at ? new Date(s.created_at).toLocaleString() : "";
-
-    return `
-      <article class="post">
-        <div style="display:flex;justify-content:space-between;gap:12px;flex-wrap:wrap">
-          <div>
-            <strong>${name}</strong>
-            ${studentId ? `<div class="muted">Student ID: ${studentId}</div>` : ""}
-            ${email ? `<div class="muted">${email}</div>` : ""}
-            ${phone ? `<div class="muted">${phone}</div>` : ""}
-            ${course ? `<div class="muted">Course: ${course}</div>` : ""}
-            ${created ? `<div class="muted">Registered: ${created}</div>` : ""}
-          </div>
-          <div><strong>Status: ${safeStatus}</strong></div>
-        </div>
-
-        <div class="actions">
-          <button class="btn gold" onclick="setStudentStatus('${attr(s.id)}','verified')">Verify</button>
-          <button class="btn light" onclick="setStudentStatus('${attr(s.id)}','pending')">Pending</button>
-          <button class="btn" onclick="setStudentStatus('${attr(s.id)}','rejected')">Reject</button>
-        </div>
-      </article>`;
-  }).join("");
-}
-
-async function setStudentStatus(id,status){
-  clearMsg($("studentStatus"));
-
-  const {error} = await sb
-    .from("students")
-    .update({
-      status,
-      verified: status === "verified"
-    })
-    .eq("id",id);
-
-  if(error){
-    console.error("Student status update error:", error);
-    msg($("studentStatus"), error.message, true);
-    return;
-  }
-
-  msg($("studentStatus"), "Student status updated.");
-  await loadStudents();
-}
-
-$("studentSearch").addEventListener("input", renderStudents);
-$("studentFilter").addEventListener("change", renderStudents);
-$("refreshStudents").onclick = loadStudents;
-
-if(SUPABASE_URL.includes("PASTE_")) {
-  msg($("loginStatus"),"First add your Supabase Project URL and anon/publishable key to this file.",true);
-} else {
-  checkAdmin();
-}
+function updateMetrics(){$("mStudents").textContent=students.length;$("mPending").textContent=students.filter(s=>String(s.status||"pending")==="pending").length;$("mVerifiedStudents").textContent=students.filter(s=>String(s.status)==="verified"||s.verified===true).length;$("mCourses").textContent=courses.length;$("mCertificates").textContent=certificates.length}
+boot();
 </script>
 </body>
 </html>
