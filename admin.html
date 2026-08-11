@@ -93,18 +93,34 @@ const $ = id => document.getElementById(id);
 function msg(el, text, error=false){el.className="status"+(error?" error":"");el.textContent=text}
 function clearMsg(el){el.className="";el.textContent=""}
 
+
+let checkingAdmin = false;
+
+async function showLogin(){
+  $("loginCard").classList.remove("hidden");
+  $("dashboard").classList.add("hidden");
+  $("logout").classList.add("hidden");
+}
+
+async function showDashboard(){
+  $("loginCard").classList.add("hidden");
+  $("dashboard").classList.remove("hidden");
+  $("logout").classList.remove("hidden");
+  await loadPosts();
+  await loadStudents();
+}
+
 async function checkAdmin(){
   if (checkingAdmin) return false;
   checkingAdmin = true;
 
   try {
-    // getSession() returns { session: null } when nobody is logged in.
-    // That is normal on the login page and should not be shown as an error.
-    const {data:{session}, error:sessionError} = await sb.auth.getSession();
+    const { data: { session }, error: sessionError } = await sb.auth.getSession();
 
     if (sessionError) {
       console.error("Session check error:", sessionError);
       await showLogin();
+      msg($("loginStatus"), sessionError.message || "Session check failed.", true);
       return false;
     }
 
@@ -116,41 +132,40 @@ async function checkAdmin(){
 
     const user = session.user;
 
-    const {data:profile, error:profileError} = await sb
+    const { data: profile, error: profileError } = await sb
       .from("profiles")
-      .select("id,role")
+      .select("id, role")
       .eq("id", user.id)
       .maybeSingle();
 
     if (profileError) {
       console.error("Profile check error:", profileError);
-      msg($("loginStatus"), "Could not check administrator permission: " + profileError.message, true);
       await sb.auth.signOut();
       await showLogin();
+      msg($("loginStatus"), "Could not check administrator permission: " + profileError.message, true);
       return false;
     }
 
     if (!profile) {
       await sb.auth.signOut();
-      msg($("loginStatus"), "No profile was found for this account.", true);
       await showLogin();
+      msg($("loginStatus"), "No profile was found for this account.", true);
       return false;
     }
 
-    if (String(profile.role).toLowerCase() !== "admin") {
+    if (String(profile.role || "").toLowerCase() !== "admin") {
       await sb.auth.signOut();
-      msg($("loginStatus"), "This account is not an administrator.", true);
       await showLogin();
+      msg($("loginStatus"), "This account is not an administrator.", true);
       return false;
     }
 
     await showDashboard();
-  await loadStudents();
-  return true;
+    return true;
   } catch (e) {
     console.error("Admin check error:", e);
-    msg($("loginStatus"), e.message || "Unable to check administrator access.", true);
     await showLogin();
+    msg($("loginStatus"), e.message || "Unable to check administrator access.", true);
     return false;
   } finally {
     checkingAdmin = false;
