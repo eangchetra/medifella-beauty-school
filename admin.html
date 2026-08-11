@@ -75,44 +75,27 @@ function msg(el, text, error=false){el.className="status"+(error?" error":"");el
 function clearMsg(el){el.className="";el.textContent=""}
 
 async function checkAdmin(){
-  const {data:{user}} = await sb.auth.getUser();
-  if(!user){$("loginCard").classList.remove("hidden");$("dashboard").classList.add("hidden");$("logout").classList.add("hidden");return}
-  const {data:profile,error} = await sb.from("profiles").select("role").eq("id",user.id).single();
-  if(error || !profile || profile.role!=="admin"){
-    await sb.auth.signOut();
-    msg($("loginStatus"),"This account is not an administrator.",true); return;
-  }
-  $("loginCard").classList.add("hidden");$("dashboard").classList.remove("hidden");$("logout").classList.remove("hidden");
-  loadPosts();
-}
-
-let checkingAdmin = false;
-
-async function showLogin(){
-  $("loginCard").classList.remove("hidden");
-  $("dashboard").classList.add("hidden");
-  $("logout").classList.add("hidden");
-}
-
-async function showDashboard(){
-  $("loginCard").classList.add("hidden");
-  $("dashboard").classList.remove("hidden");
-  $("logout").classList.remove("hidden");
-  await loadPosts();
-}
-
-async function checkAdmin(){
   if (checkingAdmin) return false;
   checkingAdmin = true;
+
   try {
-    const {data:{user}, error:userError} = await sb.auth.getUser();
+    // getSession() returns { session: null } when nobody is logged in.
+    // That is normal on the login page and should not be shown as an error.
+    const {data:{session}, error:sessionError} = await sb.auth.getSession();
 
-    if (userError) throw userError;
-
-    if (!user) {
+    if (sessionError) {
+      console.error("Session check error:", sessionError);
       await showLogin();
       return false;
     }
+
+    if (!session || !session.user) {
+      await showLogin();
+      clearMsg($("loginStatus"));
+      return false;
+    }
+
+    const user = session.user;
 
     const {data:profile, error:profileError} = await sb
       .from("profiles")
@@ -122,7 +105,7 @@ async function checkAdmin(){
 
     if (profileError) {
       console.error("Profile check error:", profileError);
-      msg($("loginStatus"), "Could not check your administrator permission: " + profileError.message, true);
+      msg($("loginStatus"), "Could not check administrator permission: " + profileError.message, true);
       await sb.auth.signOut();
       await showLogin();
       return false;
@@ -145,7 +128,7 @@ async function checkAdmin(){
     await showDashboard();
     return true;
   } catch (e) {
-    console.error(e);
+    console.error("Admin check error:", e);
     msg($("loginStatus"), e.message || "Unable to check administrator access.", true);
     await showLogin();
     return false;
