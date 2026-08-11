@@ -121,110 +121,230 @@ This certificate is authentic and officially verified.<br>
 <footer>© 2026 Medi Fella Beauty School · Certificate Verification</footer>
 
 <script>
-let records=[];
-const fallbackRecords=[{
-  id:"Medifella2026001",
-  name:"Eang Chetra",
-  sex:"Male",
-  dateOfBirth:"08 August 2000",
-  photo:"students/MFS-2026-0001.jpg",
-  course:"Diploma of Beauty Care",
-  duration:"12 Months",
-  issueDate:"2026-08-08",
-  completionDate:"2027-08-08"
-}];
+/*
+  Medi Fella Beauty School
+  Public certificate verification using Supabase.
+
+  IMPORTANT:
+  Replace SUPABASE_ANON_KEY with the SAME public/publishable key
+  already used by your other website pages.
+  Do NOT use a Supabase service_role/secret key here.
+*/
+const SUPABASE_URL = "https://dwrpriwxbjgxpsvhclai.supabase.co";
+const SUPABASE_ANON_KEY = "PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE";
+
+let records = [];
 
 function text(v){
- if(typeof v==="string") return v;
- if(v && typeof v==="object") return v.en||v.km||v.ko||"";
- return "";
+  if(v === null || v === undefined) return "";
+  if(typeof v === "string") return v;
+  if(typeof v === "object") return v.en || v.km || v.ko || "";
+  return String(v);
 }
 
-function getDate(obj, keys){
- for(const key of keys){
-  if(obj[key]!==undefined && obj[key]!==null && String(obj[key]).trim()!=="") return String(obj[key]);
- }
- return "";
+function formatDate(value){
+  if(!value) return "";
+  const s = String(value).trim();
+
+  // Supabase date values normally arrive as YYYY-MM-DD.
+  const m = s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+  if(m) return `${m[3]}/${m[2]}/${m[1]}`;
+
+  return s;
 }
 
-function showError(){
- document.getElementById("card").style.display="none";
- document.getElementById("error").style.display="block";
+function showError(message){
+  document.getElementById("card").style.display = "none";
+  const error = document.getElementById("error");
+  error.style.display = "block";
+  error.innerHTML =
+    `<strong>${message || "Certificate not found · រកមិនឃើញវិញ្ញាបនបត្រ · 수료증을 찾을 수 없습니다"}</strong>`;
 }
 
 function showCertificate(student){
- document.getElementById("error").style.display="none";
- document.getElementById("card").style.display="block";
+  document.getElementById("error").style.display = "none";
+  document.getElementById("card").style.display = "block";
 
- document.getElementById("name").textContent=text(student.name);
- document.getElementById("sex").textContent=text(student.sex);
- document.getElementById("dateOfBirth").textContent=text(
-   student.dateOfBirth ?? student["date of birth"] ?? student.dob
- );
- document.getElementById("id").textContent=text(student.id);
- document.getElementById("course").textContent=text(student.course);
- document.getElementById("duration").textContent=text(student.duration);
+  document.getElementById("name").textContent =
+    text(student.name);
 
- const from=getDate(student,["issueDate","startDate","fromDate","courseStartDate"]);
- const to=getDate(student,["completionDate","endDate","toDate","courseEndDate"]);
- document.getElementById("period").textContent =
-   from && to ? from+"  →  "+to : (from || to || "");
+  document.getElementById("sex").textContent =
+    text(student.sex);
 
- if(student.photo){
-   document.getElementById("photo").src =
-     new URL(String(student.photo).replace(/^\/+/,""),location.href).href;
- }
+  document.getElementById("dateOfBirth").textContent =
+    formatDate(student.dateofbirth ?? student.dateOfBirth ?? student.dob);
 
- document.getElementById("certInput").value=student.id || "";
-}
+  document.getElementById("id").textContent =
+    text(student.id);
 
-function findCertificate(id){
- const target=String(id||"").trim().toLowerCase();
- return records.find(x=>String(x.id||"").trim().toLowerCase()===target);
-}
+  document.getElementById("course").textContent =
+    text(student.course);
 
-function manualSearch(){
- const id=document.getElementById("certInput").value.trim();
- if(!id){showError();return;}
- const student=findCertificate(id);
- if(!student){showError();return;}
+  document.getElementById("duration").textContent =
+    text(student.duration);
 
- history.replaceState(null,"",location.pathname);
- showCertificate(student);
-}
+  const from = formatDate(
+    student.issuedate ?? student.issueDate ?? student.startDate
+  );
 
-async function start(){
-  const id=new URLSearchParams(location.search).get("id");
+  const to = formatDate(
+    student.completiondate ?? student.completionDate ?? student.endDate
+  );
 
-  try{
-    const jsonUrl=new URL("certificates.json",location.href);
-    jsonUrl.searchParams.set("v",Date.now());
+  document.getElementById("period").textContent =
+    from && to ? `${from}  →  ${to}` : (from || to || "");
 
-    const response=await fetch(jsonUrl.href,{cache:"no-store"});
-    if(!response.ok) throw new Error("certificates.json unavailable");
+  const photo = document.getElementById("photo");
 
-    const data=await response.json();
-    records=Array.isArray(data) ? data : fallbackRecords;
-  }catch(e){
-    console.warn("Using built-in certificate data:",e);
-    records=fallbackRecords;
+  if(student.photo){
+    photo.src = String(student.photo);
+    photo.style.display = "block";
+    photo.onerror = () => {
+      photo.removeAttribute("src");
+      photo.style.display = "none";
+    };
+  }else{
+    photo.removeAttribute("src");
+    photo.style.display = "none";
   }
 
-  // QR mode: open the requested certificate directly.
-  if(id){
-    const student=findCertificate(id);
-    if(!student){
-      showError();
-      return;
-    }
-    document.getElementById("searchBox").style.display="none";
-    showCertificate(student);
+  document.getElementById("certInput").value = student.id || "";
+}
+
+async function getCertificate(id){
+  const cleanId = String(id || "").trim();
+
+  if(!cleanId) return null;
+
+  if(
+    !SUPABASE_ANON_KEY ||
+    SUPABASE_ANON_KEY === "PASTE_YOUR_SUPABASE_PUBLISHABLE_KEY_HERE"
+  ){
+    throw new Error("Supabase public key has not been added to verify.html.");
+  }
+
+  const url =
+    SUPABASE_URL +
+    "/rest/v1/certificates?select=*&id=eq." +
+    encodeURIComponent(cleanId) +
+    "&limit=1";
+
+  const response = await fetch(url, {
+    method: "GET",
+    headers: {
+      "apikey": SUPABASE_ANON_KEY,
+      "Authorization": "Bearer " + SUPABASE_ANON_KEY,
+      "Accept": "application/json"
+    },
+    cache: "no-store"
+  });
+
+  if(!response.ok){
+    let detail = "";
+    try{
+      const data = await response.json();
+      detail = data.message || data.error_description || data.hint || "";
+    }catch(e){}
+
+    throw new Error(
+      `Supabase error ${response.status}${detail ? ": " + detail : ""}`
+    );
+  }
+
+  const data = await response.json();
+  return Array.isArray(data) && data.length ? data[0] : null;
+}
+
+async function manualSearch(){
+  const input = document.getElementById("certInput");
+  const button = document.querySelector(".search button");
+  const id = input.value.trim();
+
+  if(!id){
+    showError();
     return;
   }
 
-  // Normal website mode: show the search box.
-  document.getElementById("searchBox").style.display="block";
+  button.disabled = true;
+  button.textContent = "Checking...";
+
+  try{
+    const student = await getCertificate(id);
+
+    if(!student){
+      showError();
+      history.replaceState(null, "", location.pathname);
+      return;
+    }
+
+    records = [student];
+    history.replaceState(
+      null,
+      "",
+      location.pathname + "?id=" + encodeURIComponent(student.id)
+    );
+
+    showCertificate(student);
+  }catch(error){
+    console.error(error);
+
+    if(error.message.includes("public key")){
+      showError(
+        "Certificate verification is not configured yet. Please add the Supabase public/publishable key to verify.html."
+      );
+    }else{
+      showError(
+        "Unable to connect to the certificate database. Please try again."
+      );
+    }
+  }finally{
+    button.disabled = false;
+    button.textContent = "Verify · ផ្ទៀងផ្ទាត់ · 확인";
+  }
 }
+
+async function start(){
+  const id = new URLSearchParams(location.search).get("id");
+
+  // Keep the search box visible for normal verification.
+  document.getElementById("searchBox").style.display = "block";
+
+  // If opened from a QR code/link with ?id=..., verify directly.
+  if(id){
+    document.getElementById("certInput").value = id;
+
+    try{
+      const student = await getCertificate(id);
+
+      if(!student){
+        showError();
+        return;
+      }
+
+      document.getElementById("searchBox").style.display = "none";
+      records = [student];
+      showCertificate(student);
+    }catch(error){
+      console.error(error);
+
+      if(error.message.includes("public key")){
+        showError(
+          "Certificate verification is not configured yet. Please add the Supabase public/publishable key to verify.html."
+        );
+      }else{
+        showError(
+          "Unable to connect to the certificate database. Please try again."
+        );
+      }
+    }
+  }
+}
+
+document.getElementById("certInput").addEventListener("keydown", function(e){
+  if(e.key === "Enter"){
+    manualSearch();
+  }
+});
 
 start();
 </script>
