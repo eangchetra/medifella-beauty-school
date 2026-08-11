@@ -62,7 +62,27 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <section id="students" class="section">
 <h1>Student Registration</h1><div class="card">
 <div class="toolbar"><input id="studentSearch" placeholder="Search name, email, phone, course, ID"><select id="studentFilter"><option value="all">All</option><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option></select><button id="studentRefresh" class="light">Refresh</button></div>
-<div id="studentStatus"></div><div id="studentList">Loading...</div></div>
+<div id="studentStatus"></div>
+<div id="studentList">Loading...</div>
+<div id="studentEditCard" class="card hidden" style="margin-top:18px">
+<h2>Edit Student</h2>
+<input type="hidden" id="editStudentId">
+<div class="row">
+<div><label>Full Name</label><input id="editStudentName"></div>
+<div><label>Email</label><input id="editStudentEmail" type="email"></div>
+</div>
+<div class="row">
+<div><label>Phone</label><input id="editStudentPhone"></div>
+<div><label>Course</label><input id="editStudentCourse"></div>
+</div>
+<label>Student ID</label><input id="editStudentStudentId">
+<div class="row" style="margin-top:14px">
+<button id="saveStudentEdit" class="gold">Save Changes</button>
+<button id="cancelStudentEdit" class="light">Cancel</button>
+</div>
+<div id="editStudentStatus"></div>
+</div>
+</div>
 </section>
 
 <section id="certificates" class="section">
@@ -96,7 +116,23 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </section>
 
 <section id="admins" class="section">
-<h1>Admin / Users</h1><div class="card"><h2>Admin Account</h2><p class="muted">Your current account</p><div id="currentAdmin">Loading...</div><p class="muted" style="margin-top:18px">Admin permissions are controlled by the <code>profiles.role</code> field in Supabase.</p></div>
+<h1>Admin / Users</h1>
+<div class="two">
+<div class="card"><h2>Admin Account</h2><p class="muted">Your current account</p><div id="currentAdmin">Loading...</div>
+<div id="adminRole" style="margin-top:12px"></div>
+<p class="muted" style="margin-top:18px">Administrator access is controlled by <code>profiles.role = admin</code> in Supabase.</p></div>
+<div class="card"><h2>Admin Permissions</h2>
+<p>Current admin can manage:</p>
+<ul>
+<li>Student registrations and status</li>
+<li>Student information</li>
+<li>Certificates and verification</li>
+<li>News Feed posts and media</li>
+<li>Courses, pricing, duration and registration status</li>
+</ul>
+<p class="muted">For security, don't expose a Supabase service-role key in this HTML file.</p>
+</div>
+</div>
 </section>
 
 </main></div></div>
@@ -124,6 +160,7 @@ async function boot(){
  adminUser=await getAdmin();
  if(!adminUser){$("loginView").classList.remove("hidden");$("appView").classList.add("hidden");return}
  $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("currentAdmin").textContent=adminUser.email||adminUser.id;
+ $("adminRole").innerHTML='<span class="badge verified">Administrator</span>';
  await refreshAll();
 }
 $("loginBtn").onclick=async()=>{
@@ -133,7 +170,9 @@ $("loginBtn").onclick=async()=>{
   if(error)throw error;
   adminUser=await getAdmin();
   if(!adminUser){await sb.auth.signOut();throw new Error("This account is not an administrator.");}
-  $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("currentAdmin").textContent=adminUser.email||adminUser.id;await refreshAll();
+  $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");$("currentAdmin").textContent=adminUser.email||adminUser.id;
+  $("adminRole").innerHTML='<span class="badge verified">Administrator</span>';
+  await refreshAll();
  }catch(e){msg($("loginStatus"),e.message||"Login failed.",true)}
  finally{$("loginBtn").disabled=false;$("loginBtn").textContent="Log in"}
 };
@@ -154,7 +193,40 @@ function renderStudents(){
 }
 $("studentSearch").oninput=renderStudents;$("studentFilter").onchange=renderStudents;$("studentRefresh").onclick=loadStudents;
 async function setStudent(id,status){const{error}=await sb.from("students").update({status,verified:status==="verified"}).eq("id",id);if(error)msg($("studentStatus"),error.message,true);else{msg($("studentStatus"),"Student updated.");await loadStudents();updateMetrics()}}
-function editStudent(id){const s=students.find(x=>x.id===id);if(!s)return;alert("Student: "+(s.full_name||"")+"\nEmail: "+(s.email||"")+"\nPhone: "+(s.phone||"")+"\nCourse: "+(s.course||"")+"\n\nFor full editing, we can add an edit form next.");}
+function editStudent(id){
+ const s=students.find(x=>x.id===id);
+ if(!s)return;
+ $("editStudentId").value=s.id||"";
+ $("editStudentName").value=s.full_name||"";
+ $("editStudentEmail").value=s.email||"";
+ $("editStudentPhone").value=s.phone||"";
+ $("editStudentCourse").value=s.course||"";
+ $("editStudentStudentId").value=s.student_id||"";
+ clearMsg($("editStudentStatus"));
+ $("studentEditCard").classList.remove("hidden");
+ $("studentEditCard").scrollIntoView({behavior:"smooth",block:"start"});
+}
+$("cancelStudentEdit").onclick=()=>{$("studentEditCard").classList.add("hidden");clearMsg($("editStudentStatus"))};
+$("saveStudentEdit").onclick=async()=>{
+ clearMsg($("editStudentStatus"));
+ const id=$("editStudentId").value;
+ if(!id){msg($("editStudentStatus"),"No student selected.",true);return}
+ const payload={
+   full_name:$("editStudentName").value.trim(),
+   email:$("editStudentEmail").value.trim(),
+   phone:$("editStudentPhone").value.trim(),
+   course:$("editStudentCourse").value.trim(),
+   student_id:$("editStudentStudentId").value.trim()
+ };
+ $("saveStudentEdit").disabled=true;
+ try{
+   const {error}=await sb.from("students").update(payload).eq("id",id);
+   if(error)throw error;
+   msg($("editStudentStatus"),"Student information updated.");
+   await loadStudents();
+ }catch(e){msg($("editStudentStatus"),e.message||"Could not update student.",true)}
+ finally{$("saveStudentEdit").disabled=false}
+};
 
 async function loadCertificates(){
  const{data,error}=await sb.from("certificates").select("*").order("issue_date",{ascending:false});if(error){$("certList").textContent=error.message;return}certificates=data||[];renderCertificates();
