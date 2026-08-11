@@ -43,6 +43,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <button class="nav" data-section="certificates">📜 Certificate Verification</button>
 <button class="nav" data-section="posts">📰 News Feed</button>
 <button class="nav" data-section="courses">📚 Course Management</button>
+<button class="nav" data-section="staff">👥 Staff Accounts</button>
 <button class="nav" data-section="admins">👤 Admin / Users</button>
 </aside>
 <main class="main">
@@ -148,6 +149,45 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div class="card"><h2>Courses</h2><div id="courseList">Loading...</div></div></div>
 </section>
 
+
+<section id="staff" class="section">
+<h1>Staff Accounts & Permissions</h1>
+<div class="two">
+<div class="card">
+<h2>Add / Edit Staff Permissions</h2>
+<p class="muted">
+Create the staff login first in the secure staff-account system. Then enter the staff user's username below
+and select exactly what this staff member can access.
+</p>
+
+<label>Staff Username</label>
+<input id="staffUsername" type="text" autocomplete="off" placeholder="e.g. staff01">
+
+<label style="margin-top:16px">Permissions</label>
+<div style="display:grid;gap:10px;margin-top:10px">
+<label style="font-weight:400"><input id="permDashboard" type="checkbox"> View Dashboard</label>
+<label style="font-weight:400"><input id="permStudents" type="checkbox"> Student Registration</label>
+<label style="font-weight:400"><input id="permCertificates" type="checkbox"> Certificate Verification</label>
+<label style="font-weight:400"><input id="permPosts" type="checkbox"> News Feed</label>
+<label style="font-weight:400"><input id="permCourses" type="checkbox"> Course Management</label>
+<label style="font-weight:400"><input id="permAdmins" type="checkbox"> Admin / Users</label>
+</div>
+
+<div class="row" style="margin-top:16px">
+<button id="staffSave" class="gold">Save Staff Permissions</button>
+<button id="staffClear" class="light">Clear</button>
+</div>
+<div id="staffStatus"></div>
+</div>
+
+<div class="card">
+<h2>Staff Accounts</h2>
+<p class="muted">Staff can only use the sections allowed below. The Admin / Users permission should normally be left off.</p>
+<div id="staffList">Loading...</div>
+</div>
+</div>
+</section>
+
 <section id="admins" class="section">
 <h1>Admin / Users</h1>
 <div class="two">
@@ -179,7 +219,7 @@ function msg(el,text,error=false){el.className="status"+(error?" error":"");el.t
 function clearMsg(el){el.className="";el.textContent=""}
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function attr(v){return String(v??"").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
-let adminUser=null,students=[],certificates=[],courses=[],posts=[];
+let adminUser=null,students=[],certificates=[],courses=[],posts=[],staffProfiles=[];
 
 async function getAdmin(){
  const {data:{session},error}=await sb.auth.getSession();
@@ -212,7 +252,7 @@ $("loginBtn").onclick=async()=>{
 $("logoutBtn").onclick=async()=>{await sb.auth.signOut();location.reload()};
 document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));$(b.dataset.section).classList.add("active")});
 
-async function refreshAll(){await Promise.all([loadStudents(),loadCertificates(),loadCourses(),loadPosts()]);updateMetrics()}
+async function refreshAll(){await Promise.all([loadStudents(),loadCertificates(),loadCourses(),loadPosts(),loadStaff()]);updateMetrics()}
 
 async function loadStudents(){
  const {data,error}=await sb.from("students").select("*").order("created_at",{ascending:false});
@@ -297,11 +337,26 @@ $("certSearch").oninput=renderCertificates;
 function normalizeDate(value){
   const v=String(value||"").trim();
   if(!v)return null;
+
+  // Already in DD/MM/YYYY format
   if(/^\d{2}\/\d{2}\/\d{4}$/.test(v))return v;
+
+  // ISO format YYYY-MM-DD
   if(/^\d{4}-\d{2}-\d{2}$/.test(v)){
     const [y,m,d]=v.split("-");
     return `${d}/${m}/${y}`;
   }
+
+  // Existing certificates may store dates like "08 August 2000"
+  const months={january:1,february:2,march:3,april:4,may:5,june:6,july:7,august:8,september:9,october:10,november:11,december:12};
+  const match=v.match(/^(\d{1,2})\s+([A-Za-z]+)\s+(\d{4})$/);
+  if(match){
+    const d=Number(match[1]);
+    const m=months[match[2].toLowerCase()];
+    const y=Number(match[3]);
+    if(m && d>=1 && d<=31)return `${String(d).padStart(2,"0")}/${String(m).padStart(2,"0")}/${y}`;
+  }
+
   return null;
 }
 function dateToNumber(value){
@@ -465,6 +520,140 @@ $("certCreate").onclick=async()=>{
    $("certCreate").disabled=false;
    $("certCreate").textContent="Save Certificate"
  }
+};
+
+
+const STAFF_PERMISSION_KEYS = [
+  ["dashboard","permDashboard"],
+  ["students","permStudents"],
+  ["certificates","permCertificates"],
+  ["posts","permPosts"],
+  ["courses","permCourses"],
+  ["admins","permAdmins"]
+];
+
+function getStaffPermissionsFromForm(){
+  const permissions={};
+  STAFF_PERMISSION_KEYS.forEach(([key,id])=>{
+    permissions[key]=$(id).checked;
+  });
+  return permissions;
+}
+
+function setStaffPermissionsForm(permissions){
+  STAFF_PERMISSION_KEYS.forEach(([key,id])=>{
+    $(id).checked=!!(permissions && permissions[key]);
+  });
+}
+
+function renderStaff(){
+  const rows=staffProfiles.filter(p=>String(p.role||"").toLowerCase()==="staff");
+
+  $("staffList").innerHTML=rows.length ? rows.map(p=>{
+    const permissions=p.permissions||{};
+    const labels=[
+      ["dashboard","Dashboard"],
+      ["students","Students"],
+      ["certificates","Certificates"],
+      ["posts","News"],
+      ["courses","Courses"],
+      ["admins","Admin / Users"]
+    ].filter(([k])=>permissions[k]).map(([,label])=>label);
+
+    return `<div class="post">
+      <strong>${esc(p.username||p.email||p.id||"Staff")}</strong>
+      <div class="muted" style="margin-top:5px">${labels.length?esc(labels.join(" · ")):"No permissions selected"}</div>
+      <div class="actions" style="margin-top:8px">
+        <button class="light" onclick="editStaff('${attr(p.id)}')">Edit</button>
+      </div>
+    </div>`;
+  }).join("") : '<p class="muted">No staff permissions have been assigned yet.</p>';
+}
+
+async function loadStaff(){
+  const {data,error}=await sb
+    .from("profiles")
+    .select("id,email,username,role,permissions")
+    .eq("role","staff")
+    .order("email",{ascending:true});
+
+  if(error){
+    $("staffList").innerHTML =
+      `<p class="muted">Staff table setup is required: ${esc(error.message)}</p>`;
+    staffProfiles=[];
+    return;
+  }
+
+  staffProfiles=data||[];
+  renderStaff();
+}
+
+function editStaff(id){
+  const p=staffProfiles.find(x=>String(x.id)===String(id));
+  if(!p)return;
+
+  $("staffUsername").value=p.username||"";
+  setStaffPermissionsForm(p.permissions||{});
+  clearMsg($("staffStatus"));
+  $("staffEmail").scrollIntoView({behavior:"smooth",block:"center"});
+}
+
+$("staffClear").onclick=()=>{
+  $("staffUsername").value="";
+  setStaffPermissionsForm({});
+  clearMsg($("staffStatus"));
+};
+
+$("staffSave").onclick=async()=>{
+  clearMsg($("staffStatus"));
+
+  const username=$("staffUsername").value.trim().toLowerCase();
+  const permissions=getStaffPermissionsFromForm();
+
+  if(!username){
+    msg($("staffStatus"),"Enter the staff username.",true);
+    return;
+  }
+
+  $("staffSave").disabled=true;
+  $("staffSave").textContent="Saving...";
+
+  try{
+    // Look up the existing profile by email. Auth account creation itself
+    // must be done securely in Supabase Authentication, not with a secret key
+    // in this browser page.
+    const {data:profile,error:findError}=await sb
+      .from("profiles")
+      .select("id,email,role")
+      .eq("username",username)
+      .maybeSingle();
+
+    if(findError)throw findError;
+
+    if(!profile){
+      throw new Error(
+        "This username does not have a staff profile yet. Create the staff account first, then return here."
+      );
+    }
+
+    const {error:updateError}=await sb
+      .from("profiles")
+      .update({
+        role:"staff",
+        permissions
+      })
+      .eq("id",profile.id);
+
+    if(updateError)throw updateError;
+
+    msg($("staffStatus"),"Staff permissions saved successfully.");
+    await loadStaff();
+  }catch(e){
+    msg($("staffStatus"),e.message||"Could not save staff permissions.",true);
+  }finally{
+    $("staffSave").disabled=false;
+    $("staffSave").textContent="Save Staff Permissions";
+  }
 };
 
 async function loadPosts(){
