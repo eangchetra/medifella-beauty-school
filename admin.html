@@ -89,12 +89,47 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <h1>Certificate Verification</h1>
 <div class="two">
 <div class="card"><h2>Create / Upload Certificate</h2>
-<label>Certificate Number</label><input id="certNo" placeholder="MF-2026-0001">
-<label>Student Name</label><input id="certStudent"><label>Student ID</label><input id="certStudentId">
-<label>Course</label><input id="certCourse"><label>Issue Date</label><input id="certDate" type="date">
-<label>Certificate File</label><input id="certFile" type="file" accept="image/*,.pdf">
-<button id="certCreate" class="gold" style="margin-top:14px">Create Certificate</button><div id="certStatus"></div></div>
-<div class="card"><h2>Search Certificates</h2><input id="certSearch" placeholder="Certificate number or student name"><div id="certList">Loading...</div></div>
+<label>Certificate ID <span style="color:#9d2d2d">*</span></label>
+<input id="certNo" placeholder="MEDIFELLA01202547" required>
+
+<label>Student Name (Khmer) <span style="color:#9d2d2d">*</span></label>
+<input id="certNameKhmer" placeholder="ឈ្មោះជាភាសាខ្មែរ" required>
+
+<label>Student Name (English) <span style="color:#9d2d2d">*</span></label>
+<input id="certNameEnglish" placeholder="CHIEN CHARYA" required>
+
+<label>Sex <span style="color:#9d2d2d">*</span></label>
+<select id="certSex" required>
+<option value="">Select sex</option><option value="Male">Male</option><option value="Female">Female</option>
+</select>
+
+<label>Date of Birth <span style="color:#9d2d2d">*</span></label>
+<input id="certDob" type="date" required>
+
+<label>Course <span style="color:#9d2d2d">*</span></label>
+<input id="certCourse" placeholder="Diploma of Beauty Care" required>
+
+<label>Duration <span style="color:#9d2d2d">*</span></label>
+<input id="certDuration" placeholder="12 Months" required>
+
+<label>Issue Date <span style="color:#9d2d2d">*</span></label>
+<input id="certDate" type="date" required>
+
+<label>Completion Date <span style="color:#9d2d2d">*</span></label>
+<input id="certCompletionDate" type="date" required>
+
+<label>Certificate Photo <span style="color:#9d2d2d">*</span></label>
+<input id="certFile" type="file" accept="image/jpeg,image/png,image/webp" required>
+<div class="muted" style="margin-top:5px">The uploaded photo will be saved using the Certificate ID as the filename.</div>
+
+<button id="certCreate" class="gold" style="margin-top:14px">Create Certificate</button>
+<div id="certStatus"></div>
+</div>
+
+<div class="card"><h2>Search Certificates</h2>
+<input id="certSearch" placeholder="Certificate ID or student name">
+<div id="certList">Loading...</div>
+</div>
 </div>
 </section>
 
@@ -229,21 +264,50 @@ $("saveStudentEdit").onclick=async()=>{
 };
 
 async function loadCertificates(){
- const{data,error}=await sb.from("certificates").select("*").order("issue_date",{ascending:false});if(error){$("certList").textContent=error.message;return}certificates=data||[];renderCertificates();
+ const{data,error}=await sb.from("certificates").select("*").order("issue_date",{ascending:false});
+ if(error){$("certList").textContent=error.message;return}
+ certificates=data||[];renderCertificates();
 }
 function renderCertificates(){
- const q=$("certSearch").value.trim().toLowerCase();const rows=certificates.filter(c=>(`${c.certificate_no||""} ${c.student_name||""} ${c.student_id||""}`).toLowerCase().includes(q));
- $("certList").innerHTML=rows.length?rows.map(c=>`<div class="post"><strong>${esc(c.certificate_no)}</strong><div>${esc(c.student_name)} · ${esc(c.course||"")}</div><div class="muted">${esc(c.issue_date||"")} · ${c.verified?'<span class="badge verified">Verified</span>':'<span class="badge pending">Pending</span>'}</div><div class="actions" style="margin-top:8px"><button class="gold" onclick="setCert('${attr(c.id)}',true)">Verify</button><button class="danger" onclick="setCert('${attr(c.id)}',false)">Revoke</button><button class="light" onclick="deleteCert('${attr(c.id)}')">Delete</button></div></div>`).join(""):'<p class="muted">No certificates found.</p>';
- $("recentCertificates").innerHTML=certificates.slice(0,5).map(c=>`<div class="post"><strong>${esc(c.certificate_no)}</strong><div class="muted">${esc(c.student_name)} · ${c.verified?"Verified":"Pending"}</div></div>`).join("")||'<p class="muted">No certificates.</p>';
+ const q=$("certSearch").value.trim().toLowerCase();
+ const rows=certificates.filter(c=>(
+   `${c.certificate_no||c.id||""} ${c.name_khmer||c.nameKhmer||""} ${c.name_english||c.nameEnglish||c.student_name||""}`
+ ).toLowerCase().includes(q));
+ $("certList").innerHTML=rows.length?rows.map(c=>`<div class="post">
+<strong>${esc(c.certificate_no||c.id||"")}</strong>
+<div>${esc(c.name_khmer||c.nameKhmer||"")} · ${esc(c.name_english||c.nameEnglish||c.student_name||"")}</div>
+<div class="muted">${esc(c.course||"")} · ${esc(c.duration||"")} · Issue: ${esc(c.issue_date||"")} · Completion: ${esc(c.completion_date||"")} · ${c.verified?'<span class="badge verified">Verified</span>':'<span class="badge pending">Pending</span>'}</div>
+${c.file_url?`<div style="margin-top:8px"><a href="${attr(c.file_url)}" target="_blank" rel="noopener">View Certificate Photo</a></div>`:""}
+<div class="actions" style="margin-top:8px"><button class="gold" onclick="setCert('${attr(c.id)}',true)">Verify</button><button class="danger" onclick="setCert('${attr(c.id)}',false)">Revoke</button><button class="light" onclick="deleteCert('${attr(c.id)}')">Delete</button></div>
+</div>`).join(""):'<p class="muted">No certificates found.</p>';
+ $("recentCertificates").innerHTML=certificates.slice(0,5).map(c=>`<div class="post"><strong>${esc(c.certificate_no||c.id||"")}</strong><div class="muted">${esc(c.name_english||c.nameEnglish||c.student_name||"")} · ${c.verified?"Verified":"Pending"}</div></div>`).join("")||'<p class="muted">No certificates.</p>';
 }
 $("certSearch").oninput=renderCertificates;
 async function setCert(id,verified){const{error}=await sb.from("certificates").update({verified}).eq("id",id);if(error)msg($("certStatus"),error.message,true);else{msg($("certStatus"),verified?"Certificate verified.":"Certificate revoked.");await loadCertificates();updateMetrics()}}
-async function deleteCert(id){if(!confirm("Delete this certificate?"))return;const{error}=await sb.from("certificates").delete().eq("id",id);if(error)alert(error.message);else loadCertificates()}
+async function deleteCert(id){if(!confirm("Delete this certificate?"))return;const{error}=await sb.from("certificates").delete().eq("id",id);if(error)alert(error.message);else await loadCertificates()}
+
 $("certCreate").onclick=async()=>{
- clearMsg($("certStatus"));const no=$("certNo").value.trim(),name=$("certStudent").value.trim(),sid=$("certStudentId").value.trim(),course=$("certCourse").value.trim(),date=$("certDate").value||null,file=$("certFile").files[0];
- if(!no||!name||!course){msg($("certStatus"),"Certificate number, student name and course are required.",true);return}
- try{let file_url=null;if(file){const path=`${adminUser.id}/${Date.now()}-${file.name.replace(/[^a-z0-9._-]/gi,"-")}`;const up=await sb.storage.from("certificates").upload(path,file);if(up.error)throw up.error;file_url=sb.storage.from("certificates").getPublicUrl(path).data.publicUrl}
- const{error}=await sb.from("certificates").insert({certificate_no:no,student_name:name,student_id:sid||null,course,issue_date:date,file_url,verified:true});if(error)throw error;msg($("certStatus"),"Certificate created.");["certNo","certStudent","certStudentId","certCourse","certDate"].forEach(id=>$(id).value="");$("certFile").value="";await loadCertificates();updateMetrics()}catch(e){msg($("certStatus"),e.message,true)}
+ clearMsg($("certStatus"));
+ const no=$("certNo").value.trim(),nameKhmer=$("certNameKhmer").value.trim(),nameEnglish=$("certNameEnglish").value.trim(),sex=$("certSex").value,dob=$("certDob").value,course=$("certCourse").value.trim(),duration=$("certDuration").value.trim(),issueDate=$("certDate").value,completionDate=$("certCompletionDate").value,file=$("certFile").files[0];
+ if(!no||!nameKhmer||!nameEnglish||!sex||!dob||!course||!duration||!issueDate||!completionDate||!file){msg($("certStatus"),"Please complete all required certificate fields and upload the certificate photo.",true);return}
+ if(!["image/jpeg","image/png","image/webp"].includes(file.type)){msg($("certStatus"),"Certificate photo must be JPG, PNG, or WEBP.",true);return}
+ if(completionDate<issueDate){msg($("certStatus"),"Completion Date cannot be earlier than Issue Date.",true);return}
+ $("certCreate").disabled=true;$("certCreate").textContent="Creating...";
+ try{
+   if(certificates.some(c=>String(c.certificate_no||"").toLowerCase()===no.toLowerCase()))throw new Error("This Certificate ID already exists.");
+   const ext=file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg";
+   const safeNo=no.replace(/[^a-z0-9_-]/gi,"-");
+   const path=`${adminUser.id}/${safeNo}.${ext}`;
+   const up=await sb.storage.from("certificates").upload(path,file,{upsert:false,contentType:file.type});
+   if(up.error)throw up.error;
+   const file_url=sb.storage.from("certificates").getPublicUrl(path).data.publicUrl;
+   const payload={certificate_no:no,student_name:nameEnglish,student_id:null,course,issue_date:issueDate,file_url,verified:true,name_khmer:nameKhmer,name_english:nameEnglish,sex,date_of_birth:dob,duration,completion_date:completionDate};
+   const{error}=await sb.from("certificates").insert(payload);if(error)throw error;
+   msg($("certStatus"),"Certificate created successfully.");
+   ["certNo","certNameKhmer","certNameEnglish","certDob","certCourse","certDuration","certDate","certCompletionDate"].forEach(id=>$(id).value="");$("certSex").value="";$("certFile").value="";
+   await loadCertificates();updateMetrics();
+ }catch(e){msg($("certStatus"),e.message||"Could not create certificate.",true)}
+ finally{$("certCreate").disabled=false;$("certCreate").textContent="Create Certificate"}
 };
 
 async function loadPosts(){
