@@ -264,16 +264,16 @@ $("saveStudentEdit").onclick=async()=>{
 };
 
 async function loadCertificates(){
- const{data,error}=await sb.from("certificates").select("*").order("issueDate",{ascending:false});
+ const{data,error}=await sb.from("certificates").select("*").order("issuedate",{ascending:false});
  if(error){$("certList").textContent=error.message;certificates=[];return}
  certificates=data||[];renderCertificates();
 }
-function certId(c){return c.certificateId||c.certificate_id||c.certificate_no||c.id||""}
-function certKhmer(c){return c.studentNameKhmer||c.name_khmer||c.nameKhmer||""}
-function certEnglish(c){return c.studentNameEnglish||c.name_english||c.nameEnglish||c.student_name||""}
-function certDob(c){return c.dateOfBirth||c.date_of_birth||""}
-function certIssue(c){return c.issueDate||c.issue_date||""}
-function certCompletion(c){return c.completionDate||c.completion_date||""}
+function certId(c){return c.certificateid||c.certificateId||c.certificate_id||c.certificate_no||c.id||""}
+function certKhmer(c){return c.studentnamekhmer||c.studentNameKhmer||c.name_khmer||c.nameKhmer||""}
+function certEnglish(c){return c.studentnameenglish||c.studentNameEnglish||c.name_english||c.nameEnglish||c.student_name||""}
+function certDob(c){return c.dateofbirth||c.dateOfBirth||c.date_of_birth||""}
+function certIssue(c){return c.issuedate||c.issueDate||c.issue_date||""}
+function certCompletion(c){return c.completiondate||c.completionDate||c.completion_date||""}
 function certPhoto(c){return c.photo||c.file_url||""}
 function renderCertificates(){
  const q=$("certSearch").value.trim().toLowerCase();
@@ -292,7 +292,7 @@ ${certPhoto(c)?`<div style="margin-top:8px"><a href="${attr(certPhoto(c))}" targ
 $("certSearch").oninput=renderCertificates;
 async function deleteCert(certificateId){
  if(!confirm("Delete this certificate?"))return;
- const{error}=await sb.from("certificates").delete().eq("certificateId",certificateId);
+ const{error}=await sb.from("certificates").delete().eq("certificateid",certificateId);
  if(error)alert(error.message);else{await loadCertificates();updateMetrics()}
 }
 
@@ -337,21 +337,21 @@ $("certCreate").onclick=async()=>{
 
    const photo=sb.storage.from("certificates").getPublicUrl(path).data.publicUrl;
 
-   // IMPORTANT: These names match the existing certificates table
-   // created in your Supabase SQL: certificateId, studentNameKhmer,
-   // studentNameEnglish, sex, dateOfBirth, photo, course, duration,
-   // issueDate and completionDate.
+   // IMPORTANT: PostgreSQL folds unquoted camelCase column names to lowercase.
+   // The SQL you used creates these columns as:
+   // certificateid, studentnamekhmer, studentnameenglish, sex,
+   // dateofbirth, photo, course, duration, issuedate and completiondate.
    const payload={
-     certificateId:no,
-     studentNameKhmer:nameKhmer,
-     studentNameEnglish:nameEnglish,
+     certificateid:no,
+     studentnamekhmer:nameKhmer,
+     studentnameenglish:nameEnglish,
      sex,
-     dateOfBirth:dob,
+     dateofbirth:dob,
      photo,
      course,
      duration,
-     issueDate,
-     completionDate
+     issuedate:issueDate,
+     completiondate:completionDate
    };
 
    const{error}=await sb.from("certificates").insert(payload);
