@@ -148,11 +148,21 @@
     "sex": "Female",
     "dateOfBirth": "16 June 1993",
     "photo": "students/MEDIFELLA02202548.jpg",
-    "course": "ថម៉ាស្សាមុខទូទៅ(កម្រិតមធ្យម) General Facial Massage (Medium)",
+    "course": "ម៉ាស្សាមុខទូទៅ(កម្រិតមធ្យម) General Facial Massage (Medium)",
     "duration": "2 Months",
     "issueDate": "10/06/2026",
     "completionDate": "10/08/2026"
+    },
+    {
+    "id": "MEDIFELLA01202548",
+    "name": "រ៉ុន​ ចាន់ជី RUN CHANCHY",
+    "sex": "Female",
+    "dateOfBirth": "30 October 1986",
+    "photo": "students/MEDIFELLA01202548.jpg",
+    "course": "ថែរក្សាសម្ផស្ស Beauty Care",
+    "duration": "12 Months",
+    "issueDate": "01/06/2024",
+    "completionDate": "01/06/2025"
     }
     ]
-
 
