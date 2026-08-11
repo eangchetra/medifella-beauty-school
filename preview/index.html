@@ -1,0 +1,689 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Medi Fella Beauty School | Korean Beauty Education</title>
+  <meta name="description" content="Medi Fella Beauty School - Korean Beauty Education in Cambodia.">
+
+  <!-- IMPORTANT: CSS stays in style.css, not inside this HTML file -->
+  <link rel="stylesheet" href="style.css?v=4">
+  <style>
+    .online-course-link {
+      color: #075e66 !important;
+      font-weight: 700;
+    }
+    .online-course-link small {
+      color: #075e66 !important;
+    }
+
+    .language-switcher {
+      display: none !important;
+    }
+
+    .nav-links > a {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: center;
+      line-height: 1.25;
+      text-align: center;
+    }
+
+    .nav-links > a > span {
+      font-family: "Khmer OS Battambang", "Battambang", sans-serif !important;
+      font-size: 13px;
+    }
+
+    .nav-links > a > small {
+      display: block;
+      font-size: 8px;
+      line-height: 1.35;
+      letter-spacing: .3px;
+      font-weight: 600;
+    }
+
+    .nav-links > a > small:last-child {
+      font-family: Arial, "Noto Sans KR", sans-serif;
+    }
+
+    .language-switcher button {
+      border: 1px solid #d7d2c7;
+      background: #fff;
+      color: #334b4f;
+      border-radius: 18px;
+      padding: 6px 9px;
+      font-size: 11px;
+      line-height: 1;
+      cursor: pointer;
+      white-space: nowrap;
+    }
+
+    .language-switcher button.selected {
+      background: #075e66;
+      color: #fff;
+      border-color: #075e66;
+    }
+
+    @media (max-width: 900px) {
+      .language-switcher {
+        flex-wrap: wrap;
+      }
+    }
+
+    @media (max-width: 600px) {
+      .language-switcher button {
+        padding: 7px 10px;
+        font-size: 10px;
+      }
+    }
+  
+  .facebook-fallback {
+    text-align: center;
+    padding: 18px 12px 6px;
+    font-size: 13px;
+    color: #666;
+  }
+
+  .facebook-fallback a {
+    color: #075e66;
+    font-weight: 700;
+  }
+
+</style>
+
+<style>
+  /* Facebook section */
+  .facebook-section {
+    padding: 80px 5%;
+    background: #f7f8f6;
+    border-top: 1px solid #e6e1d7;
+  }
+
+  .facebook-heading {
+    max-width: 1100px;
+    margin: 0 auto 28px;
+    text-align: center;
+  }
+
+  .facebook-heading > span {
+    display: inline-block;
+    color: #075e66;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+  }
+
+  .facebook-heading h2 {
+    margin: 0 0 10px;
+    color: #075e66;
+    font-size: clamp(28px, 4vw, 42px);
+  }
+
+  .facebook-heading p {
+    margin: 0 auto 20px;
+    max-width: 720px;
+    line-height: 1.8;
+  }
+
+  .facebook-page-button {
+    display: inline-block;
+    padding: 12px 20px;
+    border-radius: 8px;
+    background: #075e66;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  .facebook-feed-wrap {
+    width: 100%;
+    max-width: 1200px;
+    min-height: 900px;
+    margin: 0 auto;
+    display: block;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.08);
+    padding: 8px;
+    box-sizing: border-box;
+  }
+
+  .facebook-feed-wrap .fb-page,
+  .facebook-feed-wrap .fb-page > span {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .facebook-feed-wrap iframe {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    border: 0 !important;
+  }
+
+  @media (max-width: 600px) {
+    .facebook-section {
+      padding: 55px 12px;
+    }
+
+    .facebook-feed-wrap {
+      min-height: 850px;
+      padding: 4px;
+      border-radius: 10px;
+    }
+
+    .facebook-heading p {
+      font-size: 14px;
+    }
+  }
+</style>
+
+
+<style id="preview-banner-style">
+  .preview-banner {
+    position: sticky;
+    top: 0;
+    z-index: 99999;
+    width: 100%;
+    padding: 10px 14px;
+    background: #075e66;
+    color: #fff;
+    text-align: center;
+    font: 700 13px/1.4 Arial, sans-serif;
+    letter-spacing: .3px;
+    box-shadow: 0 2px 10px rgba(0,0,0,.12);
+  }
+  .preview-banner strong { color: #c9a24e; }
+</style>
+
+</head>
+
+<body>
+
+<div class="preview-banner">
+  <strong>DESIGN PREVIEW</strong> — This is the test version of Medi Fella Beauty School.
+  The public homepage remains under maintenance.
+</div>
+
+
+<header class="header">
+  <a href="#home" class="brand">
+    <img src="logo.jpeg" alt="Medi Fella Beauty School">
+    <div>
+      <div class="brand-name">Medi Fella</div>
+      <div class="brand-sub">BEAUTY SCHOOL</div>
+      <div class="brand-kh">BEAUTY EDUCATION • CAMBODIA</div>
+    </div>
+  </a>
+
+  <button class="hamburger" onclick="document.querySelector('.nav-links').classList.toggle('open')">☰</button>
+
+  <nav class="nav-links">
+    <a href="#home">
+      <span>ទំព័រដើម</span><small>HOME</small><small>홈</small>
+    </a>
+    <a href="#about">
+      <span>អំពីសាលា</span><small>ABOUT US</small><small>학교소개</small>
+    </a>
+    <a href="#courses">
+      <span>វគ្គសិក្សា</span><small>COURSES</small><small>과정</small>
+    </a>
+    <a class="online-course-link" href="online-course.html">
+      <span>វគ្គសិក្សាអនឡាញ</span><small>ONLINE COURSE</small><small>온라인 과정</small>
+    </a>
+    <a href="#scholarship">
+      <span>អាហារូបករណ៍</span><small>SCHOLARSHIP</small><small>장학제도</small>
+    </a>
+    <a href="#gallery">
+      <span>វិចិត្រសាល</span><small>GALLERY</small><small>갤러리</small>
+    </a>
+    <a href="#contact">
+      <span>ទំនាក់ទំនង</span><small>CONTACT</small><small>문의하기</small>
+    </a>
+
+    <div class="language-switcher" aria-label="Language selection">
+      <button type="button" onclick="setLanguage('km')" data-lang="km">ខ្មែរ</button>
+      <button type="button" onclick="setLanguage('en')" data-lang="en">English</button>
+      <button type="button" onclick="setLanguage('ko')" data-lang="ko">한국어</button>
+    </div>
+
+    <a class="enroll" href="#contact">ចុះឈ្មោះឥឡូវនេះ<br><small>ENROLL NOW →</small></a>
+  </nav>
+</header>
+
+<main>
+
+<!-- HOME -->
+<section id="home" class="hero">
+
+  <div class="hero-copy">
+
+    <div class="gold-label">
+      <span data-i18n="label">ការអប់រំសម្រស់បែបកូរ៉េ</span>
+    </div>
+
+    <h1>
+      <span data-i18n="heroTitle">
+        សិក្សាជំនាញសម្រស់កូរ៉េ។<br>
+        <span>កសាងអនាគតរបស់អ្នក។</span>
+      </span>
+    </h1>
+
+    <p class="kr-copy">
+      <span data-i18n="heroText">
+        ការអប់រំផ្នែកសម្រស់តាមបែបកូរ៉េ ផ្តោតលើជំនាញអនុវត្ត
+        ទំនុកចិត្ត និងបច្ចេកទេសសម្រស់ទំនើប។
+      </span>
+    </p>
+
+    <p class="en-tag">
+      <span data-i18n="tag">សិក្សាសម្រស់។ កសាងអនាគត។</span>
+    </p>
+
+    <div class="hero-buttons">
+      <a href="#courses" class="btn filled">
+        <span data-i18n="explore">មើលវគ្គសិក្សា →</span>
+      </a>
+
+      <a href="#about" class="btn outline">
+        <span data-i18n="about">អំពីសាលារបស់យើង</span>
+      </a>
+    </div>
+
+    <div class="feature-row">
+      <div>
+        <b>♙</b>
+        <strong>KOREAN EXPERT<br>INSTRUCTORS</strong>
+        <small>គ្រូជំនាញកូរ៉េ</small>
+      </div>
+
+      <div>
+        <b>▣</b>
+        <strong>INTERNATIONAL<br>CERTIFICATION</strong>
+        <small>វិញ្ញាបនបត្រអន្តរជាតិ</small>
+      </div>
+
+      <div>
+        <b>♧</b>
+        <strong>100% PRACTICAL<br>TRAINING</strong>
+        <small>ការអនុវត្តជាក់ស្តែង</small>
+      </div>
+
+      <div>
+        <b>◎</b>
+        <strong>GLOBAL BEAUTY<br>CAREER</strong>
+        <small>អាជីពសម្រស់អន្តរជាតិ</small>
+      </div>
+    </div>
+
+  </div>
+
+  <div class="hero-visual">
+
+    <div class="training-photo">
+      <img
+        src="hero_training.jpg?v=4"
+        alt="Medi Fella Beauty School Korean beauty training">
+    </div>
+
+    <aside class="hero-side">
+      <img src="logo.jpeg" alt="Medi Fella logo">
+      <h2>MEDI FELLA<br>BEAUTY SCHOOL</h2>
+      <p>សាលាសម្រស់ មេឌី ហ្វេឡា</p>
+      <div class="side-line"></div>
+      <p class="quote">“បង្រៀនសម្រស់<br>រចនាអនាគត”</p>
+      <strong>DESIGN YOUR BEAUTY.<br>DESIGN YOUR FUTURE.</strong>
+    </aside>
+
+  </div>
+</section>
+
+
+<!-- STATISTICS -->
+<section class="stats">
+  <div>
+    <b>♙</b>
+    <strong>500+</strong>
+    <span>GRADUATES<br>សិស្សបញ្ចប់ការសិក្សា</span>
+  </div>
+
+  <div>
+    <b>▤</b>
+    <strong>20+</strong>
+    <span>PROFESSIONAL COURSES<br>វគ្គសិក្សាជំនាញ</span>
+  </div>
+
+  <div>
+    <b>☆</b>
+    <strong>98%</strong>
+    <span>STUDENT SATISFACTION<br>ការពេញចិត្តរបស់សិស្ស</span>
+  </div>
+
+  <div>
+    <b>♜</b>
+    <strong>🇰🇷</strong>
+    <span>PARTNERSHIP WITH KOREA<br>សហការជាមួយកូរ៉េ</span>
+  </div>
+</section>
+
+
+<!-- STUDENT VERIFICATION
+     THIS IS NOW ABOVE PROFESSIONAL BEAUTY EDUCATION PROGRAMS -->
+<section class="verify">
+
+  <div>
+    <span>STUDENT VERIFICATION</span>
+
+    <h2>
+      <span data-i18n="verify">
+        ផ្ទៀងផ្ទាត់វិញ្ញាបនបត្រ / ព័ត៌មានសិស្ស
+      </span>
+    </h2>
+
+    <p>
+      <span data-i18n="verifyText">
+        បញ្ចូល Student ID ឬស្កេន QR Code
+        ដើម្បីផ្ទៀងផ្ទាត់ព័ត៌មានសិស្ស។
+      </span>
+    </p>
+  </div>
+
+  <a class="btn light" href="verify.html">
+    VERIFY STUDENT →
+  </a>
+
+</section>
+
+
+<!-- FACEBOOK PAGE FEED -->
+<section id="facebook" class="facebook-section">
+  <div class="facebook-heading">
+    <span>FOLLOW US ON FACEBOOK</span>
+    <h2>Medi Fella Beauty School</h2>
+    <p>បន្តរំកិលចុះក្រោម ដើម្បីមើលព័ត៌មាន និងការបណ្តុះបណ្តាលថ្មីៗពី Facebook របស់យើង។</p>
+    <a class="facebook-page-button"
+       href="https://www.facebook.com/medifellabeautyschool"
+       target="_blank" rel="noopener noreferrer">
+      OPEN FACEBOOK PAGE →
+    </a>
+  </div>
+
+  <div class="facebook-feed-wrap">
+    <div class="fb-page"
+         data-href="https://www.facebook.com/medifellabeautyschool"
+         data-tabs="timeline"
+         data-width="1000"
+         data-height="900"
+         data-small-header="false"
+         data-adapt-container-width="true"
+         data-hide-cover="false"
+         data-show-facepile="true">
+      <blockquote cite="https://www.facebook.com/medifellabeautyschool"
+                  class="fb-xfbml-parse-ignore">
+        <a href="https://www.facebook.com/medifellabeautyschool"
+           target="_blank" rel="noopener noreferrer">
+          Medi Fella Beauty School
+        </a>
+      </blockquote>
+    </div>
+  </div>
+</section>
+
+
+
+
+
+
+</main>
+
+
+
+<footer>
+
+  <div class="footer-brand">
+    <img src="logo.jpeg" alt="Medi Fella Beauty School">
+
+    <strong>
+      Medi Fella<br>
+      <small>BEAUTY SCHOOL</small>
+    </strong>
+  </div>
+
+  <div>
+    អំពីសាលា<br>
+    វគ្គសិក្សា<br>
+    អាហារូបករណ៍<br>
+    វិចិត្រសាល
+  </div>
+
+  <div>
+    CONTACT US<br>
+    Telegram: 086 454 353<br>
+    Phnom Penh, Cambodia
+  </div>
+
+  <div class="copyright">
+    © 2026 Medi Fella Beauty School. All rights reserved.
+  </div>
+
+</footer>
+
+
+<script>
+const onlineCourseLabels = {
+  km: { title: "វគ្គសិក្សាអនឡាញ", subtitle: "វគ្គសិក្សាអនឡាញ" },
+  en: { title: "Online Course", subtitle: "ONLINE COURSE" },
+  ko: { title: "온라인 과정", subtitle: "ONLINE COURSE" }
+};
+
+
+function updateOnlineCourseLabel(lang) {
+  const title = document.querySelector("[data-online-course-km]");
+  const subtitle = document.querySelector("[data-online-course-en]");
+
+  if (!title || !subtitle) return;
+
+  const labels = onlineCourseLabels[lang] || onlineCourseLabels.km;
+  title.textContent = labels.title;
+  subtitle.textContent = labels.subtitle;
+}
+
+
+const translations = {
+
+  en: {
+    label: "KOREAN BEAUTY EDUCATION",
+
+    heroTitle:
+      "Learn Korean Beauty.<br><span>Build Your Future.</span>",
+
+    heroText:
+      "Professional Korean-inspired beauty education designed to develop practical skills, confidence and modern beauty techniques.",
+
+    tag:
+      "LEARN BEAUTY. BUILD YOUR FUTURE.",
+
+    explore:
+      "Explore Courses →",
+
+    about:
+      "About Our School",
+
+    coursesTitle:
+      "Professional Beauty Education Programs",
+
+    allCourses:
+      "View All Courses →",
+
+    scholarship:
+      "Invest in Your Future<br>Through Beauty Education",
+
+    verify:
+      "Certificate / Student Verification",
+
+    verifyText:
+      "Enter a Student ID or scan a QR code to verify student information."
+  },
+
+
+  km: {
+    label:
+      "ការអប់រំសម្រស់បែបកូរ៉េ",
+
+    heroTitle:
+      "សិក្សាជំនាញសម្រស់កូរ៉េ។<br><span>កសាងអនាគតរបស់អ្នក។</span>",
+
+    heroText:
+      "ការអប់រំផ្នែកសម្រស់តាមបែបកូរ៉េ ផ្តោតលើជំនាញអនុវត្ត ទំនុកចិត្ត និងបច្ចេកទេសសម្រស់ទំនើប។",
+
+    tag:
+      "សិក្សាសម្រស់។ កសាងអនាគត។",
+
+    explore:
+      "មើលវគ្គសិក្សា →",
+
+    about:
+      "អំពីសាលារបស់យើង",
+
+    coursesTitle:
+      "កម្មវិធីអប់រំជំនាញសម្រស់",
+
+    allCourses:
+      "មើលវគ្គសិក្សាទាំងអស់ →",
+
+    scholarship:
+      "វិនិយោគលើអនាគតរបស់អ្នក<br>តាមរយៈការអប់រំសម្រស់",
+
+    verify:
+      "ផ្ទៀងផ្ទាត់វិញ្ញាបនបត្រ / ព័ត៌មានសិស្ស",
+
+    verifyText:
+      "បញ្ចូល Student ID ឬស្កេន QR Code ដើម្បីផ្ទៀងផ្ទាត់ព័ត៌មានសិស្ស។"
+  },
+
+
+  ko: {
+    label:
+      "KOREAN BEAUTY EDUCATION",
+
+    heroTitle:
+      "한국의 뷰티 기술을 배우고,<br><span>당신의 미래를 디자인하세요.</span>",
+
+    heroText:
+      "실무 능력과 자신감, 최신 뷰티 기술을 배울 수 있는 한국식 전문 뷰티 교육을 제공합니다.",
+
+    tag:
+      "BEAUTY를 배우고, 미래를 만드세요.",
+
+    explore:
+      "과정 둘러보기 →",
+
+    about:
+      "학교소개 보기",
+
+    coursesTitle:
+      "실무 중심의 전문 뷰티 교육",
+
+    allCourses:
+      "모든 과정 보기 →",
+
+    scholarship:
+      "당신의 미래에 투자하세요<br>뷰티 교육으로",
+
+    verify:
+      "수료증 / 학생 정보 확인",
+
+    verifyText:
+      "Student ID를 입력하거나 QR 코드를 스캔하여 학생 정보를 확인하세요."
+  }
+
+};
+
+
+function setLanguage(lang) {
+
+  const elements =
+    document.querySelectorAll("[data-i18n]");
+
+  elements.forEach(element => {
+
+    const key = element.dataset.i18n;
+
+    if (translations[lang] &&
+        translations[lang][key]) {
+
+      element.innerHTML =
+        translations[lang][key];
+
+    }
+
+  });
+
+
+  document.documentElement.lang = lang;
+
+  updateOnlineCourseLabel(lang);
+
+  localStorage.setItem(
+    "medifellaLanguage",
+    lang
+  );
+
+
+  document
+    .querySelectorAll(".language-switcher button")
+    .forEach(button => {
+      button.classList.toggle(
+        "selected",
+        button.dataset.lang === lang
+      );
+    });
+
+}
+
+
+document.addEventListener(
+  "DOMContentLoaded",
+  function () {
+
+    const savedLanguage =
+      localStorage.getItem("medifellaLanguage") || "km";
+
+    setLanguage(savedLanguage);
+
+  }
+);
+
+
+document
+  .querySelectorAll(".nav-links a")
+  .forEach(link => {
+
+    link.addEventListener(
+      "click",
+      function () {
+
+        document
+          .querySelector(".nav-links")
+          .classList.remove("open");
+
+      }
+    );
+
+  });
+</script>
+
+
+<!-- Facebook SDK for the Page timeline -->
+<div id="fb-root"></div>
+<script async defer crossorigin="anonymous"
+  src="https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v23.0"></script>
+
+</body>
+</html>
