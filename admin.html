@@ -86,12 +86,115 @@ async function checkAdmin(){
   loadPosts();
 }
 
+let checkingAdmin = false;
+
+async function showLogin(){
+  $("loginCard").classList.remove("hidden");
+  $("dashboard").classList.add("hidden");
+  $("logout").classList.add("hidden");
+}
+
+async function showDashboard(){
+  $("loginCard").classList.add("hidden");
+  $("dashboard").classList.remove("hidden");
+  $("logout").classList.remove("hidden");
+  await loadPosts();
+}
+
+async function checkAdmin(){
+  if (checkingAdmin) return false;
+  checkingAdmin = true;
+  try {
+    const {data:{user}, error:userError} = await sb.auth.getUser();
+
+    if (userError) throw userError;
+
+    if (!user) {
+      await showLogin();
+      return false;
+    }
+
+    const {data:profile, error:profileError} = await sb
+      .from("profiles")
+      .select("id,role")
+      .eq("id", user.id)
+      .maybeSingle();
+
+    if (profileError) {
+      console.error("Profile check error:", profileError);
+      msg($("loginStatus"), "Could not check your administrator permission: " + profileError.message, true);
+      await sb.auth.signOut();
+      await showLogin();
+      return false;
+    }
+
+    if (!profile) {
+      await sb.auth.signOut();
+      msg($("loginStatus"), "No profile was found for this account.", true);
+      await showLogin();
+      return false;
+    }
+
+    if (String(profile.role).toLowerCase() !== "admin") {
+      await sb.auth.signOut();
+      msg($("loginStatus"), "This account is not an administrator.", true);
+      await showLogin();
+      return false;
+    }
+
+    await showDashboard();
+    return true;
+  } catch (e) {
+    console.error(e);
+    msg($("loginStatus"), e.message || "Unable to check administrator access.", true);
+    await showLogin();
+    return false;
+  } finally {
+    checkingAdmin = false;
+  }
+}
+
 $("login").onclick=async()=>{
   clearMsg($("loginStatus"));
-  const {error}=await sb.auth.signInWithPassword({email:$("email").value.trim(),password:$("password").value});
-  if(error) msg($("loginStatus"),error.message,true); else checkAdmin();
+
+  const email = $("email").value.trim();
+  const password = $("password").value;
+
+  if (!email || !password) {
+    msg($("loginStatus"), "Please enter your email and password.", true);
+    return;
+  }
+
+  $("login").disabled = true;
+  $("login").textContent = "Logging in...";
+
+  try {
+    const {error} = await sb.auth.signInWithPassword({
+      email,
+      password
+    });
+
+    if (error) {
+      msg($("loginStatus"), error.message, true);
+      return;
+    }
+
+    await checkAdmin();
+  } catch (e) {
+    console.error(e);
+    msg($("loginStatus"), e.message || "Login failed.", true);
+  } finally {
+    $("login").disabled = false;
+    $("login").textContent = "Log in";
+  }
 };
-$("logout").onclick=async()=>{await sb.auth.signOut();location.reload()};
+
+$("logout").onclick=async()=>{
+  await sb.auth.signOut();
+  await showLogin();
+  clearMsg($("loginStatus"));
+  $("password").value="";
+};
 
 $("clear").onclick=()=>{
   $("title").value="";$("content").value="";$("media").value="";clearMsg($("postStatus"));
@@ -144,9 +247,11 @@ function attr(s){return String(s).replace(/"/g,"&quot;")}
 async function togglePost(id,published){const {error}=await sb.from("posts").update({published}).eq("id",id);if(error)alert(error.message);else loadPosts()}
 async function deletePost(id){if(!confirm("Delete this post?"))return;const {error}=await sb.from("posts").delete().eq("id",id);if(error)alert(error.message);else loadPosts()}
 
-sb.auth.onAuthStateChange(()=>checkAdmin());
-if(SUPABASE_URL.includes("PASTE_")) msg($("loginStatus"),"First add your Supabase Project URL and anon/publishable key to this file.",true);
-else checkAdmin();
+if(SUPABASE_URL.includes("PASTE_")) {
+  msg($("loginStatus"),"First add your Supabase Project URL and anon/publishable key to this file.",true);
+} else {
+  checkAdmin();
+}
 </script>
 </body>
 </html>
