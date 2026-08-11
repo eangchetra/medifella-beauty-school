@@ -78,6 +78,90 @@
       }
     }
   </style>
+
+<style>
+  /* Facebook section */
+  .facebook-section {
+    padding: 80px 5%;
+    background: #f7f8f6;
+    border-top: 1px solid #e6e1d7;
+  }
+
+  .facebook-heading {
+    max-width: 1100px;
+    margin: 0 auto 28px;
+    text-align: center;
+  }
+
+  .facebook-heading > span {
+    display: inline-block;
+    color: #075e66;
+    font-size: 12px;
+    font-weight: 800;
+    letter-spacing: 1.5px;
+    margin-bottom: 8px;
+  }
+
+  .facebook-heading h2 {
+    margin: 0 0 10px;
+    color: #075e66;
+    font-size: clamp(28px, 4vw, 42px);
+  }
+
+  .facebook-heading p {
+    margin: 0 auto 20px;
+    max-width: 720px;
+    line-height: 1.8;
+  }
+
+  .facebook-page-button {
+    display: inline-block;
+    padding: 12px 20px;
+    border-radius: 8px;
+    background: #075e66;
+    color: #fff;
+    text-decoration: none;
+    font-weight: 700;
+    font-size: 13px;
+  }
+
+  .facebook-feed-wrap {
+    width: 100%;
+    max-width: 1000px;
+    min-height: 900px;
+    margin: 0 auto;
+    display: flex;
+    justify-content: center;
+    overflow: hidden;
+    background: #fff;
+    border-radius: 14px;
+    box-shadow: 0 8px 30px rgba(0,0,0,.08);
+    padding: 10px;
+    box-sizing: border-box;
+  }
+
+  .facebook-feed-wrap .fb-page,
+  .facebook-feed-wrap .fb-page > span {
+    max-width: 100%;
+  }
+
+  @media (max-width: 600px) {
+    .facebook-section {
+      padding: 55px 12px;
+    }
+
+    .facebook-feed-wrap {
+      min-height: 850px;
+      padding: 4px;
+      border-radius: 10px;
+    }
+
+    .facebook-heading p {
+      font-size: 14px;
+    }
+  }
+</style>
+
 </head>
 
 <body>
@@ -271,280 +355,79 @@
 </section>
 
 
-<!-- PROFESSIONAL BEAUTY EDUCATION PROGRAMS -->
-<section id="courses" class="section courses-section">
-
-  <div class="section-title">
-
-    <div>
-      <span>OUR COURSES</span>
-
-      <h2>
-        <span data-i18n="coursesTitle">
-          កម្មវិធីអប់រំជំនាញសម្រស់
-        </span>
-      </h2>
-    </div>
-
-    <p>
-      ចាប់ពីមូលដ្ឋានរហូតដល់កម្រិតជំនាញ
-      ជាមួយកម្មវិធីសិក្សាដែលផ្តោតលើការអនុវត្ត។
-    </p>
-
-    <a href="#contact">
-      <span data-i18n="allCourses">
-        មើលវគ្គសិក្សាទាំងអស់ →
-      </span>
+<!-- FACEBOOK PAGE FEED -->
+<section id="facebook" class="facebook-section">
+  <div class="facebook-heading">
+    <span>FOLLOW US ON FACEBOOK</span>
+    <h2>Medi Fella Beauty School</h2>
+    <p>បន្តរំកិលចុះក្រោម ដើម្បីមើលព័ត៌មាន និងការបណ្តុះបណ្តាលថ្មីៗពី Facebook របស់យើង។</p>
+    <a class="facebook-page-button"
+       href="https://www.facebook.com/share/1CPGN2M5ww/?mibextid=wwXIfr"
+       target="_blank" rel="noopener noreferrer">
+      OPEN FACEBOOK PAGE →
     </a>
-
   </div>
 
-
-  <div class="course-grid">
-
-    <article>
-      <div class="course-art">
-        <img src="course_skin_care.jpg" alt="Korean Skin Care">
-      </div>
-
-      <div class="course-body">
-        <small>ថែរក្សាស្បែក</small>
-        <h3>KOREAN SKIN CARE</h3>
-        <p>
-          សិក្សាពីការវិភាគស្បែក និងបច្ចេកទេសថែរក្សាស្បែកតាមបែបកូរ៉េ។
-        </p>
-      </div>
-    </article>
-
-
-    <article>
-      <div class="course-art">
-        <img src="course_aesthetic_injection.jpg" alt="Aesthetic Beauty">
-      </div>
-
-      <div class="course-body">
-        <small>សោភ័ណភាព</small>
-        <h3>AESTHETIC BEAUTY</h3>
-        <p>
-          បច្ចេកទេសសោភ័ណភាព និងការអនុវត្តជាក់ស្តែងប្រកបដោយវិជ្ជាជីវៈ។
-        </p>
-      </div>
-    </article>
-
-
-    <article>
-      <div class="course-art">
-        <img src="course_advanced_laser.jpg" alt="Advanced Laser">
-      </div>
-
-      <div class="course-body">
-        <small>ឡាស៊ែរ និងស្តារស្បែក</small>
-        <h3>LASER & SKIN REJUVENATION</h3>
-        <p>
-          សិក្សាអំពីបច្ចេកទេសឡាស៊ែរ និងកម្មវិធីស្តារស្បែកទំនើប។
-        </p>
-      </div>
-    </article>
-
-
-    <article>
-      <div class="course-art">
-        <img src="course_body_face_massage.jpg" alt="Body and Face Massage">
-      </div>
-
-      <div class="course-body">
-        <small>ម៉ាស្សាមុខ និងរាងកាយ</small>
-        <h3>BODY & FACE MASSAGE</h3>
-        <p>
-          រៀនបច្ចេកទេសម៉ាស្សាមុខ និងរាងកាយតាមបែបកូរ៉េ។
-        </p>
-      </div>
-    </article>
-
-
-    <article>
-      <div class="course-art">
-        <img src="course_makeup_pmu.jpg" alt="Makeup and PMU">
-      </div>
-
-      <div class="course-body">
-        <small>តុបតែងមុខ និង PMU</small>
-        <h3>MAKEUP & PMU</h3>
-        <p>
-          សិក្សាបច្ចេកទេសតុបតែងមុខ និងការរចនាសម្រស់ទំនើប។
-        </p>
-      </div>
-    </article>
-
+  <div class="facebook-feed-wrap">
+    <div class="fb-page"
+         data-href="https://www.facebook.com/share/1CPGN2M5ww/?mibextid=wwXIfr"
+         data-tabs="timeline"
+         data-width="1000"
+         data-height="900"
+         data-small-header="false"
+         data-adapt-container-width="true"
+         data-hide-cover="false"
+         data-show-facepile="true">
+      <blockquote cite="https://www.facebook.com/share/1CPGN2M5ww/?mibextid=wwXIfr"
+                  class="fb-xfbml-parse-ignore">
+        <a href="https://www.facebook.com/share/1CPGN2M5ww/?mibextid=wwXIfr"
+           target="_blank" rel="noopener noreferrer">
+          Medi Fella Beauty School
+        </a>
+      </blockquote>
+    </div>
   </div>
 </section>
 
 
-<!-- ABOUT -->
-<section id="about" class="about section">
 
-  <div class="about-copy">
-
-    <span>ABOUT MEDI FELLA</span>
-
-    <h2>
-      ហេតុអ្វីជ្រើសរើស<br>
-      Medi Fella Beauty School?
-    </h2>
-
-    <ul>
-      <li>✓ ប្រព័ន្ធអប់រំ និងកម្មវិធីសិក្សាតាមបែបកូរ៉េ</li>
-      <li>✓ រៀនជាមួយគ្រូជំនាញ</li>
-      <li>✓ ឧបករណ៍ និងបច្ចេកវិទ្យាទំនើប</li>
-      <li>✓ ការអប់រំផ្តោតលើការអនុវត្ត</li>
-      <li>✓ គាំទ្រការងារ និងការបើកអាជីវកម្ម</li>
-    </ul>
-
-    <a href="#contact" class="btn outline">
-      ស្វែងយល់បន្ថែម →
+<!-- FACEBOOK PAGE FEED -->
+<section id="facebook" class="facebook-section">
+  <div class="facebook-heading">
+    <span>FOLLOW US ON FACEBOOK</span>
+    <h2>Medi Fella Beauty School</h2>
+    <p>បន្តរំកិលចុះក្រោម ដើម្បីមើលព័ត៌មាន និងការបណ្តុះបណ្តាលថ្មីៗពី Facebook របស់យើង។</p>
+    <a class="facebook-page-button"
+       href="https://www.facebook.com/share/1CPGN2M5ww/?mibextid=wwXIfr"
+       target="_blank" rel="noopener noreferrer">
+      OPEN FACEBOOK PAGE →
     </a>
-
   </div>
 
-  <div class="about-visual">
-
-    <div class="school-photo">
-      MEDI FELLA<br>
-      <small>School / Training</small>
+  <div class="facebook-feed-wrap">
+    <div class="fb-page"
+         data-href="https://www.facebook.com/share/1CPGN2M5ww/?mibextid=wwXIfr"
+         data-tabs="timeline"
+         data-width="1000"
+         data-height="900"
+         data-small-header="false"
+         data-adapt-container-width="true"
+         data-hide-cover="false"
+         data-show-facepile="true">
+      <blockquote cite="https://www.facebook.com/share/1CPGN2M5ww/?mibextid=wwXIfr"
+                  class="fb-xfbml-parse-ignore">
+        <a href="https://www.facebook.com/share/1CPGN2M5ww/?mibextid=wwXIfr"
+           target="_blank" rel="noopener noreferrer">
+          Medi Fella Beauty School
+        </a>
+      </blockquote>
     </div>
-
-    <div class="small-photo">
-      STUDENTS<br>
-      <small>Training</small>
-    </div>
-
-    <div class="education-card">
-      <span>KOREAN EDUCATION SYSTEM</span>
-
-      <h3>
-        ប្រព័ន្ធអប់រំបែបកូរ៉េ
-        នៅកម្ពុជា
-      </h3>
-
-      <p>ទ្រឹស្តី + ការអនុវត្ត</p>
-      <p>ការបង្រៀនជាក្រុមតូច</p>
-      <p>ការវាយតម្លៃ និងមតិយោបល់</p>
-      <p>ការគាំទ្របន្ទាប់ពីបញ្ចប់</p>
-    </div>
-
   </div>
 </section>
 
-
-<!-- SCHOLARSHIP -->
-<section id="scholarship" class="scholarship section">
-
-  <div>
-
-    <span>SCHOLARSHIP</span>
-
-    <h2>
-      <span data-i18n="scholarship">
-        វិនិយោគលើអនាគតរបស់អ្នក<br>
-        តាមរយៈការអប់រំសម្រស់
-      </span>
-    </h2>
-
-    <p>
-      សាកសួរអំពីកម្មវិធីអាហារូបករណ៍ និងលក្ខខណ្ឌដាក់ពាក្យ។
-    </p>
-
-    <a href="#contact" class="btn gold">
-      សាកសួរអំពីអាហារូបករណ៍ →
-    </a>
-
-  </div>
-
-  <div class="scholarship-mark">
-    KOREAN<br>
-    BEAUTY<br>
-    EDUCATION
-  </div>
-
-</section>
-
-
-<!-- GALLERY -->
-<section id="gallery" class="section gallery-section">
-
-  <div class="section-title">
-    <div>
-      <span>GALLERY</span>
-      <h2>ជីវិតសាលា និងការបណ្តុះបណ្តាល</h2>
-    </div>
-  </div>
-
-  <div class="gallery-grid">
-    <div>Training</div>
-    <div>Students</div>
-    <div>Classroom</div>
-    <div>Graduation</div>
-  </div>
-
-</section>
-
-
-<!-- CONTACT -->
-<section id="contact" class="contact section">
-
-  <div>
-
-    <span>CONTACT US</span>
-
-    <h2>
-      ចាប់ផ្តើមអាជីពសម្រស់របស់អ្នក
-    </h2>
-
-    <p>
-      សម្រាប់ព័ត៌មានអំពីវគ្គសិក្សា អាហារូបករណ៍
-      និងការចុះឈ្មោះ។
-    </p>
-
-    <p>📍 Phnom Penh, Cambodia</p>
-    <p>✈ Telegram: 086 454 353</p>
-
-  </div>
-
-
-  <form onsubmit="event.preventDefault(); alert('សូមអរគុណ! Medi Fella Beauty School នឹងទាក់ទងអ្នក។');">
-
-    <input
-      type="text"
-      placeholder="ឈ្មោះពេញ"
-      required>
-
-    <input
-      type="text"
-      placeholder="លេខទូរស័ព្ទ / Telegram"
-      required>
-
-    <input
-      type="email"
-      placeholder="អ៊ីមែល">
-
-    <select>
-      <option>ជ្រើសរើសវគ្គសិក្សា</option>
-      <option>Korean Skin Care</option>
-      <option>Aesthetic Beauty</option>
-      <option>Laser & Skin Rejuvenation</option>
-      <option>Body & Face Massage</option>
-      <option>Makeup & PMU</option>
-    </select>
-
-    <button class="btn filled">
-      ផ្ញើការចុះឈ្មោះ
-    </button>
-
-  </form>
-
-</section>
 
 </main>
+
 
 
 <footer>
@@ -781,6 +664,12 @@ document
 
   });
 </script>
+
+
+<!-- Facebook SDK for the Page timeline -->
+<div id="fb-root"></div>
+<script async defer crossorigin="anonymous"
+  src="https://connect.facebook.net/en_US/sdk.js#xfbml=1&version=v23.0"></script>
 
 </body>
 </html>
