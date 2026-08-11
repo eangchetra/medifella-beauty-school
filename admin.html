@@ -285,6 +285,7 @@ function renderCertificates(){
 <div class="muted">${esc(c.sex||"")} · DOB: ${esc(certDob(c))} · ${esc(c.course||"")} · ${esc(c.duration||"")} · Issue: ${esc(certIssue(c))} · Completion: ${esc(certCompletion(c))}</div>
 ${certPhoto(c)?`<div style="margin-top:8px"><a href="${attr(certPhoto(c))}" target="_blank" rel="noopener">View Certificate Photo</a></div>`:""}
 <div class="actions" style="margin-top:8px">
+<button class="light" onclick="editCertificate(\'${attr(certId(c))}\')">Edit</button>
 <button class="danger" onclick="deleteCert('${attr(certId(c))}')">Delete</button>
 </div>
 </div>`).join(""):'<p class="muted">No certificates found.</p>';
@@ -320,6 +321,26 @@ function formatDateField(el){
 ["certDob","certDate","certCompletionDate"].forEach(id=>{
   $(id).addEventListener("input",()=>formatDateField($(id)));
 });
+
+function editCertificate(certificateId){
+ const c=certificates.find(x=>certId(x)===certificateId);
+ if(!c)return;
+
+ $("certNo").value=certId(c);
+ $("certName").value=certName(c);
+ $("certSex").value=c.sex||"";
+ $("certDob").value=certDob(c);
+ $("certCourse").value=c.course||"";
+ $("certDuration").value=c.duration||"";
+ $("certDate").value=certIssue(c);
+ $("certCompletionDate").value=certCompletion(c);
+ $("certFile").value="";
+
+ clearMsg($("certStatus"));
+ $("certNo").readOnly=true;
+ $("certCreate").textContent="Update Certificate";
+ $("certNo").scrollIntoView({behavior:"smooth",block:"center"});
+}
 
 async function deleteCert(certificateId){
  if(!confirm("Delete this certificate?"))return;
@@ -381,13 +402,11 @@ $("certCreate").onclick=async()=>{
    if(file){
      const ext=file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg";
      const safeNo=no.replace(/[^a-z0-9_-]/gi,"-");
-     // Use a unique filename so a new upload only needs Storage INSERT permission.
-     // This avoids the UPDATE/SELECT RLS requirements caused by upsert:true.
-     const path=`${adminUser.id}/${safeNo}-${Date.now()}.${ext}`;
+     const path=`${adminUser.id}/${safeNo}.${ext}`;
      uploadedPath=path;
 
      const up=await sb.storage.from("certificates").upload(path,file,{
-       upsert:false,
+       upsert:true,
        contentType:file.type
      });
      if(up.error)throw up.error;
@@ -435,6 +454,8 @@ $("certCreate").onclick=async()=>{
    ["certNo","certName","certDob","certCourse","certDuration","certDate","certCompletionDate"].forEach(id=>$(id).value="");
    $("certSex").value="";
    $("certFile").value="";
+    $("certNo").readOnly=false;
+    $("certCreate").textContent="Save Certificate";
 
    await loadCertificates();
    updateMetrics();
