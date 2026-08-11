@@ -89,14 +89,12 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <h1>Certificate Verification</h1>
 <div class="two">
 <div class="card"><h2>Create / Upload Certificate</h2>
+
 <label>Certificate ID <span style="color:#9d2d2d">*</span></label>
 <input id="certNo" placeholder="MEDIFELLA01202547" required>
 
-<label>Student Name (Khmer) <span style="color:#9d2d2d">*</span></label>
-<input id="certNameKhmer" placeholder="ឈ្មោះជាភាសាខ្មែរ" required>
-
-<label>Student Name (English) <span style="color:#9d2d2d">*</span></label>
-<input id="certNameEnglish" placeholder="CHIEN CHARYA" required>
+<label>Student Name <span style="color:#9d2d2d">*</span></label>
+<input id="certName" placeholder="ជៀម ចរិយា CHIEM CHARIYA" required>
 
 <label>Sex <span style="color:#9d2d2d">*</span></label>
 <select id="certSex" required>
@@ -118,11 +116,11 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <label>Completion Date <span style="color:#9d2d2d">*</span></label>
 <input id="certCompletionDate" type="date" required>
 
-<label>Certificate Photo <span style="color:#9d2d2d">*</span></label>
-<input id="certFile" type="file" accept="image/jpeg,image/png,image/webp" required>
-<div class="muted" style="margin-top:5px">The uploaded photo will be saved using the Certificate ID as the filename.</div>
+<label>Certificate Photo</label>
+<input id="certFile" type="file" accept="image/jpeg,image/png,image/webp">
+<div class="muted" style="margin-top:5px">Optional for now. Existing certificates can keep their current photo path; new uploads are saved in Supabase Storage.</div>
 
-<button id="certCreate" class="gold" style="margin-top:14px">Create Certificate</button>
+<button id="certCreate" class="gold" style="margin-top:14px">Save Certificate</button>
 <div id="certStatus"></div>
 </div>
 
@@ -268,39 +266,45 @@ async function loadCertificates(){
  if(error){$("certList").textContent="Certificate database error: "+error.message;certificates=[];return}
  certificates=data||[];renderCertificates();
 }
-function certId(c){return c.certificateid||c.certificateId||c.certificate_id||c.certificate_no||c.id||""}
-function certKhmer(c){return c.studentnamekhmer||c.studentNameKhmer||c.name_khmer||c.nameKhmer||""}
-function certEnglish(c){return c.studentnameenglish||c.studentNameEnglish||c.name_english||c.nameEnglish||c.student_name||""}
-function certDob(c){return c.dateofbirth||c.dateOfBirth||c.date_of_birth||""}
-function certIssue(c){return c.issuedate||c.issueDate||c.issue_date||""}
-function certCompletion(c){return c.completiondate||c.completionDate||c.completion_date||""}
-function certPhoto(c){return c.photo||c.file_url||""}
+function certId(c){return c.id||""}
+function certName(c){return c.name||""}
+function certDob(c){return c.dateofbirth||""}
+function certIssue(c){return c.issuedate||""}
+function certCompletion(c){return c.completiondate||""}
+function certPhoto(c){return c.photo||""}
+
 function renderCertificates(){
  const q=$("certSearch").value.trim().toLowerCase();
  const rows=certificates.filter(c=>(
-   `${certId(c)} ${certKhmer(c)} ${certEnglish(c)} ${c.course||""}`
+   `${certId(c)} ${certName(c)} ${c.sex||""} ${c.course||""}`
  ).toLowerCase().includes(q));
+
  $("certList").innerHTML=rows.length?rows.map(c=>`<div class="post">
 <strong>${esc(certId(c))}</strong>
-<div>${esc(certKhmer(c))} · ${esc(certEnglish(c))}</div>
+<div>${esc(certName(c))}</div>
 <div class="muted">${esc(c.sex||"")} · DOB: ${esc(certDob(c))} · ${esc(c.course||"")} · ${esc(c.duration||"")} · Issue: ${esc(certIssue(c))} · Completion: ${esc(certCompletion(c))}</div>
 ${certPhoto(c)?`<div style="margin-top:8px"><a href="${attr(certPhoto(c))}" target="_blank" rel="noopener">View Certificate Photo</a></div>`:""}
-<div class="actions" style="margin-top:8px"><button class="danger" onclick="deleteCert('${attr(certId(c))}')">Delete</button></div>
+<div class="actions" style="margin-top:8px">
+<button class="danger" onclick="deleteCert('${attr(certId(c))}')">Delete</button>
+</div>
 </div>`).join(""):'<p class="muted">No certificates found.</p>';
- $("recentCertificates").innerHTML=certificates.slice(0,5).map(c=>`<div class="post"><strong>${esc(certId(c))}</strong><div class="muted">${esc(certEnglish(c))} · ${esc(c.course||"")}</div></div>`).join("")||'<p class="muted">No certificates.</p>';
+
+ $("recentCertificates").innerHTML=certificates.slice(0,5).map(c=>`<div class="post"><strong>${esc(certId(c))}</strong><div class="muted">${esc(certName(c))} · ${esc(c.course||"")}</div></div>`).join("")||'<p class="muted">No certificates.</p>';
 }
 $("certSearch").oninput=renderCertificates;
+
 async function deleteCert(certificateId){
  if(!confirm("Delete this certificate?"))return;
- const{error}=await sb.from("certificates").delete().eq("certificateid",certificateId);
- if(error)alert(error.message);else{await loadCertificates();updateMetrics()}
+ const{error}=await sb.from("certificates").delete().eq("id",certificateId);
+ if(error)alert(error.message);
+ else{await loadCertificates();updateMetrics()}
 }
 
 $("certCreate").onclick=async()=>{
  clearMsg($("certStatus"));
+
  const no=$("certNo").value.trim(),
-       nameKhmer=$("certNameKhmer").value.trim(),
-       nameEnglish=$("certNameEnglish").value.trim(),
+       name=$("certName").value.trim(),
        sex=$("certSex").value,
        dob=$("certDob").value,
        course=$("certCourse").value.trim(),
@@ -309,42 +313,64 @@ $("certCreate").onclick=async()=>{
        completionDate=$("certCompletionDate").value,
        file=$("certFile").files[0];
 
- if(!no||!nameKhmer||!nameEnglish||!sex||!dob||!course||!duration||!issueDate||!completionDate||!file){
-   msg($("certStatus"),"Please complete all required certificate fields and upload the certificate photo.",true);return
+ if(!no||!name||!sex||!dob||!course||!duration||!issueDate||!completionDate){
+   msg($("certStatus"),"Please complete all required certificate fields.",true);
+   return
  }
- if(!["image/jpeg","image/png","image/webp"].includes(file.type)){
-   msg($("certStatus"),"Certificate photo must be JPG, PNG, or WEBP.",true);return
+
+ if(file && !["image/jpeg","image/png","image/webp"].includes(file.type)){
+   msg($("certStatus"),"Certificate photo must be JPG, PNG, or WEBP.",true);
+   return
  }
+
  if(completionDate<issueDate){
-   msg($("certStatus"),"Completion Date cannot be earlier than Issue Date.",true);return
+   msg($("certStatus"),"Completion Date cannot be earlier than Issue Date.",true);
+   return
  }
 
- $("certCreate").disabled=true;$("certCreate").textContent="Creating...";
+ $("certCreate").disabled=true;
+ $("certCreate").textContent="Saving...";
+
  let uploadedPath=null;
+
  try{
-   if(certificates.some(c=>String(certId(c)).toLowerCase()===no.toLowerCase()))
-     throw new Error("This Certificate ID already exists.");
+   const{data:existingRows,error:findError}=await sb
+     .from("certificates")
+     .select("id")
+     .eq("id",no)
+     .limit(1);
 
-   const ext=file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg";
-   const safeNo=no.replace(/[^a-z0-9_-]/gi,"-");
-   const path=`${adminUser.id}/${safeNo}.${ext}`;
-   uploadedPath=path;
+   if(findError)throw findError;
 
-   const up=await sb.storage.from("certificates").upload(path,file,{
-     upsert:true,contentType:file.type
-   });
-   if(up.error)throw up.error;
+   let photo=null;
 
-   const photo=sb.storage.from("certificates").getPublicUrl(path).data.publicUrl;
+   // Only upload a new photo when the admin selected one.
+   if(file){
+     const ext=file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg";
+     const safeNo=no.replace(/[^a-z0-9_-]/gi,"-");
+     const path=`${adminUser.id}/${safeNo}.${ext}`;
+     uploadedPath=path;
 
-   // IMPORTANT: PostgreSQL folds unquoted camelCase column names to lowercase.
-   // The SQL you used creates these columns as:
-   // certificateid, studentnamekhmer, studentnameenglish, sex,
-   // dateofbirth, photo, course, duration, issuedate and completiondate.
+     const up=await sb.storage.from("certificates").upload(path,file,{
+       upsert:true,
+       contentType:file.type
+     });
+     if(up.error)throw up.error;
+
+     photo=sb.storage.from("certificates").getPublicUrl(path).data.publicUrl;
+   }else if(existingRows && existingRows.length){
+     const{data:oldRow,error:oldError}=await sb
+       .from("certificates")
+       .select("photo")
+       .eq("id",no)
+       .maybeSingle();
+     if(oldError)throw oldError;
+     photo=oldRow?.photo||null;
+   }
+
    const payload={
-     certificateid:no,
-     studentnamekhmer:nameKhmer,
-     studentnameenglish:nameEnglish,
+     id:no,
+     name,
      sex,
      dateofbirth:dob,
      photo,
@@ -354,45 +380,34 @@ $("certCreate").onclick=async()=>{
      completiondate:completionDate
    };
 
-   // Save the certificate. If this Certificate ID already exists,
-// update it instead of creating a duplicate record.
-   const{data:existingRows,error:findError}=await sb
-     .from("certificates")
-     .select("certificateid")
-     .eq("certificateid",no)
-     .limit(1);
-
-   if(findError) throw findError;
-
-   let dbError=null;
+   let result;
 
    if(existingRows && existingRows.length){
-     const result=await sb
-       .from("certificates")
-       .update(payload)
-       .eq("certificateid",no);
-     dbError=result.error;
+     result=await sb.from("certificates").update(payload).eq("id",no);
    }else{
-     const result=await sb
-       .from("certificates")
-       .insert(payload);
-     dbError=result.error;
+     result=await sb.from("certificates").insert(payload);
    }
 
-   if(dbError){
-     // If the database write fails, remove the newly uploaded photo.
-     await sb.storage.from("certificates").remove([path]).catch(()=>{});
-     throw dbError;
+   if(result.error){
+     if(uploadedPath)await sb.storage.from("certificates").remove([uploadedPath]).catch(()=>{});
+     throw result.error;
    }
 
-   msg($("certStatus"),"Certificate saved successfully. It is now available for public verification.");
-   ["certNo","certNameKhmer","certNameEnglish","certDob","certCourse","certDuration","certDate","certCompletionDate"].forEach(id=>$(id).value="");
-   $("certSex").value="";$("certFile").value="";
-   await loadCertificates();updateMetrics();
+   msg($("certStatus"),existingRows && existingRows.length
+     ?"Certificate updated successfully."
+     :"Certificate saved successfully. It is now available for verification.");
+
+   ["certNo","certName","certDob","certCourse","certDuration","certDate","certCompletionDate"].forEach(id=>$(id).value="");
+   $("certSex").value="";
+   $("certFile").value="";
+
+   await loadCertificates();
+   updateMetrics();
  }catch(e){
-   msg($("certStatus"),e.message||"Could not create certificate.",true)
+   msg($("certStatus"),e.message||"Could not save certificate.",true)
  }finally{
-   $("certCreate").disabled=false;$("certCreate").textContent="Create Certificate"
+   $("certCreate").disabled=false;
+   $("certCreate").textContent="Save Certificate"
  }
 };
 
