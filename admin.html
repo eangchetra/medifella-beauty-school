@@ -265,7 +265,7 @@ $("saveStudentEdit").onclick=async()=>{
 
 async function loadCertificates(){
  const{data,error}=await sb.from("certificates").select("*").order("issuedate",{ascending:false});
- if(error){$("certList").textContent=error.message;certificates=[];return}
+ if(error){$("certList").textContent="Certificate database error: "+error.message;certificates=[];return}
  certificates=data||[];renderCertificates();
 }
 function certId(c){return c.certificateid||c.certificateId||c.certificate_id||c.certificate_no||c.id||""}
@@ -331,7 +331,7 @@ $("certCreate").onclick=async()=>{
    uploadedPath=path;
 
    const up=await sb.storage.from("certificates").upload(path,file,{
-     upsert:false,contentType:file.type
+     upsert:true,contentType:file.type
    });
    if(up.error)throw up.error;
 
@@ -354,15 +354,38 @@ $("certCreate").onclick=async()=>{
      completiondate:completionDate
    };
 
-   const{error}=await sb.from("certificates").insert(payload);
-   if(error){
-     // If the database insert fails, remove the uploaded photo so we
-     // don't leave an unused file in Storage.
-     await sb.storage.from("certificates").remove([path]).catch(()=>{});
-     throw error;
+   // Save the certificate. If this Certificate ID already exists,
+// update it instead of creating a duplicate record.
+   const{data:existingRows,error:findError}=await sb
+     .from("certificates")
+     .select("certificateid")
+     .eq("certificateid",no)
+     .limit(1);
+
+   if(findError) throw findError;
+
+   let dbError=null;
+
+   if(existingRows && existingRows.length){
+     const result=await sb
+       .from("certificates")
+       .update(payload)
+       .eq("certificateid",no);
+     dbError=result.error;
+   }else{
+     const result=await sb
+       .from("certificates")
+       .insert(payload);
+     dbError=result.error;
    }
 
-   msg($("certStatus"),"Certificate created successfully. It is now available for public verification.");
+   if(dbError){
+     // If the database write fails, remove the newly uploaded photo.
+     await sb.storage.from("certificates").remove([path]).catch(()=>{});
+     throw dbError;
+   }
+
+   msg($("certStatus"),"Certificate saved successfully. It is now available for public verification.");
    ["certNo","certNameKhmer","certNameEnglish","certDob","certCourse","certDuration","certDate","certCompletionDate"].forEach(id=>$(id).value="");
    $("certSex").value="";$("certFile").value="";
    await loadCertificates();updateMetrics();
