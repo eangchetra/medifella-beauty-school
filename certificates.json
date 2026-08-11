@@ -111,7 +111,7 @@
       },
     {
     "id": "MEDIFELLA19062611",
-    "name": "សគាង សំអាង KHEANG SAMANG",
+    "name": "គាង សំអាង KHEANG SAMANG",
     "sex": "Female",
     "dateOfBirth": "16 December 1985",
     "photo": "students/MEDIFELLA19062611.jpg",
@@ -119,5 +119,16 @@
     "duration": "2 Months",
     "issueDate": "15/04/2026",
     "completionDate": "15/06/2026"
+       },
+    {
+    "id": "MEDIFELLA01202580",
+    "name": "សអុឹង គីមហួយ OUNG KIM HOUY",
+    "sex": "Female",
+    "dateOfBirth": "25 October 1991",
+    "photo": "students/MEDIFELLA01202580.jpg",
+    "course": "ថែរក្សាសម្ផស្ស Beauty Care",
+    "duration": "12 Months",
+    "issueDate": "01/01/2025",
+    "completionDate": "31/12/2025"
     }
     ]
