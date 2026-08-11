@@ -108,5 +108,16 @@
     "duration": "6 Months",
     "issueDate": "01/01/2025",
     "completionDate": "01/07/2025"
+      },
+    {
+    "id": "MEDIFELLA19062611",
+    "name": "សគាង សំអាង KHEANG SAMANG",
+    "sex": "Female",
+    "dateOfBirth": "16 December 1985",
+    "photo": "students/MEDIFELLA19062611.jpg",
+    "course": "ម៉ាស្សាមុខទូទៅ(កម្រិតមធ្យម) General Facial Massage (Medium)",
+    "duration": "2 Months",
+    "issueDate": "15/04/2026",
+    "completionDate": "15/06/2026"
     }
     ]
