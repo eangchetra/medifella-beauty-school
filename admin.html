@@ -381,11 +381,13 @@ $("certCreate").onclick=async()=>{
    if(file){
      const ext=file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg";
      const safeNo=no.replace(/[^a-z0-9_-]/gi,"-");
-     const path=`${adminUser.id}/${safeNo}.${ext}`;
+     // Use a unique filename so a new upload only needs Storage INSERT permission.
+     // This avoids the UPDATE/SELECT RLS requirements caused by upsert:true.
+     const path=`${adminUser.id}/${safeNo}-${Date.now()}.${ext}`;
      uploadedPath=path;
 
      const up=await sb.storage.from("certificates").upload(path,file,{
-       upsert:true,
+       upsert:false,
        contentType:file.type
      });
      if(up.error)throw up.error;
