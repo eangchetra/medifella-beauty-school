@@ -244,13 +244,35 @@ function syntheticEmail(username){
 }
 
 async function getCurrentAccount(){
- const {data:{session},error}=await sb.auth.getSession();
- if(error||!session?.user)return null;
+ const {data:{session},error:sessionError}=await sb.auth.getSession();
+ if(sessionError) throw new Error("Could not read the Supabase login session: "+sessionError.message);
+ if(!session?.user)return null;
+
  const user=session.user;
- const {data:profile,error:e}=await sb.from("profiles")
+
+ // The profiles table uses the Supabase Auth user ID as its primary key.
+ // It does NOT need an email column for admin authentication.
+ const {data:profile,error:profileError}=await sb.from("profiles")
    .select("id,role,username,permissions")
-   .eq("id",user.id).maybeSingle();
- if(e||!profile)return null;
+   .eq("id",user.id)
+   .maybeSingle();
+
+ if(profileError){
+   throw new Error("Could not read your Medi Fella admin profile. "
+     + profileError.message
+     + " If this says a row-level security (RLS) error, run the profiles policy SQL provided with this file.");
+ }
+
+ if(!profile){
+   throw new Error("Your Gmail is authenticated, but your Supabase user ID is not present in profiles. "
+     + "Make sure profiles.id equals "+user.id+" and profiles.role is admin.");
+ }
+
+ if(String(profile.role||"").toLowerCase()!=="admin"){
+   throw new Error("This account is not an administrator. Current profile role: "
+     + String(profile.role||"not set")+".");
+ }
+
  return {user,profile};
 }
 
@@ -285,11 +307,18 @@ async function getAccount(){
 }
 
 async function boot(){
- const account=await getCurrentAccount();
- if(!account){
-   $("loginView").classList.remove("hidden");$("appView").classList.add("hidden");return;
+ try{
+   const account=await getCurrentAccount();
+   if(!account){
+     $("loginView").classList.remove("hidden");$("appView").classList.add("hidden");return;
+   }
+   adminUser=account.user;currentProfile=account.profile;
+ }catch(e){
+   $("loginView").classList.remove("hidden");
+   $("appView").classList.add("hidden");
+   msg($("loginStatus"),e.message||"Could not load the admin profile.",true);
+   return;
  }
- adminUser=account.user;currentProfile=account.profile;
  $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
  applyAccountPermissions();
  await refreshAll();
@@ -305,8 +334,13 @@ async function doLogin(){
    const email=identifier.includes("@") ? identifier.toLowerCase() : syntheticEmail(identifier);
    const {error}=await sb.auth.signInWithPassword({email,password});
    if(error)throw error;
-   const account=await getCurrentAccount();
-   if(!account){await sb.auth.signOut();throw new Error("This account is not configured in the Medi Fella profiles table.");}
+   let account;
+   try{
+     account=await getCurrentAccount();
+   }catch(profileError){
+     await sb.auth.signOut();
+     throw profileError;
+   }
    adminUser=account.user;currentProfile=account.profile;
    $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
    applyAccountPermissions();
