@@ -77,7 +77,20 @@
         font-size: 10px;
       }
     }
-  </style>
+  
+  .facebook-fallback {
+    text-align: center;
+    padding: 18px 12px 6px;
+    font-size: 13px;
+    color: #666;
+  }
+
+  .facebook-fallback a {
+    color: #075e66;
+    font-weight: 700;
+  }
+
+</style>
 
 <style>
   /* Facebook section */
@@ -127,22 +140,31 @@
 
   .facebook-feed-wrap {
     width: 100%;
-    max-width: 1000px;
+    max-width: 1200px;
     min-height: 900px;
     margin: 0 auto;
-    display: flex;
-    justify-content: center;
+    display: block;
     overflow: hidden;
     background: #fff;
     border-radius: 14px;
     box-shadow: 0 8px 30px rgba(0,0,0,.08);
-    padding: 10px;
+    padding: 8px;
     box-sizing: border-box;
   }
 
   .facebook-feed-wrap .fb-page,
   .facebook-feed-wrap .fb-page > span {
-    max-width: 100%;
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+  }
+
+  .facebook-feed-wrap iframe {
+    display: block !important;
+    width: 100% !important;
+    max-width: 100% !important;
+    min-width: 100% !important;
+    border: 0 !important;
   }
 
   @media (max-width: 600px) {
@@ -391,39 +413,7 @@
 
 
 
-<!-- FACEBOOK PAGE FEED -->
-<section id="facebook" class="facebook-section">
-  <div class="facebook-heading">
-    <span>FOLLOW US ON FACEBOOK</span>
-    <h2>Medi Fella Beauty School</h2>
-    <p>បន្តរំកិលចុះក្រោម ដើម្បីមើលព័ត៌មាន និងការបណ្តុះបណ្តាលថ្មីៗពី Facebook របស់យើង។</p>
-    <a class="facebook-page-button"
-       href="https://www.facebook.com/medifellabeautyschool"
-       target="_blank" rel="noopener noreferrer">
-      OPEN FACEBOOK PAGE →
-    </a>
-  </div>
 
-  <div class="facebook-feed-wrap">
-    <div class="fb-page"
-         data-href="https://www.facebook.com/medifellabeautyschool"
-         data-tabs="timeline"
-         data-width="1000"
-         data-height="900"
-         data-small-header="false"
-         data-adapt-container-width="true"
-         data-hide-cover="false"
-         data-show-facepile="true">
-      <blockquote cite="https://www.facebook.com/medifellabeautyschool"
-                  class="fb-xfbml-parse-ignore">
-        <a href="https://www.facebook.com/medifellabeautyschool"
-           target="_blank" rel="noopener noreferrer">
-          Medi Fella Beauty School
-        </a>
-      </blockquote>
-    </div>
-  </div>
-</section>
 
 
 </main>
