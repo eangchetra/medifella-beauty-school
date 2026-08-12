@@ -234,8 +234,9 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <label>Student / Customer *</label>
 <div class="sale-student-tools">
   <div>
-    <input id="saleStudentSearch" placeholder="Search student name, ID or phone">
-    <select id="saleStudent" style="margin-top:6px"><option value="">Select student</option></select>
+    <input id="saleStudentSearch" list="saleStudentSearchList" autocomplete="off" placeholder="Search student name, ID or phone">
+    <datalist id="saleStudentSearchList"></datalist>
+    <input id="saleStudentId" type="hidden">
   </div>
   <button id="newSaleStudentBtn" class="gold" type="button">+ New Student</button>
 </div>
@@ -775,15 +776,43 @@ async function loadSales(){
  renderSaleStudentOptions();renderSales();updateSalesMetrics();
 }
 function renderSaleStudentOptions(){
- if(!$("saleStudent"))return;
- const current=$("saleStudent").value||"";
- const q=($("saleStudentSearch")?.value||"").trim().toLowerCase();
+ const search=$("saleStudentSearch");
+ const hidden=$("saleStudentId");
+ const list=$("saleStudentSearchList");
+ if(!search)return;
+
+ const q=(search.value||"").trim().toLowerCase();
  const filtered=students.filter(s=>{
    const hay=[s.full_name,s.full_name_km,s.phone,s.student_id,s.email].join(" ").toLowerCase();
    return !q || hay.includes(q);
  });
- $("saleStudent").innerHTML='<option value="">Select student</option>'+filtered.map(s=>`<option value="${attr(s.id)}">${esc(s.full_name||"Unnamed")} · ${esc(s.student_id||"")} · ${esc(s.phone||"")}</option>`).join("");
- if(filtered.some(s=>String(s.id)===String(current))) $("saleStudent").value=current;
+
+ if(list){
+   list.innerHTML=filtered.map(s=>
+     `<option value="${esc(s.full_name||"")}">${esc(s.student_id||"")} · ${esc(s.phone||"")}</option>`
+   ).join("");
+ }
+
+ if(q && filtered.length===1){
+   const s=filtered[0];
+   hidden.value=String(s.id);
+   search.value=s.full_name||search.value;
+   $("saleStudentHint").textContent=
+     `Selected: ${s.full_name||"Student"} · ${s.student_id||"No ID"} · ${s.phone||"No phone"}`;
+ }else if(q && filtered.length>1){
+   hidden.value="";
+   $("saleStudentHint").textContent=
+     `${filtered.length} students found. Continue typing to find the student.`;
+ }else if(q && filtered.length===0){
+   hidden.value="";
+   $("saleStudentHint").textContent=
+     "No matching student found. Check the name, Student ID or phone number.";
+ }else{
+   hidden.value="";
+   $("saleStudentHint").textContent=
+     "Type a student name, Student ID or phone number.";
+ }
+
  renderNewSaleStudentCourseOptions();
 }
 function renderNewSaleStudentCourseOptions(){
@@ -854,7 +883,7 @@ function updateSaleTotals(){
  document.querySelectorAll("#saleItems .sale-item").forEach(w=>{const p=Number(w.querySelector(".sale-item-price").value||0),q=Math.max(1,Number(w.querySelector(".sale-item-qty").value||1));w.querySelector(".sale-item-subtotal").value=money(p*q)});
 }
 function resetSaleForm(){
- $("saleStudentSearch").value="";$("saleStudent").value="";
+ $("saleStudentSearch").value="";$("saleStudentId").value="";
  $("saleDate").value=new Date().toISOString().slice(0,10);$("saleReference").value=nextSaleReference();
  $("saleItems").innerHTML="";addSaleItemRow();
  $("saleDiscount").value="0";$("saleShipping").value="0";$("saleInitialPayment").value="0";$("salePaymentMethod").value="Cash";$("saleNote").value="";
@@ -864,12 +893,6 @@ $("toggleSaleForm").onclick=()=>{$("saleForm").classList.toggle("hidden");if(!$(
 $("cancelSale").onclick=()=>{$("saleForm").classList.add("hidden");clearMsg($("newSaleStatus"))};
 $("addSaleItem").onclick=()=>addSaleItemRow();
 $("saleStudentSearch").oninput=renderSaleStudentOptions;
-$("saleStudent").onchange=()=>{
- const s=students.find(x=>String(x.id)===String($("saleStudent").value));
- $("saleStudentHint").textContent=s
-   ? `${s.full_name||"Student"} · ${s.student_id||"No ID"} · ${s.phone||"No phone"}`
-   : "Choose an existing student, or add a new student without leaving List Sales.";
-};
 $("newSaleStudentBtn").onclick=()=>{
  renderNewSaleStudentCourseOptions();
  $("saleStudentModal").classList.add("show");
@@ -928,7 +951,7 @@ $("saveSaleNewStudent").onclick=async()=>{
    await loadStudents();
    $("saleStudentSearch").value=data.full_name||"";
    renderSaleStudentOptions();
-   $("saleStudent").value=String(data.id);
+   $("saleStudentId").value=String(data.id);
    $("saleStudentHint").textContent=`${data.full_name||"Student"} · ${data.student_id||"No ID"} · ${data.phone||"No phone"}`;
 
    msg($("newSaleStatus"),`New student ${data.full_name||""} added and selected. Choose a Sales Course below.`);
@@ -944,7 +967,7 @@ $("saveSaleNewStudent").onclick=async()=>{
 ["saleDiscount","saleShipping","saleInitialPayment"].forEach(id=>$(id).addEventListener("input",updateSaleTotals));
 $("salesSearch").oninput=renderSales;$("salesPaymentFilter").onchange=renderSales;$("salesRefresh").onclick=loadSales;
 $("saveSale").onclick=async()=>{
- clearMsg($("newSaleStatus"));const studentId=$("saleStudent").value,student=students.find(s=>String(s.id)===String(studentId)),items=getSaleItems(),saleDate=$("saleDate").value,reference=$("saleReference").value.trim()||nextSaleReference(),discount=Math.max(0,Number($("saleDiscount").value||0)),shipping=Math.max(0,Number($("saleShipping").value||0)),initialPayment=Math.max(0,Number($("saleInitialPayment").value||0)),subtotal=items.reduce((a,x)=>a+x.subtotal,0),grandTotal=Math.max(0,subtotal-discount+shipping);
+ clearMsg($("newSaleStatus"));const studentId=$("saleStudentId").value,student=students.find(s=>String(s.id)===String(studentId)),items=getSaleItems(),saleDate=$("saleDate").value,reference=$("saleReference").value.trim()||nextSaleReference(),discount=Math.max(0,Number($("saleDiscount").value||0)),shipping=Math.max(0,Number($("saleShipping").value||0)),initialPayment=Math.max(0,Number($("saleInitialPayment").value||0)),subtotal=items.reduce((a,x)=>a+x.subtotal,0),grandTotal=Math.max(0,subtotal-discount+shipping);
  if(!student){msg($("newSaleStatus"),"Please select a student/customer.",true);return}if(!saleDate){msg($("newSaleStatus"),"Please select the sale date.",true);return}if(!items.length){msg($("newSaleStatus"),"Add at least one course or product.",true);return}if(initialPayment>grandTotal){msg($("newSaleStatus"),"Initial payment cannot be greater than the grand total.",true);return}
  $("saveSale").disabled=true;
  try{
@@ -1477,6 +1500,45 @@ async function deleteCourse(id){
 
 function updateMetrics(){$("mStudents").textContent=students.length;$("mPending").textContent=students.filter(s=>String(s.status||"pending")==="pending").length;$("mVerifiedStudents").textContent=students.filter(s=>String(s.status)==="verified"||s.verified===true).length;$("mCourses").textContent=courses.length;$("mCertificates").textContent=certificates.length;updateSalesMetrics()}
 boot();
+
+// Sales Course/Product search box: no visible product selector.
+// Typing filters suggestions; an exact/unique match selects the course/product.
+// The existing "+ Add Course / Product" button remains unchanged.
+document.addEventListener("input", function(e){
+  const input=e.target.closest(".sale-course-search");
+  if(!input) return;
+
+  const row=input.closest(".sale-course-row, .sale-row, [data-sale-row]") || input.parentElement;
+  const list=document.getElementById("saleCourseSearchList");
+  const q=(input.value||"").trim().toLowerCase();
+
+  const items=(typeof courses!=="undefined" ? courses : []).filter(c=>{
+    const type=(c.course_type||c.type||"").toLowerCase();
+    return type==="sales" || type==="sale" || !type;
+  });
+
+  if(list){
+    list.innerHTML=items
+      .filter(c=>[c.name,c.title,c.course_name,c.product_name,c.code].join(" ").toLowerCase().includes(q))
+      .map(c=>`<option value="${String(c.name||c.title||c.course_name||c.product_name||"").replace(/"/g,"&quot;")}">${String(c.code||"")} · $${Number(c.price||c.unit_price||0).toFixed(2)}</option>`)
+      .join("");
+  }
+
+  const matches=items.filter(c=>[c.name,c.title,c.course_name,c.product_name,c.code].join(" ").toLowerCase().includes(q));
+
+  if(q && matches.length===1){
+    const c=matches[0];
+    const id=c.id||c.course_id||"";
+    const hidden=row?.querySelector(".sale-course-id");
+    if(hidden) hidden.value=String(id);
+
+    const price=row?.querySelector('input[name*="unit"], input.sale-unit-price, .sale-unit-price');
+    if(price && c.price!=null) price.value=c.price;
+  } else {
+    const hidden=row?.querySelector(".sale-course-id");
+    if(hidden) hidden.value="";
+  }
+});
 </script>
 </body>
 </html>
