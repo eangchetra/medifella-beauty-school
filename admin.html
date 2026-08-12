@@ -71,6 +71,77 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <h1>Student Registration</h1><div class="card">
 <div class="toolbar"><input id="studentSearch" placeholder="Search name, Khmer name, email, phone, course, ID"><select id="studentFilter"><option value="all">All</option><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option></select><button id="studentRefresh" class="light">Refresh</button></div>
 <div id="studentStatus"></div>
+<div class="card" style="margin-top:14px">
+  <div class="toolbar" style="justify-content:space-between">
+    <h2 style="margin:0">Register New Student</h2>
+    <button id="toggleStudentRegister" class="gold" type="button">+ Register Student</button>
+  </div>
+
+  <div id="studentRegisterCard" class="hidden" style="margin-top:14px">
+    <div class="row">
+      <div>
+        <label>Full Name (English) *</label>
+        <input id="newStudentName" type="text" required>
+      </div>
+      <div>
+        <label>Full Name (Khmer) *</label>
+        <input id="newStudentNameKh" type="text" required>
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Phone Number *</label>
+        <input id="newStudentPhone" type="text" inputmode="numeric" placeholder="086454353" required>
+      </div>
+      <div>
+        <label>Email</label>
+        <input id="newStudentEmail" type="email" placeholder="student@example.com">
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Gender</label>
+        <select id="newStudentGender">
+          <option value="">Select gender</option>
+          <option value="Male">Male</option>
+          <option value="Female">Female</option>
+          <option value="Other">Other</option>
+        </select>
+      </div>
+      <div>
+        <label>Date of Birth</label>
+        <input id="newStudentDob" type="date">
+      </div>
+    </div>
+
+    <label>Address</label>
+    <textarea id="newStudentAddress" rows="3" placeholder="Student address"></textarea>
+
+    <div class="row">
+      <div>
+        <label>Course *</label>
+        <input id="newStudentCourse" type="text" placeholder="Course name" required>
+      </div>
+      <div>
+        <label>Student ID</label>
+        <input id="newStudentStudentId" type="text" placeholder="Auto-generate if blank">
+      </div>
+    </div>
+
+    <label>Profile Photo (4×6 certificate photo, white background) *</label>
+    <input id="newStudentPhoto" type="file" accept="image/jpeg,image/png,image/webp" required>
+    <div id="newStudentPhotoPreview" class="muted" style="margin-top:8px"></div>
+
+    <div class="row" style="margin-top:14px">
+      <button id="saveNewStudent" class="gold" type="button">Register Student</button>
+      <button id="cancelNewStudent" class="light" type="button">Cancel</button>
+    </div>
+    <div id="newStudentStatus"></div>
+  </div>
+</div>
+
 <div id="studentList">Loading...</div>
 <div id="studentEditCard" class="card hidden" style="margin-top:18px">
 <h2>Edit Student</h2>
@@ -430,6 +501,109 @@ function editStudent(id){
  $("studentEditCard").classList.remove("hidden");
  $("studentEditCard").scrollIntoView({behavior:"smooth",block:"start"});
 }
+function resetNewStudentForm(){
+  ["newStudentName","newStudentNameKh","newStudentPhone","newStudentEmail","newStudentDob","newStudentAddress","newStudentCourse","newStudentStudentId"].forEach(id=>$(id).value="");
+  $("newStudentGender").value="";
+  $("newStudentPhoto").value="";
+  $("newStudentPhotoPreview").innerHTML="";
+  clearMsg($("newStudentStatus"));
+}
+$("toggleStudentRegister").onclick=()=>{
+  $("studentRegisterCard").classList.toggle("hidden");
+  if(!$("studentRegisterCard").classList.contains("hidden")){
+    $("newStudentName").focus();
+    $("studentRegisterCard").scrollIntoView({behavior:"smooth",block:"start"});
+  }
+};
+$("cancelNewStudent").onclick=()=>{
+  resetNewStudentForm();
+  $("studentRegisterCard").classList.add("hidden");
+};
+$("newStudentPhoto").onchange=()=>{
+  const file=$("newStudentPhoto").files[0];
+  if(!file){$("newStudentPhotoPreview").innerHTML="";return}
+  if(!["image/jpeg","image/png","image/webp"].includes(file.type)){
+    $("newStudentPhoto").value="";
+    msg($("newStudentStatus"),"Student photo must be JPG, PNG, or WEBP.",true);
+    return;
+  }
+  const url=URL.createObjectURL(file);
+  $("newStudentPhotoPreview").innerHTML=`<div>Preview:</div><img src="${attr(url)}" alt="" style="width:120px;height:180px;object-fit:cover;border-radius:10px;margin-top:6px">`;
+};
+async function nextStudentId(){
+  const year=new Date().getFullYear();
+  const {data,error}=await sb.from("students").select("student_id").like("student_id",`MFS-${year}-%`);
+  if(error)throw error;
+  let max=0;
+  (data||[]).forEach(r=>{
+    const m=String(r.student_id||"").match(new RegExp(`^MFS-${year}-(\\d+)$`));
+    if(m)max=Math.max(max,Number(m[1]));
+  });
+  return `MFS-${year}-${String(max+1).padStart(4,"0")}`;
+}
+$("saveNewStudent").onclick=async()=>{
+  clearMsg($("newStudentStatus"));
+  const fullName=$("newStudentName").value.trim();
+  const fullNameKm=$("newStudentNameKh").value.trim();
+  const phone=$("newStudentPhone").value.trim();
+  const course=$("newStudentCourse").value.trim();
+  const photoFile=$("newStudentPhoto").files[0];
+
+  if(!fullName||!fullNameKm||!phone||!course){
+    msg($("newStudentStatus"),"Please fill all required fields.",true);return;
+  }
+  if(!/^\d{7,}$/.test(phone)){
+    msg($("newStudentStatus"),"Phone number must contain at least 7 digits (for example 086454353).",true);return;
+  }
+  if(!photoFile){
+    msg($("newStudentStatus"),"Please select the student's 4×6 certificate photo.",true);return;
+  }
+  if(!["image/jpeg","image/png","image/webp"].includes(photoFile.type)){
+    msg($("newStudentStatus"),"Student photo must be JPG, PNG, or WEBP.",true);return;
+  }
+
+  $("saveNewStudent").disabled=true;
+  try{
+    const studentId=$("newStudentStudentId").value.trim()||await nextStudentId();
+    const ext=photoFile.type==="image/png"?"png":photoFile.type==="image/webp"?"webp":"jpg";
+    const safeId=studentId.replace(/[^a-z0-9_-]/gi,"-");
+    const path=`${adminUser.id}/students/${safeId}.${ext}`;
+
+    const up=await sb.storage.from("student-photos").upload(path,photoFile,{
+      upsert:true,contentType:photoFile.type
+    });
+    if(up.error)throw up.error;
+
+    const photoUrl=sb.storage.from("student-photos").getPublicUrl(path).data.publicUrl;
+    const payload={
+      student_id:studentId,
+      full_name:fullName,
+      full_name_km:fullNameKm,
+      email:$("newStudentEmail").value.trim(),
+      phone,
+      gender:$("newStudentGender").value,
+      date_of_birth:$("newStudentDob").value||null,
+      address:$("newStudentAddress").value.trim(),
+      course,
+      photo_url:photoUrl,
+      status:"pending",
+      verified:false
+    };
+
+    const {data,error}=await sb.from("students").insert(payload).select().single();
+    if(error)throw error;
+
+    msg($("newStudentStatus"),`Student registered successfully: ${data.student_id}`);
+    resetNewStudentForm();
+    $("studentRegisterCard").classList.remove("hidden");
+    await loadStudents();
+    updateMetrics();
+  }catch(e){
+    msg($("newStudentStatus"),e.message||"Could not register student.",true);
+  }finally{
+    $("saveNewStudent").disabled=false;
+  }
+};
 $("cancelStudentEdit").onclick=()=>{$("studentEditCard").classList.add("hidden");clearMsg($("editStudentStatus"))};
 $("saveStudentEdit").onclick=async()=>{
  clearMsg($("editStudentStatus"));
