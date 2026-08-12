@@ -82,6 +82,66 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .sale-entry-table .sale-course-search-results button{display:block;width:100%;text-align:left;background:#fff;color:var(--text);border-radius:0;border-bottom:1px solid #e4eff0;padding:12px}
 .sale-entry-table .sale-course-search-results button:hover{background:#edf9fa}
 .sale-entry-table .sale-course-search-results button:last-child{border-bottom:0}
+.sale-course-picker{margin:0 0 12px;position:relative;max-width:720px}
+.sale-course-picker-wrap{position:relative}
+.sale-course-picker-wrap input{
+  width:100%;
+  min-height:54px;
+  padding:12px 16px 12px 44px;
+  border:2px solid #9fd9df;
+  border-radius:12px;
+  font-size:17px;
+  background:#fff;
+  box-sizing:border-box;
+}
+.sale-course-picker-wrap input:focus{
+  outline:none;
+  border-color:#42b8c8;
+  box-shadow:0 0 0 3px #42b8c81c;
+}
+.sale-search-icon{
+  position:absolute;
+  left:15px;
+  top:50%;
+  transform:translateY(-50%);
+  z-index:2;
+  color:#168e9f;
+  font-size:25px;
+  line-height:1;
+  pointer-events:none;
+}
+.sale-course-picker-results{
+  position:absolute;
+  left:0;
+  right:0;
+  top:calc(100% - 1px);
+  z-index:50;
+  display:none;
+  background:#fff;
+  border:1px solid #cfe5e8;
+  border-radius:0 0 12px 12px;
+  box-shadow:0 12px 30px #075e661c;
+  max-height:260px;
+  overflow:auto;
+}
+.sale-course-picker-results.show{display:block}
+.sale-course-picker-results button{
+  display:block;
+  width:100%;
+  text-align:left;
+  background:#fff;
+  color:var(--text);
+  border:0;
+  border-bottom:1px solid #e4eff0;
+  border-radius:0;
+  padding:13px 16px;
+  cursor:pointer;
+}
+.sale-course-picker-results button:hover{background:#edf9fa}
+.sale-course-picker-results button:last-child{border-bottom:0}
+.sale-course-picker-results .course-picker-name{font-weight:800}
+.sale-course-picker-results .course-picker-meta{margin-top:3px;font-size:13px;color:#6d7b7d}
+.sale-course-picker-help{padding:5px 3px}
 .sale-item-discount-wrap{display:grid;grid-template-columns:66px 1fr;gap:5px}
 .sale-item-discount-wrap select{padding:8px}
 .sale-item-discount-wrap input{min-width:0}
@@ -348,6 +408,18 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
   <div class="sale-section-title">
     <h2>Course / Product</h2>
     <button id="addSaleItem" class="light" type="button">+ Add Course / Product</button>
+  </div>
+
+  <div class="sale-course-picker">
+    <div class="sale-course-picker-wrap">
+      <span class="sale-search-icon">⌕</span>
+      <input id="saleCourseSearch" type="text" autocomplete="off"
+             placeholder="Search course name or Course ID...">
+      <div id="saleCourseSearchResults" class="sale-course-picker-results"></div>
+    </div>
+    <div class="muted sale-course-picker-help">
+      Search by course name or Course ID, then click the course to add it.
+    </div>
   </div>
 
   <div class="sale-table-wrap">
@@ -1149,6 +1221,59 @@ function addSaleItemRow(name="",price=0,qty=1,courseId=""){
    if(c){search.value=c.name||name;idInput.value=String(c.id);priceInput.value=Number(price||c.price||0)}
  }
  updateSaleTotals();
+}
+
+function setupSaleCoursePicker(){
+ const search=$("saleCourseSearch");
+ const results=$("saleCourseSearchResults");
+ if(!search||!results)return;
+
+ function render(){
+   const q=search.value.trim().toLowerCase();
+   if(!q){
+     results.innerHTML="";
+     results.classList.remove("show");
+     return;
+   }
+   const matches=getSalesCourses()
+     .filter(c=>[c.name,c.id].join(" ").toLowerCase().includes(q))
+     .slice(0,12);
+
+   results.innerHTML=matches.length
+     ? matches.map(c=>`<button type="button" data-course-id="${attr(c.id)}">
+         <div class="course-picker-name">${esc(c.name)}</div>
+         <div class="course-picker-meta">Course ID: ${esc(c.id)} · ${money(c.price)}</div>
+       </button>`).join("")
+     : `<div class="muted" style="padding:14px">No matching course found.</div>`;
+
+   results.classList.add("show");
+ }
+
+ search.addEventListener("input",render);
+ search.addEventListener("focus",render);
+
+ results.addEventListener("mousedown",e=>{
+   const btn=e.target.closest("button[data-course-id]");
+   if(!btn)return;
+   e.preventDefault();
+   const c=getSalesCourses().find(x=>String(x.id)===String(btn.dataset.courseId));
+   if(!c)return;
+
+   addSaleItemRow(c.name||"",Number(c.price||0),1,String(c.id));
+   search.value="";
+   results.innerHTML="";
+   results.classList.remove("show");
+   updateSaleTotals();
+
+   const rows=document.querySelectorAll("#saleItems .sale-item");
+   const last=rows[rows.length-1];
+   if(last){
+     const field=last.querySelector(".sale-item-qty");
+     if(field)field.focus();
+   }
+ });
+
+ search.addEventListener("blur",()=>setTimeout(()=>results.classList.remove("show"),180));
 }
 
 function getSaleItems(){
@@ -2040,6 +2165,8 @@ async function deleteCourse(id){
  const{error}=await sb.from("courses").delete().eq("id",id);
  if(error)alert(error.message);else{await loadCourses();updateMetrics()}
 }
+
+setupSaleCoursePicker();
 
 function updateMetrics(){$("mStudents").textContent=students.length;$("mPending").textContent=students.filter(s=>String(s.status||"pending")==="pending").length;$("mVerifiedStudents").textContent=students.filter(s=>String(s.status)==="verified"||s.verified===true).length;$("mCourses").textContent=courses.length;$("mCertificates").textContent=certificates.length;updateSalesMetrics()}
 boot();
