@@ -364,14 +364,14 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     <label>Price (USD)</label>
     <div style="display:flex;align-items:center;gap:6px">
       <span style="font-weight:700">$</span>
-      <input id="coursePrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="50.00">
+      <input id="coursePrice" type="text" inputmode="decimal" autocomplete="off" placeholder="50.00">
     </div>
     <div class="muted" style="margin-top:4px">Example: 50, 500, 0.01, 125.50</div>
   </div>
   <div>
     <label>Duration</label>
     <div style="display:flex;gap:8px">
-      <input id="courseDurationValue" type="number" min="1" step="1" inputmode="numeric" placeholder="3" style="flex:1">
+      <input id="courseDurationValue" type="text" inputmode="numeric" autocomplete="off" placeholder="3" style="flex:1">
       <select id="courseDurationUnit" style="flex:1">
         <option value="day">Day</option>
         <option value="month">Month</option>
