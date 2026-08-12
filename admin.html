@@ -759,6 +759,10 @@ function salePaid(s){return Number(saleField(s,["paid","paid_amount","amount_pai
 function saleDateValue(s){return saleField(s,["sale_date","date","created_at"],"")}
 function saleItemsValue(s){return saleField(s,["items","order_items","products"],"")}
 async function loadSales(){
+ // Refresh students first so newly registered students immediately
+ // appear in the List Sales student dropdown.
+ await loadStudents();
+
  const [sr,pr]=await Promise.all([
    sb.from("medifella_sales").select("*").order("created_at",{ascending:false}),
    sb.from("medifella_sale_payments").select("*").order("created_at",{ascending:false})
