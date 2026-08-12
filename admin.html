@@ -41,14 +41,14 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .sale-student-tools{display:flex;gap:8px;align-items:end}
 .sale-student-tools>div{flex:1}
 .sale-student-tools button{white-space:nowrap}
-.sale-course-row{display:grid;grid-template-columns:2fr 110px 110px 130px 40px;gap:8px;align-items:end;margin-bottom:8px}
+.sale-course-row{display:grid;grid-template-columns:minmax(240px,2fr) 90px 120px 130px 130px 40px;gap:8px;align-items:end;margin-bottom:8px}.sale-course-search-wrap{position:relative}.sale-course-search-results{position:absolute;left:0;right:0;top:100%;z-index:8;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 25px #075e6618;max-height:220px;overflow:auto;display:none}.sale-course-search-results.show{display:block}.sale-course-search-results button{display:block;width:100%;text-align:left;background:#fff;color:var(--text);border-radius:0;border-bottom:1px solid var(--line);padding:10px}.sale-course-search-results button:hover{background:#e8f1f2}.sale-payment-grid{display:grid;grid-template-columns:repeat(5,1fr);gap:10px}.sale-payment-grid .readonly{background:#f3f7f7}.sale-money-input{font-variant-numeric:tabular-nums}
 .sale-course-row .custom-course-name{margin-top:6px}
 .student-modal{position:fixed;inset:0;background:#0008;z-index:30;display:none;overflow:auto;padding:24px}
 .student-modal.show{display:block}
 .student-modal-box{background:#fff;max-width:820px;margin:0 auto;padding:24px;border-radius:16px}
 .student-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px}
-@media(max-width:900px){.sale-course-row{grid-template-columns:1fr 90px 100px 110px 40px}}
-@media(max-width:650px){.sale-student-tools{display:grid}.sale-course-row{grid-template-columns:1fr 1fr}.student-modal{padding:8px}.student-modal-box{padding:14px}}
+@media(max-width:900px){.sale-course-row{grid-template-columns:1fr 90px 110px 120px 120px 40px}.sale-payment-grid{grid-template-columns:repeat(2,1fr)}}
+@media(max-width:650px){.sale-student-tools{display:grid}.sale-course-row{grid-template-columns:1fr 1fr}.sale-payment-grid{grid-template-columns:1fr}.student-modal{padding:8px}.student-modal-box{padding:14px}}
 
 @media(max-width:900px){.sales-summary{grid-template-columns:repeat(2,1fr)}.sales-item{grid-template-columns:1fr 90px 110px 110px 40px}}
 @media(max-width:650px){.sales-summary{grid-template-columns:1fr}.sales-item{grid-template-columns:1fr 1fr}.invoice-overlay{padding:5px}.invoice-box{padding:14px}}
@@ -227,8 +227,10 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <button id="salesRefresh" class="light">Refresh</button><button id="toggleSaleForm" class="gold">+ New Sale</button>
 </div>
 <div id="salesStatus"></div>
+
 <div id="saleForm" class="card hidden" style="margin-top:14px">
 <h2 style="margin-top:0">Create Sale / Student Purchase</h2>
+
 <div class="row">
 <div>
 <label>Student / Customer *</label>
@@ -240,29 +242,70 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
   </div>
   <button id="newSaleStudentBtn" class="gold" type="button">+ New Student</button>
 </div>
-<div id="saleStudentHint" class="muted" style="margin-top:6px">Choose an existing student, or add a new student without leaving List Sales.</div>
+<div id="saleStudentHint" class="muted" style="margin-top:6px">Search and select a student by name, Student ID or phone.</div>
 </div>
-<div><label>Sale Date *</label><input id="saleDate" type="date"></div>
+
+<div><label>Sale Date + Time *</label><input id="saleDate" type="datetime-local"></div>
 <div><label>Reference No</label><input id="saleReference" placeholder="Auto-generate"></div>
 </div>
+
 <label>Course / Product *</label>
 <div id="saleItems"></div>
 <button id="addSaleItem" class="light" type="button">+ Add Course / Product</button>
-<div class="muted" style="margin-top:6px">Choose a Sales Course from Course Management. Online Courses are not shown here. The current sales-course price is filled automatically. You can add multiple courses, or choose Other Product / Service.</div>
-<div class="row" style="margin-top:14px">
-<div><label>Discount</label><input id="saleDiscount" type="number" min="0" step="0.01" value="0"></div>
-<div><label>Shipping</label><input id="saleShipping" type="number" min="0" step="0.01" value="0"></div>
-<div><label>Initial Payment</label><input id="saleInitialPayment" type="number" min="0" step="0.01" value="0"></div>
+<div class="muted" style="margin-top:6px">Search by Course Name or Course ID. There is no course/product dropdown. If the name is not found, you can type it as an Other Product / Service and enter the unit price manually.</div>
+
+<div class="sale-total" style="margin-top:14px">
+  <span>Subtotal: <strong id="saleItemsSubtotal">$0.00</strong></span>
+  <span>Discount: <strong id="saleDiscountTotal">$0.00</strong></span>
+  <span>Delivery Fee: <strong id="saleDeliveryFeeTotal">$0.00</strong></span>
+  <span>Initial Total: <strong id="saleInitialTotal">$0.00</strong></span>
 </div>
-<label>Payment Method</label><select id="salePaymentMethod"><option value="Cash">Cash</option><option value="ABA">ABA</option><option value="Bank Transfer">Bank Transfer</option><option value="Card">Card</option><option value="Other">Other</option></select>
-<label>Sale Note</label><textarea id="saleNote" rows="3" placeholder="Optional note"></textarea>
-<div class="sale-total"><span>Grand Total: <strong id="saleGrandTotal">$0.00</strong></span><span>Balance: <strong id="saleBalance">$0.00</strong></span></div>
+
+<div class="row" style="margin-top:14px">
+<div>
+  <label>Delivery Fee (USD)</label>
+  <input id="saleDeliveryFee" class="sale-money-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="0">
+</div>
+<div>
+  <label>Payment Method</label>
+  <select id="salePaymentMethod"><option value="Cash">Cash</option><option value="ABA">ABA</option><option value="Bank Transfer">Bank Transfer</option><option value="Card">Card</option><option value="Other">Other</option></select>
+</div>
+</div>
+
+<div class="sale-payment-grid" style="margin-top:14px">
+<div>
+  <label>Initial Payment</label>
+  <input id="saleInitialPayment" class="sale-money-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="0">
+</div>
+<div>
+  <label>Partial Payment</label>
+  <input id="salePartialPayment" class="sale-money-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="0">
+</div>
+<div>
+  <label>Due</label>
+  <input id="saleDue" class="readonly" type="text" readonly value="$0.00">
+</div>
+<div>
+  <label>Paid Balance</label>
+  <input id="salePaidBalance" class="readonly" type="text" readonly value="$0.00">
+</div>
+<div>
+  <label>Grand Total</label>
+  <input id="saleGrandTotalInput" class="readonly" type="text" readonly value="$0.00">
+</div>
+</div>
+
+<label>Sale Note</label>
+<textarea id="saleNote" rows="3" placeholder="Optional note"></textarea>
+<div class="sale-total"><span>Grand Total: <strong id="saleGrandTotal">$0.00</strong></span><span>Due: <strong id="saleBalance">$0.00</strong></span></div>
 <div class="row" style="margin-top:14px"><button id="saveSale" class="gold">Save Sale</button><button id="cancelSale" class="light">Cancel</button></div>
 <div id="newSaleStatus"></div>
 </div>
+
 <div id="salesList" style="margin-top:18px">Loading...</div>
 </div>
 </section>
+
 
 <div id="saleStudentModal" class="student-modal">
   <div class="student-modal-box">
@@ -781,11 +824,34 @@ function saleTotal(s){return Number(saleField(s,["grand_total","total","total_am
 function salePaid(s){return Number(saleField(s,["paid","paid_amount","amount_paid"],0))}
 function saleDateValue(s){return saleField(s,["sale_date","date","created_at"],"")}
 function saleItemsValue(s){return saleField(s,["items","order_items","products"],"")}
-async function loadSales(){
- // Refresh students first so newly registered students immediately
- // appear in the List Sales student dropdown.
- await loadStudents();
+function parseMoneyInput(v){const n=Number(String(v??"").replace(/[$,\s]/g,""));return Number.isFinite(n)&&n>=0?n:0}
+function parseDiscount(value,base){
+ const raw=String(value??"").trim().replace(/\$/g,"").replace(/,/g,"");
+ if(!raw)return {amount:0,type:"usd",value:0};
+ if(raw.endsWith("%")){
+   const pct=Math.max(0,Number(raw.slice(0,-1))||0);
+   return {amount:Math.min(base,base*pct/100),type:"percent",value:pct};
+ }
+ const usd=Math.max(0,Number(raw)||0);
+ return {amount:Math.min(base,usd),type:"usd",value:usd};
+}
+function formatDateTimeLocalValue(date=new Date()){
+ const p=n=>String(n).padStart(2,"0");
+ return `${date.getFullYear()}-${p(date.getMonth()+1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}`;
+}
+function saleDateForDb(v){
+ // Keep the existing sale_date column compatible with a date column.
+ // The exact time is also sent in sale_time when the column exists.
+ const d=String(v||"");
+ return d ? d.slice(0,10) : "";
+}
+function saleTimeForDb(v){
+ const d=String(v||"");
+ return d.length>=16 ? d.slice(11,16) : "";
+}
 
+async function loadSales(){
+ await loadStudents();
  const [sr,pr]=await Promise.all([
    sb.from("medifella_sales").select("*").order("created_at",{ascending:false}),
    sb.from("medifella_sale_payments").select("*").order("created_at",{ascending:false})
@@ -797,223 +863,228 @@ async function loadSales(){
  salesRecords=sr.data||[];salePayments=pr.error?[]:(pr.data||[]);
  renderSaleStudentOptions();renderSales();updateSalesMetrics();
 }
-function renderSaleStudentOptions(){
- const search=$("saleStudentSearch");
- const hidden=$("saleStudentId");
- const list=$("saleStudentSearchList");
- if(!search)return;
 
+function renderSaleStudentOptions(){
+ const search=$("saleStudentSearch"),hidden=$("saleStudentId"),list=$("saleStudentSearchList");
+ if(!search)return;
  const q=(search.value||"").trim().toLowerCase();
  const filtered=students.filter(s=>{
    const hay=[s.full_name,s.full_name_km,s.phone,s.student_id,s.email].join(" ").toLowerCase();
-   return !q || hay.includes(q);
+   return !q||hay.includes(q);
  });
-
- if(list){
-   list.innerHTML=filtered.map(s=>
-     `<option value="${esc(s.full_name||"")}">${esc(s.student_id||"")} · ${esc(s.phone||"")}</option>`
-   ).join("");
- }
-
- if(q && filtered.length===1){
-   const s=filtered[0];
-   hidden.value=String(s.id);
-   search.value=s.full_name||search.value;
-   $("saleStudentHint").textContent=
-     `Selected: ${s.full_name||"Student"} · ${s.student_id||"No ID"} · ${s.phone||"No phone"}`;
- }else if(q && filtered.length>1){
-   hidden.value="";
-   $("saleStudentHint").textContent=
-     `${filtered.length} students found. Continue typing to find the student.`;
- }else if(q && filtered.length===0){
-   hidden.value="";
-   $("saleStudentHint").textContent=
-     "No matching student found. Check the name, Student ID or phone number.";
+ if(list)list.innerHTML=filtered.map(s=>`<option value="${esc(s.full_name||"")}">${esc(s.student_id||"")} · ${esc(s.phone||"")}</option>`).join("");
+ if(q&&filtered.length===1){
+   const s=filtered[0];hidden.value=String(s.id);search.value=s.full_name||search.value;
+   $("saleStudentHint").textContent=`Selected: ${s.full_name||"Student"} · ${s.student_id||"No ID"} · ${s.phone||"No phone"}`;
+ }else if(q&&filtered.length>1){
+   hidden.value="";$("saleStudentHint").textContent=`${filtered.length} students found. Continue typing to find the student.`;
+ }else if(q){
+   hidden.value="";$("saleStudentHint").textContent="No matching student found. Check the name, Student ID or phone number.";
  }else{
-   hidden.value="";
-   $("saleStudentHint").textContent=
-     "Type a student name, Student ID or phone number.";
+   hidden.value="";$("saleStudentHint").textContent="Search and select a student by name, Student ID or phone.";
  }
+}
 
- renderNewSaleStudentCourseOptions();
-}
-function renderNewSaleStudentCourseOptions(){
-  // Student registration is information-only. Course selection happens in the sale item list.
-}
 function nextSaleReference(){
  const d=new Date(),prefix=`SALE-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-`;let max=0;
  salesRecords.forEach(s=>{const m=saleRef(s).match(new RegExp("^"+prefix+"(\\d+)$"));if(m)max=Math.max(max,Number(m[1]))});
  return prefix+String(max+1).padStart(3,"0");
 }
-function courseOptions(selected=""){
- const salesCourses=courses.filter(c=>courseType(c)==="sales");
- return '<option value="">Select sales course / product</option>'
-   + salesCourses.map(c=>`<option value="${attr(c.id)}" ${String(c.id)===String(selected)?"selected":""}>${esc(c.name)} · ${money(c.price)}</option>`).join("")
-   + '<option value="__custom__">Other Product / Service</option>';
+
+function getSalesCourses(){
+ return courses.filter(c=>courseType(c)==="sales");
+}
+function findCourseMatch(query){
+ const q=String(query||"").trim().toLowerCase();
+ if(!q)return null;
+ const exact=getSalesCourses().find(c=>String(c.id).toLowerCase()===q || String(c.name||"").trim().toLowerCase()===q);
+ if(exact)return exact;
+ const matches=getSalesCourses().filter(c=>[c.name,c.id].join(" ").toLowerCase().includes(q));
+ return matches.length===1?matches[0]:null;
 }
 function addSaleItemRow(name="",price=0,qty=1,courseId=""){
  const wrap=document.createElement("div");wrap.className="sale-item";
- const isCustom=!courseId || courseId==="__custom__";
  wrap.innerHTML=`<div class="sale-course-row">
-   <div>
-     <label>Course / Product</label>
-     <select class="sale-item-course">${courseOptions(courseId)}</select>
-     <input class="sale-item-custom-name ${isCustom&&name?"":"hidden"}" value="${attr(name)}" placeholder="Enter product / service name">
+   <div class="sale-course-search-wrap">
+     <label>Course / Product Search</label>
+     <input class="sale-course-search" type="text" autocomplete="off" placeholder="Search course name or ID" value="${attr(name)}">
+     <input class="sale-course-id" type="hidden" value="${attr(courseId)}">
+     <div class="sale-course-search-results"></div>
+     <div class="muted" style="margin-top:4px">Name or Course ID</div>
    </div>
-   <div><label>Unit Price</label><input class="sale-item-price" type="number" min="0" step="0.01" value="${Number(price||0)}"></div>
-   <div><label>Quantity</label><input class="sale-item-qty" type="number" min="1" step="1" value="${Number(qty||1)}"></div>
-   <div><label>Subtotal</label><input class="sale-item-subtotal" readonly value="${money(Number(price||0)*Number(qty||1))}"></div>
+   <div><label>Quantity</label><input class="sale-item-qty" type="text" inputmode="numeric" autocomplete="off" value="${Number(qty||1)}"></div>
+   <div><label>Unit Price (USD)</label><input class="sale-item-price" type="text" inputmode="decimal" autocomplete="off" value="${Number(price||0)}"></div>
+   <div><label>Discount</label><input class="sale-item-discount" type="text" inputmode="decimal" autocomplete="off" placeholder="0 or 10%" value=""></div>
+   <div><label>Subtotal</label><input class="sale-item-subtotal readonly" readonly value="$0.00"></div>
    <button class="danger remove-sale-item" type="button">×</button>
  </div>`;
  $("saleItems").appendChild(wrap);
- const select=wrap.querySelector(".sale-item-course"),custom=wrap.querySelector(".sale-item-custom-name"),priceInput=wrap.querySelector(".sale-item-price");
- select.addEventListener("change",()=>{
-   const c=courses.find(x=>String(x.id)===String(select.value));
-   if(c){
-     custom.classList.add("hidden");custom.value=c.name||"";
-     priceInput.value=Number(c.price||0);
-   }else if(select.value==="__custom__"){
-     custom.classList.remove("hidden");custom.value="";
+
+ const search=wrap.querySelector(".sale-course-search");
+ const idInput=wrap.querySelector(".sale-course-id");
+ const results=wrap.querySelector(".sale-course-search-results");
+ const priceInput=wrap.querySelector(".sale-item-price");
+ const qtyInput=wrap.querySelector(".sale-item-qty");
+ const discountInput=wrap.querySelector(".sale-item-discount");
+
+ function renderCourseSearch(){
+   const q=search.value.trim().toLowerCase();
+   const matches=getSalesCourses().filter(c=>[c.name,c.id].join(" ").toLowerCase().includes(q)).slice(0,12);
+   results.innerHTML=matches.map(c=>`<button type="button" data-course-id="${attr(c.id)}"><strong>${esc(c.name)}</strong><div class="muted">ID: ${esc(c.id)} · ${money(c.price)}</div></button>`).join("");
+   results.classList.toggle("show",!!q&&matches.length>0);
+   const exact=findCourseMatch(search.value);
+   if(exact){
+     idInput.value=String(exact.id);
+     if(document.activeElement!==priceInput)priceInput.value=Number(exact.price||0);
    }else{
-     custom.classList.add("hidden");custom.value="";
-     priceInput.value="0";
+     idInput.value="";
    }
    updateSaleTotals();
+ }
+ search.addEventListener("input",renderCourseSearch);
+ search.addEventListener("focus",()=>{if(search.value.trim())renderCourseSearch()});
+ results.addEventListener("click",e=>{
+   const btn=e.target.closest("button[data-course-id]");if(!btn)return;
+   const c=getSalesCourses().find(x=>String(x.id)===String(btn.dataset.courseId));if(!c)return;
+   search.value=c.name||"";idInput.value=String(c.id);priceInput.value=Number(c.price||0);
+   results.classList.remove("show");updateSaleTotals();
  });
- [custom,priceInput,wrap.querySelector(".sale-item-qty")].forEach(i=>i.addEventListener("input",updateSaleTotals));
+ document.addEventListener("click",function closeSaleSearch(e){if(!wrap.contains(e.target))results.classList.remove("show")},{once:false});
+
+ [qtyInput,priceInput,discountInput].forEach(i=>i.addEventListener("input",updateSaleTotals));
  wrap.querySelector(".remove-sale-item").onclick=()=>{wrap.remove();updateSaleTotals()};
- if(!isCustom && courseId){
-   const c=courses.find(x=>String(x.id)===String(courseId));
-   if(c){priceInput.value=Number(price||c.price||0);custom.value=c.name||"";custom.classList.add("hidden")}
+ if(courseId){
+   const c=getSalesCourses().find(x=>String(x.id)===String(courseId));
+   if(c){search.value=c.name||name;idInput.value=String(c.id);priceInput.value=Number(price||c.price||0)}
+ }else if(name){
+   const c=findCourseMatch(name);
+   if(c){search.value=c.name||name;idInput.value=String(c.id);priceInput.value=Number(price||c.price||0)}
  }
  updateSaleTotals();
 }
+
 function getSaleItems(){
  return [...document.querySelectorAll("#saleItems .sale-item")].map(w=>{
-   const courseId=w.querySelector(".sale-item-course").value;
-   const custom=w.querySelector(".sale-item-custom-name").value.trim();
-   const course=courses.find(c=>String(c.id)===String(courseId));
-   const name=course ? course.name : custom;
-   const price=Number(w.querySelector(".sale-item-price").value||0);
-   const quantity=Math.max(1,Number(w.querySelector(".sale-item-qty").value||1));
-   return{name,course_id:course?.id||null,unit_price:price,quantity,subtotal:price*quantity};
+   const search=w.querySelector(".sale-course-search").value.trim();
+   const courseId=w.querySelector(".sale-course-id").value;
+   const course=getSalesCourses().find(c=>String(c.id)===String(courseId));
+   const name=course?course.name:search;
+   const price=parseMoneyInput(w.querySelector(".sale-item-price").value);
+   const quantity=Math.max(1,parseInt(w.querySelector(".sale-item-qty").value,10)||1);
+   const base=price*quantity;
+   const discount=parseDiscount(w.querySelector(".sale-item-discount").value,base);
+   return {
+     name,course_id:course?.id||null,unit_price:price,quantity,
+     discount_input:w.querySelector(".sale-item-discount").value.trim(),
+     discount_amount:discount.amount,
+     discount_type:discount.type,
+     subtotal:Math.max(0,base-discount.amount)
+   };
  }).filter(x=>x.name);
 }
+
 function updateSaleTotals(){
- const items=getSaleItems(),subtotal=items.reduce((a,x)=>a+x.subtotal,0),discount=Math.max(0,Number($("saleDiscount")?.value||0)),shipping=Math.max(0,Number($("saleShipping")?.value||0)),grand=Math.max(0,subtotal-discount+shipping),paid=Math.max(0,Number($("saleInitialPayment")?.value||0));
- $("saleGrandTotal").textContent=money(grand);$("saleBalance").textContent=money(Math.max(0,grand-paid));
- document.querySelectorAll("#saleItems .sale-item").forEach(w=>{const p=Number(w.querySelector(".sale-item-price").value||0),q=Math.max(1,Number(w.querySelector(".sale-item-qty").value||1));w.querySelector(".sale-item-subtotal").value=money(p*q)});
+ const items=getSaleItems();
+ const gross=items.reduce((a,x)=>a+x.unit_price*x.quantity,0);
+ const discount=items.reduce((a,x)=>a+x.discount_amount,0);
+ const subtotal=items.reduce((a,x)=>a+x.subtotal,0);
+ const delivery=parseMoneyInput($("saleDeliveryFee")?.value);
+ const initialTotal=Math.max(0,subtotal+delivery);
+ const initialPayment=parseMoneyInput($("saleInitialPayment")?.value);
+ const partialPayment=parseMoneyInput($("salePartialPayment")?.value);
+ const paidBalance=Math.min(initialTotal,initialPayment+partialPayment);
+ const due=Math.max(0,initialTotal-paidBalance);
+
+ $("saleItemsSubtotal").textContent=money(gross);
+ $("saleDiscountTotal").textContent=money(discount);
+ $("saleDeliveryFeeTotal").textContent=money(delivery);
+ $("saleInitialTotal").textContent=money(initialTotal);
+ $("saleGrandTotal").textContent=money(initialTotal);
+ $("saleGrandTotalInput").value=money(initialTotal);
+ $("saleDue").value=money(due);
+ $("salePaidBalance").value=money(paidBalance);
+ $("saleBalance").textContent=money(due);
+
+ document.querySelectorAll("#saleItems .sale-item").forEach(w=>{
+   const p=parseMoneyInput(w.querySelector(".sale-item-price").value);
+   const q=Math.max(1,parseInt(w.querySelector(".sale-item-qty").value,10)||1);
+   const d=parseDiscount(w.querySelector(".sale-item-discount").value,p*q);
+   w.querySelector(".sale-item-subtotal").value=money(Math.max(0,p*q-d.amount));
+ });
 }
 function resetSaleForm(){
  $("saleStudentSearch").value="";$("saleStudentId").value="";
- $("saleDate").value=new Date().toISOString().slice(0,10);$("saleReference").value=nextSaleReference();
+ $("saleDate").value=formatDateTimeLocalValue();$("saleReference").value=nextSaleReference();
  $("saleItems").innerHTML="";addSaleItemRow();
- $("saleDiscount").value="0";$("saleShipping").value="0";$("saleInitialPayment").value="0";$("salePaymentMethod").value="Cash";$("saleNote").value="";
+ $("saleDeliveryFee").value="0";$("saleInitialPayment").value="0";$("salePartialPayment").value="0";$("salePaymentMethod").value="Cash";$("saleNote").value="";
  clearMsg($("newSaleStatus"));renderSaleStudentOptions();updateSaleTotals();
 }
 $("toggleSaleForm").onclick=()=>{$("saleForm").classList.toggle("hidden");if(!$("saleForm").classList.contains("hidden")){resetSaleForm();$("saleForm").scrollIntoView({behavior:"smooth",block:"start"})}};
 $("cancelSale").onclick=()=>{$("saleForm").classList.add("hidden");clearMsg($("newSaleStatus"))};
 $("addSaleItem").onclick=()=>addSaleItemRow();
 $("saleStudentSearch").oninput=renderSaleStudentOptions;
-$("newSaleStudentBtn").onclick=()=>{
- renderNewSaleStudentCourseOptions();
- $("saleStudentModal").classList.add("show");
- $("saleNewStudentName").focus();
-};
+$("newSaleStudentBtn").onclick=()=>{$("saleStudentModal").classList.add("show");$("saleNewStudentName").focus()};
 $("closeSaleStudentModal").onclick=()=>{$("saleStudentModal").classList.remove("show");clearMsg($("saleNewStudentStatus"))};
 $("cancelSaleNewStudent").onclick=()=>{$("saleStudentModal").classList.remove("show");clearMsg($("saleNewStudentStatus"))};
 $("saleStudentModal").onclick=e=>{if(e.target.id==="saleStudentModal")$("saleStudentModal").classList.remove("show")};
-function resetSaleNewStudentForm(){
- ["saleNewStudentName","saleNewStudentNameKh","saleNewStudentPhone","saleNewStudentEmail","saleNewStudentDob","saleNewStudentAddress","saleNewStudentStudentId"].forEach(id=>$(id).value="");
- $("saleNewStudentGender").value="";
- clearMsg($("saleNewStudentStatus"));
-}
-async function createStudentFromSaleForm(){
- const fullName=$("saleNewStudentName").value.trim();
- const fullNameKm=$("saleNewStudentNameKh").value.trim();
- const phone=$("saleNewStudentPhone").value.trim();
 
- if(!fullName||!fullNameKm||!phone){
-   msg($("saleNewStudentStatus"),"Full name, Khmer name and phone are required.",true);return null
- }
- if(!/^\d{7,}$/.test(phone)){
-   msg($("saleNewStudentStatus"),"Phone number must contain at least 7 digits.",true);return null
- }
-
- const studentId=await nextStudentId();
-
- // Student creation from List Sales is also information-only.
- // No course and no photo upload are performed here.
- const payload={
-   student_id:studentId,
-   full_name:fullName,
-   full_name_km:fullNameKm,
-   email:$("saleNewStudentEmail").value.trim(),
-   phone,
-   gender:$("saleNewStudentGender").value,
-   date_of_birth:$("saleNewStudentDob").value||null,
-   address:$("saleNewStudentAddress").value.trim(),
-   course:"",
-   photo_url:null,
-   status:"pending",
-   verified:false
- };
- const {data,error}=await sb.from("students").insert(payload).select().single();
- if(error)throw error;
- return data;
-}
-$("saveSaleNewStudent").onclick=async()=>{
- clearMsg($("saleNewStudentStatus"));
- $("saveSaleNewStudent").disabled=true;
- $("saveSaleNewStudent").textContent="Saving...";
- try{
-   const data=await createStudentFromSaleForm();
-   if(!data)return;
-
-   await loadStudents();
-   $("saleStudentSearch").value=data.full_name||"";
-   renderSaleStudentOptions();
-   $("saleStudentId").value=String(data.id);
-   $("saleStudentHint").textContent=`${data.full_name||"Student"} · ${data.student_id||"No ID"} · ${data.phone||"No phone"}`;
-
-   msg($("newSaleStatus"),`New student ${data.full_name||""} added and selected. Choose a Sales Course below.`);
-   resetSaleNewStudentForm();
-   $("saleStudentModal").classList.remove("show");
- }catch(e){
-   msg($("saleNewStudentStatus"),e.message||"Could not add student.",true)
- }finally{
-   $("saveSaleNewStudent").disabled=false;
-   $("saveSaleNewStudent").textContent="Save Student & Select"
- }
-};
-["saleDiscount","saleShipping","saleInitialPayment"].forEach(id=>$(id).addEventListener("input",updateSaleTotals));
-$("salesSearch").oninput=renderSales;$("salesPaymentFilter").onchange=renderSales;$("salesRefresh").onclick=loadSales;
-$("saveSale").onclick=async()=>{
- clearMsg($("newSaleStatus"));const studentId=$("saleStudentId").value,student=students.find(s=>String(s.id)===String(studentId)),items=getSaleItems(),saleDate=$("saleDate").value,reference=$("saleReference").value.trim()||nextSaleReference(),discount=Math.max(0,Number($("saleDiscount").value||0)),shipping=Math.max(0,Number($("saleShipping").value||0)),initialPayment=Math.max(0,Number($("saleInitialPayment").value||0)),subtotal=items.reduce((a,x)=>a+x.subtotal,0),grandTotal=Math.max(0,subtotal-discount+shipping);
- if(!student){msg($("newSaleStatus"),"Please select a student/customer.",true);return}if(!saleDate){msg($("newSaleStatus"),"Please select the sale date.",true);return}if(!items.length){msg($("newSaleStatus"),"Add at least one course or product.",true);return}if(initialPayment>grandTotal){msg($("newSaleStatus"),"Initial payment cannot be greater than the grand total.",true);return}
- $("saveSale").disabled=true;
- try{
-  const payload={reference_no:reference,sale_date:saleDate,student_id:String(student.id),student_name:student.full_name||"",student_phone:student.phone||"",subtotal,discount,shipping,grand_total:grandTotal,paid:initialPayment,balance:Math.max(0,grandTotal-initialPayment),payment_status:saleStatus(grandTotal,initialPayment),sale_status:"Completed",items,notes:$("saleNote").value.trim(),created_by:adminUser.id};
-  const {data,error}=await sb.from("medifella_sales").insert(payload).select().single();if(error)throw error;
-  if(initialPayment>0){const {error:pe}=await sb.from("medifella_sale_payments").insert({sale_id:String(data.id),amount:initialPayment,payment_method:$("salePaymentMethod").value,payment_date:saleDate,note:"Initial payment",created_by:adminUser.id});if(pe)throw pe}
-  msg($("newSaleStatus"),"Sale saved successfully.");$("saleForm").classList.add("hidden");await loadSales();
- }catch(e){msg($("newSaleStatus"),e.message||"Could not save sale.",true)}finally{$("saveSale").disabled=false}
-};
 function formatSaleItems(v){if(!v)return"—";try{const arr=typeof v==="string"?JSON.parse(v):v;if(Array.isArray(arr))return arr.map(x=>`${x.name} × ${x.quantity} (${money(x.subtotal)})`).join("; ")}catch(_){}return String(v)}
+function formatSaleItems(v){
+ if(!v)return"—";
+ try{
+   const arr=typeof v==="string"?JSON.parse(v):v;
+   if(Array.isArray(arr))return arr.map(x=>`${x.name} × ${x.quantity} (${money(x.subtotal)})`).join("; ");
+ }catch(_){}
+ return String(v);
+}
 function renderSales(){
  const q=$("salesSearch").value.trim().toLowerCase(),f=$("salesPaymentFilter").value;
- const rows=salesRecords.filter(s=>{const total=saleTotal(s),paid=salePaid(s),status=saleStatus(total,paid),hay=[saleRef(s),saleCustomer(s),saleField(s,["student_phone","phone"],""),formatSaleItems(saleItemsValue(s))].join(" ").toLowerCase();return(f==="all"||status===f)&&hay.includes(q)});
- $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid</th><th>Balance</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";return`<tr><td>${esc(String(saleDateValue(s)).slice(0,10))}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${esc(status)}</span></td><td><div class="actions"><button class="light" onclick="showSaleInvoice('${attr(s.id)}','A4')">Invoice A4</button><button class="light" onclick="showSaleInvoice('${attr(s.id)}','A5')">Invoice A5</button>${bal>0.005?`<button class="gold" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`}).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
+ const rows=salesRecords.filter(s=>{
+   const total=saleTotal(s),paid=salePaid(s),status=saleStatus(total,paid);
+   const hay=[saleRef(s),saleCustomer(s),saleField(s,["student_phone","phone"],""),formatSaleItems(saleItemsValue(s))].join(" ").toLowerCase();
+   return(f==="all"||status===f)&&hay.includes(q)
+ });
+ $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date / Time</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{
+   const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
+   const dt=saleDateValue(s),time=saleField(s,["sale_time","time"],"");
+   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${esc(status)}</span></td><td><div class="actions"><button class="light" onclick="showSaleInvoice('${attr(s.id)}','A4')">Invoice A4</button><button class="light" onclick="showSaleInvoice('${attr(s.id)}','A5')">Invoice A5</button>${bal>0.005?`<button class="gold" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`
+ }).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
  updateSalesMetrics();
 }
-function updateSalesMetrics(){const total=salesRecords.reduce((a,s)=>a+saleTotal(s),0),paid=salesRecords.reduce((a,s)=>a+salePaid(s),0);$("mSales").textContent=salesRecords.length;$("mSalesPaid").textContent=money(paid);$("mSalesBalance").textContent=money(Math.max(0,total-paid));$("mSalesDue").textContent=salesRecords.filter(s=>saleStatus(saleTotal(s),salePaid(s))!=="Paid").length}
+function updateSalesMetrics(){
+ const total=salesRecords.reduce((a,s)=>a+saleTotal(s),0),paid=salesRecords.reduce((a,s)=>a+salePaid(s),0);
+ $("mSales").textContent=salesRecords.length;$("mSalesPaid").textContent=money(paid);$("mSalesBalance").textContent=money(Math.max(0,total-paid));$("mSalesDue").textContent=salesRecords.filter(s=>saleStatus(saleTotal(s),salePaid(s))!=="Paid").length;
+}
 async function recordSalePayment(id){
- const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid),raw=prompt(`Balance for ${saleRef(s)} is ${money(balance)}.\nEnter payment amount:`,String(balance));if(raw===null)return;const amount=Number(raw);if(!Number.isFinite(amount)||amount<=0||amount>balance+0.005){alert("Enter a valid payment amount not greater than the balance.");return}const method=prompt("Payment method (Cash / ABA / Bank Transfer / Card / Other):","Cash")||"Cash";
- try{const{error:pe}=await sb.from("medifella_sale_payments").insert({sale_id:String(id),amount,payment_method:method,payment_date:new Date().toISOString().slice(0,10),created_by:adminUser.id});if(pe)throw pe;const newPaid=paid+amount;const{error:se}=await sb.from("medifella_sales").update({paid:newPaid,balance:Math.max(0,total-newPaid),payment_status:saleStatus(total,newPaid)}).eq("id",id);if(se)throw se;await loadSales()}catch(e){alert(e.message||"Could not record payment.")}
+ const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
+ const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
+ const raw=prompt(`Due for ${saleRef(s)} is ${money(balance)}.\nEnter additional payment amount:`,String(balance));
+ if(raw===null)return;
+ const amount=parseMoneyInput(raw);
+ if(!Number.isFinite(amount)||amount<=0||amount>balance+0.005){alert("Enter a valid payment amount not greater than the Due amount.");return}
+ const method=prompt("Payment method (Cash / ABA / Bank Transfer / Card / Other):","Cash")||"Cash";
+ try{
+   const paymentDate=new Date();
+   const{error:pe}=await sb.from("medifella_sale_payments").insert({
+     sale_id:String(id),amount,payment_method:method,
+     payment_date:paymentDate.toISOString().slice(0,10),
+     note:"Additional payment",created_by:adminUser.id
+   });
+   if(pe)throw pe;
+   const newPaid=paid+amount;
+   const{error:se}=await sb.from("medifella_sales").update({
+     paid:newPaid,balance:Math.max(0,total-newPaid),payment_status:saleStatus(total,newPaid)
+   }).eq("id",id);
+   if(se)throw se;
+   await loadSales();
+ }catch(e){alert(e.message||"Could not record payment.")}
 }
 function showSaleInvoice(id,size="A4"){
- const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);let items=[];try{items=typeof saleItemsValue(s)==="string"?JSON.parse(saleItemsValue(s)):saleItemsValue(s)||[]}catch(_){}
- $("invoicePrint").innerHTML=`<div style="font-size:12px"><div class="invoice-head"><div><div style="font-size:24px;font-weight:900;color:#075e66">MEDI FELLA</div><div>Beauty School</div><div class="muted">Sales Invoice</div></div><div style="text-align:right"><strong>INVOICE</strong><br>No: ${esc(saleRef(s))}<br>Date: ${esc(String(saleDateValue(s)).slice(0,10))}</div></div><div style="margin-top:15px"><strong>Customer / Student:</strong> ${esc(saleCustomer(s)||"—")}<br><strong>Phone:</strong> ${esc(saleField(s,["student_phone","phone"],"—"))}</div><table class="invoice-table"><thead><tr><th>#</th><th>Course / Product</th><th>Unit Price</th><th>Qty</th><th>Subtotal</th></tr></thead><tbody>${items.length?items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name||"")}</td><td>${money(x.unit_price)}</td><td>${esc(x.quantity)}</td><td>${money(x.subtotal)}</td></tr>`).join(""):`<tr><td>1</td><td colspan="4">${esc(formatSaleItems(saleItemsValue(s)))}</td></tr>`}</tbody></table><div style="margin-left:auto;width:330px;margin-top:15px"><div style="display:flex;justify-content:space-between"><span>Subtotal</span><strong>${money(saleField(s,["subtotal"],total))}</strong></div><div style="display:flex;justify-content:space-between"><span>Discount</span><strong>${money(saleField(s,["discount"],0))}</strong></div><div style="display:flex;justify-content:space-between"><span>Shipping</span><strong>${money(saleField(s,["shipping"],0))}</strong></div><hr><div style="display:flex;justify-content:space-between;font-size:18px"><span>Total</span><strong>${money(total)}</strong></div><div style="display:flex;justify-content:space-between"><span>Paid</span><strong>${money(paid)}</strong></div><div style="display:flex;justify-content:space-between"><span>Balance</span><strong>${money(balance)}</strong></div><div style="display:flex;justify-content:space-between"><span>Status</span><strong>${esc(saleStatus(total,paid))}</strong></div></div><div style="margin-top:50px;display:flex;justify-content:space-between"><span>Seller Signature</span><span>Buyer Signature</span></div><div class="invoice-actions"><button class="light" onclick="printInvoice('${size}')">Print / Save PDF (${size})</button><button class="danger" onclick="closeInvoice()">Close</button></div></div>`;
+ const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
+ const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
+ let items=[];try{items=typeof saleItemsValue(s)==="string"?JSON.parse(saleItemsValue(s)):saleItemsValue(s)||[]}catch(_){}
+ const dt=String(saleDateValue(s)||"").slice(0,10),time=saleField(s,["sale_time","time"],"");
+ $("invoicePrint").innerHTML=`<div style="font-size:12px"><div class="invoice-head"><div><div style="font-size:24px;font-weight:900;color:#075e66">MEDI FELLA</div><div>Beauty School</div><div class="muted">Sales Invoice</div></div><div style="text-align:right"><strong>INVOICE</strong><br>No: ${esc(saleRef(s))}<br>Date: ${esc(dt)}${time?`<br>Time: ${esc(String(time).slice(0,5))}`:""}</div></div><div style="margin-top:15px"><strong>Customer / Student:</strong> ${esc(saleCustomer(s)||"—")}<br><strong>Phone:</strong> ${esc(saleField(s,["student_phone","phone"],"—"))}</div><table class="invoice-table"><thead><tr><th>#</th><th>Course / Product</th><th>Qty</th><th>Unit Price</th><th>Discount</th><th>Subtotal</th></tr></thead><tbody>${items.length?items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name||"")}</td><td>${esc(x.quantity)}</td><td>${money(x.unit_price)}</td><td>${esc(x.discount_input||"")} (${money(x.discount_amount||0)})</td><td>${money(x.subtotal)}</td></tr>`).join(""):`<tr><td>1</td><td colspan="5">${esc(formatSaleItems(saleItemsValue(s)))}</td></tr>`}</tbody></table><div style="margin-left:auto;width:360px;margin-top:15px"><div style="display:flex;justify-content:space-between"><span>Gross Subtotal</span><strong>${money(saleField(s,["subtotal"],total)+Number(saleField(s,["discount"],0)))}</strong></div><div style="display:flex;justify-content:space-between"><span>Discount</span><strong>${money(saleField(s,["discount"],0))}</strong></div><div style="display:flex;justify-content:space-between"><span>Delivery Fee</span><strong>${money(saleField(s,["shipping","delivery_fee"],0))}</strong></div><hr><div style="display:flex;justify-content:space-between;font-size:18px"><span>Grand Total</span><strong>${money(total)}</strong></div><div style="display:flex;justify-content:space-between"><span>Paid Balance</span><strong>${money(paid)}</strong></div><div style="display:flex;justify-content:space-between"><span>Due</span><strong>${money(balance)}</strong></div><div style="display:flex;justify-content:space-between"><span>Status</span><strong>${esc(saleStatus(total,paid))}</strong></div></div><div style="margin-top:50px;display:flex;justify-content:space-between"><span>Seller Signature</span><span>Buyer Signature</span></div><div class="invoice-actions"><button class="light" onclick="printInvoice('${size}')">Print / Save PDF (${size})</button><button class="danger" onclick="closeInvoice()">Close</button></div></div>`;
  $("invoiceOverlay").classList.add("show");
 }
 function printInvoice(size){const style=document.createElement("style");style.id="invoicePrintSize";style.textContent=`@page{size:${size};margin:10mm}`;document.head.appendChild(style);window.print();setTimeout(()=>style.remove(),1000)}
@@ -1021,7 +1092,7 @@ function closeInvoice(){$("invoiceOverlay").classList.remove("show")}
 $("invoiceOverlay").onclick=e=>{if(e.target.id==="invoiceOverlay")closeInvoice()};
 function startSaleForStudent(studentId){
  document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
- const nav=document.querySelector('.nav[data-section="sales"]');if(nav)nav.classList.add("active");$("sales").classList.add("active");$("saleForm").classList.remove("hidden");renderSaleStudentOptions();resetSaleForm();$("saleStudent").value=String(studentId);$("saleForm").scrollIntoView({behavior:"smooth",block:"start"});
+ const nav=document.querySelector('.nav[data-section="sales"]');if(nav)nav.classList.add("active");$("sales").classList.add("active");$("saleForm").classList.remove("hidden");renderSaleStudentOptions();resetSaleForm();const student=students.find(s=>String(s.id)===String(studentId)); if(student){$("saleStudentSearch").value=student.full_name||"";$("saleStudentId").value=String(student.id);$("saleStudentHint").textContent=`Selected: ${student.full_name||"Student"} · ${student.student_id||"No ID"} · ${student.phone||"No phone"}`;}$("saleForm").scrollIntoView({behavior:"smooth",block:"start"});
 }
 
 async function loadCertificates(){
@@ -1543,44 +1614,79 @@ async function deleteCourse(id){
 function updateMetrics(){$("mStudents").textContent=students.length;$("mPending").textContent=students.filter(s=>String(s.status||"pending")==="pending").length;$("mVerifiedStudents").textContent=students.filter(s=>String(s.status)==="verified"||s.verified===true).length;$("mCourses").textContent=courses.length;$("mCertificates").textContent=certificates.length;updateSalesMetrics()}
 boot();
 
-// Sales Course/Product search box: no visible product selector.
-// Typing filters suggestions; an exact/unique match selects the course/product.
-// The existing "+ Add Course / Product" button remains unchanged.
-document.addEventListener("input", function(e){
-  const input=e.target.closest(".sale-course-search");
-  if(!input) return;
 
-  const row=input.closest(".sale-course-row, .sale-row, [data-sale-row]") || input.parentElement;
-  const list=document.getElementById("saleCourseSearchList");
-  const q=(input.value||"").trim().toLowerCase();
-
-  const items=(typeof courses!=="undefined" ? courses : []).filter(c=>{
-    const type=(c.course_type||c.type||"").toLowerCase();
-    return type==="sales" || type==="sale" || !type;
-  });
-
-  if(list){
-    list.innerHTML=items
-      .filter(c=>[c.name,c.title,c.course_name,c.product_name,c.code].join(" ").toLowerCase().includes(q))
-      .map(c=>`<option value="${String(c.name||c.title||c.course_name||c.product_name||"").replace(/"/g,"&quot;")}">${String(c.code||"")} · $${Number(c.price||c.unit_price||0).toFixed(2)}</option>`)
-      .join("");
-  }
-
-  const matches=items.filter(c=>[c.name,c.title,c.course_name,c.product_name,c.code].join(" ").toLowerCase().includes(q));
-
-  if(q && matches.length===1){
-    const c=matches[0];
-    const id=c.id||c.course_id||"";
-    const hidden=row?.querySelector(".sale-course-id");
-    if(hidden) hidden.value=String(id);
-
-    const price=row?.querySelector('input[name*="unit"], input.sale-unit-price, .sale-unit-price');
-    if(price && c.price!=null) price.value=c.price;
-  } else {
-    const hidden=row?.querySelector(".sale-course-id");
-    if(hidden) hidden.value="";
-  }
-});
 </script>
 </body>
-</html>
+</html$("saveSale").onclick=async()=>{
+ clearMsg($("newSaleStatus"));
+ const studentId=$("saleStudentId").value;
+ const student=students.find(s=>String(s.id)===String(studentId));
+ const items=getSaleItems();
+ const saleDateTime=$("saleDate").value;
+ const saleDate=saleDateForDb(saleDateTime);
+ const saleTime=saleTimeForDb(saleDateTime);
+ const reference=$("saleReference").value.trim()||nextSaleReference();
+ const discount=items.reduce((a,x)=>a+x.discount_amount,0);
+ const delivery=parseMoneyInput($("saleDeliveryFee").value);
+ const subtotal=items.reduce((a,x)=>a+x.subtotal,0);
+ const grandTotal=Math.max(0,subtotal+delivery);
+ const initialPayment=parseMoneyInput($("saleInitialPayment").value);
+ const partialPayment=parseMoneyInput($("salePartialPayment").value);
+ const paidBalance=Math.min(grandTotal,initialPayment+partialPayment);
+ const due=Math.max(0,grandTotal-paidBalance);
+
+ if(!student){msg($("newSaleStatus"),"Please select a student/customer by name, Student ID or phone.",true);return}
+ if(!saleDateTime){msg($("newSaleStatus"),"Please select the sale date and time.",true);return}
+ if(!items.length){msg($("newSaleStatus"),"Add at least one course or product.",true);return}
+ if(initialPayment+partialPayment>grandTotal+0.005){msg($("newSaleStatus"),"Initial Payment + Partial Payment cannot be greater than the Grand Total.",true);return}
+
+ $("saveSale").disabled=true;
+ try{
+  const payload={
+    reference_no:reference,
+    sale_date:saleDate,
+    student_id:String(student.id),
+    student_name:student.full_name||"",
+    student_phone:student.phone||"",
+    subtotal,
+    discount,
+    shipping:delivery,
+    grand_total:grandTotal,
+    paid:paidBalance,
+    balance:due,
+    payment_status:saleStatus(grandTotal,paidBalance),
+    sale_status:"Completed",
+    items,
+    notes:$("saleNote").value.trim(),
+    created_by:adminUser.id
+  };
+
+  // Keep the existing database compatible. If sale_time exists, save the exact time too.
+  let result=await sb.from("medifella_sales").insert({...payload,sale_time:saleTime}).select().single();
+  if(result.error && /sale_time|column .* does not exist/i.test(result.error.message||"")){
+    result=await sb.from("medifella_sales").insert(payload).select().single();
+  }
+  if(result.error)throw result.error;
+
+  const paymentRows=[];
+  if(initialPayment>0){
+    paymentRows.push({sale_id:String(result.data.id),amount:initialPayment,payment_method:$("salePaymentMethod").value,payment_date:saleDate,note:"Initial payment",created_by:adminUser.id});
+  }
+  if(partialPayment>0){
+    paymentRows.push({sale_id:String(result.data.id),amount:partialPayment,payment_method:$("salePaymentMethod").value,payment_date:saleDate,note:"Partial payment",created_by:adminUser.id});
+  }
+  if(paymentRows.length){
+    const {error:pe}=await sb.from("medifella_sale_payments").insert(paymentRows);
+    if(pe)throw pe;
+  }
+
+  msg($("newSaleStatus"),"Sale saved successfully.");
+  $("saleForm").classList.add("hidden");
+  await loadSales();
+ }catch(e){
+   msg($("newSaleStatus"),e.message||"Could not save sale.",true);
+ }finally{
+   $("saveSale").disabled=false;
+ }
+};
+>
