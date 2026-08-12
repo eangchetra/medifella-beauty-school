@@ -359,7 +359,29 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </select>
 <div class="muted" style="margin-top:5px">Online courses are for the public website. Sales courses are the courses staff can select when creating a sale.</div>
 <label>Course Name</label><input id="courseName"><label>Description</label><textarea id="courseDescription"></textarea>
-<div class="row"><div><label>Price</label><input id="coursePrice" type="number" min="0" step="0.01"></div><div><label>Duration</label><input id="courseDuration" placeholder="3 days / 1 month"></div></div>
+<div class="row">
+  <div>
+    <label>Price (USD)</label>
+    <div style="display:flex;align-items:center;gap:6px">
+      <span style="font-weight:700">$</span>
+      <input id="coursePrice" type="number" min="0" step="0.01" inputmode="decimal" placeholder="50.00">
+    </div>
+    <div class="muted" style="margin-top:4px">Example: 50, 500, 0.01, 125.50</div>
+  </div>
+  <div>
+    <label>Duration</label>
+    <div style="display:flex;gap:8px">
+      <input id="courseDurationValue" type="number" min="1" step="1" inputmode="numeric" placeholder="3" style="flex:1">
+      <select id="courseDurationUnit" style="flex:1">
+        <option value="day">Day</option>
+        <option value="month">Month</option>
+        <option value="year">Year</option>
+      </select>
+    </div>
+    <input id="courseDuration" type="hidden">
+    <div class="muted" style="margin-top:4px">Example: 3 Days, 1 Month, 2 Years</div>
+  </div>
+</div>
 <label>Course Image</label><input id="courseFile" type="file" accept="image/*">
 <label>Registration</label><select id="courseOpen"><option value="true">Open</option><option value="false">Closed</option></select>
 <div class="row" style="margin-top:14px"><button id="courseSave" class="gold">Save Course</button><button id="courseClear" class="light">Clear</button></div><div id="courseStatus"></div></div>
@@ -1443,7 +1465,9 @@ $("courseSave").onclick=async()=>{
  const name=$("courseName").value.trim();
  const description=$("courseDescription").value.trim();
  const price=Number($("coursePrice").value||0);
- const duration=$("courseDuration").value.trim();
+ const durationValue=$("courseDurationValue").value.trim();
+ const durationUnit=$("courseDurationUnit").value;
+ const duration=durationValue ? `${durationValue} ${durationUnit}${Number(durationValue)===1?"":"s"}` : "";
  const registration_open=$("courseOpen").value==="true";
  const file=$("courseFile").files[0];
  if(!name){msg($("courseStatus"),"Course name is required.",true);return}
@@ -1477,7 +1501,16 @@ function editCourse(id){
  $("courseName").value=c.name||"";
  $("courseDescription").value=c.description||"";
  $("coursePrice").value=c.price??"";
- $("courseDuration").value=c.duration||"";
+ const durationText=String(c.duration||"").trim();
+ const dm=durationText.match(/^(\d+(?:\.\d+)?)\s*(day|days|month|months|year|years)$/i);
+ if(dm){
+   $("courseDurationValue").value=dm[1];
+   $("courseDurationUnit").value=dm[2].toLowerCase().replace(/s$/,"");
+ }else{
+   $("courseDurationValue").value="";
+   $("courseDurationUnit").value="day";
+ }
+ $("courseDuration").value=durationText;
  $("courseOpen").value=String(c.registration_open!==false);
  $("courseFile").value="";
 }
@@ -1487,9 +1520,18 @@ function clearCourse(){
  $("courseName").value="";
  $("courseDescription").value="";
  $("coursePrice").value="";
+ $("courseDurationValue").value="";
+ $("courseDurationUnit").value="day";
  $("courseDuration").value="";
  $("courseOpen").value="true";
  $("courseFile").value=""
+}
+$("courseDurationValue").oninput=syncCourseDuration;
+$("courseDurationUnit").onchange=syncCourseDuration;
+function syncCourseDuration(){
+ const v=$("courseDurationValue").value.trim();
+ const u=$("courseDurationUnit").value;
+ $("courseDuration").value=v ? `${v} ${u}${Number(v)===1?"":"s"}` : "";
 }
 $("courseClear").onclick=clearCourse;
 async function deleteCourse(id){
