@@ -247,7 +247,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <label>Course / Product *</label>
 <div id="saleItems"></div>
 <button id="addSaleItem" class="light" type="button">+ Add Course / Product</button>
-<div class="muted" style="margin-top:6px">Courses come from Course Management. Select a course to automatically use its current price. Choose Other Product / Service for an item not in the course list.</div>
+<div class="muted" style="margin-top:6px">Choose a course from the existing Course Management list. The current course price is filled automatically. You can add multiple courses, or choose Other Product / Service for something outside the course list.</div>
 <div class="row" style="margin-top:14px">
 <div><label>Discount</label><input id="saleDiscount" type="number" min="0" step="0.01" value="0"></div>
 <div><label>Shipping</label><input id="saleShipping" type="number" min="0" step="0.01" value="0"></div>
@@ -944,14 +944,34 @@ async function createStudentFromSaleForm(){
 $("saveSaleNewStudent").onclick=async()=>{
  clearMsg($("saleNewStudentStatus"));$("saveSaleNewStudent").disabled=true;$("saveSaleNewStudent").textContent="Saving...";
  try{
+   const selectedCourseId=$("saleNewStudentCourse").value;
    const data=await createStudentFromSaleForm();
    if(!data)return;
-   await loadStudents();renderSaleStudentOptions();
+
+   // Refresh the main student list and immediately select the new student in this sale.
+   await loadStudents();
    $("saleStudentSearch").value=data.full_name||"";
-   renderSaleStudentOptions();$("saleStudent").value=String(data.id);
+   renderSaleStudentOptions();
+   $("saleStudent").value=String(data.id);
    $("saleStudentHint").textContent=`${data.full_name||"Student"} · ${data.student_id||"No ID"} · ${data.phone||"No phone"}`;
-   msg($("newSaleStatus"),`New student ${data.full_name||""} added and selected.`);
-   resetSaleNewStudentForm();$("saleStudentModal").classList.remove("show");
+
+   // If a course was selected while creating the student, use that same
+   // existing Course Management item in the sale automatically.
+   if(selectedCourseId){
+     const selectedCourse=courses.find(c=>String(c.id)===String(selectedCourseId));
+     if(selectedCourse && !getSaleItems().length){
+       $("saleItems").innerHTML="";
+       addSaleItemRow(selectedCourse.name,Number(selectedCourse.price||0),1,selectedCourse.id);
+       msg($("newSaleStatus"),`${data.full_name||"Student"} added, selected, and ${selectedCourse.name} was added to the sale.`);
+     }else{
+       msg($("newSaleStatus"),`New student ${data.full_name||""} added and selected.`);
+     }
+   }else{
+     msg($("newSaleStatus"),`New student ${data.full_name||""} added and selected.`);
+   }
+
+   resetSaleNewStudentForm();
+   $("saleStudentModal").classList.remove("show");
  }catch(e){msg($("saleNewStudentStatus"),e.message||"Could not add student.",true)}
  finally{$("saveSaleNewStudent").disabled=false;$("saveSaleNewStudent").textContent="Save Student & Select"}
 };
