@@ -158,16 +158,21 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     <div class="row">
       <div>
         <label>Course *</label>
-        <input id="newStudentCourse" type="text" placeholder="Course name" required>
+        <select id="newStudentCourse" required>
+          <option value="">Select course</option>
+        </select>
+        <div class="muted" style="margin-top:5px">Courses and prices come from Course Management.</div>
       </div>
       <div>
         <label>Student ID</label>
-        <input id="newStudentStudentId" type="text" placeholder="Auto-generate if blank">
+        <input id="newStudentStudentId" type="text" placeholder="Automatically generated" readonly>
+        <div class="muted" style="margin-top:5px">Student ID is generated automatically. No need to fill it.</div>
       </div>
     </div>
 
-    <label>Profile Photo (4×6 certificate photo, white background) *</label>
-    <input id="newStudentPhoto" type="file" accept="image/jpeg,image/png,image/webp" required>
+    <label>Profile Photo (4×6 certificate photo, white background) <span class="muted">(Optional)</span></label>
+    <input id="newStudentPhoto" type="file" accept="image/jpeg,image/png,image/webp">
+    <div class="muted" style="margin-top:5px">You can register the student without a photo. The student or admin can upload the photo later.</div>
     <div id="newStudentPhotoPreview" class="muted" style="margin-top:8px"></div>
 
     <div class="row" style="margin-top:14px">
@@ -283,11 +288,13 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     </div>
     <div class="row">
       <div><label>Course</label><select id="saleNewStudentCourse"><option value="">Select course</option></select></div>
-      <div><label>Student ID</label><input id="saleNewStudentStudentId" placeholder="Auto-generate if blank"></div>
+      <div><label>Student ID</label><input id="saleNewStudentStudentId" placeholder="Automatically generated" readonly></div>
     </div>
+    <div class="muted" style="margin-top:-4px">Course list and prices come from Course Management. The selected course will also be added to the sale automatically.</div>
     <label>Address</label><textarea id="saleNewStudentAddress" rows="2"></textarea>
-    <label>Profile Photo (4×6 certificate photo) *</label>
-    <input id="saleNewStudentPhoto" type="file" accept="image/jpeg,image/png,image/webp" required>
+    <label>Profile Photo (4×6 certificate photo) <span class="muted">(Optional)</span></label>
+    <input id="saleNewStudentPhoto" type="file" accept="image/jpeg,image/png,image/webp">
+    <div class="muted" style="margin-top:5px">You can save the student without a photo and upload it later.</div>
     <div id="saleNewStudentPhotoPreview" class="muted" style="margin-top:8px"></div>
     <div id="saleNewStudentStatus"></div>
     <div class="row" style="margin-top:14px">
@@ -625,14 +632,26 @@ function editStudent(id){
  $("studentEditCard").classList.remove("hidden");
  $("studentEditCard").scrollIntoView({behavior:"smooth",block:"start"});
 }
+function renderStudentRegistrationCourseOptions(){
+  const el=$("newStudentCourse");
+  if(!el)return;
+  const current=el.value||"";
+  const openCourses=courses.filter(c=>c.registration_open!==false);
+  el.innerHTML='<option value="">Select course</option>'
+    +openCourses.map(c=>`<option value="${attr(c.id)}">${esc(c.name)} · ${money(c.price)}</option>`).join("");
+  if(current && openCourses.some(c=>String(c.id)===String(current))) el.value=current;
+}
 function resetNewStudentForm(){
-  ["newStudentName","newStudentNameKh","newStudentPhone","newStudentEmail","newStudentDob","newStudentAddress","newStudentCourse","newStudentStudentId"].forEach(id=>$(id).value="");
+  ["newStudentName","newStudentNameKh","newStudentPhone","newStudentEmail","newStudentDob","newStudentAddress","newStudentStudentId"].forEach(id=>$(id).value="");
+  $("newStudentCourse").value="";
   $("newStudentGender").value="";
   $("newStudentPhoto").value="";
   $("newStudentPhotoPreview").innerHTML="";
   clearMsg($("newStudentStatus"));
+  renderStudentRegistrationCourseOptions();
 }
 $("toggleStudentRegister").onclick=()=>{
+  renderStudentRegistrationCourseOptions();
   $("studentRegisterCard").classList.toggle("hidden");
   if(!$("studentRegisterCard").classList.contains("hidden")){
     $("newStudentName").focus();
@@ -670,35 +689,38 @@ $("saveNewStudent").onclick=async()=>{
   const fullName=$("newStudentName").value.trim();
   const fullNameKm=$("newStudentNameKh").value.trim();
   const phone=$("newStudentPhone").value.trim();
-  const course=$("newStudentCourse").value.trim();
+  const courseId=$("newStudentCourse").value;
+  const selectedCourse=courses.find(c=>String(c.id)===String(courseId));
+  const course=selectedCourse?.name||"";
   const photoFile=$("newStudentPhoto").files[0];
 
-  if(!fullName||!fullNameKm||!phone||!course){
-    msg($("newStudentStatus"),"Please fill all required fields.",true);return;
+  if(!fullName||!fullNameKm||!phone||!courseId||!selectedCourse){
+    msg($("newStudentStatus"),"Please fill all required fields and select a course.",true);return;
   }
   if(!/^\d{7,}$/.test(phone)){
     msg($("newStudentStatus"),"Phone number must contain at least 7 digits (for example 086454353).",true);return;
   }
-  if(!photoFile){
-    msg($("newStudentStatus"),"Please select the student's 4×6 certificate photo.",true);return;
-  }
-  if(!["image/jpeg","image/png","image/webp"].includes(photoFile.type)){
+  if(photoFile && !["image/jpeg","image/png","image/webp"].includes(photoFile.type)){
     msg($("newStudentStatus"),"Student photo must be JPG, PNG, or WEBP.",true);return;
   }
 
   $("saveNewStudent").disabled=true;
   try{
-    const studentId=$("newStudentStudentId").value.trim()||await nextStudentId();
-    const ext=photoFile.type==="image/png"?"png":photoFile.type==="image/webp"?"webp":"jpg";
-    const safeId=studentId.replace(/[^a-z0-9_-]/gi,"-");
-    const path=`${adminUser.id}/students/${safeId}.${ext}`;
+    const studentId=await nextStudentId();
+    let photoUrl=null;
 
-    const up=await sb.storage.from("student-photos").upload(path,photoFile,{
-      upsert:true,contentType:photoFile.type
-    });
-    if(up.error)throw up.error;
+    // Photo is optional. Do not touch Supabase Storage when no photo is selected.
+    if(photoFile){
+      const ext=photoFile.type==="image/png"?"png":photoFile.type==="image/webp"?"webp":"jpg";
+      const safeId=studentId.replace(/[^a-z0-9_-]/gi,"-");
+      const path=`${adminUser.id}/students/${safeId}.${ext}`;
+      const up=await sb.storage.from("student-photos").upload(path,photoFile,{
+        upsert:true,contentType:photoFile.type
+      });
+      if(up.error)throw up.error;
+      photoUrl=sb.storage.from("student-photos").getPublicUrl(path).data.publicUrl;
+    }
 
-    const photoUrl=sb.storage.from("student-photos").getPublicUrl(path).data.publicUrl;
     const payload={
       student_id:studentId,
       full_name:fullName,
@@ -919,15 +941,18 @@ async function createStudentFromSaleForm(){
  const fullName=$("saleNewStudentName").value.trim(),fullNameKm=$("saleNewStudentNameKh").value.trim(),phone=$("saleNewStudentPhone").value.trim(),photoFile=$("saleNewStudentPhoto").files[0];
  if(!fullName||!fullNameKm||!phone){msg($("saleNewStudentStatus"),"Full name, Khmer name and phone are required.",true);return null}
  if(!/^\d{7,}$/.test(phone)){msg($("saleNewStudentStatus"),"Phone number must contain at least 7 digits.",true);return null}
- if(!photoFile){msg($("saleNewStudentStatus"),"Please select the student's 4×6 certificate photo.",true);return null}
- if(!["image/jpeg","image/png","image/webp"].includes(photoFile.type)){msg($("saleNewStudentStatus"),"Student photo must be JPG, PNG, or WEBP.",true);return null}
- const studentId=$("saleNewStudentStudentId").value.trim()||await nextStudentId();
- const ext=photoFile.type==="image/png"?"png":photoFile.type==="image/webp"?"webp":"jpg";
- const safeId=studentId.replace(/[^a-z0-9_-]/gi,"-");
- const path=`${adminUser.id}/students/${safeId}.${ext}`;
- const up=await sb.storage.from("student-photos").upload(path,photoFile,{upsert:true,contentType:photoFile.type});
- if(up.error)throw up.error;
- const photoUrl=sb.storage.from("student-photos").getPublicUrl(path).data.publicUrl;
+ if(photoFile && !["image/jpeg","image/png","image/webp"].includes(photoFile.type)){msg($("saleNewStudentStatus"),"Student photo must be JPG, PNG, or WEBP.",true);return null}
+ const studentId=await nextStudentId();
+ let photoUrl=null;
+ // Photo is optional. Do not call the missing student-photos bucket when no photo is selected.
+ if(photoFile){
+   const ext=photoFile.type==="image/png"?"png":photoFile.type==="image/webp"?"webp":"jpg";
+   const safeId=studentId.replace(/[^a-z0-9_-]/gi,"-");
+   const path=`${adminUser.id}/students/${safeId}.${ext}`;
+   const up=await sb.storage.from("student-photos").upload(path,photoFile,{upsert:true,contentType:photoFile.type});
+   if(up.error)throw up.error;
+   photoUrl=sb.storage.from("student-photos").getPublicUrl(path).data.publicUrl;
+ }
  const courseId=$("saleNewStudentCourse").value;
  const course=courses.find(c=>String(c.id)===String(courseId));
  const courseName=course?.name||"";
@@ -1427,7 +1452,12 @@ async function togglePost(id,published){const{error}=await sb.from("posts").upda
 async function deletePost(id){if(!confirm("Delete this post?"))return;const{error}=await sb.from("posts").delete().eq("id",id);if(error)alert(error.message);else loadPosts()}
 
 async function loadCourses(){
- const{data,error}=await sb.from("courses").select("*").order("created_at",{ascending:false});if(error){$("courseList").textContent=error.message;return}courses=data||[];renderCourses();renderSaleStudentOptions();
+ const{data,error}=await sb.from("courses").select("*").order("created_at",{ascending:false});
+ if(error){$("courseList").textContent=error.message;return}
+ courses=data||[];
+ renderCourses();
+ renderStudentRegistrationCourseOptions();
+ renderSaleStudentOptions();
 }
 function renderCourses(){$("courseList").innerHTML=courses.map(c=>`<div class="post"><strong>${esc(c.name)}</strong><div>${esc(c.description||"")}</div><div class="muted">$${Number(c.price||0).toFixed(2)} · ${esc(c.duration||"")} · <span class="badge ${c.registration_open?"open":"closed"}">${c.registration_open?"Open":"Closed"}</span></div><div class="actions"><button class="light" onclick="editCourse('${attr(c.id)}')">Edit</button><button class="danger" onclick="deleteCourse('${attr(c.id)}')">Delete</button></div></div>`).join("")||'<p class="muted">No courses yet.</p>'}
 $("courseSave").onclick=async()=>{
