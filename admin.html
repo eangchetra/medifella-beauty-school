@@ -208,7 +208,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
 <label>Certificate Photo</label>
 <input id="certFile" type="file" accept="image/jpeg,image/png,image/webp">
-<div class="muted" style="margin-top:5px">Optional for now. Existing certificates can keep their current photo path; new uploads are saved in Supabase Storage.</div>
+<div class="muted" style="margin-top:5px">Optional. Existing certificate photos are kept. New certificate photos are uploaded to Cloudflare Storage.</div>
 
 <button id="certCreate" class="gold" style="margin-top:14px">Save Certificate</button>
 <div id="certStatus"></div>
@@ -313,6 +313,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <script>
 const SUPABASE_URL="https://dwrpriwxbjgxpsvhclai.supabase.co";
 const SUPABASE_ANON_KEY="sb_publishable_gwLGNpQg4mo-Ae_OvlGiMQ_rZVx7S3I";
+const CLOUDFLARE_STORAGE_URL="https://medi-fella-storage.eang-chetraafs.workers.dev";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
 const $=id=>document.getElementById(id);
 function msg(el,text,error=false){el.className="status"+(error?" error":"");el.textContent=text}
@@ -752,6 +753,35 @@ async function deleteCert(certificateId){
  else{await loadCertificates();updateMetrics()}
 }
 
+async function uploadCertificatePhotoToCloudflare(file, certificateId){
+  if(!file) return null;
+
+  const ext=file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg";
+  const safeNo=String(certificateId).replace(/[^a-z0-9_-]/gi,"-");
+  const path=`certificates/${adminUser.id}/${safeNo}.${ext}`;
+  const uploadUrl=`${CLOUDFLARE_STORAGE_URL}/${path}`;
+
+  const response=await fetch(uploadUrl,{
+    method:"PUT",
+    headers:{
+      "Content-Type":file.type || "application/octet-stream"
+    },
+    body:file
+  });
+
+  const result=await response.json().catch(()=>null);
+
+  if(!response.ok){
+    throw new Error(result?.error || `Cloudflare Storage upload failed (${response.status}).`);
+  }
+
+  if(result && result.success===false){
+    throw new Error(result.error || "Cloudflare Storage upload failed.");
+  }
+
+  return uploadUrl;
+}
+
 $("certCreate").onclick=async()=>{
  clearMsg($("certStatus"));
 
@@ -788,8 +818,6 @@ $("certCreate").onclick=async()=>{
  $("certCreate").disabled=true;
  $("certCreate").textContent="Saving...";
 
- let uploadedPath=null;
-
  try{
    const{data:existingRows,error:findError}=await sb
      .from("certificates")
@@ -801,20 +829,9 @@ $("certCreate").onclick=async()=>{
 
    let photo=null;
 
-   // Only upload a new photo when the admin selected one.
+   // Upload new certificate photos to Cloudflare Storage.
    if(file){
-     const ext=file.type==="image/png"?"png":file.type==="image/webp"?"webp":"jpg";
-     const safeNo=no.replace(/[^a-z0-9_-]/gi,"-");
-     const path=`${adminUser.id}/${safeNo}.${ext}`;
-     uploadedPath=path;
-
-     const up=await sb.storage.from("certificates").upload(path,file,{
-       upsert:true,
-       contentType:file.type
-     });
-     if(up.error)throw up.error;
-
-     photo=sb.storage.from("certificates").getPublicUrl(path).data.publicUrl;
+     photo=await uploadCertificatePhotoToCloudflare(file,no);
    }else if(existingRows && existingRows.length){
      const{data:oldRow,error:oldError}=await sb
        .from("certificates")
@@ -846,7 +863,6 @@ $("certCreate").onclick=async()=>{
    }
 
    if(result.error){
-     if(uploadedPath)await sb.storage.from("certificates").remove([uploadedPath]).catch(()=>{});
      throw result.error;
    }
 
