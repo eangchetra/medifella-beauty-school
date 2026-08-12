@@ -374,7 +374,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <section id="sales" class="section">
 <h1>Add Sale</h1>
 
-<div class="card sale-form-shell">
+<div id="saleForm" class="card sale-form-shell">
   <div class="sale-header-grid">
     <div>
       <label>Customer / Student *</label>
@@ -800,6 +800,10 @@ function applyAccountPermissions(){
  $("adminRole").innerHTML=role==="admin"
    ? '<span class="badge verified">Administrator</span>'
    : '<span class="badge pending">Staff</span>';
+ if($("saleForm") && !$("saleForm").classList.contains("hidden")){
+   updateSaleDateTimeDisplay();
+   $("saleReference").value=nextSaleReference();
+ }
 }
 
 async function getAccount(){
@@ -860,7 +864,18 @@ $("forgotBtn").onclick=async()=>{
  }catch(e){msg($("loginStatus"),e.message||"Could not send the reset email.",true)}
 };
 $("logoutBtn").onclick=async()=>{await sb.auth.signOut();location.reload()};
-document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));b.classList.add("active");document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));$(b.dataset.section).classList.add("active")});
+document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{
+ document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
+ b.classList.add("active");
+ document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
+ $(b.dataset.section).classList.add("active");
+ if(b.dataset.section==="sales"){
+   $("saleForm").classList.remove("hidden");
+   resetSaleForm();
+   updateSaleDateTimeDisplay();
+   $("saleReference").value=nextSaleReference();
+ }
+});
 
 
 sb.auth.onAuthStateChange(async (event)=>{
@@ -1074,7 +1089,10 @@ function formatPhnomPenhDisplay(){
 function updateSaleDateTimeDisplay(){
  const localValue=formatDateTimeLocalValue();
  if($("saleDate"))$("saleDate").value=localValue;
- if($("saleDateDisplay"))$("saleDateDisplay").value=formatPhnomPenhDisplay();
+ if($("saleDateDisplay")){
+   const d=localValue.replace("T"," ");
+   $("saleDateDisplay").value=d.slice(0,19);
+ }
  return localValue;
 }
 
@@ -1082,13 +1100,13 @@ function formatDateTimeLocalValue(){
  const parts=new Intl.DateTimeFormat("en-CA",{
    timeZone:"Asia/Phnom_Penh",
    year:"numeric",month:"2-digit",day:"2-digit",
-   hour:"2-digit",minute:"2-digit",hourCycle:"h23"
+   hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"
  }).formatToParts(new Date());
  const get=type=>parts.find(p=>p.type===type)?.value||"00";
- return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}`;
+ return `${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`;
 }
 function saleDateForDb(v){const d=String(v||"");return d?d.slice(0,10):""}
-function saleTimeForDb(v){const d=String(v||"");return d.length>=16?d.slice(11,16):""}
+function saleTimeForDb(v){const d=String(v||"");return d.length>=19?d.slice(11,19):(d.length>=16?d.slice(11,16):"")}
 
 async function loadSales(){
  const [sr,pr]=await Promise.all([
@@ -1147,7 +1165,11 @@ function selectSaleStudentByInput(){
 }
 
 function nextSaleReference(){
- const d=new Date(),prefix=`SALE-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-`;
+ const parts=new Intl.DateTimeFormat("en-CA",{
+   timeZone:"Asia/Phnom_Penh",year:"numeric",month:"2-digit",day:"2-digit"
+ }).formatToParts(new Date());
+ const get=type=>parts.find(p=>p.type===type)?.value||"00";
+ const prefix=`SALE-${get("year")}${get("month")}${get("day")}-`;
  let max=0;
  salesRecords.forEach(s=>{const m=saleRef(s).match(new RegExp("^"+prefix+"(\\d+)$"));if(m)max=Math.max(max,Number(m[1]))});
  return prefix+String(max+1).padStart(3,"0");
