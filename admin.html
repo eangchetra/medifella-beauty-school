@@ -69,21 +69,32 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
 <section id="students" class="section">
 <h1>Student Registration</h1><div class="card">
-<div class="toolbar"><input id="studentSearch" placeholder="Search name, email, phone, course, ID"><select id="studentFilter"><option value="all">All</option><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option></select><button id="studentRefresh" class="light">Refresh</button></div>
+<div class="toolbar"><input id="studentSearch" placeholder="Search name, Khmer name, email, phone, course, ID"><select id="studentFilter"><option value="all">All</option><option value="pending">Pending</option><option value="verified">Verified</option><option value="rejected">Rejected</option></select><button id="studentRefresh" class="light">Refresh</button></div>
 <div id="studentStatus"></div>
 <div id="studentList">Loading...</div>
 <div id="studentEditCard" class="card hidden" style="margin-top:18px">
 <h2>Edit Student</h2>
 <input type="hidden" id="editStudentId">
 <div class="row">
-<div><label>Full Name</label><input id="editStudentName"></div>
-<div><label>Email</label><input id="editStudentEmail" type="email"></div>
+<div><label>Full Name (English)</label><input id="editStudentName"></div>
+<div><label>Full Name (Khmer)</label><input id="editStudentNameKh"></div>
 </div>
 <div class="row">
+<div><label>Email</label><input id="editStudentEmail" type="email"></div>
 <div><label>Phone</label><input id="editStudentPhone"></div>
-<div><label>Course</label><input id="editStudentCourse"></div>
 </div>
-<label>Student ID</label><input id="editStudentStudentId">
+<div class="row">
+<div><label>Gender</label><select id="editStudentGender"><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
+<div><label>Date of Birth</label><input id="editStudentDob" type="date"></div>
+</div>
+<div class="row">
+<div><label>Course</label><input id="editStudentCourse"></div>
+<div><label>Student ID</label><input id="editStudentStudentId"></div>
+</div>
+<label>Address</label><textarea id="editStudentAddress" style="min-height:80px"></textarea>
+<label>Student Photo</label>
+<input id="editStudentPhoto" type="file" accept="image/jpeg,image/png,image/webp">
+<div id="editStudentPhotoPreview" class="muted" style="margin-top:8px"></div>
 <div class="row" style="margin-top:14px">
 <button id="saveStudentEdit" class="gold">Save Changes</button>
 <button id="cancelStudentEdit" class="light">Cancel</button>
@@ -378,9 +389,23 @@ async function loadStudents(){
 }
 function renderStudents(){
  const q=$("studentSearch").value.trim().toLowerCase(),f=$("studentFilter").value;
- const rows=students.filter(s=>{const st=String(s.status||"pending").toLowerCase();const hay=[s.full_name,s.email,s.phone,s.course,s.student_id].join(" ").toLowerCase();return(f==="all"||st===f)&&hay.includes(q)});
- $("studentList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Name</th><th>Email</th><th>Course</th><th>Status</th><th>Action</th></tr>${rows.map(s=>`<tr><td>${esc(s.full_name)}</td><td>${esc(s.email)}</td><td>${esc(s.course)}</td><td><span class="badge ${esc(s.status||"pending")}">${esc(s.status||"pending")}</span></td><td><div class="actions"><button class="gold" onclick="setStudent('${attr(s.id)}','verified')">Approve</button><button class="light" onclick="setStudent('${attr(s.id)}','pending')">Pending</button><button class="danger" onclick="setStudent('${attr(s.id)}','rejected')">Reject</button><button class="light" onclick="editStudent('${attr(s.id)}')">Edit</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No students found.</p>';
- $("recentStudents").innerHTML=students.slice(0,5).map(s=>`<div class="post"><strong>${esc(s.full_name||"Unnamed")}</strong><div class="muted">${esc(s.email||"")} · ${esc(s.status||"pending")}</div></div>`).join("")||'<p class="muted">No students.</p>';
+ const rows=students.filter(s=>{
+   const st=String(s.status||"pending").toLowerCase();
+   const hay=[s.full_name,s.full_name_km,s.email,s.phone,s.course,s.student_id,s.gender,s.address].join(" ").toLowerCase();
+   return(f==="all"||st===f)&&hay.includes(q)
+ });
+ $("studentList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Photo</th><th>Name</th><th>Khmer Name</th><th>Phone</th><th>Gender</th><th>DOB</th><th>Course</th><th>Status</th><th>Action</th></tr>${rows.map(s=>`<tr>
+<td>${s.photo_url?`<img src="${attr(s.photo_url)}" alt="" style="width:48px;height:48px;object-fit:cover;border-radius:8px">`:"—"}</td>
+<td><strong>${esc(s.full_name)}</strong><div class="muted">${esc(s.student_id||"")}</div></td>
+<td>${esc(s.full_name_km||"—")}</td>
+<td>${esc(s.phone||"—")}</td>
+<td>${esc(s.gender||"—")}</td>
+<td>${esc(s.date_of_birth||"—")}</td>
+<td>${esc(s.course||"—")}</td>
+<td><span class="badge ${esc(s.status||"pending")}">${esc(s.status||"pending")}</span></td>
+<td><div class="actions"><button class="gold" onclick="setStudent('${attr(s.id)}','verified')">Approve</button><button class="light" onclick="setStudent('${attr(s.id)}','pending')">Pending</button><button class="danger" onclick="setStudent('${attr(s.id)}','rejected')">Reject</button><button class="light" onclick="editStudent('${attr(s.id)}')">Edit</button></div></td>
+</tr>`).join("")}</table></div>`:'<p class="muted">No students found.</p>';
+ $("recentStudents").innerHTML=students.slice(0,5).map(s=>`<div class="post"><strong>${esc(s.full_name||"Unnamed")}</strong>${s.full_name_km?`<div>${esc(s.full_name_km)}</div>`:""}<div class="muted">${esc(s.email||"")} · ${esc(s.phone||"")} · ${esc(s.status||"pending")}</div></div>`).join("")||'<p class="muted">No students.</p>';
 }
 $("studentSearch").oninput=renderStudents;$("studentFilter").onchange=renderStudents;$("studentRefresh").onclick=loadStudents;
 async function setStudent(id,status){const{error}=await sb.from("students").update({status,verified:status==="verified"}).eq("id",id);if(error)msg($("studentStatus"),error.message,true);else{msg($("studentStatus"),"Student updated.");await loadStudents();updateMetrics()}}
@@ -389,10 +414,18 @@ function editStudent(id){
  if(!s)return;
  $("editStudentId").value=s.id||"";
  $("editStudentName").value=s.full_name||"";
+ $("editStudentNameKh").value=s.full_name_km||"";
  $("editStudentEmail").value=s.email||"";
  $("editStudentPhone").value=s.phone||"";
+ $("editStudentGender").value=s.gender||"";
+ $("editStudentDob").value=s.date_of_birth||"";
  $("editStudentCourse").value=s.course||"";
  $("editStudentStudentId").value=s.student_id||"";
+ $("editStudentAddress").value=s.address||"";
+ $("editStudentPhoto").value="";
+ $("editStudentPhotoPreview").innerHTML=s.photo_url
+   ? `<div>Current photo:</div><img src="${attr(s.photo_url)}" alt="" style="width:90px;height:90px;object-fit:cover;border-radius:10px;margin-top:6px">`
+   : "No student photo uploaded.";
  clearMsg($("editStudentStatus"));
  $("studentEditCard").classList.remove("hidden");
  $("studentEditCard").scrollIntoView({behavior:"smooth",block:"start"});
@@ -402,19 +435,42 @@ $("saveStudentEdit").onclick=async()=>{
  clearMsg($("editStudentStatus"));
  const id=$("editStudentId").value;
  if(!id){msg($("editStudentStatus"),"No student selected.",true);return}
+ const photoFile=$("editStudentPhoto").files[0];
  const payload={
    full_name:$("editStudentName").value.trim(),
+   full_name_km:$("editStudentNameKh").value.trim(),
    email:$("editStudentEmail").value.trim(),
    phone:$("editStudentPhone").value.trim(),
+   gender:$("editStudentGender").value,
+   date_of_birth:$("editStudentDob").value||null,
    course:$("editStudentCourse").value.trim(),
-   student_id:$("editStudentStudentId").value.trim()
+   student_id:$("editStudentStudentId").value.trim(),
+   address:$("editStudentAddress").value.trim()
  };
+ if(photoFile && !["image/jpeg","image/png","image/webp"].includes(photoFile.type)){
+   msg($("editStudentStatus"),"Student photo must be JPG, PNG, or WEBP.",true);return;
+ }
  $("saveStudentEdit").disabled=true;
  try{
+   if(photoFile){
+     const ext=photoFile.type==="image/png"?"png":photoFile.type==="image/webp"?"webp":"jpg";
+     const safeId=String(payload.student_id||id).replace(/[^a-z0-9_-]/gi,"-");
+     const path=`${adminUser.id}/students/${safeId}.${ext}`;
+     const up=await sb.storage.from("student-photos").upload(path,photoFile,{upsert:true,contentType:photoFile.type});
+     if(up.error)throw up.error;
+     payload.photo_url=sb.storage.from("student-photos").getPublicUrl(path).data.publicUrl;
+   }
    const {error}=await sb.from("students").update(payload).eq("id",id);
    if(error)throw error;
    msg($("editStudentStatus"),"Student information updated.");
    await loadStudents();
+   const updated=students.find(x=>String(x.id)===String(id));
+   if(updated){
+     $("editStudentPhoto").value="";
+     $("editStudentPhotoPreview").innerHTML=updated.photo_url
+       ? `<div>Current photo:</div><img src="${attr(updated.photo_url)}" alt="" style="width:90px;height:90px;object-fit:cover;border-radius:10px;margin-top:6px">`
+       : "No student photo uploaded.";
+   }
  }catch(e){msg($("editStudentStatus"),e.message||"Could not update student.",true)}
  finally{$("saveStudentEdit").disabled=false}
 };
