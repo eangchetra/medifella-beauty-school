@@ -24,6 +24,29 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .account-row{display:flex;justify-content:space-between;gap:12px;align-items:center}
 .account-actions{display:flex;gap:6px;flex-wrap:wrap}
 @media(max-width:650px){.account-row{display:block}.account-actions{margin-top:8px}}
+
+.sales-summary{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:15px}
+.sales-summary .card{padding:14px}
+.sales-item{display:grid;grid-template-columns:2fr 100px 120px 130px 40px;gap:8px;align-items:end;margin-bottom:8px}
+.sale-total{display:flex;justify-content:flex-end;gap:28px;font-size:15px;margin-top:12px}
+.sale-total strong{font-size:20px;color:var(--teal)}
+.invoice-overlay{position:fixed;inset:0;background:#0008;z-index:20;display:none;overflow:auto;padding:24px}
+.invoice-overlay.show{display:block}
+.invoice-box{background:#fff;max-width:900px;margin:0 auto;padding:28px;color:#222}
+.invoice-head{display:flex;justify-content:space-between;gap:20px;border-bottom:2px solid #ddd;padding-bottom:15px}
+.invoice-table{width:100%;border-collapse:collapse;margin-top:18px}
+.invoice-table th,.invoice-table td{border:1px solid #aaa;padding:8px}
+.invoice-table th{background:#075e66;color:#fff}
+.invoice-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+@media(max-width:900px){.sales-summary{grid-template-columns:repeat(2,1fr)}.sales-item{grid-template-columns:1fr 90px 110px 110px 40px}}
+@media(max-width:650px){.sales-summary{grid-template-columns:1fr}.sales-item{grid-template-columns:1fr 1fr}.invoice-overlay{padding:5px}.invoice-box{padding:14px}}
+@media print{
+  body *{visibility:hidden!important}
+  #invoicePrint,#invoicePrint *{visibility:visible!important}
+  #invoicePrint{position:absolute;left:0;top:0;width:100%;padding:0!important}
+  .invoice-actions{display:none!important}
+}
+@page{size:A4;margin:10mm}
 </style>
 </head>
 <body>
@@ -47,6 +70,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <aside class="side">
 <button class="nav active" data-section="dashboard">🏠 Dashboard</button>
 <button class="nav" data-section="students">👨‍🎓 Student Registration</button>
+<button class="nav" data-section="sales">🧾 List Sales</button>
 <button class="nav" data-section="certificates">📜 Certificate Verification</button>
 <button class="nav" data-section="posts">📰 News Feed</button>
 <button class="nav" data-section="courses">📚 Course Management</button>
@@ -174,6 +198,47 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </div>
 </div>
 </section>
+
+
+<section id="sales" class="section">
+<h1>List Sales</h1>
+<div class="sales-summary">
+<div class="card"><div class="muted">Total Sales</div><div id="mSales" class="metric">—</div></div>
+<div class="card"><div class="muted">Paid</div><div id="mSalesPaid" class="metric">—</div></div>
+<div class="card"><div class="muted">Outstanding</div><div id="mSalesBalance" class="metric">—</div></div>
+<div class="card"><div class="muted">Partial / Due</div><div id="mSalesDue" class="metric">—</div></div>
+</div>
+<div class="card">
+<div class="toolbar">
+<input id="salesSearch" placeholder="Search reference, student, phone, product or course">
+<select id="salesPaymentFilter"><option value="all">All Payment Status</option><option value="Paid">Paid</option><option value="Partial">Partial</option><option value="Due">Due</option><option value="Unpaid">Unpaid</option></select>
+<button id="salesRefresh" class="light">Refresh</button><button id="toggleSaleForm" class="gold">+ New Sale</button>
+</div>
+<div id="salesStatus"></div>
+<div id="saleForm" class="card hidden" style="margin-top:14px">
+<h2 style="margin-top:0">Create Sale / Student Purchase</h2>
+<div class="row">
+<div><label>Student / Customer *</label><select id="saleStudent"><option value="">Select student</option></select></div>
+<div><label>Sale Date *</label><input id="saleDate" type="date"></div>
+<div><label>Reference No</label><input id="saleReference" placeholder="Auto-generate"></div>
+</div>
+<label>Course / Product</label><div id="saleItems"></div>
+<button id="addSaleItem" class="light" type="button">+ Add Course / Product</button>
+<div class="row" style="margin-top:14px">
+<div><label>Discount</label><input id="saleDiscount" type="number" min="0" step="0.01" value="0"></div>
+<div><label>Shipping</label><input id="saleShipping" type="number" min="0" step="0.01" value="0"></div>
+<div><label>Initial Payment</label><input id="saleInitialPayment" type="number" min="0" step="0.01" value="0"></div>
+</div>
+<label>Payment Method</label><select id="salePaymentMethod"><option value="Cash">Cash</option><option value="ABA">ABA</option><option value="Bank Transfer">Bank Transfer</option><option value="Card">Card</option><option value="Other">Other</option></select>
+<label>Sale Note</label><textarea id="saleNote" rows="3" placeholder="Optional note"></textarea>
+<div class="sale-total"><span>Grand Total: <strong id="saleGrandTotal">$0.00</strong></span><span>Balance: <strong id="saleBalance">$0.00</strong></span></div>
+<div class="row" style="margin-top:14px"><button id="saveSale" class="gold">Save Sale</button><button id="cancelSale" class="light">Cancel</button></div>
+<div id="newSaleStatus"></div>
+</div>
+<div id="salesList" style="margin-top:18px">Loading...</div>
+</div>
+</section>
+<div id="invoiceOverlay" class="invoice-overlay"><div id="invoicePrint" class="invoice-box"></div></div>
 
 <section id="certificates" class="section">
 <h1>Certificate Verification</h1>
@@ -320,7 +385,7 @@ function msg(el,text,error=false){el.className="status"+(error?" error":"");el.t
 function clearMsg(el){el.className="";el.textContent=""}
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function attr(v){return String(v??"").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
-let currentProfile=null,adminUser=null,students=[],certificates=[],courses=[],posts=[],staffProfiles=[];
+let currentProfile=null,adminUser=null,students=[],certificates=[],courses=[],posts=[],staffProfiles=[],salesRecords=[],salePayments=[];
 
 function syntheticEmail(username){
   return String(username||"").trim().toLowerCase()+"@accounts.medifella.local";
@@ -453,7 +518,7 @@ sb.auth.onAuthStateChange(async (event)=>{
     if(account){adminUser=account.user;currentProfile=account.profile;applyAccountPermissions();}
   }
 });
-async function refreshAll(){await Promise.all([loadStudents(),loadCertificates(),loadCourses(),loadPosts(),loadStaff()]);updateMetrics()}
+async function refreshAll(){await Promise.all([loadStudents(),loadCertificates(),loadCourses(),loadPosts(),loadStaff(),loadSales()]);updateMetrics()}
 
 async function loadStudents(){
  const {data,error}=await sb.from("students").select("*").order("created_at",{ascending:false});
@@ -475,7 +540,7 @@ function renderStudents(){
 <td>${esc(s.date_of_birth||"—")}</td>
 <td>${esc(s.course||"—")}</td>
 <td><span class="badge ${esc(s.status||"pending")}">${esc(s.status||"pending")}</span></td>
-<td><div class="actions"><button class="gold" onclick="setStudent('${attr(s.id)}','verified')">Approve</button><button class="light" onclick="setStudent('${attr(s.id)}','pending')">Pending</button><button class="danger" onclick="setStudent('${attr(s.id)}','rejected')">Reject</button><button class="light" onclick="editStudent('${attr(s.id)}')">Edit</button></div></td>
+<td><div class="actions"><button class="gold" onclick="setStudent('${attr(s.id)}','verified')">Approve</button><button class="light" onclick="setStudent('${attr(s.id)}','pending')">Pending</button><button class="danger" onclick="setStudent('${attr(s.id)}','rejected')">Reject</button><button class="light" onclick="editStudent('${attr(s.id)}')">Edit</button><button class="gold" onclick="startSaleForStudent('${attr(s.id)}')">+ Sale</button></div></td>
 </tr>`).join("")}</table></div>`:'<p class="muted">No students found.</p>';
  $("recentStudents").innerHTML=students.slice(0,5).map(s=>`<div class="post"><strong>${esc(s.full_name||"Unnamed")}</strong>${s.full_name_km?`<div>${esc(s.full_name_km)}</div>`:""}<div class="muted">${esc(s.email||"")} · ${esc(s.phone||"")} · ${esc(s.status||"pending")}</div></div>`).join("")||'<p class="muted">No students.</p>';
 }
@@ -649,6 +714,94 @@ $("saveStudentEdit").onclick=async()=>{
  }catch(e){msg($("editStudentStatus"),e.message||"Could not update student.",true)}
  finally{$("saveStudentEdit").disabled=false}
 };
+
+
+function money(v){return "$"+Number(v||0).toFixed(2)}
+function saleField(s,names,def=""){for(const n of names){if(s&&s[n]!==undefined&&s[n]!==null&&s[n]!=="")return s[n]}return def}
+function saleStatus(total,paid){total=Number(total||0);paid=Number(paid||0);if(total<=0)return "Unpaid";if(paid>=total-0.005)return "Paid";if(paid>0)return "Partial";return "Due"}
+function saleRef(s){return String(saleField(s,["reference_no","reference","ref_no","invoice_no"],""))}
+function saleCustomer(s){return String(saleField(s,["student_name","customer_name","customer","name"],""))}
+function saleTotal(s){return Number(saleField(s,["grand_total","total","total_amount","amount"],0))}
+function salePaid(s){return Number(saleField(s,["paid","paid_amount","amount_paid"],0))}
+function saleDateValue(s){return saleField(s,["sale_date","date","created_at"],"")}
+function saleItemsValue(s){return saleField(s,["items","order_items","products"],"")}
+async function loadSales(){
+ const [sr,pr]=await Promise.all([
+   sb.from("medifella_sales").select("*").order("created_at",{ascending:false}),
+   sb.from("medifella_sale_payments").select("*").order("created_at",{ascending:false})
+ ]);
+ if(sr.error){
+   $("salesList").innerHTML=`<p class="muted">Sales database is not ready yet. Run the List Sales SQL setup in Supabase SQL Editor first.</p><p class="error status">${esc(sr.error.message)}</p>`;
+   salesRecords=[];salePayments=[];renderSaleStudentOptions();updateSalesMetrics();return;
+ }
+ salesRecords=sr.data||[];salePayments=pr.error?[]:(pr.data||[]);
+ renderSaleStudentOptions();renderSales();updateSalesMetrics();
+}
+function renderSaleStudentOptions(){
+ if(!$("saleStudent"))return;const current=$("saleStudent").value||"";
+ $("saleStudent").innerHTML='<option value="">Select student</option>'+students.map(s=>`<option value="${attr(s.id)}">${esc(s.full_name||"Unnamed")} · ${esc(s.student_id||"")} · ${esc(s.phone||"")}</option>`).join("");
+ $("saleStudent").value=current;
+}
+function nextSaleReference(){
+ const d=new Date(),prefix=`SALE-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-`;let max=0;
+ salesRecords.forEach(s=>{const m=saleRef(s).match(new RegExp("^"+prefix+"(\\d+)$"));if(m)max=Math.max(max,Number(m[1]))});
+ return prefix+String(max+1).padStart(3,"0");
+}
+function addSaleItemRow(name="",price=0,qty=1){
+ const wrap=document.createElement("div");wrap.className="sale-item";
+ wrap.innerHTML=`<div class="sales-item"><div><label>Course / Product</label><input class="sale-item-name" value="${attr(name)}" placeholder="e.g. Diploma of Beauty Care / Product name"></div><div><label>Unit Price</label><input class="sale-item-price" type="number" min="0" step="0.01" value="${Number(price||0)}"></div><div><label>Quantity</label><input class="sale-item-qty" type="number" min="1" step="1" value="${Number(qty||1)}"></div><div><label>Subtotal</label><input class="sale-item-subtotal" readonly value="${money(Number(price||0)*Number(qty||1))}"></div><button class="danger remove-sale-item" type="button">×</button></div>`;
+ $("saleItems").appendChild(wrap);wrap.querySelectorAll("input").forEach(i=>i.addEventListener("input",updateSaleTotals));wrap.querySelector(".remove-sale-item").onclick=()=>{wrap.remove();updateSaleTotals()};updateSaleTotals();
+}
+function getSaleItems(){return [...document.querySelectorAll("#saleItems .sale-item")].map(w=>{const name=w.querySelector(".sale-item-name").value.trim(),price=Number(w.querySelector(".sale-item-price").value||0),quantity=Math.max(1,Number(w.querySelector(".sale-item-qty").value||1));return{name,unit_price:price,quantity,subtotal:price*quantity}}).filter(x=>x.name)}
+function updateSaleTotals(){
+ const items=getSaleItems(),subtotal=items.reduce((a,x)=>a+x.subtotal,0),discount=Math.max(0,Number($("saleDiscount")?.value||0)),shipping=Math.max(0,Number($("saleShipping")?.value||0)),grand=Math.max(0,subtotal-discount+shipping),paid=Math.max(0,Number($("saleInitialPayment")?.value||0));
+ $("saleGrandTotal").textContent=money(grand);$("saleBalance").textContent=money(Math.max(0,grand-paid));
+ document.querySelectorAll("#saleItems .sale-item").forEach(w=>{const p=Number(w.querySelector(".sale-item-price").value||0),q=Math.max(1,Number(w.querySelector(".sale-item-qty").value||1));w.querySelector(".sale-item-subtotal").value=money(p*q)});
+}
+function resetSaleForm(){
+ $("saleStudent").value="";$("saleDate").value=new Date().toISOString().slice(0,10);$("saleReference").value=nextSaleReference();$("saleItems").innerHTML="";addSaleItemRow();
+ $("saleDiscount").value="0";$("saleShipping").value="0";$("saleInitialPayment").value="0";$("salePaymentMethod").value="Cash";$("saleNote").value="";clearMsg($("newSaleStatus"));updateSaleTotals();
+}
+$("toggleSaleForm").onclick=()=>{$("saleForm").classList.toggle("hidden");if(!$("saleForm").classList.contains("hidden")){resetSaleForm();$("saleForm").scrollIntoView({behavior:"smooth",block:"start"})}};
+$("cancelSale").onclick=()=>{$("saleForm").classList.add("hidden");clearMsg($("newSaleStatus"))};
+$("addSaleItem").onclick=()=>addSaleItemRow();
+["saleDiscount","saleShipping","saleInitialPayment"].forEach(id=>$(id).addEventListener("input",updateSaleTotals));
+$("salesSearch").oninput=renderSales;$("salesPaymentFilter").onchange=renderSales;$("salesRefresh").onclick=loadSales;
+$("saveSale").onclick=async()=>{
+ clearMsg($("newSaleStatus"));const studentId=$("saleStudent").value,student=students.find(s=>String(s.id)===String(studentId)),items=getSaleItems(),saleDate=$("saleDate").value,reference=$("saleReference").value.trim()||nextSaleReference(),discount=Math.max(0,Number($("saleDiscount").value||0)),shipping=Math.max(0,Number($("saleShipping").value||0)),initialPayment=Math.max(0,Number($("saleInitialPayment").value||0)),subtotal=items.reduce((a,x)=>a+x.subtotal,0),grandTotal=Math.max(0,subtotal-discount+shipping);
+ if(!student){msg($("newSaleStatus"),"Please select a student/customer.",true);return}if(!saleDate){msg($("newSaleStatus"),"Please select the sale date.",true);return}if(!items.length){msg($("newSaleStatus"),"Add at least one course or product.",true);return}if(initialPayment>grandTotal){msg($("newSaleStatus"),"Initial payment cannot be greater than the grand total.",true);return}
+ $("saveSale").disabled=true;
+ try{
+  const payload={reference_no:reference,sale_date:saleDate,student_id:String(student.id),student_name:student.full_name||"",student_phone:student.phone||"",subtotal,discount,shipping,grand_total:grandTotal,paid:initialPayment,balance:Math.max(0,grandTotal-initialPayment),payment_status:saleStatus(grandTotal,initialPayment),sale_status:"Completed",items,notes:$("saleNote").value.trim(),created_by:adminUser.id};
+  const {data,error}=await sb.from("medifella_sales").insert(payload).select().single();if(error)throw error;
+  if(initialPayment>0){const {error:pe}=await sb.from("medifella_sale_payments").insert({sale_id:String(data.id),amount:initialPayment,payment_method:$("salePaymentMethod").value,payment_date:saleDate,note:"Initial payment",created_by:adminUser.id});if(pe)throw pe}
+  msg($("newSaleStatus"),"Sale saved successfully.");$("saleForm").classList.add("hidden");await loadSales();
+ }catch(e){msg($("newSaleStatus"),e.message||"Could not save sale.",true)}finally{$("saveSale").disabled=false}
+};
+function formatSaleItems(v){if(!v)return"—";try{const arr=typeof v==="string"?JSON.parse(v):v;if(Array.isArray(arr))return arr.map(x=>`${x.name} × ${x.quantity} (${money(x.subtotal)})`).join("; ")}catch(_){}return String(v)}
+function renderSales(){
+ const q=$("salesSearch").value.trim().toLowerCase(),f=$("salesPaymentFilter").value;
+ const rows=salesRecords.filter(s=>{const total=saleTotal(s),paid=salePaid(s),status=saleStatus(total,paid),hay=[saleRef(s),saleCustomer(s),saleField(s,["student_phone","phone"],""),formatSaleItems(saleItemsValue(s))].join(" ").toLowerCase();return(f==="all"||status===f)&&hay.includes(q)});
+ $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid</th><th>Balance</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";return`<tr><td>${esc(String(saleDateValue(s)).slice(0,10))}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${esc(status)}</span></td><td><div class="actions"><button class="light" onclick="showSaleInvoice('${attr(s.id)}','A4')">Invoice A4</button><button class="light" onclick="showSaleInvoice('${attr(s.id)}','A5')">Invoice A5</button>${bal>0.005?`<button class="gold" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`}).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
+ updateSalesMetrics();
+}
+function updateSalesMetrics(){const total=salesRecords.reduce((a,s)=>a+saleTotal(s),0),paid=salesRecords.reduce((a,s)=>a+salePaid(s),0);$("mSales").textContent=salesRecords.length;$("mSalesPaid").textContent=money(paid);$("mSalesBalance").textContent=money(Math.max(0,total-paid));$("mSalesDue").textContent=salesRecords.filter(s=>saleStatus(saleTotal(s),salePaid(s))!=="Paid").length}
+async function recordSalePayment(id){
+ const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid),raw=prompt(`Balance for ${saleRef(s)} is ${money(balance)}.\nEnter payment amount:`,String(balance));if(raw===null)return;const amount=Number(raw);if(!Number.isFinite(amount)||amount<=0||amount>balance+0.005){alert("Enter a valid payment amount not greater than the balance.");return}const method=prompt("Payment method (Cash / ABA / Bank Transfer / Card / Other):","Cash")||"Cash";
+ try{const{error:pe}=await sb.from("medifella_sale_payments").insert({sale_id:String(id),amount,payment_method:method,payment_date:new Date().toISOString().slice(0,10),created_by:adminUser.id});if(pe)throw pe;const newPaid=paid+amount;const{error:se}=await sb.from("medifella_sales").update({paid:newPaid,balance:Math.max(0,total-newPaid),payment_status:saleStatus(total,newPaid)}).eq("id",id);if(se)throw se;await loadSales()}catch(e){alert(e.message||"Could not record payment.")}
+}
+function showSaleInvoice(id,size="A4"){
+ const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);let items=[];try{items=typeof saleItemsValue(s)==="string"?JSON.parse(saleItemsValue(s)):saleItemsValue(s)||[]}catch(_){}
+ $("invoicePrint").innerHTML=`<div style="font-size:12px"><div class="invoice-head"><div><div style="font-size:24px;font-weight:900;color:#075e66">MEDI FELLA</div><div>Beauty School</div><div class="muted">Sales Invoice</div></div><div style="text-align:right"><strong>INVOICE</strong><br>No: ${esc(saleRef(s))}<br>Date: ${esc(String(saleDateValue(s)).slice(0,10))}</div></div><div style="margin-top:15px"><strong>Customer / Student:</strong> ${esc(saleCustomer(s)||"—")}<br><strong>Phone:</strong> ${esc(saleField(s,["student_phone","phone"],"—"))}</div><table class="invoice-table"><thead><tr><th>#</th><th>Course / Product</th><th>Unit Price</th><th>Qty</th><th>Subtotal</th></tr></thead><tbody>${items.length?items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name||"")}</td><td>${money(x.unit_price)}</td><td>${esc(x.quantity)}</td><td>${money(x.subtotal)}</td></tr>`).join(""):`<tr><td>1</td><td colspan="4">${esc(formatSaleItems(saleItemsValue(s)))}</td></tr>`}</tbody></table><div style="margin-left:auto;width:330px;margin-top:15px"><div style="display:flex;justify-content:space-between"><span>Subtotal</span><strong>${money(saleField(s,["subtotal"],total))}</strong></div><div style="display:flex;justify-content:space-between"><span>Discount</span><strong>${money(saleField(s,["discount"],0))}</strong></div><div style="display:flex;justify-content:space-between"><span>Shipping</span><strong>${money(saleField(s,["shipping"],0))}</strong></div><hr><div style="display:flex;justify-content:space-between;font-size:18px"><span>Total</span><strong>${money(total)}</strong></div><div style="display:flex;justify-content:space-between"><span>Paid</span><strong>${money(paid)}</strong></div><div style="display:flex;justify-content:space-between"><span>Balance</span><strong>${money(balance)}</strong></div><div style="display:flex;justify-content:space-between"><span>Status</span><strong>${esc(saleStatus(total,paid))}</strong></div></div><div style="margin-top:50px;display:flex;justify-content:space-between"><span>Seller Signature</span><span>Buyer Signature</span></div><div class="invoice-actions"><button class="light" onclick="printInvoice('${size}')">Print / Save PDF (${size})</button><button class="danger" onclick="closeInvoice()">Close</button></div></div>`;
+ $("invoiceOverlay").classList.add("show");
+}
+function printInvoice(size){const style=document.createElement("style");style.id="invoicePrintSize";style.textContent=`@page{size:${size};margin:10mm}`;document.head.appendChild(style);window.print();setTimeout(()=>style.remove(),1000)}
+function closeInvoice(){$("invoiceOverlay").classList.remove("show")}
+$("invoiceOverlay").onclick=e=>{if(e.target.id==="invoiceOverlay")closeInvoice()};
+function startSaleForStudent(studentId){
+ document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
+ const nav=document.querySelector('.nav[data-section="sales"]');if(nav)nav.classList.add("active");$("sales").classList.add("active");$("saleForm").classList.remove("hidden");renderSaleStudentOptions();resetSaleForm();$("saleStudent").value=String(studentId);$("saleForm").scrollIntoView({behavior:"smooth",block:"start"});
+}
 
 async function loadCertificates(){
  const{data,error}=await sb.from("certificates").select("*").order("issuedate",{ascending:false});
@@ -1077,7 +1230,7 @@ function clearCourse(){$("courseId").value="";$("courseName").value="";$("course
 $("courseClear").onclick=clearCourse;
 async function deleteCourse(id){if(!confirm("Delete this course?"))return;const{error}=await sb.from("courses").delete().eq("id",id);if(error)alert(error.message);else{loadCourses();updateMetrics()}}
 
-function updateMetrics(){$("mStudents").textContent=students.length;$("mPending").textContent=students.filter(s=>String(s.status||"pending")==="pending").length;$("mVerifiedStudents").textContent=students.filter(s=>String(s.status)==="verified"||s.verified===true).length;$("mCourses").textContent=courses.length;$("mCertificates").textContent=certificates.length}
+function updateMetrics(){$("mStudents").textContent=students.length;$("mPending").textContent=students.filter(s=>String(s.status||"pending")==="pending").length;$("mVerifiedStudents").textContent=students.filter(s=>String(s.status)==="verified"||s.verified===true).length;$("mCourses").textContent=courses.length;$("mCertificates").textContent=certificates.length;updateSalesMetrics()}
 boot();
 </script>
 </body>
