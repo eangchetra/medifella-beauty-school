@@ -59,6 +59,51 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
   .invoice-actions{display:none!important}
 }
 @page{size:A4;margin:10mm}
+
+/* Medi Fella Beauty School sales design */
+.sale-form-shell{padding:22px;border-top:4px solid #49bfd0}
+.sale-header-grid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:18px}
+.sale-section-title{display:flex;justify-content:space-between;align-items:center;margin-top:24px;margin-bottom:10px}
+.sale-section-title h2{margin:0;color:#1aa8bb;font-size:21px}
+.sale-table-wrap{overflow:visible;border:1px solid #d8eaed;border-radius:12px}
+.sale-entry-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.sale-entry-table th{background:#42b8c8;color:#fff;padding:13px 12px;text-align:left;font-size:14px}
+.sale-entry-table th:first-child{border-radius:11px 0 0 0}.sale-entry-table th:last-child{border-radius:0 11px 0 0}
+.sale-entry-table td{padding:10px;border-top:1px solid #e0eef0;vertical-align:middle;background:#fff}
+.sale-entry-table input,.sale-entry-table select{min-height:46px;font-size:16px}
+.sale-entry-table .sale-course-search-wrap{position:relative}
+.sale-entry-table .sale-course-search-results{position:absolute;left:0;right:0;top:100%;z-index:20;background:#fff;border:1px solid #cfe5e8;border-radius:10px;box-shadow:0 12px 30px #075e661c;max-height:230px;overflow:auto;display:none}
+.sale-entry-table .sale-course-search-results.show{display:block}
+.sale-entry-table .sale-course-search-results button{display:block;width:100%;text-align:left;background:#fff;color:var(--text);border-radius:0;border-bottom:1px solid #e4eff0;padding:12px}
+.sale-entry-table .sale-course-search-results button:hover{background:#edf9fa}
+.sale-entry-table .sale-course-search-results button:last-child{border-bottom:0}
+.sale-item-discount-wrap{display:grid;grid-template-columns:66px 1fr;gap:5px}
+.sale-item-discount-wrap select{padding:8px}
+.sale-item-discount-wrap input{min-width:0}
+.sale-money-input,.sale-entry-table input{font-variant-numeric:tabular-nums}
+.sale-entry-table .sale-item-subtotal{font-size:20px;font-weight:900;color:#1aa8bb;background:#f5fbfc}
+.sale-remove-btn{width:40px!important;height:40px!important;padding:0!important;border-radius:9px!important}
+.sale-help{padding:8px 4px}
+.sale-subtotal-line{display:flex;justify-content:flex-end;gap:28px;align-items:center;padding:16px 4px;font-size:17px}
+.sale-subtotal-line strong{font-size:26px;color:#168e9f;font-variant-numeric:tabular-nums}
+.sale-controls-grid{display:grid;grid-template-columns:1.2fr 1.2fr 1.2fr 1.2fr;gap:16px;margin-top:8px}
+.sale-controls-grid input,.sale-controls-grid select{min-height:48px;font-size:17px}
+.discount-control{display:grid;grid-template-columns:78px 1fr;gap:6px}
+.sale-summary-card{display:grid;grid-template-columns:1fr 1fr;border:1px solid #d6e9ec;border-radius:14px;margin-top:20px;overflow:hidden;background:#fff}
+.sale-summary-col{padding:20px 24px}
+.sale-summary-col+ .sale-summary-col{border-left:1px solid #d6e9ec}
+.sale-summary-row{display:flex;justify-content:space-between;align-items:center;gap:15px;margin:10px 0;font-size:17px}
+.sale-summary-row strong{font-size:25px;font-variant-numeric:tabular-nums;color:#1aa8bb}
+.sale-summary-divider{border-top:1px solid #d6e9ec;margin:15px 0}
+.sale-initial-row span,.sale-initial-row strong{color:#168e9f}
+.sale-grand-row span,.sale-grand-row strong{font-size:19px}
+.sale-grand-row strong{font-size:30px}
+.discount-number{color:#c28d19!important}.paid-number{color:#18865b!important}.due-number{color:#c53535!important}
+.sale-actions{display:flex;justify-content:flex-end;gap:12px;margin-top:18px}
+.sale-actions button{min-width:180px;min-height:50px;font-size:17px}
+.sale-summary .card{padding:14px;border-top:3px solid #49bfd0}
+@media(max-width:1050px){.sale-header-grid{grid-template-columns:1fr 1fr}.sale-controls-grid{grid-template-columns:1fr 1fr}}
+@media(max-width:760px){.sale-header-grid,.sale-controls-grid,.sale-summary-card{grid-template-columns:1fr}.sale-summary-col+.sale-summary-col{border-left:0;border-top:1px solid #d6e9ec}.sale-entry-table{min-width:900px}.sale-table-wrap{overflow:auto}.sale-actions{justify-content:stretch}.sale-actions button{flex:1}}
 </style>
 </head>
 <body>
@@ -213,99 +258,148 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
 
 <section id="sales" class="section">
-<h1>List Sales</h1>
-<div class="sales-summary">
-<div class="card"><div class="muted">Total Sales</div><div id="mSales" class="metric">—</div></div>
-<div class="card"><div class="muted">Paid</div><div id="mSalesPaid" class="metric">—</div></div>
-<div class="card"><div class="muted">Outstanding</div><div id="mSalesBalance" class="metric">—</div></div>
-<div class="card"><div class="muted">Partial / Due</div><div id="mSalesDue" class="metric">—</div></div>
-</div>
-<div class="card">
-<div class="toolbar">
-<input id="salesSearch" placeholder="Search reference, student, phone, product or course">
-<select id="salesPaymentFilter"><option value="all">All Payment Status</option><option value="Paid">Paid</option><option value="Partial">Partial</option><option value="Due">Due</option><option value="Unpaid">Unpaid</option></select>
-<button id="salesRefresh" class="light">Refresh</button><button id="toggleSaleForm" class="gold">+ New Sale</button>
-</div>
-<div id="salesStatus"></div>
+<h1>Add Sale</h1>
 
-<div id="saleForm" class="card hidden" style="margin-top:14px">
-<h2 style="margin-top:0">Create Sale / Student Purchase</h2>
-
-<div class="row">
-<div>
-<label>Student / Customer *</label>
-<div class="sale-student-tools">
-  <div>
-    <input id="saleStudentSearch" list="saleStudentSearchList" autocomplete="off" placeholder="Search student name, ID or phone">
-    <datalist id="saleStudentSearchList"></datalist>
-    <input id="saleStudentId" type="hidden">
+<div class="card sale-form-shell">
+  <div class="sale-header-grid">
+    <div>
+      <label>Customer / Student *</label>
+      <div class="sale-student-tools">
+        <div>
+          <input id="saleStudentSearch" list="saleStudentSearchList" autocomplete="off"
+                 placeholder="Search student name, Student ID or phone">
+          <datalist id="saleStudentSearchList"></datalist>
+          <input id="saleStudentId" type="hidden">
+        </div>
+        <button id="newSaleStudentBtn" class="gold" type="button">+ New Student</button>
+      </div>
+      <div id="saleStudentHint" class="muted" style="margin-top:6px">
+        Search and select a student by name, Student ID or phone.
+      </div>
+    </div>
+    <div>
+      <label>Reference No.</label>
+      <input id="saleReference" placeholder="Auto-generate">
+    </div>
+    <div>
+      <label>Date &amp; Time *</label>
+      <input id="saleDate" type="datetime-local">
+    </div>
   </div>
-  <button id="newSaleStudentBtn" class="gold" type="button">+ New Student</button>
-</div>
-<div id="saleStudentHint" class="muted" style="margin-top:6px">Search and select a student by name, Student ID or phone.</div>
+
+  <div class="sale-section-title">
+    <h2>Course / Product</h2>
+    <button id="addSaleItem" class="light" type="button">+ Add Course / Product</button>
+  </div>
+
+  <div class="sale-table-wrap">
+    <table class="sale-entry-table">
+      <thead>
+        <tr>
+          <th style="width:45%">Course / Product</th>
+          <th style="width:10%">Qty</th>
+          <th style="width:15%">Unit Price (USD)</th>
+          <th style="width:18%">Discount</th>
+          <th style="width:15%">Subtotal (USD)</th>
+          <th style="width:46px"></th>
+        </tr>
+      </thead>
+      <tbody id="saleItems"></tbody>
+    </table>
+  </div>
+  <div class="muted sale-help">
+    Search by Course Name or Course ID. There is no course/product dropdown.
+  </div>
+
+  <div class="sale-subtotal-line">
+    <span>Sub Initial Total</span>
+    <strong id="saleItemsSubtotal">$0.00</strong>
+  </div>
+
+  <div class="sale-controls-grid">
+    <div>
+      <label>Overall Discount</label>
+      <div class="discount-control">
+        <select id="saleOverallDiscountType">
+          <option value="percent">%</option>
+          <option value="usd">USD</option>
+        </select>
+        <input id="saleOverallDiscountValue" type="text" inputmode="decimal"
+               autocomplete="off" placeholder="0">
+      </div>
+    </div>
+    <div>
+      <label>Payment Method *</label>
+      <select id="salePaymentMethod">
+        <option value="Cash">Cash</option>
+        <option value="ABA">ABA</option>
+        <option value="Bank Transfer">Bank Transfer</option>
+        <option value="Card">Card</option>
+        <option value="Other">Other</option>
+      </select>
+    </div>
+    <div>
+      <label>Payment Status *</label>
+      <select id="salePaymentStatus">
+        <option value="Paid">Paid</option>
+        <option value="Partial">Partial Payment</option>
+        <option value="Due">Due</option>
+      </select>
+    </div>
+    <div>
+      <label>Amount Paid Now (USD)</label>
+      <input id="saleAmountPaidNow" class="sale-money-input" type="text"
+             inputmode="decimal" autocomplete="off" placeholder="0.00">
+      <div class="muted" style="margin-top:5px">Paid = full amount · Due = $0 · Partial = enter amount</div>
+    </div>
+  </div>
+
+  <div class="sale-summary-card">
+    <div class="sale-summary-col">
+      <div class="sale-summary-row"><span>Sub Initial Total</span><strong id="saleSummarySubtotal">$0.00</strong></div>
+      <div class="sale-summary-row"><span>Overall Discount</span><strong id="saleSummaryDiscount" class="discount-number">$0.00</strong></div>
+      <div class="sale-summary-divider"></div>
+      <div class="sale-summary-row sale-initial-row"><span>Initial Total</span><strong id="saleInitialTotal">$0.00</strong></div>
+    </div>
+    <div class="sale-summary-col">
+      <div class="sale-summary-row"><span>Paid Balance</span><strong id="salePaidBalanceDisplay" class="paid-number">$0.00</strong></div>
+      <div class="sale-summary-row"><span>Due</span><strong id="saleDueDisplay" class="due-number">$0.00</strong></div>
+      <div class="sale-summary-divider"></div>
+      <div class="sale-summary-row sale-grand-row"><span>Grand Total Due (This Student)</span><strong id="saleGrandTotalDue">$0.00</strong></div>
+    </div>
+  </div>
+
+  <label>Sale Note (Optional)</label>
+  <textarea id="saleNote" rows="4" placeholder="Enter note here..."></textarea>
+
+  <div class="sale-actions">
+    <button id="saveSale" class="gold">Save Sale</button>
+    <button id="cancelSale" class="light">Cancel</button>
+  </div>
+  <div id="newSaleStatus"></div>
 </div>
 
-<div><label>Sale Date + Time *</label><input id="saleDate" type="datetime-local"></div>
-<div><label>Reference No</label><input id="saleReference" placeholder="Auto-generate"></div>
-</div>
-
-<label>Course / Product *</label>
-<div id="saleItems"></div>
-<button id="addSaleItem" class="light" type="button">+ Add Course / Product</button>
-<div class="muted" style="margin-top:6px">Search by Course Name or Course ID. There is no course/product dropdown. If the name is not found, you can type it as an Other Product / Service and enter the unit price manually.</div>
-
-<div class="sale-total" style="margin-top:14px">
-  <span>Subtotal: <strong id="saleItemsSubtotal">$0.00</strong></span>
-  <span>Discount: <strong id="saleDiscountTotal">$0.00</strong></span>
-  <span>Delivery Fee: <strong id="saleDeliveryFeeTotal">$0.00</strong></span>
-  <span>Initial Total: <strong id="saleInitialTotal">$0.00</strong></span>
-</div>
-
-<div class="row" style="margin-top:14px">
-<div>
-  <label>Delivery Fee (USD)</label>
-  <input id="saleDeliveryFee" class="sale-money-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="0">
-</div>
-<div>
-  <label>Payment Method</label>
-  <select id="salePaymentMethod"><option value="Cash">Cash</option><option value="ABA">ABA</option><option value="Bank Transfer">Bank Transfer</option><option value="Card">Card</option><option value="Other">Other</option></select>
-</div>
-</div>
-
-<div class="sale-payment-grid" style="margin-top:14px">
-<div>
-  <label>Initial Payment</label>
-  <input id="saleInitialPayment" class="sale-money-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="0">
-</div>
-<div>
-  <label>Partial Payment</label>
-  <input id="salePartialPayment" class="sale-money-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00" value="0">
-</div>
-<div>
-  <label>Due</label>
-  <input id="saleDue" class="readonly" type="text" readonly value="$0.00">
-</div>
-<div>
-  <label>Paid Balance</label>
-  <input id="salePaidBalance" class="readonly" type="text" readonly value="$0.00">
-</div>
-<div>
-  <label>Grand Total</label>
-  <input id="saleGrandTotalInput" class="readonly" type="text" readonly value="$0.00">
-</div>
-</div>
-
-<label>Sale Note</label>
-<textarea id="saleNote" rows="3" placeholder="Optional note"></textarea>
-<div class="sale-total"><span>Grand Total: <strong id="saleGrandTotal">$0.00</strong></span><span>Due: <strong id="saleBalance">$0.00</strong></span></div>
-<div class="row" style="margin-top:14px"><button id="saveSale" class="gold">Save Sale</button><button id="cancelSale" class="light">Cancel</button></div>
-<div id="newSaleStatus"></div>
-</div>
-
-<div id="salesList" style="margin-top:18px">Loading...</div>
+<div class="card" style="margin-top:18px">
+  <div class="toolbar">
+    <input id="salesSearch" placeholder="Search reference, student, phone, course or product">
+    <select id="salesPaymentFilter">
+      <option value="all">All Payment Status</option>
+      <option value="Paid">Paid</option>
+      <option value="Partial">Partial Payment</option>
+      <option value="Due">Due</option>
+    </select>
+    <button id="salesRefresh" class="light">Refresh</button>
+  </div>
+  <div class="sales-summary">
+    <div class="card"><div class="muted">Total Sales</div><div id="mSales" class="metric">—</div></div>
+    <div class="card"><div class="muted">Paid</div><div id="mSalesPaid" class="metric">—</div></div>
+    <div class="card"><div class="muted">Outstanding</div><div id="mSalesBalance" class="metric">—</div></div>
+    <div class="card"><div class="muted">Partial / Due</div><div id="mSalesDue" class="metric">—</div></div>
+  </div>
+  <div id="salesStatus"></div>
+  <div id="salesList" style="margin-top:18px">Loading...</div>
 </div>
 </section>
-
 
 <div id="saleStudentModal" class="student-modal">
   <div class="student-modal-box">
@@ -817,9 +911,10 @@ $("saveStudentEdit").onclick=async()=>{
 
 function money(v){return "$"+Number(v||0).toFixed(2)}
 function saleField(s,names,def=""){for(const n of names){if(s&&s[n]!==undefined&&s[n]!==null&&s[n]!=="")return s[n]}return def}
-function saleStatus(total,paid){total=Number(total||0);paid=Number(paid||0);if(total<=0)return "Unpaid";if(paid>=total-0.005)return "Paid";if(paid>0)return "Partial";return "Due"}
+function saleStatus(total,paid){total=Number(total||0);paid=Number(paid||0);if(total<=0)return "Due";if(paid>=total-0.005)return "Paid";if(paid>0)return "Partial";return "Due"}
 function saleRef(s){return String(saleField(s,["reference_no","reference","ref_no","invoice_no"],""))}
 function saleCustomer(s){return String(saleField(s,["student_name","customer_name","customer","name"],""))}
+function saleStudentId(s){return String(saleField(s,["student_id"],""))}
 function saleTotal(s){return Number(saleField(s,["grand_total","total","total_amount","amount"],0))}
 function salePaid(s){return Number(saleField(s,["paid","paid_amount","amount_paid"],0))}
 function saleDateValue(s){return saleField(s,["sale_date","date","created_at"],"")}
@@ -839,19 +934,10 @@ function formatDateTimeLocalValue(date=new Date()){
  const p=n=>String(n).padStart(2,"0");
  return `${date.getFullYear()}-${p(date.getMonth()+1)}-${p(date.getDate())}T${p(date.getHours())}:${p(date.getMinutes())}`;
 }
-function saleDateForDb(v){
- // Keep the existing sale_date column compatible with a date column.
- // The exact time is also sent in sale_time when the column exists.
- const d=String(v||"");
- return d ? d.slice(0,10) : "";
-}
-function saleTimeForDb(v){
- const d=String(v||"");
- return d.length>=16 ? d.slice(11,16) : "";
-}
+function saleDateForDb(v){const d=String(v||"");return d?d.slice(0,10):""}
+function saleTimeForDb(v){const d=String(v||"");return d.length>=16?d.slice(11,16):""}
 
 async function loadSales(){
- await loadStudents();
  const [sr,pr]=await Promise.all([
    sb.from("medifella_sales").select("*").order("created_at",{ascending:false}),
    sb.from("medifella_sale_payments").select("*").order("created_at",{ascending:false})
@@ -860,8 +946,11 @@ async function loadSales(){
    $("salesList").innerHTML=`<p class="muted">Sales database is not ready yet. Run the List Sales SQL setup in Supabase SQL Editor first.</p><p class="error status">${esc(sr.error.message)}</p>`;
    salesRecords=[];salePayments=[];renderSaleStudentOptions();updateSalesMetrics();return;
  }
- salesRecords=sr.data||[];salePayments=pr.error?[]:(pr.data||[]);
- renderSaleStudentOptions();renderSales();updateSalesMetrics();
+ salesRecords=sr.data||[];
+ salePayments=pr.error?[]:(pr.data||[]);
+ renderSaleStudentOptions();
+ renderSales();
+ updateSalesMetrics();
 }
 
 function renderSaleStudentOptions(){
@@ -872,60 +961,81 @@ function renderSaleStudentOptions(){
    const hay=[s.full_name,s.full_name_km,s.phone,s.student_id,s.email].join(" ").toLowerCase();
    return !q||hay.includes(q);
  });
- if(list)list.innerHTML=filtered.map(s=>`<option value="${esc(s.full_name||"")}">${esc(s.student_id||"")} · ${esc(s.phone||"")}</option>`).join("");
+ if(list)list.innerHTML=filtered.slice(0,30).map(s=>`<option value="${esc(s.full_name||"")}">${esc(s.student_id||"")} · ${esc(s.phone||"")}</option>`).join("");
  if(q&&filtered.length===1){
    const s=filtered[0];hidden.value=String(s.id);search.value=s.full_name||search.value;
    $("saleStudentHint").textContent=`Selected: ${s.full_name||"Student"} · ${s.student_id||"No ID"} · ${s.phone||"No phone"}`;
+   updateSaleTotals();
  }else if(q&&filtered.length>1){
    hidden.value="";$("saleStudentHint").textContent=`${filtered.length} students found. Continue typing to find the student.`;
+   updateSaleTotals();
  }else if(q){
    hidden.value="";$("saleStudentHint").textContent="No matching student found. Check the name, Student ID or phone number.";
+   updateSaleTotals();
  }else{
    hidden.value="";$("saleStudentHint").textContent="Search and select a student by name, Student ID or phone.";
+   updateSaleTotals();
  }
 }
 
+function selectSaleStudentByInput(){
+ const q=String($("saleStudentSearch").value||"").trim().toLowerCase();
+ if(!q)return null;
+ const matches=students.filter(s=>[s.full_name,s.full_name_km,s.phone,s.student_id,s.email].join(" ").toLowerCase().includes(q));
+ const exact=students.find(s=>[s.full_name,s.student_id,s.phone].some(v=>String(v||"").trim().toLowerCase()===q));
+ const student=exact||(matches.length===1?matches[0]:null);
+ if(student){
+   $("saleStudentId").value=String(student.id);
+   $("saleStudentSearch").value=student.full_name||$("saleStudentSearch").value;
+   $("saleStudentHint").textContent=`Selected: ${student.full_name||"Student"} · ${student.student_id||"No ID"} · ${student.phone||"No phone"}`;
+   return student;
+ }
+ return null;
+}
+
 function nextSaleReference(){
- const d=new Date(),prefix=`SALE-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-`;let max=0;
+ const d=new Date(),prefix=`SALE-${d.getFullYear()}${String(d.getMonth()+1).padStart(2,"0")}${String(d.getDate()).padStart(2,"0")}-`;
+ let max=0;
  salesRecords.forEach(s=>{const m=saleRef(s).match(new RegExp("^"+prefix+"(\\d+)$"));if(m)max=Math.max(max,Number(m[1]))});
  return prefix+String(max+1).padStart(3,"0");
 }
 
-function getSalesCourses(){
- return courses.filter(c=>courseType(c)==="sales");
-}
+function getSalesCourses(){return courses.filter(c=>courseType(c)==="sales")}
 function findCourseMatch(query){
  const q=String(query||"").trim().toLowerCase();
  if(!q)return null;
- const exact=getSalesCourses().find(c=>String(c.id).toLowerCase()===q || String(c.name||"").trim().toLowerCase()===q);
+ const exact=getSalesCourses().find(c=>String(c.id).toLowerCase()===q||String(c.name||"").trim().toLowerCase()===q);
  if(exact)return exact;
  const matches=getSalesCourses().filter(c=>[c.name,c.id].join(" ").toLowerCase().includes(q));
  return matches.length===1?matches[0]:null;
 }
+
 function addSaleItemRow(name="",price=0,qty=1,courseId=""){
- const wrap=document.createElement("div");wrap.className="sale-item";
- wrap.innerHTML=`<div class="sale-course-row">
+ const tr=document.createElement("tr");tr.className="sale-item";
+ tr.innerHTML=`<td>
    <div class="sale-course-search-wrap">
-     <label>Course / Product Search</label>
      <input class="sale-course-search" type="text" autocomplete="off" placeholder="Search course name or ID" value="${attr(name)}">
      <input class="sale-course-id" type="hidden" value="${attr(courseId)}">
      <div class="sale-course-search-results"></div>
-     <div class="muted" style="margin-top:4px">Name or Course ID</div>
    </div>
-   <div><label>Quantity</label><input class="sale-item-qty" type="text" inputmode="numeric" autocomplete="off" value="${Number(qty||1)}"></div>
-   <div><label>Unit Price (USD)</label><input class="sale-item-price" type="text" inputmode="decimal" autocomplete="off" value="${Number(price||0)}"></div>
-   <div><label>Discount</label><input class="sale-item-discount" type="text" inputmode="decimal" autocomplete="off" placeholder="0 or 10%" value=""></div>
-   <div><label>Subtotal</label><input class="sale-item-subtotal readonly" readonly value="$0.00"></div>
-   <button class="danger remove-sale-item" type="button">×</button>
- </div>`;
- $("saleItems").appendChild(wrap);
+ </td>
+ <td><input class="sale-item-qty" type="text" inputmode="numeric" autocomplete="off" value="${Number(qty||1)}"></td>
+ <td><input class="sale-item-price" type="text" inputmode="decimal" autocomplete="off" value="${Number(price||0)}"></td>
+ <td><div class="sale-item-discount-wrap">
+   <select class="sale-item-discount-type"><option value="percent">%</option><option value="usd">USD</option></select>
+   <input class="sale-item-discount-value" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="">
+ </div></td>
+ <td><input class="sale-item-subtotal" readonly value="$0.00"></td>
+ <td><button class="danger sale-remove-btn remove-sale-item" type="button">×</button></td>`;
+ $("saleItems").appendChild(tr);
 
- const search=wrap.querySelector(".sale-course-search");
- const idInput=wrap.querySelector(".sale-course-id");
- const results=wrap.querySelector(".sale-course-search-results");
- const priceInput=wrap.querySelector(".sale-item-price");
- const qtyInput=wrap.querySelector(".sale-item-qty");
- const discountInput=wrap.querySelector(".sale-item-discount");
+ const search=tr.querySelector(".sale-course-search");
+ const idInput=tr.querySelector(".sale-course-id");
+ const results=tr.querySelector(".sale-course-search-results");
+ const priceInput=tr.querySelector(".sale-item-price");
+ const qtyInput=tr.querySelector(".sale-item-qty");
+ const discountType=tr.querySelector(".sale-item-discount-type");
+ const discountValue=tr.querySelector(".sale-item-discount-value");
 
  function renderCourseSearch(){
    const q=search.value.trim().toLowerCase();
@@ -933,12 +1043,8 @@ function addSaleItemRow(name="",price=0,qty=1,courseId=""){
    results.innerHTML=matches.map(c=>`<button type="button" data-course-id="${attr(c.id)}"><strong>${esc(c.name)}</strong><div class="muted">ID: ${esc(c.id)} · ${money(c.price)}</div></button>`).join("");
    results.classList.toggle("show",!!q&&matches.length>0);
    const exact=findCourseMatch(search.value);
-   if(exact){
-     idInput.value=String(exact.id);
-     if(document.activeElement!==priceInput)priceInput.value=Number(exact.price||0);
-   }else{
-     idInput.value="";
-   }
+   if(exact){idInput.value=String(exact.id);if(document.activeElement!==priceInput)priceInput.value=Number(exact.price||0)}
+   else idInput.value="";
    updateSaleTotals();
  }
  search.addEventListener("input",renderCourseSearch);
@@ -949,10 +1055,11 @@ function addSaleItemRow(name="",price=0,qty=1,courseId=""){
    search.value=c.name||"";idInput.value=String(c.id);priceInput.value=Number(c.price||0);
    results.classList.remove("show");updateSaleTotals();
  });
- document.addEventListener("click",function closeSaleSearch(e){if(!wrap.contains(e.target))results.classList.remove("show")},{once:false});
+ search.addEventListener("blur",()=>setTimeout(()=>results.classList.remove("show"),180));
+ [qtyInput,priceInput,discountType,discountValue].forEach(i=>i.addEventListener("input",updateSaleTotals));
+ [discountType].forEach(i=>i.addEventListener("change",updateSaleTotals));
+ tr.querySelector(".remove-sale-item").onclick=()=>{tr.remove();if(!$("saleItems").children.length)addSaleItemRow();updateSaleTotals()};
 
- [qtyInput,priceInput,discountInput].forEach(i=>i.addEventListener("input",updateSaleTotals));
- wrap.querySelector(".remove-sale-item").onclick=()=>{wrap.remove();updateSaleTotals()};
  if(courseId){
    const c=getSalesCourses().find(x=>String(x.id)===String(courseId));
    if(c){search.value=c.name||name;idInput.value=String(c.id);priceInput.value=Number(price||c.price||0)}
@@ -972,63 +1079,107 @@ function getSaleItems(){
    const price=parseMoneyInput(w.querySelector(".sale-item-price").value);
    const quantity=Math.max(1,parseInt(w.querySelector(".sale-item-qty").value,10)||1);
    const base=price*quantity;
-   const discount=parseDiscount(w.querySelector(".sale-item-discount").value,base);
-   return {
-     name,course_id:course?.id||null,unit_price:price,quantity,
-     discount_input:w.querySelector(".sale-item-discount").value.trim(),
-     discount_amount:discount.amount,
-     discount_type:discount.type,
-     subtotal:Math.max(0,base-discount.amount)
-   };
+   const type=w.querySelector(".sale-item-discount-type").value;
+   const value=parseMoneyInput(w.querySelector(".sale-item-discount-value").value);
+   const discount=type==="percent"?Math.min(base,base*value/100):Math.min(base,value);
+   return {name,course_id:course?.id||null,unit_price:price,quantity,
+     discount_input:type==="percent"?`${value}%`:`$${value.toFixed(2)}`,
+     discount_amount:discount,discount_type:type,discount_value:value,
+     subtotal:Math.max(0,base-discount)};
  }).filter(x=>x.name);
 }
 
-function updateSaleTotals(){
- const items=getSaleItems();
- const gross=items.reduce((a,x)=>a+x.unit_price*x.quantity,0);
- const discount=items.reduce((a,x)=>a+x.discount_amount,0);
- const subtotal=items.reduce((a,x)=>a+x.subtotal,0);
- const delivery=parseMoneyInput($("saleDeliveryFee")?.value);
- const initialTotal=Math.max(0,subtotal+delivery);
- const initialPayment=parseMoneyInput($("saleInitialPayment")?.value);
- const partialPayment=parseMoneyInput($("salePartialPayment")?.value);
- const paidBalance=Math.min(initialTotal,initialPayment+partialPayment);
- const due=Math.max(0,initialTotal-paidBalance);
+function getOverallDiscount(subInitialTotal){
+ const type=$("saleOverallDiscountType").value;
+ const value=parseMoneyInput($("saleOverallDiscountValue").value);
+ const amount=type==="percent"?Math.min(subInitialTotal,subInitialTotal*value/100):Math.min(subInitialTotal,value);
+ return {type,value,amount};
+}
 
- $("saleItemsSubtotal").textContent=money(gross);
- $("saleDiscountTotal").textContent=money(discount);
- $("saleDeliveryFeeTotal").textContent=money(delivery);
- $("saleInitialTotal").textContent=money(initialTotal);
- $("saleGrandTotal").textContent=money(initialTotal);
- $("saleGrandTotalInput").value=money(initialTotal);
- $("saleDue").value=money(due);
- $("salePaidBalance").value=money(paidBalance);
- $("saleBalance").textContent=money(due);
+function studentOutstanding(studentId){
+ if(!studentId)return 0;
+ return salesRecords.filter(s=>saleStudentId(s)===String(studentId)).reduce((sum,s)=>sum+Math.max(0,saleTotal(s)-salePaid(s)),0);
+}
+
+function setPaymentStatusDefaults(){
+ const status=$("salePaymentStatus").value;
+ const total=calculateSaleTotal().initialTotal;
+ const input=$("saleAmountPaidNow");
+ if(status==="Paid")input.value=total.toFixed(2);
+ else if(status==="Due")input.value="0.00";
+ else{
+   const current=parseMoneyInput(input.value);
+   input.value=Math.min(current,total).toFixed(2);
+ }
+ input.readOnly=status!=="Partial";
+ input.style.background=status==="Partial"?"#fff":"#f3f7f7";
+ updateSaleTotals();
+}
+
+function calculateSaleTotal(){
+ const items=getSaleItems();
+ const subInitialTotal=items.reduce((a,x)=>a+x.subtotal,0);
+ const overall=getOverallDiscount(subInitialTotal);
+ const initialTotal=Math.max(0,subInitialTotal-overall.amount);
+ const paidNow=Math.min(initialTotal,parseMoneyInput($("saleAmountPaidNow")?.value));
+ const due=Math.max(0,initialTotal-paidNow);
+ const existingDue=studentOutstanding($("saleStudentId")?.value);
+ const grandStudentDue=Math.max(0,existingDue+due);
+ return {items,subInitialTotal,overall,initialTotal,paidNow,due,existingDue,grandStudentDue};
+}
+
+function updateSaleTotals(){
+ const calc=calculateSaleTotal();
+ $("saleItemsSubtotal").textContent=money(calc.subInitialTotal);
+ $("saleSummarySubtotal").textContent=money(calc.subInitialTotal);
+ $("saleSummaryDiscount").textContent=calc.overall.type==="percent"
+   ? `-${money(calc.overall.amount)} (${calc.overall.value}%)`
+   : `-${money(calc.overall.amount)}`;
+ $("saleInitialTotal").textContent=money(calc.initialTotal);
+ $("salePaidBalanceDisplay").textContent=money(calc.paidNow);
+ $("saleDueDisplay").textContent=money(calc.due);
+ $("saleGrandTotalDue").textContent=money(calc.grandStudentDue);
 
  document.querySelectorAll("#saleItems .sale-item").forEach(w=>{
    const p=parseMoneyInput(w.querySelector(".sale-item-price").value);
    const q=Math.max(1,parseInt(w.querySelector(".sale-item-qty").value,10)||1);
-   const d=parseDiscount(w.querySelector(".sale-item-discount").value,p*q);
-   w.querySelector(".sale-item-subtotal").value=money(Math.max(0,p*q-d.amount));
+   const type=w.querySelector(".sale-item-discount-type").value;
+   const value=parseMoneyInput(w.querySelector(".sale-item-discount-value").value);
+   const base=p*q;
+   const d=type==="percent"?Math.min(base,base*value/100):Math.min(base,value);
+   w.querySelector(".sale-item-subtotal").value=money(Math.max(0,base-d));
  });
 }
+
 function resetSaleForm(){
  $("saleStudentSearch").value="";$("saleStudentId").value="";
  $("saleDate").value=formatDateTimeLocalValue();$("saleReference").value=nextSaleReference();
  $("saleItems").innerHTML="";addSaleItemRow();
- $("saleDeliveryFee").value="0";$("saleInitialPayment").value="0";$("salePartialPayment").value="0";$("salePaymentMethod").value="Cash";$("saleNote").value="";
- clearMsg($("newSaleStatus"));renderSaleStudentOptions();updateSaleTotals();
+ $("saleOverallDiscountType").value="percent";$("saleOverallDiscountValue").value="0";
+ $("salePaymentMethod").value="Cash";$("salePaymentStatus").value="Due";$("saleAmountPaidNow").value="0.00";
+ $("saleAmountPaidNow").readOnly=true;$("saleAmountPaidNow").style.background="#f3f7f7";
+ $("saleNote").value="";clearMsg($("newSaleStatus"));renderSaleStudentOptions();updateSaleTotals();
 }
-$("toggleSaleForm").onclick=()=>{$("saleForm").classList.toggle("hidden");if(!$("saleForm").classList.contains("hidden")){resetSaleForm();$("saleForm").scrollIntoView({behavior:"smooth",block:"start"})}};
-$("cancelSale").onclick=()=>{$("saleForm").classList.add("hidden");clearMsg($("newSaleStatus"))};
+
 $("addSaleItem").onclick=()=>addSaleItemRow();
-$("saleStudentSearch").oninput=renderSaleStudentOptions;
+$("saleStudentSearch").addEventListener("input",renderSaleStudentOptions);
+$("saleStudentSearch").addEventListener("change",selectSaleStudentByInput);
+$("saleStudentSearch").addEventListener("blur",()=>setTimeout(selectSaleStudentByInput,150));
+$("saleOverallDiscountType").addEventListener("change",updateSaleTotals);
+$("saleOverallDiscountValue").addEventListener("input",updateSaleTotals);
+$("salePaymentStatus").addEventListener("change",setPaymentStatusDefaults);
+$("saleAmountPaidNow").addEventListener("input",()=>{if($("salePaymentStatus").value==="Partial")updateSaleTotals()});
+
+$("cancelSale").onclick=()=>{$("saleForm").classList.add("hidden");clearMsg($("newSaleStatus"))};
+$("salesRefresh").onclick=loadSales;
+$("salesSearch").oninput=renderSales;
+$("salesPaymentFilter").onchange=renderSales;
+
 $("newSaleStudentBtn").onclick=()=>{$("saleStudentModal").classList.add("show");$("saleNewStudentName").focus()};
 $("closeSaleStudentModal").onclick=()=>{$("saleStudentModal").classList.remove("show");clearMsg($("saleNewStudentStatus"))};
 $("cancelSaleNewStudent").onclick=()=>{$("saleStudentModal").classList.remove("show");clearMsg($("saleNewStudentStatus"))};
 $("saleStudentModal").onclick=e=>{if(e.target.id==="saleStudentModal")$("saleStudentModal").classList.remove("show")};
 
-function formatSaleItems(v){if(!v)return"—";try{const arr=typeof v==="string"?JSON.parse(v):v;if(Array.isArray(arr))return arr.map(x=>`${x.name} × ${x.quantity} (${money(x.subtotal)})`).join("; ")}catch(_){}return String(v)}
 function formatSaleItems(v){
  if(!v)return"—";
  try{
@@ -1037,31 +1188,37 @@ function formatSaleItems(v){
  }catch(_){}
  return String(v);
 }
+
 function renderSales(){
  const q=$("salesSearch").value.trim().toLowerCase(),f=$("salesPaymentFilter").value;
  const rows=salesRecords.filter(s=>{
    const total=saleTotal(s),paid=salePaid(s),status=saleStatus(total,paid);
    const hay=[saleRef(s),saleCustomer(s),saleField(s,["student_phone","phone"],""),formatSaleItems(saleItemsValue(s))].join(" ").toLowerCase();
-   return(f==="all"||status===f)&&hay.includes(q)
+   return(f==="all"||status===f)&&hay.includes(q);
  });
  $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date / Time</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{
    const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
    const dt=saleDateValue(s),time=saleField(s,["sale_time","time"],"");
-   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${esc(status)}</span></td><td><div class="actions"><button class="light" onclick="showSaleInvoice('${attr(s.id)}','A4')">Invoice A4</button><button class="light" onclick="showSaleInvoice('${attr(s.id)}','A5')">Invoice A5</button>${bal>0.005?`<button class="gold" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`
+   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" onclick="showSaleInvoice('${attr(s.id)}','A4')">Invoice A4</button><button class="light" onclick="showSaleInvoice('${attr(s.id)}','A5')">Invoice A5</button>${bal>0.005?`<button class="gold" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
  }).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
  updateSalesMetrics();
 }
+
 function updateSalesMetrics(){
  const total=salesRecords.reduce((a,s)=>a+saleTotal(s),0),paid=salesRecords.reduce((a,s)=>a+salePaid(s),0);
- $("mSales").textContent=salesRecords.length;$("mSalesPaid").textContent=money(paid);$("mSalesBalance").textContent=money(Math.max(0,total-paid));$("mSalesDue").textContent=salesRecords.filter(s=>saleStatus(saleTotal(s),salePaid(s))!=="Paid").length;
+ $("mSales").textContent=salesRecords.length;
+ $("mSalesPaid").textContent=money(paid);
+ $("mSalesBalance").textContent=money(Math.max(0,total-paid));
+ $("mSalesDue").textContent=salesRecords.filter(s=>saleStatus(saleTotal(s),salePaid(s))!=="Paid").length;
 }
+
 async function recordSalePayment(id){
  const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
  const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
  const raw=prompt(`Due for ${saleRef(s)} is ${money(balance)}.\nEnter additional payment amount:`,String(balance));
  if(raw===null)return;
  const amount=parseMoneyInput(raw);
- if(!Number.isFinite(amount)||amount<=0||amount>balance+0.005){alert("Enter a valid payment amount not greater than the Due amount.");return}
+ if(amount<=0||amount>balance+0.005){alert("Enter a valid payment amount not greater than the Due amount.");return}
  const method=prompt("Payment method (Cash / ABA / Bank Transfer / Card / Other):","Cash")||"Cash";
  try{
    const paymentDate=new Date();
@@ -1079,21 +1236,97 @@ async function recordSalePayment(id){
    await loadSales();
  }catch(e){alert(e.message||"Could not record payment.")}
 }
+
 function showSaleInvoice(id,size="A4"){
  const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
  const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
  let items=[];try{items=typeof saleItemsValue(s)==="string"?JSON.parse(saleItemsValue(s)):saleItemsValue(s)||[]}catch(_){}
  const dt=String(saleDateValue(s)||"").slice(0,10),time=saleField(s,["sale_time","time"],"");
- $("invoicePrint").innerHTML=`<div style="font-size:12px"><div class="invoice-head"><div><div style="font-size:24px;font-weight:900;color:#075e66">MEDI FELLA</div><div>Beauty School</div><div class="muted">Sales Invoice</div></div><div style="text-align:right"><strong>INVOICE</strong><br>No: ${esc(saleRef(s))}<br>Date: ${esc(dt)}${time?`<br>Time: ${esc(String(time).slice(0,5))}`:""}</div></div><div style="margin-top:15px"><strong>Customer / Student:</strong> ${esc(saleCustomer(s)||"—")}<br><strong>Phone:</strong> ${esc(saleField(s,["student_phone","phone"],"—"))}</div><table class="invoice-table"><thead><tr><th>#</th><th>Course / Product</th><th>Qty</th><th>Unit Price</th><th>Discount</th><th>Subtotal</th></tr></thead><tbody>${items.length?items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name||"")}</td><td>${esc(x.quantity)}</td><td>${money(x.unit_price)}</td><td>${esc(x.discount_input||"")} (${money(x.discount_amount||0)})</td><td>${money(x.subtotal)}</td></tr>`).join(""):`<tr><td>1</td><td colspan="5">${esc(formatSaleItems(saleItemsValue(s)))}</td></tr>`}</tbody></table><div style="margin-left:auto;width:360px;margin-top:15px"><div style="display:flex;justify-content:space-between"><span>Gross Subtotal</span><strong>${money(saleField(s,["subtotal"],total)+Number(saleField(s,["discount"],0)))}</strong></div><div style="display:flex;justify-content:space-between"><span>Discount</span><strong>${money(saleField(s,["discount"],0))}</strong></div><div style="display:flex;justify-content:space-between"><span>Delivery Fee</span><strong>${money(saleField(s,["shipping","delivery_fee"],0))}</strong></div><hr><div style="display:flex;justify-content:space-between;font-size:18px"><span>Grand Total</span><strong>${money(total)}</strong></div><div style="display:flex;justify-content:space-between"><span>Paid Balance</span><strong>${money(paid)}</strong></div><div style="display:flex;justify-content:space-between"><span>Due</span><strong>${money(balance)}</strong></div><div style="display:flex;justify-content:space-between"><span>Status</span><strong>${esc(saleStatus(total,paid))}</strong></div></div><div style="margin-top:50px;display:flex;justify-content:space-between"><span>Seller Signature</span><span>Buyer Signature</span></div><div class="invoice-actions"><button class="light" onclick="printInvoice('${size}')">Print / Save PDF (${size})</button><button class="danger" onclick="closeInvoice()">Close</button></div></div>`;
+ $("invoicePrint").innerHTML=`<div style="font-size:12px"><div class="invoice-head"><div><div style="font-size:24px;font-weight:900;color:#42b8c8">MEDI FELLA</div><div>Beauty School</div><div class="muted">Sales Invoice</div></div><div style="text-align:right"><strong>INVOICE</strong><br>No: ${esc(saleRef(s))}<br>Date: ${esc(dt)}${time?`<br>Time: ${esc(String(time).slice(0,5))}`:""}</div></div><div style="margin-top:15px"><strong>Customer / Student:</strong> ${esc(saleCustomer(s)||"—")}<br><strong>Phone:</strong> ${esc(saleField(s,["student_phone","phone"],"—"))}</div><table class="invoice-table"><thead><tr><th>#</th><th>Course / Product</th><th>Qty</th><th>Unit Price</th><th>Discount</th><th>Subtotal</th></tr></thead><tbody>${items.length?items.map((x,i)=>`<tr><td>${i+1}</td><td>${esc(x.name||"")}</td><td>${esc(x.quantity)}</td><td>${money(x.unit_price)}</td><td>${esc(x.discount_input||"")} (${money(x.discount_amount||0)})</td><td>${money(x.subtotal)}</td></tr>`).join(""):`<tr><td>1</td><td colspan="5">${esc(formatSaleItems(saleItemsValue(s)))}</td></tr>`}</tbody></table><div style="margin-left:auto;width:360px;margin-top:15px"><div style="display:flex;justify-content:space-between"><span>Sub Initial Total</span><strong>${money(saleField(s,["subtotal"],total))}</strong></div><div style="display:flex;justify-content:space-between"><span>Overall Discount</span><strong>${money(saleField(s,["discount"],0))}</strong></div><hr><div style="display:flex;justify-content:space-between;font-size:18px"><span>Initial Total</span><strong>${money(total)}</strong></div><div style="display:flex;justify-content:space-between"><span>Paid Balance</span><strong>${money(paid)}</strong></div><div style="display:flex;justify-content:space-between"><span>Due</span><strong>${money(balance)}</strong></div><div style="display:flex;justify-content:space-between"><span>Status</span><strong>${esc(saleStatus(total,paid)==="Partial"?"Partial Payment":saleStatus(total,paid))}</strong></div></div><div style="margin-top:22px"><strong>Sale Note:</strong><div>${esc(saleField(s,["notes","note"],"—"))}</div></div><div style="margin-top:50px;display:flex;justify-content:space-between"><span>Seller Signature</span><span>Buyer Signature</span></div><div class="invoice-actions"><button class="light" onclick="printInvoice('${size}')">Print / Save PDF (${size})</button><button class="danger" onclick="closeInvoice()">Close</button></div></div>`;
  $("invoiceOverlay").classList.add("show");
 }
 function printInvoice(size){const style=document.createElement("style");style.id="invoicePrintSize";style.textContent=`@page{size:${size};margin:10mm}`;document.head.appendChild(style);window.print();setTimeout(()=>style.remove(),1000)}
 function closeInvoice(){$("invoiceOverlay").classList.remove("show")}
 $("invoiceOverlay").onclick=e=>{if(e.target.id==="invoiceOverlay")closeInvoice()};
+
 function startSaleForStudent(studentId){
- document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
- const nav=document.querySelector('.nav[data-section="sales"]');if(nav)nav.classList.add("active");$("sales").classList.add("active");$("saleForm").classList.remove("hidden");renderSaleStudentOptions();resetSaleForm();const student=students.find(s=>String(s.id)===String(studentId)); if(student){$("saleStudentSearch").value=student.full_name||"";$("saleStudentId").value=String(student.id);$("saleStudentHint").textContent=`Selected: ${student.full_name||"Student"} · ${student.student_id||"No ID"} · ${student.phone||"No phone"}`;}$("saleForm").scrollIntoView({behavior:"smooth",block:"start"});
+ document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
+ document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
+ const nav=document.querySelector('.nav[data-section="sales"]');
+ if(nav)nav.classList.add("active");
+ $("sales").classList.add("active");
+ $("saleForm").classList.remove("hidden");
+ resetSaleForm();
+ const student=students.find(s=>String(s.id)===String(studentId));
+ if(student){
+   $("saleStudentSearch").value=student.full_name||"";
+   $("saleStudentId").value=String(student.id);
+   $("saleStudentHint").textContent=`Selected: ${student.full_name||"Student"} · ${student.student_id||"No ID"} · ${student.phone||"No phone"}`;
+   updateSaleTotals();
+ }
+ $("saleForm").scrollIntoView({behavior:"smooth",block:"start"});
 }
+
+$("saveSale").onclick=async()=>{
+ clearMsg($("newSaleStatus"));
+ selectSaleStudentByInput();
+ const studentId=$("saleStudentId").value;
+ const student=students.find(s=>String(s.id)===String(studentId));
+ const calc=calculateSaleTotal();
+ const saleDateTime=$("saleDate").value;
+ const saleDate=saleDateForDb(saleDateTime);
+ const saleTime=saleTimeForDb(saleDateTime);
+ const reference=$("saleReference").value.trim()||nextSaleReference();
+ const status=$("salePaymentStatus").value;
+ const amountPaid=calc.paidNow;
+
+ if(!student){msg($("newSaleStatus"),"Please select a student/customer by name, Student ID or phone.",true);return}
+ if(!saleDateTime){msg($("newSaleStatus"),"Please select the sale date and time.",true);return}
+ if(!calc.items.length){msg($("newSaleStatus"),"Add at least one course or product.",true);return}
+ if(status==="Paid"&&amountPaid+0.005<calc.initialTotal){msg($("newSaleStatus"),"Paid status requires the full Initial Total.",true);return}
+ if(status==="Due"&&amountPaid>0.005){msg($("newSaleStatus"),"Due status must have $0.00 paid.",true);return}
+ if(status==="Partial"&&(amountPaid<=0||amountPaid>=calc.initialTotal-0.005)){msg($("newSaleStatus"),"Partial Payment must be greater than $0 and less than the Initial Total.",true);return}
+
+ $("saveSale").disabled=true;
+ try{
+   const payload={
+     reference_no:reference,
+     sale_date:saleDate,
+     student_id:String(student.id),
+     student_name:student.full_name||"",
+     student_phone:student.phone||"",
+     subtotal:calc.subInitialTotal,
+     discount:calc.overall.amount,
+     shipping:0,
+     grand_total:calc.initialTotal,
+     paid:amountPaid,
+     balance:calc.due,
+     payment_status:status,
+     sale_status:"Completed",
+     items:calc.items,
+     notes:$("saleNote").value.trim(),
+     created_by:adminUser.id
+   };
+   let result=await sb.from("medifella_sales").insert({...payload,sale_time:saleTime}).select().single();
+   if(result.error&&/sale_time|column .* does not exist/i.test(result.error.message||"")){
+     result=await sb.from("medifella_sales").insert(payload).select().single();
+   }
+   if(result.error)throw result.error;
+
+   if(amountPaid>0){
+     const{error:pe}=await sb.from("medifella_sale_payments").insert({
+       sale_id:String(result.data.id),amount:amountPaid,payment_method:$("salePaymentMethod").value,
+       payment_date:saleDate,note:status==="Partial"?"Partial Payment":"Paid in Full",created_by:adminUser.id
+     });
+     if(pe)throw pe;
+   }
+   msg($("newSaleStatus"),"Sale saved successfully.");
+   $("saleForm").classList.add("hidden");
+   await loadSales();
+ }catch(e){
+   msg($("newSaleStatus"),e.message||"Could not save sale.",true);
+ }finally{$("saveSale").disabled=false}
+};
 
 async function loadCertificates(){
  const{data,error}=await sb.from("certificates").select("*").order("issuedate",{ascending:false});
@@ -1617,76 +1850,4 @@ boot();
 
 </script>
 </body>
-</html$("saveSale").onclick=async()=>{
- clearMsg($("newSaleStatus"));
- const studentId=$("saleStudentId").value;
- const student=students.find(s=>String(s.id)===String(studentId));
- const items=getSaleItems();
- const saleDateTime=$("saleDate").value;
- const saleDate=saleDateForDb(saleDateTime);
- const saleTime=saleTimeForDb(saleDateTime);
- const reference=$("saleReference").value.trim()||nextSaleReference();
- const discount=items.reduce((a,x)=>a+x.discount_amount,0);
- const delivery=parseMoneyInput($("saleDeliveryFee").value);
- const subtotal=items.reduce((a,x)=>a+x.subtotal,0);
- const grandTotal=Math.max(0,subtotal+delivery);
- const initialPayment=parseMoneyInput($("saleInitialPayment").value);
- const partialPayment=parseMoneyInput($("salePartialPayment").value);
- const paidBalance=Math.min(grandTotal,initialPayment+partialPayment);
- const due=Math.max(0,grandTotal-paidBalance);
-
- if(!student){msg($("newSaleStatus"),"Please select a student/customer by name, Student ID or phone.",true);return}
- if(!saleDateTime){msg($("newSaleStatus"),"Please select the sale date and time.",true);return}
- if(!items.length){msg($("newSaleStatus"),"Add at least one course or product.",true);return}
- if(initialPayment+partialPayment>grandTotal+0.005){msg($("newSaleStatus"),"Initial Payment + Partial Payment cannot be greater than the Grand Total.",true);return}
-
- $("saveSale").disabled=true;
- try{
-  const payload={
-    reference_no:reference,
-    sale_date:saleDate,
-    student_id:String(student.id),
-    student_name:student.full_name||"",
-    student_phone:student.phone||"",
-    subtotal,
-    discount,
-    shipping:delivery,
-    grand_total:grandTotal,
-    paid:paidBalance,
-    balance:due,
-    payment_status:saleStatus(grandTotal,paidBalance),
-    sale_status:"Completed",
-    items,
-    notes:$("saleNote").value.trim(),
-    created_by:adminUser.id
-  };
-
-  // Keep the existing database compatible. If sale_time exists, save the exact time too.
-  let result=await sb.from("medifella_sales").insert({...payload,sale_time:saleTime}).select().single();
-  if(result.error && /sale_time|column .* does not exist/i.test(result.error.message||"")){
-    result=await sb.from("medifella_sales").insert(payload).select().single();
-  }
-  if(result.error)throw result.error;
-
-  const paymentRows=[];
-  if(initialPayment>0){
-    paymentRows.push({sale_id:String(result.data.id),amount:initialPayment,payment_method:$("salePaymentMethod").value,payment_date:saleDate,note:"Initial payment",created_by:adminUser.id});
-  }
-  if(partialPayment>0){
-    paymentRows.push({sale_id:String(result.data.id),amount:partialPayment,payment_method:$("salePaymentMethod").value,payment_date:saleDate,note:"Partial payment",created_by:adminUser.id});
-  }
-  if(paymentRows.length){
-    const {error:pe}=await sb.from("medifella_sale_payments").insert(paymentRows);
-    if(pe)throw pe;
-  }
-
-  msg($("newSaleStatus"),"Sale saved successfully.");
-  $("saleForm").classList.add("hidden");
-  await loadSales();
- }catch(e){
-   msg($("newSaleStatus"),e.message||"Could not save sale.",true);
- }finally{
-   $("saveSale").disabled=false;
- }
-};
->
+</html>
