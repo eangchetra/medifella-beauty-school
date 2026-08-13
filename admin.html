@@ -1407,6 +1407,73 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="invoice-info-true-natural-spacing-final">
+/* TRUE FIX:
+   Do not use a fixed-width label column. Let each label take only the
+   width it actually needs, then put the value immediately after it with
+   a small guaranteed gap. This fixes the large empty space visible in
+   both Customer Information and Invoice Information. */
+#invoicePrint .mf-info-row,
+#invoiceOverlay .mf-info-row,
+#invoiceExportContent .mf-info-row{
+  display:grid!important;
+  grid-template-columns:max-content minmax(0,1fr)!important;
+  column-gap:12px!important;
+  align-items:center!important;
+  width:100%!important;
+}
+
+#invoicePrint .mf-info-row .label,
+#invoiceOverlay .mf-info-row .label,
+#invoiceExportContent .mf-info-row .label{
+  width:auto!important;
+  min-width:0!important;
+  max-width:none!important;
+  white-space:nowrap!important;
+  overflow:visible!important;
+  padding:0!important;
+  margin:0!important;
+}
+
+#invoicePrint .mf-info-row > div:last-child,
+#invoiceOverlay .mf-info-row > div:last-child,
+#invoiceExportContent .mf-info-row > div:last-child{
+  min-width:0!important;
+  width:auto!important;
+  white-space:nowrap!important;
+  padding:0!important;
+  margin:0!important;
+}
+
+/* Exchange rate must stay together. */
+#invoicePrint .mf-info-row .mf-rate,
+#invoiceOverlay .mf-info-row .mf-rate,
+#invoiceExportContent .mf-info-row .mf-rate{
+  display:block!important;
+  white-space:nowrap!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+/* A4 print/PDF: same natural label width. */
+#invoicePrint.invoice-print-a4 .mf-info-row{
+  grid-template-columns:max-content minmax(0,1fr)!important;
+  column-gap:10px!important;
+}
+
+/* A5: smaller but still natural. */
+#invoicePrint.invoice-print-a5 .mf-info-row{
+  grid-template-columns:max-content minmax(0,1fr)!important;
+  column-gap:6px!important;
+}
+#invoiceOverlay.preview-a5 .mf-info-row,
+#invoiceExportContent .invoice-export-a5 .mf-info-row{
+  grid-template-columns:max-content minmax(0,1fr)!important;
+  column-gap:6px!important;
+}
+</style>
+
 </head>
 <body>
 
