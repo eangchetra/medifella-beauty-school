@@ -169,9 +169,13 @@ function showCertificate(student){
   let englishName = "";
   let khmerName = "";
 
-  // Certificate names may be stored as "English / Khmer" or as
-  // "Khmer English" in older records. Display English first and Khmer below.
-  if(rawName.includes("/")){
+  // New certificates store English and Khmer on separate lines.
+  // Older certificates may use "English / Khmer" or "Khmer English".
+  const nameLines = rawName.split(/\\r?\\n/).map(x=>x.trim()).filter(Boolean);
+  if(nameLines.length >= 2){
+    englishName = nameLines[0];
+    khmerName = nameLines.slice(1).join(" ");
+  }else if(rawName.includes("/")){
     const parts = rawName.split("/");
     englishName = (parts[0] || "").trim();
     khmerName = (parts.slice(1).join("/") || "").trim();
