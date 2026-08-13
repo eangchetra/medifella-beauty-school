@@ -1940,8 +1940,8 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
     <div class="row">
       <div>
-        <label>Gender</label>
-        <select id="newStudentGender">
+        <label>Gender *</label>
+        <select id="newStudentGender" required>
           <option value="">Select gender</option>
           <option value="Male">Male</option>
           <option value="Female">Female</option>
@@ -1949,8 +1949,8 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
         </select>
       </div>
       <div>
-        <label>Date of Birth</label>
-        <input id="newStudentDob" type="date">
+        <label>Date of Birth *</label>
+        <input id="newStudentDob" type="date" required>
       </div>
     </div>
 
@@ -1966,11 +1966,20 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
       <div>
         <label>Registration</label>
         <input type="text" value="Student information only" readonly>
-        <div class="muted" style="margin-top:5px">Course is selected later in List Sales. Photo can be uploaded later.</div>
+        <div class="muted" style="margin-top:5px">Course is selected later in List Sales. Photo can be uploaded now or later.</div>
       </div>
     </div>
 
-    <div class="status" style="margin-top:12px">No course or photo is required during registration. The student/admin can add the photo later, and courses are selected from List Sales.</div>
+    <label>Registration Date & Time</label>
+    <input id="newStudentRegistrationDateTime" type="datetime-local" readonly>
+    <div class="muted" style="margin-top:5px">Automatically records the Cambodia registration date and time.</div>
+
+    <label>Student Photo (4×6, White Background)</label>
+    <input id="newStudentPhoto" type="file" accept="image/jpeg,image/png,image/webp">
+    <div class="muted" style="margin-top:5px">Optional during registration. You can upload it now or later from Edit Student.</div>
+    <div id="newStudentPhotoPreview" class="muted" style="margin-top:8px"></div>
+
+    <div class="status" style="margin-top:12px">No course is required during registration. Student photo is optional and can be uploaded now or later.</div>
 
     <div class="row" style="margin-top:14px">
       <button id="saveNewStudent" class="gold" type="button">Register Student</button>
@@ -2646,6 +2655,8 @@ function editStudent(id){
 function resetNewStudentForm(){
   ["newStudentName","newStudentNameKh","newStudentPhone","newStudentEmail","newStudentDob","newStudentAddress","newStudentStudentId"].forEach(id=>$(id).value="");
   $("newStudentGender").value="";
+  $("newStudentPhoto").value="";
+  $("newStudentPhotoPreview").innerHTML="";
   clearMsg($("newStudentStatus"));
 }
 $("toggleStudentRegister").onclick=()=>{
@@ -2659,6 +2670,17 @@ $("cancelNewStudent").onclick=()=>{
   resetNewStudentForm();
   $("studentRegisterCard").classList.add("hidden");
 };
+$("newStudentPhoto").onchange=()=>{
+  const f=$("newStudentPhoto").files[0];
+  if(!f){$("newStudentPhotoPreview").innerHTML="";return}
+  if(!["image/jpeg","image/png","image/webp"].includes(f.type)){
+    $("newStudentPhotoPreview").textContent="Student photo must be JPG, PNG, or WEBP.";
+    return;
+  }
+  const url=URL.createObjectURL(f);
+  $("newStudentPhotoPreview").innerHTML=`<div>Selected photo:</div><img src="${attr(url)}" alt="" style="width:90px;height:120px;object-fit:cover;border-radius:8px;margin-top:6px">`;
+};
+
 async function nextStudentId(){
   const year=new Date().getFullYear();
   const {data,error}=await sb.from("students").select("student_id").like("student_id",`MFS-${year}-%`);
@@ -2676,27 +2698,32 @@ $("saveNewStudent").onclick=async()=>{
   const fullNameKm=$("newStudentNameKh").value.trim();
   const phone=$("newStudentPhone").value.trim();
 
-  if(!fullName||!fullNameKm||!phone){
-    msg($("newStudentStatus"),"Please fill Full Name (English), Full Name (Khmer), and Phone Number.",true);return;
+  const gender=$("newStudentGender").value;
+  const dob=$("newStudentDob").value;
+  const photoFile=$("newStudentPhoto").files[0];
+
+  if(!fullName||!fullNameKm||!phone||!gender||!dob){
+    msg($("newStudentStatus"),"Please fill all required fields: English Name, Khmer Name, Phone Number, Gender, and Date of Birth.",true);return;
   }
   if(!/^\d{7,}$/.test(phone)){
     msg($("newStudentStatus"),"Phone number must contain at least 7 digits (for example 086454353).",true);return;
+  }
+  if(photoFile && !["image/jpeg","image/png","image/webp"].includes(photoFile.type)){
+    msg($("newStudentStatus"),"Student photo must be JPG, PNG, or WEBP.",true);return;
   }
 
   $("saveNewStudent").disabled=true;
   try{
     const studentId=await nextStudentId();
 
-    // Registration intentionally does NOT upload a photo.
-    // Student/admin can upload the photo later from Edit Student.
     const payload={
       student_id:studentId,
       full_name:fullName,
       full_name_km:fullNameKm,
       email:$("newStudentEmail").value.trim(),
       phone,
-      gender:$("newStudentGender").value,
-      date_of_birth:$("newStudentDob").value||null,
+      gender,
+      date_of_birth:dob,
       address:$("newStudentAddress").value.trim(),
       course:"",
       photo_url:null,
@@ -2707,7 +2734,18 @@ $("saveNewStudent").onclick=async()=>{
     const {data,error}=await sb.from("students").insert(payload).select().single();
     if(error)throw error;
 
-    msg($("newStudentStatus"),`Student registered successfully: ${data.student_id}. Course and photo can be added later.`);
+    if(photoFile){
+      const ext=photoFile.type==="image/png"?"png":photoFile.type==="image/webp"?"webp":"jpg";
+      const safeId=String(studentId).replace(/[^a-z0-9_-]/gi,"-");
+      const path=`${adminUser.id}/students/${safeId}.${ext}`;
+      const up=await sb.storage.from("student-photos").upload(path,photoFile,{upsert:true,contentType:photoFile.type});
+      if(up.error)throw up.error;
+      const photoUrl=sb.storage.from("student-photos").getPublicUrl(path).data.publicUrl;
+      const upd=await sb.from("students").update({photo_url:photoUrl}).eq("id",data.id);
+      if(upd.error)throw upd.error;
+    }
+
+    msg($("newStudentStatus"),`Student registered successfully: ${data.student_id}. ${photoFile?"Photo uploaded successfully.":"Photo can be uploaded later from Edit Student."}`);
     resetNewStudentForm();
     $("studentRegisterCard").classList.remove("hidden");
     await loadStudents();
