@@ -304,38 +304,46 @@ async function manualSearch(){
 }
 
 async function start(){
-  const id = new URLSearchParams(location.search).get("id");
+  const params = new URLSearchParams(location.search);
 
-  // Keep the search box visible for normal verification.
+  // Accept both formats so existing QR codes/links keep working:
+  // ?certificate=CERT-ID (new official format)
+  // ?id=CERT-ID (backward compatible)
+  const id = (params.get("certificate") || params.get("id") || "").trim();
+
+  // Normal visit to verify.html: show the search box.
   document.getElementById("searchBox").style.display = "block";
+  document.getElementById("card").style.display = "none";
+  document.getElementById("error").style.display = "none";
 
-  // If opened from a QR code/link with ?id=..., verify directly.
-  if(id){
-    document.getElementById("certInput").value = id;
+  // Direct certificate link / QR code: load and display the certificate
+  // immediately, without showing the search box.
+  if(!id) return;
 
-    try{
-      const student = await getCertificate(id);
+  document.getElementById("certInput").value = id;
+  document.getElementById("searchBox").style.display = "none";
 
-      if(!student){
-        showError();
-        return;
-      }
+  try{
+    const student = await getCertificate(id);
 
-      document.getElementById("searchBox").style.display = "none";
-      records = [student];
-      showCertificate(student);
-    }catch(error){
-      console.error(error);
+    if(!student){
+      showError();
+      return;
+    }
 
-      if(error.message.includes("public key")){
-        showError(
-          "Certificate verification is not configured yet. Please add the Supabase public/publishable key to verify.html."
-        );
-      }else{
-        showError(
-          "Unable to connect to the certificate database. Please try again."
-        );
-      }
+    records = [student];
+    showCertificate(student);
+  }catch(error){
+    console.error(error);
+
+    if(error.message.includes("public key")){
+      showError(
+        "Certificate verification is not configured yet. Please add the Supabase public/publishable key to verify.html."
+      );
+    }else{
+      showError(
+        "Unable to connect to the certificate database. Please try again."
+      );
     }
   }
 }
