@@ -2239,9 +2239,13 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <label>Certificate ID <span style="color:#9d2d2d">*</span></label>
 <input id="certNo" placeholder="MEDIFELLA01202547" required>
 
-<label>Student Name <span style="color:#9d2d2d">*</span></label>
-<textarea id="certName" rows="2" placeholder="CHIEM CHARIYA
-ជៀម ចរិយា" required style="resize:vertical;line-height:1.5"></textarea>
+<label>Full Name in English <span style="color:#9d2d2d">*</span></label>
+<input id="certNameEnglish" type="text" placeholder="CHIEM CHARIYA" required>
+
+<label>Full Name in Khmer <span style="color:#9d2d2d">*</span></label>
+<input id="certNameKhmer" type="text" placeholder="ជៀម ចរិយា" required>
+
+<input id="certName" type="hidden">
 <input id="certStudentId" type="hidden">
 
 <label>Sex <span style="color:#9d2d2d">*</span></label>
@@ -4107,6 +4111,31 @@ function setupCertificateCourseAndDuration(){
 }
 setupCertificateCourseAndDuration();
 
+function syncCertificateNames(){
+  const en=String($("certNameEnglish")?.value||"").trim();
+  const km=String($("certNameKhmer")?.value||"").trim();
+  $("certName").value = en && km ? `${en}\n${km}` : (en || km);
+}
+
+function splitCertificateNames(value){
+  const raw=String(value||"").trim();
+  if(!raw)return {en:"",km:""};
+  const lines=raw.split(/\r?\n/).map(x=>x.trim()).filter(Boolean);
+  if(lines.length>=2)return {en:lines[0],km:lines.slice(1).join(" ")};
+  if(raw.includes("/")){
+    const p=raw.split("/");
+    return {en:(p.shift()||"").trim(),km:p.join("/").trim()};
+  }
+  return {en:raw,km:""};
+}
+
+function setupCertificateNameFields(){
+  ["certNameEnglish","certNameKhmer"].forEach(id=>{
+    $(id)?.addEventListener("input",syncCertificateNames);
+  });
+  syncCertificateNames();
+}
+
 function setCertificateStudentPhoto(url){
   const clean=String(url||"").trim();
   $("certStudentPhotoUrl").value=clean;
@@ -4134,11 +4163,10 @@ function fillCertificateFromStudent(s){
   // fields editable so missing information can be entered manually.
   const fullName=String(s.full_name||"").trim();
   const fullNameKm=String(s.full_name_km||"").trim();
-  const displayName=fullName && fullNameKm
-    ? `${fullName}\n${fullNameKm}`
-    : (fullName || fullNameKm);
 
-  if(displayName)$("certName").value=displayName;
+  $("certNameEnglish").value=fullName;
+  $("certNameKhmer").value=fullNameKm;
+  syncCertificateNames();
 
   if(s.gender){
     const gender=String(s.gender);
@@ -4159,7 +4187,7 @@ function fillCertificateFromStudent(s){
   setCertificateStudentPhoto(s.photo_url||"");
 
   $("certStudentSelected").textContent=
-    `Selected: ${certificateStudentDisplayName(s)} · ${s.student_id||"No Student ID"} · ${s.phone||"No phone"}`;
+    `Selected: ${fullName || fullNameKm || "Student"}${fullName && fullNameKm ? " / " + fullNameKm : ""} · ${s.student_id||"No Student ID"} · ${s.phone||"No phone"}`;
 
   $("certStudentResults").innerHTML="";
   $("certStudentResults").classList.remove("show");
@@ -4289,7 +4317,10 @@ function editCertificate(certificateId){
  if(!c)return;
 
  $("certNo").value=certId(c);
- $("certName").value=certName(c);
+ const parsedNames=splitCertificateNames(certName(c));
+ $("certNameEnglish").value=parsedNames.en;
+ $("certNameKhmer").value=parsedNames.km;
+ syncCertificateNames();
  $("certSex").value=c.sex||"";
  $("certDob").value=certDob(c);
  setCertificateCourseValue(c.course||"");
@@ -4421,6 +4452,7 @@ async function uploadCertificatePhotoToCloudflare(file, certificateId){
 
 $("certCreate").onclick=async()=>{
  clearMsg($("certStatus"));
+ syncCertificateNames();
 
  const no=$("certNo").value.trim(),
        name=$("certName").value.trim(),
@@ -4515,7 +4547,7 @@ $("certCreate").onclick=async()=>{
      ?"Certificate updated successfully."
      :"Certificate saved successfully. It is now available for verification.");
 
-   ["certNo","certName","certDob","certCourse","certDuration","certDate","certCompletionDate","certDurationValue"].forEach(id=>$(id).value="");
+   ["certNo","certName","certNameEnglish","certNameKhmer","certDob","certCourse","certDuration","certDate","certCompletionDate","certDurationValue"].forEach(id=>$(id).value="");
    $("certSex").value="";
    $("certCourseSelect").value="";
    $("certCourseManual").value="";
@@ -4523,6 +4555,7 @@ $("certCreate").onclick=async()=>{
    $("certDurationUnit").value="day";
    $("certFile").value="";
    resetCertificateStudentLookup();
+   syncCertificateNames();
     $("certNo").readOnly=false;
     $("certCreate").textContent="Save Certificate";
 
