@@ -2214,11 +2214,24 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div class="two">
 <div class="card"><h2>Create / Upload Certificate</h2>
 
+<div class="cert-student-lookup">
+  <div class="cert-student-lookup-title">Find Student</div>
+  <div class="cert-student-search-wrap">
+    <input id="certStudentSearch" type="text" autocomplete="off"
+           placeholder="Search Student Name, Student ID or Phone Number">
+    <div id="certStudentResults" class="cert-student-results"></div>
+  </div>
+  <div id="certStudentSelected" class="cert-student-selected muted">
+    Search for a registered student. Select a result to automatically fill the certificate information below.
+  </div>
+</div>
+
 <label>Certificate ID <span style="color:#9d2d2d">*</span></label>
 <input id="certNo" placeholder="MEDIFELLA01202547" required>
 
 <label>Student Name <span style="color:#9d2d2d">*</span></label>
-<input id="certName" placeholder="ជៀម ចរិយា CHIEM CHARIYA" required>
+<input id="certName" placeholder="CHIEM CHARIYA / ជៀម ចរិយា" required>
+<input id="certStudentId" type="hidden">
 
 <label>Sex <span style="color:#9d2d2d">*</span></label>
 <select id="certSex" required>
@@ -3666,6 +3679,59 @@ async function printInvoice(id,size="A4"){
  #paper img{display:block;width:${paper.widthMm}mm;height:${paper.heightMm}mm;max-width:none;max-height:none;margin:0;padding:0}
 
 
+
+/* Certificate student lookup */
+.cert-student-lookup{
+  margin:0 0 16px;
+  padding:12px;
+  border:1px solid var(--line);
+  border-radius:12px;
+  background:#f7fbfb;
+}
+.cert-student-lookup-title{
+  font-weight:800;
+  margin-bottom:7px;
+}
+.cert-student-search-wrap{position:relative}
+#certStudentSearch{
+  width:100%;
+  box-sizing:border-box;
+}
+.cert-student-results{
+  position:absolute;
+  left:0;
+  right:0;
+  top:100%;
+  z-index:25;
+  display:none;
+  max-height:240px;
+  overflow:auto;
+  background:#fff;
+  border:1px solid var(--line);
+  border-radius:10px;
+  box-shadow:0 10px 25px #075e6618;
+}
+.cert-student-results.show{display:block}
+.cert-student-result{
+  display:block;
+  width:100%;
+  border:0;
+  border-bottom:1px solid var(--line);
+  border-radius:0;
+  background:#fff;
+  color:var(--text);
+  text-align:left;
+  padding:10px 12px;
+  cursor:pointer;
+}
+.cert-student-result:last-child{border-bottom:0}
+.cert-student-result:hover{background:#e8f1f2}
+.cert-student-result strong{display:block}
+.cert-student-result .muted{font-size:12px;margin-top:2px}
+.cert-student-selected{
+  margin-top:7px;
+  font-size:12px;
+}
 </style>
 </head>
 <body>
@@ -3866,6 +3932,138 @@ ${certPhoto(c)?`<div style="margin-top:8px"><a href="${attr(certPhoto(c))}" targ
 }
 $("certSearch").oninput=renderCertificates;
 
+function certificateStudentMatches(s,q){
+  const hay=[
+    s?.full_name,
+    s?.full_name_km,
+    s?.student_id,
+    s?.phone,
+    s?.email
+  ].join(" ").toLowerCase();
+  return !q || hay.includes(q);
+}
+
+function certificateStudentDisplayName(s){
+  const en=String(s?.full_name||"").trim();
+  const km=String(s?.full_name_km||"").trim();
+  if(en && km)return `${en} / ${km}`;
+  return en || km || "Student";
+}
+
+function certificateStudentDate(s){
+  return normalizeDate(s?.date_of_birth || "");
+}
+
+function fillCertificateFromStudent(s){
+  if(!s)return;
+
+  $("certStudentId").value=String(s.id||"");
+  $("certStudentSearch").value=certificateStudentDisplayName(s);
+
+  // Only overwrite fields for which the student record actually has data.
+  // This keeps any manually entered information that the student record lacks.
+  const fullName=String(s.full_name||"").trim();
+  const fullNameKm=String(s.full_name_km||"").trim();
+  const displayName=fullName && fullNameKm ? `${fullName} / ${fullNameKm}` : (fullName || fullNameKm);
+  if(displayName)$("certName").value=displayName;
+
+  if(s.gender){
+    const gender=String(s.gender);
+    if(["Male","Female"].includes(gender))$("certSex").value=gender;
+  }
+
+  const dob=certificateStudentDate(s);
+  if(dob)$("certDob").value=dob;
+
+  // If the student has a course saved, use it. Otherwise leave Course for manual entry.
+  if(s.course && String(s.course).trim()){
+    $("certCourse").value=String(s.course).trim();
+
+    // If the course is also in Course Management, use its duration when available.
+    const courseName=String(s.course).trim().toLowerCase();
+    const matchedCourse=(courses||[]).find(c=>String(c.name||"").trim().toLowerCase()===courseName);
+    if(matchedCourse?.duration && String(matchedCourse.duration).trim()){
+      $("certDuration").value=String(matchedCourse.duration).trim();
+    }
+  }
+
+  $("certStudentSelected").textContent=
+    `Selected: ${certificateStudentDisplayName(s)} · ${s.student_id||"No Student ID"} · ${s.phone||"No phone"}`;
+
+  $("certStudentResults").innerHTML="";
+  $("certStudentResults").classList.remove("show");
+}
+
+function renderCertificateStudentResults(){
+  const input=$("certStudentSearch");
+  const results=$("certStudentResults");
+  if(!input||!results)return;
+
+  const q=input.value.trim().toLowerCase();
+  if(!q){
+    results.innerHTML="";
+    results.classList.remove("show");
+    return;
+  }
+
+  const matches=students
+    .filter(s=>certificateStudentMatches(s,q))
+    .slice(0,15);
+
+  results.innerHTML=matches.length
+    ? matches.map(s=>`<button type="button" class="cert-student-result"
+          data-student-id="${attr(s.id)}">
+          <strong>${esc(s.full_name||s.full_name_km||"Student")}</strong>
+          <div class="muted">${s.full_name_km ? esc(s.full_name_km)+" · " : ""}ID: ${esc(s.student_id||"—")} · Phone: ${esc(s.phone||"—")}</div>
+        </button>`).join("")
+    : `<div class="muted" style="padding:12px">No registered student found.</div>`;
+
+  results.classList.add("show");
+}
+
+function setupCertificateStudentLookup(){
+  const input=$("certStudentSearch");
+  const results=$("certStudentResults");
+  if(!input||!results)return;
+
+  input.addEventListener("input",renderCertificateStudentResults);
+  input.addEventListener("focus",renderCertificateStudentResults);
+
+  results.addEventListener("mousedown",e=>{
+    const btn=e.target.closest("button[data-student-id]");
+    if(!btn)return;
+    e.preventDefault();
+    const student=students.find(s=>String(s.id)===String(btn.dataset.studentId));
+    if(student)fillCertificateFromStudent(student);
+  });
+
+  input.addEventListener("keydown",e=>{
+    if(e.key==="Escape"){
+      results.innerHTML="";
+      results.classList.remove("show");
+    }
+  });
+
+  input.addEventListener("blur",()=>setTimeout(()=>{
+    results.classList.remove("show");
+  },180));
+}
+
+setupCertificateStudentLookup();
+
+function resetCertificateStudentLookup(){
+  if($("certStudentSearch"))$("certStudentSearch").value="";
+  if($("certStudentId"))$("certStudentId").value="";
+  if($("certStudentResults")){
+    $("certStudentResults").innerHTML="";
+    $("certStudentResults").classList.remove("show");
+  }
+  if($("certStudentSelected")){
+    $("certStudentSelected").textContent=
+      "Search for a registered student. Select a result to automatically fill the certificate information below.";
+  }
+}
+
 function normalizeDate(value){
   const v=String(value||"").trim();
   if(!v)return null;
@@ -3922,6 +4120,14 @@ function editCertificate(certificateId){
  $("certDate").value=certIssue(c);
  $("certCompletionDate").value=certCompletion(c);
  $("certFile").value="";
+ resetCertificateStudentLookup();
+
+ const linkedStudent=(students||[]).find(s=>{
+   const target=certName(c).trim().toLowerCase();
+   return String(s.full_name||"").trim().toLowerCase()===target ||
+          String(s.full_name_km||"").trim().toLowerCase()===target;
+ });
+ if(linkedStudent)fillCertificateFromStudent(linkedStudent);
 
  clearMsg($("certStatus"));
  $("certNo").readOnly=true;
@@ -4056,6 +4262,7 @@ $("certCreate").onclick=async()=>{
    ["certNo","certName","certDob","certCourse","certDuration","certDate","certCompletionDate"].forEach(id=>$(id).value="");
    $("certSex").value="";
    $("certFile").value="";
+   resetCertificateStudentLookup();
     $("certNo").readOnly=false;
     $("certCreate").textContent="Save Certificate";
 
