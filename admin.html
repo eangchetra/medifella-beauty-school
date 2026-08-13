@@ -1623,7 +1623,9 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
-</head>
+<style id="staff-permission-ui-fix">
+.nav.hidden{display:none!important;pointer-events:none!important}
+</style>\n</head>
 <body>
 
 <div id="loginView" class="login-wrap">
@@ -2192,16 +2194,23 @@ async function getCurrentAccount(){
  return {user,profile};
 }
 
+function accountCan(key){
+ const role=String(currentProfile?.role||"").toLowerCase();
+ if(role==="admin") return true;
+ const p=currentProfile?.permissions||{};
+ return p[key]===true || p[key]==="true" || p[key]===1 || p[key]==="1";
+}
+
 function applyAccountPermissions(){
  const role=String(currentProfile?.role||"").toLowerCase();
- const permissions=currentProfile?.permissions||{};
- const allowed = key => role==="admin" || permissions[key]===true;
 
  document.querySelectorAll(".nav").forEach(btn=>{
    const key=btn.dataset.section;
-   const isStaffSection=(key==="staff"||key==="admins");
-   let show = role==="admin" ? true : (isStaffSection ? false : allowed(key));
+   // Staff/Admin account management is always administrator-only.
+   const isAdminOnly=(key==="staff"||key==="admins");
+   const show=!isAdminOnly && accountCan(key);
    btn.classList.toggle("hidden",!show);
+   btn.setAttribute("aria-hidden",show?"false":"true");
  });
 
  // If the current section is not allowed, switch to the first allowed section.
@@ -2210,12 +2219,18 @@ function applyAccountPermissions(){
    const first=[...document.querySelectorAll(".nav")].find(x=>!x.classList.contains("hidden"));
    document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
    document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
-   if(first){first.classList.add("active");$(first.dataset.section).classList.add("active");}
+   if(first){
+     first.classList.add("active");
+     const section=$(first.dataset.section);
+     if(section) section.classList.add("active");
+   }
  }
+
  $("currentAdmin").textContent=currentProfile.username || currentProfile.email || adminUser.email || adminUser.id;
  $("adminRole").innerHTML=role==="admin"
    ? '<span class="badge verified">Administrator</span>'
    : '<span class="badge pending">Staff</span>';
+
  if($("saleForm") && !$("saleForm").classList.contains("hidden")){
    updateSaleDateTimeDisplay();
    $("saleReference").value=nextSaleReference();
@@ -2337,7 +2352,28 @@ sb.auth.onAuthStateChange(async (event)=>{
     if(account){adminUser=account.user;currentProfile=account.profile;applyAccountPermissions();}
   }
 });
-async function refreshAll(){await Promise.all([loadStudents(),loadCertificates(),loadCourses(),loadPosts(),loadStaff(),loadSales()]);updateMetrics()}
+async function refreshAll(){
+ const role=String(currentProfile?.role||"").toLowerCase();
+ const isAdmin=role==="admin";
+ const jobs=[];
+
+ // Dashboard needs the same read-only data used by the admin metrics.
+ // Other staff sections only load when that permission was granted.
+ const dashboard= isAdmin || accountCan("dashboard");
+ if(isAdmin || accountCan("students") || dashboard) jobs.push(loadStudents());
+ if(isAdmin || accountCan("certificates") || dashboard) jobs.push(loadCertificates());
+ if(isAdmin || accountCan("courses") || dashboard) jobs.push(loadCourses());
+ if(isAdmin || accountCan("posts")) jobs.push(loadPosts());
+ if(isAdmin || accountCan("sales") || dashboard) jobs.push(loadSales());
+
+ // Never load the profiles/staff-account list for staff users.
+ if(isAdmin) jobs.push(loadStaff());
+
+ // One restricted table must not prevent the rest of the permitted dashboard
+ // from loading. This is important when Supabase RLS blocks admin-only tables.
+ await Promise.allSettled(jobs);
+ updateMetrics();
+}
 
 async function loadStudents(){
  const {data,error}=await sb.from("students").select("*").order("created_at",{ascending:false});
