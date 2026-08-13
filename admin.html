@@ -1103,6 +1103,118 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="invoice-edit-button-style">
+#invoiceOverlay .invoice-actions{
+  display:grid!important;
+  grid-template-columns:1fr 1fr 1fr 1fr!important;
+  gap:10px!important;
+}
+#invoiceOverlay .invoice-actions .mf-action-btn{min-width:0!important;width:100%!important}
+@media(max-width:900px){
+  #invoiceOverlay .invoice-actions{grid-template-columns:1fr 1fr!important}
+}
+</style>
+
+
+<style id="exchange-rate-hard-fix">
+#invoiceOverlay .mf-info-row,
+#invoiceExportContent .mf-info-row{
+  display:grid!important;
+  grid-template-columns:210px minmax(180px,1fr)!important;
+  column-gap:22px!important;
+  align-items:center!important;
+}
+#invoiceOverlay .mf-info-row .label,
+#invoiceExportContent .mf-info-row .label{
+  display:block!important;
+  white-space:nowrap!important;
+  width:210px!important;
+  min-width:210px!important;
+  padding:0!important;
+  margin:0!important;
+}
+#invoiceOverlay .mf-info-row .value,
+#invoiceExportContent .mf-info-row .value{
+  display:block!important;
+  white-space:nowrap!important;
+  min-width:180px!important;
+  padding-left:8px!important;
+  margin:0!important;
+}
+#invoiceOverlay .mf-rate,
+#invoiceExportContent .mf-rate{
+  display:inline-block!important;
+  white-space:nowrap!important;
+  margin-left:8px!important;
+  padding-left:0!important;
+}
+
+/* A5 remains compact while preserving the separation. */
+#invoiceOverlay.preview-a5 .mf-info-row,
+#invoiceExportContent .invoice-export-a5 .mf-info-row{
+  grid-template-columns:90px minmax(75px,1fr)!important;
+  column-gap:8px!important;
+}
+#invoiceOverlay.preview-a5 .mf-info-row .label,
+#invoiceExportContent .invoice-export-a5 .mf-info-row .label{
+  width:90px!important;
+  min-width:90px!important;
+}
+#invoiceOverlay.preview-a5 .mf-info-row .value,
+#invoiceExportContent .invoice-export-a5 .mf-info-row .value{
+  min-width:75px!important;
+  padding-left:3px!important;
+}
+</style>
+
+
+<style id="invoice-no-and-exchange-spacing-final">
+/* Keep Invoice No. label and value separated exactly like Exchange Rate. */
+#invoiceOverlay .mf-info-row,
+#invoiceExportContent .mf-info-row{
+  display:grid!important;
+  grid-template-columns:210px minmax(180px,1fr)!important;
+  column-gap:22px!important;
+  align-items:center!important;
+}
+#invoiceOverlay .mf-info-row .label,
+#invoiceExportContent .mf-info-row .label{
+  width:210px!important;
+  min-width:210px!important;
+  white-space:nowrap!important;
+  padding:0!important;
+}
+#invoiceOverlay .mf-info-row .value,
+#invoiceExportContent .mf-info-row .value{
+  min-width:180px!important;
+  white-space:nowrap!important;
+  padding-left:8px!important;
+}
+#invoiceOverlay .mf-rate,
+#invoiceExportContent .mf-rate{
+  margin-left:8px!important;
+  white-space:nowrap!important;
+}
+
+/* A5 compact version */
+#invoiceOverlay.preview-a5 .mf-info-row,
+#invoiceExportContent .invoice-export-a5 .mf-info-row{
+  grid-template-columns:90px minmax(75px,1fr)!important;
+  column-gap:8px!important;
+}
+#invoiceOverlay.preview-a5 .mf-info-row .label,
+#invoiceExportContent .invoice-export-a5 .mf-info-row .label{
+  width:90px!important;
+  min-width:90px!important;
+}
+#invoiceOverlay.preview-a5 .mf-info-row .value,
+#invoiceExportContent .invoice-export-a5 .mf-info-row .value{
+  min-width:75px!important;
+  padding-left:3px!important;
+}
+</style>
+
 </head>
 <body>
 
@@ -2311,7 +2423,104 @@ function updateSaleTotals(){
  });
 }
 
+
+let editingSaleId = null;
+let editingSaleOriginalPaid = 0;
+
+function setSaleEditMode(isEditing){
+  const title = document.querySelector("#sales .sale-page-title h1");
+  const saveBtn = $("saveSale");
+  const cancelBtn = $("cancelSale");
+  if(title) title.textContent = isEditing ? "Edit Invoice / Sale" : "Add Sale";
+  if(saveBtn) saveBtn.textContent = isEditing ? "Update Invoice" : "Save Sale";
+  if(cancelBtn) cancelBtn.textContent = isEditing ? "Cancel Edit" : "Cancel";
+  ["salePaymentMethod","salePaymentStatus","saleAmountPaidNow"].forEach(id=>{
+    const el=$(id);
+    if(el) el.disabled=!!isEditing;
+  });
+}
+
+function clearSaleEditMode(){
+  editingSaleId=null;
+  editingSaleOriginalPaid=0;
+  setSaleEditMode(false);
+}
+
+function parseSaleStoredDateTime(s){
+  const rawDate=String(saleField(s,["sale_date","date"],"")||"");
+  const rawTime=String(saleField(s,["sale_time","time"],"")||"");
+  if(rawDate && /T|Z|\+/.test(rawDate)) return rawDate;
+  if(rawDate && rawTime) return `${rawDate.slice(0,10)}T${rawTime.slice(0,8)}`;
+  if(rawDate) return rawDate.slice(0,19);
+  return "";
+}
+
+function editSaleFromInvoice(id){
+  const s=salesRecords.find(x=>String(x.id)===String(id));
+  if(!s)return;
+
+  closeInvoicePreview();
+  document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
+  document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
+  const nav=document.querySelector('.nav[data-section="sales"]');
+  if(nav)nav.classList.add("active");
+  $("sales").classList.add("active");
+  $("saleForm").classList.remove("hidden");
+
+  editingSaleId=String(id);
+  editingSaleOriginalPaid=Math.max(0,salePaid(s));
+  setSaleEditMode(true);
+
+  $("saleReference").value=saleRef(s)||"";
+
+  const studentId=String(saleStudentId(s)||saleField(s,["student_id"],"")||"");
+  const student=students.find(x=>String(x.id)===studentId);
+  $("saleStudentId").value=studentId;
+  $("saleStudentSearch").value=student?.full_name || saleCustomer(s) || "";
+  $("saleStudentHint").textContent=student
+    ? `Selected: ${student.full_name||"Student"} · ${student.student_id||"No ID"} · ${student.phone||"No phone"}`
+    : `Selected: ${saleCustomer(s)||"Customer"}`;
+
+  const dt=parseSaleStoredDateTime(s);
+  if(dt){
+    $("saleDate").value=dt;
+    $("saleDateDisplay").value=dt.replace("T"," ").slice(0,19);
+  }else{
+    updateSaleDateTimeDisplay();
+  }
+
+  let items=[];
+  try{items=typeof saleItemsValue(s)==="string"?JSON.parse(saleItemsValue(s)):saleItemsValue(s)||[]}catch(_){items=[]}
+  if(!Array.isArray(items))items=[];
+  $("saleItems").innerHTML="";
+  if(items.length){
+    items.forEach(x=>{
+      addSaleItemRow(x.name||"",Number(x.unit_price||x.price||0),Math.max(1,Number(x.quantity||1)),x.course_id||"");
+      const row=$("saleItems").lastElementChild;
+      if(row){
+        row.querySelector(".sale-item-discount-type").value=x.discount_type==="percent"?"percent":"usd";
+        row.querySelector(".sale-item-discount-value").value=Number(x.discount_value||0) ? String(x.discount_value) : "";
+      }
+    });
+  }else addSaleItemRow();
+
+  $("saleOverallDiscountType").value="usd";
+  $("saleOverallDiscountValue").value=Number(saleField(s,["discount"],0)||0).toFixed(2);
+
+  const total=saleTotal(s);
+  const paid=Math.min(editingSaleOriginalPaid,total);
+  $("salePaymentStatus").value=saleStatus(total,paid);
+  $("saleAmountPaidNow").value=paid.toFixed(2);
+  $("salePaymentMethod").value="Cash";
+  $("saleNote").value=saleField(s,["notes","note"],"")||"";
+  updateSaleTotals();
+  $("saleForm").scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+window.editSaleFromInvoice=editSaleFromInvoice;
+
 function resetSaleForm(){
+ clearSaleEditMode();
  $("saleStudentSearch").value="";$("saleStudentId").value="";
  updateSaleDateTimeDisplay();$("saleReference").value=nextSaleReference();
  $("saleItems").innerHTML="";addSaleItemRow();
@@ -2343,11 +2552,11 @@ $("saleOverallDiscountValue").addEventListener("input",updateSaleTotals);
 $("salePaymentStatus").addEventListener("change",setPaymentStatusDefaults);
 setInterval(()=>{
   const form=$("saleForm");
-  if(form && !form.classList.contains("hidden")) updateSaleDateTimeDisplay();
+  if(form && !form.classList.contains("hidden") && !editingSaleId) updateSaleDateTimeDisplay();
 },1000);
 $("saleAmountPaidNow").addEventListener("input",()=>{if($("salePaymentStatus").value==="Partial")updateSaleTotals()});
 
-$("cancelSale").onclick=()=>{setSaleFormCollapsed(true);clearMsg($("newSaleStatus"))};
+$("cancelSale").onclick=()=>{setSaleFormCollapsed(true);clearSaleEditMode();clearMsg($("newSaleStatus"))};
 $("salesRefresh").onclick=loadSales;
 $("salesSearch").oninput=renderSales;
 $("salesPaymentFilter").onchange=renderSales;
@@ -2376,7 +2585,7 @@ function renderSales(){
  $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date / Time</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{
    const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
    const dt=saleDateValue(s),time=saleField(s,["sale_time","time"],"");
-   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">Invoice A4</button><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A5'); return false;">Invoice A5</button>${bal>0.005?`<button class="gold" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
+   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button>${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
  }).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
  updateSalesMetrics();
 }
@@ -2590,6 +2799,7 @@ function showSaleInvoice(id,size="A4"){
    </div>
 
    <div class="invoice-actions" id="invoiceActions">
+  <button type="button" class="mf-action-btn" onclick="editSaleFromInvoice(window.currentInvoiceId)">✏️ Edit</button>
   <button type="button" class="mf-action-btn" onclick="printInvoice(window.currentInvoiceId,'A4')">🖨️ Print</button>
   <button type="button" class="mf-action-btn" onclick="downloadInvoicePDF(window.currentInvoiceId,'A4')">⬇️ Save PDF</button>
   <button type="button" class="mf-action-btn" onclick="closeInvoicePreview()">✕ Close</button>
@@ -2897,28 +3107,37 @@ function startSaleForStudent(studentId){
 $("saveSale").onclick=async()=>{
  clearMsg($("newSaleStatus"));
  selectSaleStudentByInput();
+
  const studentId=$("saleStudentId").value;
  const student=students.find(s=>String(s.id)===String(studentId));
  const calc=calculateSaleTotal();
- const saleDateTime=updateSaleDateTimeDisplay();
+ const isEdit=!!editingSaleId;
+
+ const saleDateTime=isEdit ? String($("saleDate").value||"") : updateSaleDateTimeDisplay();
  const saleDate=saleDateForDb(saleDateTime);
  const saleTime=saleTimeForDb(saleDateTime);
  const reference=$("saleReference").value.trim()||nextSaleReference();
- const status=$("salePaymentStatus").value;
- const amountPaid=calc.paidNow;
 
  if(!student){msg($("newSaleStatus"),"Please select a student/customer by name, Student ID or phone.",true);return}
  if(!saleDateTime){msg($("newSaleStatus"),"Please select the sale date and time.",true);return}
  if(!calc.items.length){msg($("newSaleStatus"),"Add at least one course or product.",true);return}
- if(status==="Paid"&&amountPaid+0.005<calc.initialTotal){msg($("newSaleStatus"),"Paid status requires the full Initial Total.",true);return}
- if(status==="Due"&&amountPaid>0.005){msg($("newSaleStatus"),"Due status must have $0.00 paid.",true);return}
- if(status==="Partial"&&(amountPaid<=0||amountPaid>=calc.initialTotal-0.005)){msg($("newSaleStatus"),"Partial Payment must be greater than $0 and less than the Initial Total.",true);return}
+
+ const existingPaid=isEdit ? Math.max(0,editingSaleOriginalPaid) : 0;
+ const amountPaid=isEdit ? Math.min(existingPaid,calc.initialTotal) : calc.paidNow;
+ const status=isEdit ? saleStatus(calc.initialTotal,amountPaid) : $("salePaymentStatus").value;
+
+ if(!isEdit){
+   if(status==="Paid"&&amountPaid+0.005<calc.initialTotal){msg($("newSaleStatus"),"Paid status requires the full Initial Total.",true);return}
+   if(status==="Due"&&amountPaid>0.005){msg($("newSaleStatus"),"Due status must have $0.00 paid.",true);return}
+   if(status==="Partial"&&(amountPaid<=0||amountPaid>=calc.initialTotal-0.005)){msg($("newSaleStatus"),"Partial Payment must be greater than $0 and less than the Initial Total.",true);return}
+ }
 
  $("saveSale").disabled=true;
  try{
    const payload={
      reference_no:reference,
      sale_date:saleDate,
+     sale_time:saleTime,
      student_id:String(student.id),
      student_name:student.full_name||"",
      student_phone:student.phone||"",
@@ -2927,32 +3146,47 @@ $("saveSale").onclick=async()=>{
      shipping:0,
      grand_total:calc.initialTotal,
      paid:amountPaid,
-     balance:calc.due,
+     balance:Math.max(0,calc.initialTotal-amountPaid),
      payment_status:status,
      sale_status:"Completed",
      items:calc.items,
-     notes:$("saleNote").value.trim(),
-     created_by:adminUser.id
+     notes:$("saleNote").value.trim()
    };
-   let result=await sb.from("medifella_sales").insert({...payload,sale_time:saleTime}).select().single();
-   if(result.error&&/sale_time|column .* does not exist/i.test(result.error.message||"")){
-     result=await sb.from("medifella_sales").insert(payload).select().single();
-   }
-   if(result.error)throw result.error;
 
-   if(amountPaid>0){
-     const{error:pe}=await sb.from("medifella_sale_payments").insert({
-       sale_id:String(result.data.id),amount:amountPaid,payment_method:$("salePaymentMethod").value,
-       payment_date:saleDate,note:status==="Partial"?"Partial Payment":"Paid in Full",created_by:adminUser.id
-     });
-     if(pe)throw pe;
+   if(isEdit){
+     const{error}=await sb.from("medifella_sales").update(payload).eq("id",editingSaleId);
+     if(error)throw error;
+     clearSaleEditMode();
+     msg($("newSaleStatus"),"Invoice updated successfully.");
+   }else{
+     const createPayload={...payload,created_by:adminUser.id};
+     let result=await sb.from("medifella_sales").insert(createPayload).select().single();
+     if(result.error&&/sale_time|column .* does not exist/i.test(result.error.message||"")){
+       delete createPayload.sale_time;
+       result=await sb.from("medifella_sales").insert(createPayload).select().single();
+     }
+     if(result.error)throw result.error;
+
+     if(amountPaid>0){
+       const{error:pe}=await sb.from("medifella_sale_payments").insert({
+         sale_id:String(result.data.id),amount:amountPaid,
+         payment_method:$("salePaymentMethod").value,
+         payment_date:saleDate,
+         note:status==="Partial"?"Partial Payment":"Paid in Full",
+         created_by:adminUser.id
+       });
+       if(pe)throw pe;
+     }
+     msg($("newSaleStatus"),"Sale saved successfully.");
    }
-   msg($("newSaleStatus"),"Sale saved successfully.");
+
    $("saleForm").classList.add("hidden");
    await loadSales();
  }catch(e){
    msg($("newSaleStatus"),e.message||"Could not save sale.",true);
- }finally{$("saveSale").disabled=false}
+ }finally{
+   $("saveSale").disabled=false;
+ }
 };
 
 async function loadCertificates(){
