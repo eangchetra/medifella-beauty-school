@@ -1340,6 +1340,73 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="invoice-info-box-spacing-final">
+/* FINAL: reduce the gap inside Customer Information and Invoice Information.
+   Keep enough room so labels never touch their values. */
+#invoiceOverlay .mf-info-row,
+#invoiceExportContent .mf-info-row{
+  display:grid!important;
+  grid-template-columns:155px minmax(0,1fr)!important;
+  column-gap:10px!important;
+  align-items:center!important;
+}
+
+#invoiceOverlay .mf-info-row .label,
+#invoiceExportContent .mf-info-row .label{
+  width:155px!important;
+  min-width:155px!important;
+  white-space:nowrap!important;
+  overflow:visible!important;
+  padding:0!important;
+  margin:0!important;
+}
+
+#invoiceOverlay .mf-info-row > div:last-child,
+#invoiceExportContent .mf-info-row > div:last-child{
+  min-width:0!important;
+  white-space:nowrap!important;
+  padding:0!important;
+  margin:0!important;
+}
+
+/* Keep the exchange-rate value together. */
+#invoiceOverlay .mf-rate,
+#invoiceExportContent .mf-rate{
+  display:inline-block!important;
+  white-space:nowrap!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+/* Print/PDF A4: same closer spacing. */
+#invoicePrint.invoice-print-a4 .mf-info-row{
+  grid-template-columns:155px minmax(0,1fr)!important;
+  column-gap:10px!important;
+}
+#invoicePrint.invoice-print-a4 .mf-info-row .label{
+  width:155px!important;
+  min-width:155px!important;
+  white-space:nowrap!important;
+}
+
+/* A5: proportionally smaller gap. */
+#invoiceOverlay.preview-a5 .mf-info-row,
+#invoiceExportContent .invoice-export-a5 .mf-info-row{
+  grid-template-columns:88px minmax(0,1fr)!important;
+  column-gap:7px!important;
+}
+#invoiceOverlay.preview-a5 .mf-info-row .label,
+#invoiceExportContent .invoice-export-a5 .mf-info-row .label{
+  width:88px!important;
+  min-width:88px!important;
+}
+#invoicePrint.invoice-print-a5 .mf-info-row{
+  grid-template-columns:88px minmax(0,1fr)!important;
+  column-gap:7px!important;
+}
+</style>
+
 </head>
 <body>
 
