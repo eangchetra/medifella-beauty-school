@@ -282,6 +282,14 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
 
 @font-face{
+  font-family:"KhmerOSBattambangUploaded";
+  src:url("https://dwrpriwxbjgxpsvhclai.supabase.co/storage/v1/object/public/fonts/Khmer%20OS%20Battambang%20Regular.ttf") format("truetype");
+  font-weight:400 900;
+  font-style:normal;
+  font-display:swap;
+}
+
+@font-face{
   font-family:"KhmerOSMuolUploaded";
   src:url("https://dwrpriwxbjgxpsvhclai.supabase.co/storage/v1/object/public/fonts/Khmer%20OS%20Muol%20Regular.ttf") format("truetype");
   font-weight:400;
@@ -541,6 +549,153 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     min-height:60px!important;
     font-size:15px!important;
   }
+}
+</style>
+
+<style id="final-mp-invoice-format">
+/* FINAL INVOICE FORMAT — Khmer OS Battambang for all Khmer invoice text,
+   except the school name at the top, which remains Khmer OS Moul. */
+#invoiceOverlay .mf-invoice{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,"Noto Sans",sans-serif;
+}
+#invoiceOverlay .mf-invoice .mf-school-kh{
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif;
+}
+#invoiceOverlay .mf-invoice .mf-invoice-label .kh,
+#invoiceOverlay .mf-invoice .mf-refund-box .kh{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif;
+}
+#invoiceOverlay .mf-invoice .mf-refund-box .kh{
+  font-size:13px;
+  line-height:1.45;
+  font-weight:700;
+}
+#invoiceOverlay .mf-invoice .mf-refund-box .en{
+  font-size:12px;
+  line-height:1.35;
+  font-weight:700;
+}
+#invoiceOverlay .mf-invoice .mf-totals-table td{
+  font-size:12px;
+  line-height:1.25;
+}
+#invoiceOverlay .mf-invoice .mf-totals-table .balance td{
+  font-weight:700;
+}
+#invoiceOverlay .mf-invoice .mf-totals-table .balance td:not(:first-child){
+  font-weight:800;
+  color:#111;
+}
+#invoiceOverlay .mf-invoice .mf-totals-table .grand td:not(:first-child){
+  font-size:15px;
+  font-weight:800;
+}
+#invoiceOverlay .invoice-actions .mf-action-btn{
+  min-height:58px!important;
+  height:58px!important;
+  font-size:15px!important;
+  border-radius:10px!important;
+}
+
+/* A5 preview: compact, but still readable and close to the requested reference. */
+#invoiceOverlay.preview-a5 .mf-invoice{
+  font-size:9px;
+  line-height:1.2;
+  padding:3.5mm!important;
+}
+#invoiceOverlay.preview-a5 .mf-invoice-top{
+  grid-template-columns:58px 1fr;
+  gap:7px;
+}
+#invoiceOverlay.preview-a5 .mf-invoice-logo{width:52px;height:52px}
+#invoiceOverlay.preview-a5 .mf-school-kh{font-size:10px;line-height:1.35}
+#invoiceOverlay.preview-a5 .mf-school-en{font-size:13px}
+#invoiceOverlay.preview-a5 .mf-school-info{font-size:6.5px;line-height:1.15;margin-top:2px}
+#invoiceOverlay.preview-a5 .mf-invoice-label{margin:5px 0 5px;padding-top:3px}
+#invoiceOverlay.preview-a5 .mf-invoice-label .kh{font-size:10px}
+#invoiceOverlay.preview-a5 .mf-invoice-label .en{font-size:15px}
+#invoiceOverlay.preview-a5 .mf-info-grid{
+  grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
+  gap:4px!important;
+  margin-bottom:4px!important;
+}
+#invoiceOverlay.preview-a5 .mf-info-title{font-size:7.2px;padding:3px 4px}
+#invoiceOverlay.preview-a5 .mf-info-body{padding:3px 4px}
+#invoiceOverlay.preview-a5 .mf-info-row{
+  grid-template-columns:72px 1fr;
+  gap:2px;
+  padding:1px 0;
+}
+#invoiceOverlay.preview-a5 .mf-invoice-table{margin-top:3px}
+#invoiceOverlay.preview-a5 .mf-invoice-table th,
+#invoiceOverlay.preview-a5 .mf-invoice-table td{padding:2.2px 2px}
+#invoiceOverlay.preview-a5 .mf-invoice-table th{font-size:6.4px}
+#invoiceOverlay.preview-a5 .mf-lower-grid{
+  grid-template-columns:minmax(0,38%) minmax(0,62%)!important;
+  gap:4px!important;
+  margin-top:4px!important;
+}
+#invoiceOverlay.preview-a5 .mf-refund-box{
+  margin-top:4px;
+  padding:4px;
+}
+#invoiceOverlay.preview-a5 .mf-refund-box .kh{font-size:8px;line-height:1.3}
+#invoiceOverlay.preview-a5 .mf-refund-box .en{font-size:7.5px;line-height:1.25}
+#invoiceOverlay.preview-a5 .mf-totals-table th,
+#invoiceOverlay.preview-a5 .mf-totals-table td{
+  padding:2px 2.5px;
+  font-size:7.3px;
+  line-height:1.15;
+}
+#invoiceOverlay.preview-a5 .mf-totals-table .balance td:not(:first-child){
+  font-size:7.5px;
+  font-weight:800;
+}
+#invoiceOverlay.preview-a5 .mf-totals-table .grand td:not(:first-child){
+  font-size:9px;
+  font-weight:800;
+}
+#invoiceOverlay.preview-a5 .mf-note{margin-top:4px;padding:3px 4px;min-height:30px}
+#invoiceOverlay.preview-a5 .mf-note-title{font-size:7px;margin-bottom:2px}
+#invoiceOverlay.preview-a5 .mf-signatures{gap:10px;margin-top:8px}
+#invoiceOverlay.preview-a5 .mf-signature{padding-top:12px;font-size:7px}
+
+/* Exported A5 PDF / print image */
+#invoiceExportContent .invoice-export-a5{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,"Noto Sans",sans-serif!important;
+}
+#invoiceExportContent .invoice-export-a5 .mf-school-kh{
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
+}
+#invoiceExportContent .invoice-export-a5 .mf-invoice-label .kh,
+#invoiceExportContent .invoice-export-a5 .mf-refund-box .kh{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
+}
+#invoiceExportContent .invoice-export-a5 .mf-totals-table td{
+  font-size:7.3px!important;
+  line-height:1.15!important;
+}
+#invoiceExportContent .invoice-export-a5 .mf-totals-table .balance td:not(:first-child){
+  font-size:7.5px!important;
+  font-weight:800!important;
+  color:#111!important;
+}
+#invoiceExportContent .invoice-export-a5 .mf-totals-table .grand td:not(:first-child){
+  font-size:9px!important;
+  font-weight:800!important;
+}
+#invoiceExportContent .invoice-export-a5 .mf-refund-box .kh{
+  font-size:8px!important;
+  line-height:1.3!important;
+  font-weight:700!important;
+}
+#invoiceExportContent .invoice-export-a5 .mf-refund-box .en{
+  font-size:7.5px!important;
+  line-height:1.25!important;
+  font-weight:700!important;
+}
+#invoiceExportContent .invoice-export-a5 .mf-note-title{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
 }
 </style>
 </head>
@@ -822,7 +977,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
       <div class="sale-summary-row"><span>Paid Balance</span><strong id="salePaidBalanceDisplay" class="paid-number">$0.00</strong></div>
       <div class="sale-summary-row"><span>Due</span><strong id="saleDueDisplay" class="due-number">$0.00</strong></div>
       <div class="sale-summary-divider"></div>
-      <div class="sale-summary-row sale-grand-row"><span>Grand Total Due (This Student)</span><strong id="saleGrandTotalDue">$0.00</strong></div>
+      <div class="sale-summary-row sale-grand-row"><span>Grand Total Due</span><strong id="saleGrandTotalDue">$0.00</strong></div>
     </div>
   </div>
 
@@ -1968,8 +2123,8 @@ function showSaleInvoice(id,size="A4"){
          <tr><td>បញ្ចុះតម្លៃសរុប / Overall Discount</td><td>${usd(overallDiscount)}</td><td>${khr(overallDiscount)}</td></tr>
          <tr class="initial"><td>សរុបត្រូវបង់ / Initial Total</td><td>${usd(total)}</td><td>${khr(total)}</td></tr>
          <tr><td>បានបង់ / Paid Balance</td><td>${usd(paid)}</td><td>${khr(paid)}</td></tr>
-         <tr class="balance"><td>នៅសល់ / Due (Left to Pay)</td><td>${usd(balance)}</td><td>${khr(balance)}</td></tr>
-         <tr class="grand"><td>សរុបនៅសល់របស់សិស្ស / Grand Total Due (This Student)</td><td>${usd(studentGrandDue)}</td><td>${khr(studentGrandDue)}</td></tr>
+         <tr class="balance"><td>នៅសល់ / Due</td><td>${usd(balance)}</td><td>${khr(balance)}</td></tr>
+         <tr class="grand"><td>សរុបនៅសល់របស់សិស្ស / Grand Total Due</td><td>${usd(studentGrandDue)}</td><td>${khr(studentGrandDue)}</td></tr>
        </tbody>
      </table>
    </div>
@@ -2135,6 +2290,7 @@ async function buildInvoicePaperCanvas(size){
    #invoiceExportContent .invoice-export-a5{
      font-size:8px!important;line-height:1.16!important;
      width:100%!important;max-width:100%!important;
+     font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,"Noto Sans",sans-serif!important;
    }
    #invoiceExportContent .invoice-export-a5 .mf-info-grid{
      display:grid!important;
