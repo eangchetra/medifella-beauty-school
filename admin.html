@@ -2240,7 +2240,8 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <input id="certNo" placeholder="MEDIFELLA01202547" required>
 
 <label>Student Name <span style="color:#9d2d2d">*</span></label>
-<input id="certName" placeholder="CHIEM CHARIYA / ជៀម ចរិយា" required>
+<textarea id="certName" rows="2" placeholder="CHIEM CHARIYA
+ជៀម ចរិយា" required style="resize:vertical;line-height:1.5"></textarea>
 <input id="certStudentId" type="hidden">
 
 <label>Sex <span style="color:#9d2d2d">*</span></label>
@@ -2276,9 +2277,13 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <label>Completion Date <span style="color:#9d2d2d">*</span></label>
 <input id="certCompletionDate" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" required>
 
-<label>Certificate Photo</label>
+<label>Certificate / Student Photo</label>
 <input id="certFile" type="file" accept="image/jpeg,image/png,image/webp">
-<div class="muted" style="margin-top:5px">Optional. Existing certificate photos are kept. New certificate photos are uploaded to Cloudflare Storage.</div>
+<input id="certStudentPhotoUrl" type="hidden">
+<div id="certStudentPhotoPreview" class="cert-student-photo-preview">
+  <span class="muted">Select a student above to automatically use their student photo.</span>
+</div>
+<div class="muted" style="margin-top:5px">Student photo is filled automatically. You can upload a different photo yourself if needed.</div>
 
 <button id="certCreate" class="gold" style="margin-top:14px">Save Certificate</button>
 <div id="certStatus"></div>
@@ -3784,6 +3789,25 @@ async function printInvoice(id,size="A4"){
   margin-top:7px;
   font-size:12px;
 }
+.cert-student-photo-preview{
+  margin-top:10px;
+  min-height:10px;
+  display:flex;
+  align-items:center;
+  gap:10px;
+}
+.cert-student-photo-preview img{
+  width:90px;
+  height:120px;
+  object-fit:cover;
+  border-radius:10px;
+  border:1px solid var(--line);
+  background:#eef4f4;
+}
+.cert-student-photo-preview .photo-label{
+  font-size:12px;
+  color:var(--muted);
+}
 </style>
 </head>
 <body>
@@ -4012,42 +4036,34 @@ function certificateStudentDate(s){
 function populateCertificateCourseOptions(selectedValue=""){
   const select=$("certCourseSelect");
   if(!select)return;
+
   const current=String(selectedValue||"").trim();
   const list=[...(courses||[])].filter(c=>String(c.name||"").trim());
 
   select.innerHTML='<option value="">Select course from Course Management</option>'
-    +list.map(c=>`<option value="${attr(c.name)}">${esc(c.name)}</option>`).join("")
-    +'<option value="__manual__">Other / Enter manually</option>';
+    +list.map(c=>`<option value="${attr(c.name)}">${esc(c.name)}</option>`).join("");
 
   if(current){
     const exact=list.find(c=>String(c.name||"").trim().toLowerCase()===current.toLowerCase());
     if(exact){
       select.value=exact.name;
-      $("certCourseManual").style.display="none";
     }else{
-      select.value="__manual__";
-      $("certCourseManual").style.display="";
-      $("certCourseManual").value=current;
+      // Preserve an existing certificate value if an older course was removed
+      // from Course Management. New certificates can only choose from the list.
+      select.innerHTML += `<option value="${attr(current)}">${esc(current)} (Existing Certificate)</option>`;
+      select.value=current;
     }
   }else{
     select.value="";
-    $("certCourseManual").style.display="none";
-    $("certCourseManual").value="";
   }
+
   syncCertificateCourse();
 }
 
 function syncCertificateCourse(){
   const select=$("certCourseSelect");
-  const manual=$("certCourseManual");
   if(!select)return;
-  if(select.value==="__manual__"){
-    if(manual)manual.style.display="";
-    if(manual)$("certCourse").value=manual.value.trim();
-  }else{
-    if(manual)manual.style.display="none";
-    $("certCourse").value=select.value||"";
-  }
+  $("certCourse").value=select.value||"";
 }
 
 function parseCertificateDuration(value){
@@ -4080,20 +4096,33 @@ function setCertificateCourseValue(courseName){
 function setupCertificateCourseAndDuration(){
   $("certCourseSelect").addEventListener("change",()=>{
     syncCertificateCourse();
-    const selected=$("certCourseSelect").value;
-    if(selected && selected!=="__manual__"){
-      const c=(courses||[]).find(x=>String(x.name||"").trim()===selected);
-      if(c?.duration)setCertificateDurationValue(c.duration);
-    }
   });
-  $("certCourseManual").addEventListener("input",syncCertificateCourse);
+
   $("certDurationValue").addEventListener("input",()=>{
     $("certDurationValue").value=$("certDurationValue").value.replace(/[^\d.]/g,"");
     syncCertificateDuration();
   });
+
   $("certDurationUnit").addEventListener("change",syncCertificateDuration);
 }
 setupCertificateCourseAndDuration();
+
+function setCertificateStudentPhoto(url){
+  const clean=String(url||"").trim();
+  $("certStudentPhotoUrl").value=clean;
+
+  const preview=$("certStudentPhotoPreview");
+  if(!preview)return;
+
+  if(clean){
+    preview.innerHTML=
+      `<div class="photo-label">Student photo will be used automatically:</div>
+       <img src="${attr(clean)}" alt="Student photo"
+            onerror="this.style.display='none'">`;
+  }else{
+    preview.innerHTML='<span class="muted">Selected student has no photo. You can upload one yourself.</span>';
+  }
+}
 
 function fillCertificateFromStudent(s){
   if(!s)return;
@@ -4101,11 +4130,14 @@ function fillCertificateFromStudent(s){
   $("certStudentId").value=String(s.id||"");
   $("certStudentSearch").value=certificateStudentDisplayName(s);
 
-  // Only overwrite fields for which the student record actually has data.
-  // This keeps any manually entered information that the student record lacks.
+  // Automatically fill available student information, while leaving
+  // fields editable so missing information can be entered manually.
   const fullName=String(s.full_name||"").trim();
   const fullNameKm=String(s.full_name_km||"").trim();
-  const displayName=fullName && fullNameKm ? `${fullName} / ${fullNameKm}` : (fullName || fullNameKm);
+  const displayName=fullName && fullNameKm
+    ? `${fullName}\n${fullNameKm}`
+    : (fullName || fullNameKm);
+
   if(displayName)$("certName").value=displayName;
 
   if(s.gender){
@@ -4116,17 +4148,15 @@ function fillCertificateFromStudent(s){
   const dob=certificateStudentDate(s);
   if(dob)$("certDob").value=dob;
 
-  // If the student has a course saved, select it from Course Management.
+  // Course is selected from the current Course Management list when
+  // the student's saved course matches one of the managed courses.
   if(s.course && String(s.course).trim()){
     setCertificateCourseValue(String(s.course).trim());
-
-    // If the course is also in Course Management, use its duration as a starting value.
-    const courseName=String(s.course).trim().toLowerCase();
-    const matchedCourse=(courses||[]).find(c=>String(c.name||"").trim().toLowerCase()===courseName);
-    if(matchedCourse?.duration && String(matchedCourse.duration).trim()){
-      setCertificateDurationValue(String(matchedCourse.duration).trim());
-    }
   }
+
+  // Student photo is used automatically. The user can still upload
+  // another photo through the file picker.
+  setCertificateStudentPhoto(s.photo_url||"");
 
   $("certStudentSelected").textContent=
     `Selected: ${certificateStudentDisplayName(s)} · ${s.student_id||"No Student ID"} · ${s.phone||"No phone"}`;
@@ -4134,6 +4164,7 @@ function fillCertificateFromStudent(s){
   $("certStudentResults").innerHTML="";
   $("certStudentResults").classList.remove("show");
 }
+
 
 function renderCertificateStudentResults(){
   const input=$("certStudentSearch");
@@ -4195,6 +4226,11 @@ setupCertificateStudentLookup();
 function resetCertificateStudentLookup(){
   if($("certStudentSearch"))$("certStudentSearch").value="";
   if($("certStudentId"))$("certStudentId").value="";
+  if($("certStudentPhotoUrl"))$("certStudentPhotoUrl").value="";
+  if($("certStudentPhotoPreview")){
+    $("certStudentPhotoPreview").innerHTML=
+      '<span class="muted">Select a student above to automatically use their student photo.</span>';
+  }
   if($("certStudentResults")){
     $("certStudentResults").innerHTML="";
     $("certStudentResults").classList.remove("show");
@@ -4268,7 +4304,14 @@ function editCertificate(certificateId){
    return String(s.full_name||"").trim().toLowerCase()===target ||
           String(s.full_name_km||"").trim().toLowerCase()===target;
  });
- if(linkedStudent)fillCertificateFromStudent(linkedStudent);
+ if(linkedStudent){
+   fillCertificateFromStudent(linkedStudent);
+   if(!String(linkedStudent.photo_url||"").trim() && c.photo){
+     setCertificateStudentPhoto(c.photo);
+   }
+ }else if(c.photo){
+   setCertificateStudentPhoto(c.photo);
+ }
 
  clearMsg($("certStatus"));
  $("certNo").readOnly=true;
@@ -4277,12 +4320,12 @@ function editCertificate(certificateId){
 }
 
 
-// Public certificate verification page used by the buttons and QR code.
-// If your public verification page uses a different path, change only this constant.
+// Public certificate verification page used by View Verified and QR Code.
 const CERTIFICATE_VERIFY_BASE_URL = "https://medifellabeautyschool.com/verify.html";
 
 function certificateVerificationUrl(certificateId){
-  return `${CERTIFICATE_VERIFY_BASE_URL}?id=${encodeURIComponent(certificateId)}`;
+  const id=String(certificateId||"").trim();
+  return `${CERTIFICATE_VERIFY_BASE_URL}?id=${encodeURIComponent(id)}`;
 }
 
 function viewVerifiedCertificate(certificateId){
@@ -4423,17 +4466,25 @@ $("certCreate").onclick=async()=>{
 
    let photo=null;
 
-   // Upload new certificate photos to Cloudflare Storage.
+   // Use a manually uploaded photo first. Otherwise use the selected
+   // student's existing photo automatically. For an older certificate
+   // with neither, keep its existing certificate photo.
    if(file){
      photo=await uploadCertificatePhotoToCloudflare(file,no);
-   }else if(existingRows && existingRows.length){
-     const{data:oldRow,error:oldError}=await sb
-       .from("certificates")
-       .select("photo")
-       .eq("id",no)
-       .maybeSingle();
-     if(oldError)throw oldError;
-     photo=oldRow?.photo||null;
+   }else{
+     const studentPhoto=String($("certStudentPhotoUrl")?.value||"").trim();
+
+     if(studentPhoto){
+       photo=studentPhoto;
+     }else if(existingRows && existingRows.length){
+       const{data:oldRow,error:oldError}=await sb
+         .from("certificates")
+         .select("photo")
+         .eq("id",no)
+         .maybeSingle();
+       if(oldError)throw oldError;
+       photo=oldRow?.photo||null;
+     }
    }
 
    const payload={
@@ -4669,6 +4720,8 @@ async function loadCourses(){
  courses=data||[];
  renderCourses();
  renderSaleStudentOptions();
+ // Keep Certificate Verification course selector synchronized with Course Management.
+ populateCertificateCourseOptions($("certCourse")?.value||"");
 }
 function courseType(c){return String(c.course_type||"sales").toLowerCase()==="online"?"online":"sales"}
 function courseTypeLabel(c){
