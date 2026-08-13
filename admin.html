@@ -1819,6 +1819,41 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="invoice-logo-final-80-percent-larger">
+/* FINAL LOGO SIZE: 80% larger than the original baseline.
+   Original baseline: A4 70px, A5 54px.
+   New size: A4 126px, A5 97.2px.
+*/
+#invoiceOverlay .invoice-preview-a4 .mf-invoice-logo,
+#invoicePrint.invoice-print-a4 .mf-invoice-logo,
+#invoiceExportContent .invoice-export-a4 .mf-invoice-logo{
+  width:126px!important;
+  height:126px!important;
+}
+
+#invoiceOverlay .invoice-preview-a4 .mf-invoice-top,
+#invoicePrint.invoice-print-a4 .mf-invoice-top,
+#invoiceExportContent .invoice-export-a4 .mf-invoice-top{
+  grid-template-columns:136px minmax(0,1fr)!important;
+  gap:8px!important;
+}
+
+#invoiceOverlay.preview-a5 .mf-invoice-logo,
+#invoicePrint.invoice-print-a5 .mf-invoice-logo,
+#invoiceExportContent .invoice-export-a5 .mf-invoice-logo{
+  width:97.2px!important;
+  height:97.2px!important;
+}
+
+#invoiceOverlay.preview-a5 .mf-invoice-top,
+#invoicePrint.invoice-print-a5 .mf-invoice-top,
+#invoiceExportContent .invoice-export-a5 .mf-invoice-top{
+  grid-template-columns:106px minmax(0,1fr)!important;
+  gap:6px!important;
+}
+</style>
+
 </head>
 <body>
 
