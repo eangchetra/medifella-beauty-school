@@ -4279,11 +4279,10 @@ function editCertificate(certificateId){
 
 // Public certificate verification page used by the buttons and QR code.
 // If your public verification page uses a different path, change only this constant.
-const CERTIFICATE_VERIFY_BASE_URL = "https://medifellabeautyschool.com/verify.html";
+const CERTIFICATE_VERIFY_BASE_URL = `${window.location.origin}/certificate-verification.html`;
 
 function certificateVerificationUrl(certificateId){
-  const id=String(certificateId||"").trim();
-  return `${CERTIFICATE_VERIFY_BASE_URL}?certificate=${encodeURIComponent(id)}`;
+  return `${CERTIFICATE_VERIFY_BASE_URL}?certificate=${encodeURIComponent(certificateId)}`;
 }
 
 function viewVerifiedCertificate(certificateId){
