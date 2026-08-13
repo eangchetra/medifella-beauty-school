@@ -2465,7 +2465,13 @@ async function buildInvoicePaperCanvas(size){
     windowWidth:Math.max(document.documentElement.clientWidth,captureW),
     windowHeight:Math.max(document.documentElement.clientHeight,captureH),
     scrollX:0,
-    scrollY:0
+    scrollY:0,
+    /* The dashboard keeps these buttons visible, but the captured invoice
+       for Print/PDF must not contain them. Remove them only from html2canvas's
+       temporary cloned document. */
+    onclone:(clonedDoc)=>{
+      clonedDoc.querySelectorAll(".invoice-actions,#invoiceActions,.mf-actions").forEach(el=>el.remove());
+    }
   });
 
   /* Restore the dashboard exactly as it was before export. */
