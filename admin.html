@@ -1548,6 +1548,57 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="invoice-info-colon-centered-final">
+/* Three-column layout: LABEL : VALUE */
+#invoiceOverlay .mf-invoice .mf-info-row,
+#invoiceExportContent .mf-invoice .mf-info-row,
+#invoicePrint .mf-invoice .mf-info-row{
+  display:grid!important;
+  grid-template-columns:max-content 14px minmax(0,1fr)!important;
+  column-gap:4px!important;
+  align-items:center!important;
+  width:100%!important;
+}
+
+#invoiceOverlay .mf-invoice .mf-info-row .label,
+#invoiceExportContent .mf-invoice .mf-info-row .label,
+#invoicePrint .mf-invoice .mf-info-row .label{
+  grid-column:1!important;
+  width:max-content!important;
+  min-width:0!important;
+  white-space:nowrap!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+#invoiceOverlay .mf-invoice .mf-info-row .label::after,
+#invoiceExportContent .mf-invoice .mf-info-row .label::after,
+#invoicePrint .mf-invoice .mf-info-row .label::after{
+  content:" :";
+  display:inline!important;
+  margin-left:4px!important;
+}
+
+#invoiceOverlay .mf-invoice .mf-info-row > div:last-child,
+#invoiceExportContent .mf-invoice .mf-info-row > div:last-child,
+#invoicePrint .mf-invoice .mf-info-row > div:last-child{
+  grid-column:3!important;
+  min-width:0!important;
+  white-space:nowrap!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+/* A5 */
+#invoiceOverlay.preview-a5 .mf-invoice .mf-info-row,
+#invoiceExportContent .invoice-export-a5 .mf-invoice .mf-info-row,
+#invoicePrint.invoice-print-a5 .mf-invoice .mf-info-row{
+  grid-template-columns:max-content 10px minmax(0,1fr)!important;
+  column-gap:3px!important;
+}
+</style>
+
 </head>
 <body>
 
