@@ -501,6 +501,14 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
   }
 }
 </style>
+<style>
+.password-wrap{position:relative;display:flex;align-items:center}
+.password-wrap input{width:100%;padding-right:48px!important}
+.password-toggle{position:absolute;right:8px;top:50%;transform:translateY(-50%);border:0;background:transparent;cursor:pointer;font-size:20px;line-height:1;padding:6px;color:#555}
+.remember-login{display:flex;align-items:center;gap:8px;margin-top:10px;font-size:14px;cursor:pointer}
+.remember-login input{width:auto;margin:0}
+</style>
+
 
 <style id="final-invoice-action-buttons">
 #invoiceOverlay .invoice-actions{
@@ -707,7 +715,14 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     <label>Username or Email</label>
     <input id="loginIdentifier" type="text" autocomplete="username" placeholder="Username or admin email">
     <label>Password</label>
-    <input id="loginPassword" type="password" autocomplete="current-password">
+    <div class="password-wrap">
+      <input id="loginPassword" type="password" autocomplete="current-password">
+      <button id="togglePassword" class="password-toggle" type="button" aria-label="Show password" title="Show password">👁️</button>
+    </div>
+    <label class="remember-login">
+      <input id="rememberLogin" type="checkbox" checked>
+      Remember my login
+    </label>
     <button id="loginBtn" class="btn" style="width:100%;margin-top:16px">Log in</button>
     <button id="forgotBtn" class="light" style="width:100%;margin-top:10px">Forgot Admin Password?</button>
     <div id="loginStatus"></div>
@@ -1330,6 +1345,11 @@ async function doLogin(){
      throw profileError;
    }
    adminUser=account.user;currentProfile=account.profile;
+   if($("rememberLogin").checked){
+     localStorage.setItem("medifellaRememberedLogin",identifier);
+   }else{
+     localStorage.removeItem("medifellaRememberedLogin");
+   }
    $("loginView").classList.add("hidden");$("appView").classList.remove("hidden");
    applyAccountPermissions();
    await refreshAll();
@@ -1337,6 +1357,37 @@ async function doLogin(){
  finally{$("loginBtn").disabled=false;$("loginBtn").textContent="Log in"}
 }
 $("loginBtn").onclick=doLogin;
+
+$("togglePassword").onclick=()=>{
+  const input=$("loginPassword");
+  const show=input.type==="password";
+  input.type=show?"text":"password";
+  $("togglePassword").textContent=show?"🙈":"👁️";
+  $("togglePassword").setAttribute("aria-label",show?"Hide password":"Show password");
+  $("togglePassword").title=show?"Hide password":"Show password";
+};
+
+// Remember the username locally. The password itself is intentionally not stored
+// by the website; Chrome/Safari can securely save and autofill it using
+// autocomplete="current-password".
+const savedLogin=localStorage.getItem("medifellaRememberedLogin");
+if(savedLogin){
+  $("loginIdentifier").value=savedLogin;
+  $("rememberLogin").checked=true;
+}
+$("rememberLogin").onchange=()=>{
+  if($("rememberLogin").checked){
+    const id=$("loginIdentifier").value.trim();
+    if(id)localStorage.setItem("medifellaRememberedLogin",id);
+  }else{
+    localStorage.removeItem("medifellaRememberedLogin");
+  }
+};
+$("loginIdentifier").addEventListener("input",()=>{
+  if($("rememberLogin").checked){
+    localStorage.setItem("medifellaRememberedLogin",$("loginIdentifier").value.trim());
+  }
+});
 
 $("forgotBtn").onclick=async()=>{
  clearMsg($("loginStatus"));
