@@ -1250,9 +1250,10 @@ async function getCurrentAccount(){
      + "Make sure profiles.id equals "+user.id+" and profiles.role is admin.");
  }
 
- if(String(profile.role||"").toLowerCase()!=="admin"){
-   throw new Error("This account is not an administrator. Current profile role: "
-     + String(profile.role||"not set")+".");
+ const role = String(profile.role || "").toLowerCase();
+ if(role !== "admin" && role !== "staff"){
+   throw new Error("This account does not have a valid Medi Fella role. Current profile role: "
+     + String(profile.role || "not set") + ".");
  }
 
  return {user,profile};
