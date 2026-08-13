@@ -4,6 +4,7 @@
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Medi Fella Admin Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <style>
 :root{--teal:#075e66;--gold:#c9a24e;--bg:#f5f8f8;--text:#203a3d;--muted:#6c7b7d;--line:#dce7e8;--danger:#9d2d2d}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,"Noto Sans",sans-serif}
@@ -2242,10 +2243,23 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <input id="certDob" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" required>
 
 <label>Course <span style="color:#9d2d2d">*</span></label>
-<input id="certCourse" placeholder="Diploma of Beauty Care" required>
+<select id="certCourseSelect" required>
+  <option value="">Select course from Course Management</option>
+</select>
+<input id="certCourseManual" placeholder="Enter course name manually" style="display:none;margin-top:8px">
+<input id="certCourse" type="hidden">
 
 <label>Duration <span style="color:#9d2d2d">*</span></label>
-<input id="certDuration" placeholder="12 Months" required>
+<div style="display:flex;gap:8px">
+  <input id="certDurationValue" type="text" inputmode="numeric" autocomplete="off" placeholder="12" style="flex:1" required>
+  <select id="certDurationUnit" style="flex:1">
+    <option value="day">Day</option>
+    <option value="month">Month</option>
+    <option value="year">Year</option>
+  </select>
+</div>
+<input id="certDuration" type="hidden">
+<div class="muted" style="margin-top:4px">Enter the number yourself and choose Day, Month, or Year.</div>
 
 <label>Issue Date <span style="color:#9d2d2d">*</span></label>
 <input id="certDate" type="text" inputmode="numeric" placeholder="DD/MM/YYYY" maxlength="10" required>
@@ -3922,8 +3936,10 @@ function renderCertificates(){
 <div>${esc(certName(c))}</div>
 <div class="muted">${esc(c.sex||"")} · DOB: ${esc(certDob(c))} · ${esc(c.course||"")} · ${esc(c.duration||"")} · Issue: ${esc(certIssue(c))} · Completion: ${esc(certCompletion(c))}</div>
 ${certPhoto(c)?`<div style="margin-top:8px"><a href="${attr(certPhoto(c))}" target="_blank" rel="noopener">View Certificate Photo</a></div>`:""}
-<div class="actions" style="margin-top:8px">
+<div class="actions" style="margin-top:8px;display:flex;flex-wrap:wrap;gap:8px">
 <button class="light" onclick="editCertificate(\'${attr(certId(c))}\')">Edit</button>
+<button class="gold" onclick="viewVerifiedCertificate('${attr(certId(c))}')">View Verified</button>
+<button class="light" onclick="downloadCertificateQRCode('${attr(certId(c))}')">Save QR Code</button>
 <button class="danger" onclick="deleteCert('${attr(certId(c))}')">Delete</button>
 </div>
 </div>`).join(""):'<p class="muted">No certificates found.</p>';
@@ -3954,6 +3970,93 @@ function certificateStudentDate(s){
   return normalizeDate(s?.date_of_birth || "");
 }
 
+
+function populateCertificateCourseOptions(selectedValue=""){
+  const select=$("certCourseSelect");
+  if(!select)return;
+  const current=String(selectedValue||"").trim();
+  const list=[...(courses||[])].filter(c=>String(c.name||"").trim());
+
+  select.innerHTML='<option value="">Select course from Course Management</option>'
+    +list.map(c=>`<option value="${attr(c.name)}">${esc(c.name)}</option>`).join("")
+    +'<option value="__manual__">Other / Enter manually</option>';
+
+  if(current){
+    const exact=list.find(c=>String(c.name||"").trim().toLowerCase()===current.toLowerCase());
+    if(exact){
+      select.value=exact.name;
+      $("certCourseManual").style.display="none";
+    }else{
+      select.value="__manual__";
+      $("certCourseManual").style.display="";
+      $("certCourseManual").value=current;
+    }
+  }else{
+    select.value="";
+    $("certCourseManual").style.display="none";
+    $("certCourseManual").value="";
+  }
+  syncCertificateCourse();
+}
+
+function syncCertificateCourse(){
+  const select=$("certCourseSelect");
+  const manual=$("certCourseManual");
+  if(!select)return;
+  if(select.value==="__manual__"){
+    if(manual)manual.style.display="";
+    if(manual)$("certCourse").value=manual.value.trim();
+  }else{
+    if(manual)manual.style.display="none";
+    $("certCourse").value=select.value||"";
+  }
+}
+
+function parseCertificateDuration(value){
+  const v=String(value||"").trim();
+  const m=v.match(/^(\d+(?:\.\d+)?)\s*(day|days|month|months|year|years)$/i);
+  if(!m)return {value:"",unit:"day"};
+  return {
+    value:m[1],
+    unit:m[2].toLowerCase().replace(/s$/,"")
+  };
+}
+
+function syncCertificateDuration(){
+  const value=$("certDurationValue").value.trim();
+  const unit=$("certDurationUnit").value;
+  $("certDuration").value=value ? `${value} ${unit}${Number(value)===1?"":"s"}` : "";
+}
+
+function setCertificateDurationValue(durationText){
+  const parsed=parseCertificateDuration(durationText);
+  $("certDurationValue").value=parsed.value;
+  $("certDurationUnit").value=parsed.unit;
+  syncCertificateDuration();
+}
+
+function setCertificateCourseValue(courseName){
+  populateCertificateCourseOptions(courseName||"");
+}
+
+function setupCertificateCourseAndDuration(){
+  $("certCourseSelect").addEventListener("change",()=>{
+    syncCertificateCourse();
+    const selected=$("certCourseSelect").value;
+    if(selected && selected!=="__manual__"){
+      const c=(courses||[]).find(x=>String(x.name||"").trim()===selected);
+      if(c?.duration)setCertificateDurationValue(c.duration);
+    }
+  });
+  $("certCourseManual").addEventListener("input",syncCertificateCourse);
+  $("certDurationValue").addEventListener("input",()=>{
+    $("certDurationValue").value=$("certDurationValue").value.replace(/[^\d.]/g,"");
+    syncCertificateDuration();
+  });
+  $("certDurationUnit").addEventListener("change",syncCertificateDuration);
+}
+setupCertificateCourseAndDuration();
+
 function fillCertificateFromStudent(s){
   if(!s)return;
 
@@ -3975,15 +4078,15 @@ function fillCertificateFromStudent(s){
   const dob=certificateStudentDate(s);
   if(dob)$("certDob").value=dob;
 
-  // If the student has a course saved, use it. Otherwise leave Course for manual entry.
+  // If the student has a course saved, select it from Course Management.
   if(s.course && String(s.course).trim()){
-    $("certCourse").value=String(s.course).trim();
+    setCertificateCourseValue(String(s.course).trim());
 
-    // If the course is also in Course Management, use its duration when available.
+    // If the course is also in Course Management, use its duration as a starting value.
     const courseName=String(s.course).trim().toLowerCase();
     const matchedCourse=(courses||[]).find(c=>String(c.name||"").trim().toLowerCase()===courseName);
     if(matchedCourse?.duration && String(matchedCourse.duration).trim()){
-      $("certDuration").value=String(matchedCourse.duration).trim();
+      setCertificateDurationValue(String(matchedCourse.duration).trim());
     }
   }
 
@@ -4115,8 +4218,8 @@ function editCertificate(certificateId){
  $("certName").value=certName(c);
  $("certSex").value=c.sex||"";
  $("certDob").value=certDob(c);
- $("certCourse").value=c.course||"";
- $("certDuration").value=c.duration||"";
+ setCertificateCourseValue(c.course||"");
+ setCertificateDurationValue(c.duration||"");
  $("certDate").value=certIssue(c);
  $("certCompletionDate").value=certCompletion(c);
  $("certFile").value="";
@@ -4133,6 +4236,70 @@ function editCertificate(certificateId){
  $("certNo").readOnly=true;
  $("certCreate").textContent="Update Certificate";
  $("certNo").scrollIntoView({behavior:"smooth",block:"center"});
+}
+
+
+// Public certificate verification page used by the buttons and QR code.
+// If your public verification page uses a different path, change only this constant.
+const CERTIFICATE_VERIFY_BASE_URL = `${window.location.origin}/certificate-verification.html`;
+
+function certificateVerificationUrl(certificateId){
+  return `${CERTIFICATE_VERIFY_BASE_URL}?certificate=${encodeURIComponent(certificateId)}`;
+}
+
+function viewVerifiedCertificate(certificateId){
+  const url=certificateVerificationUrl(certificateId);
+  window.open(url,"_blank","noopener,noreferrer");
+}
+
+async function downloadCertificateQRCode(certificateId){
+  const id=String(certificateId||"").trim();
+  if(!id)return;
+
+  if(typeof QRCode==="undefined"){
+    alert("QR Code library is not available. Please refresh the page and try again.");
+    return;
+  }
+
+  const holder=document.createElement("div");
+  holder.style.position="fixed";
+  holder.style.left="-10000px";
+  holder.style.top="0";
+  holder.style.width="320px";
+  holder.style.height="320px";
+  holder.style.background="#fff";
+  holder.style.padding="20px";
+  document.body.appendChild(holder);
+
+  try{
+    new QRCode(holder,{
+      text:certificateVerificationUrl(id),
+      width:280,
+      height:280,
+      colorDark:"#000000",
+      colorLight:"#ffffff",
+      correctLevel:QRCode.CorrectLevel.H
+    });
+
+    await new Promise(resolve=>setTimeout(resolve,250));
+
+    const canvas=holder.querySelector("canvas");
+    const img=holder.querySelector("img");
+    const dataUrl=canvas ? canvas.toDataURL("image/png") : (img ? img.src : null);
+
+    if(!dataUrl)throw new Error("Could not create the QR code.");
+
+    const a=document.createElement("a");
+    a.href=dataUrl;
+    a.download=`${id}-QR-Code.png`;
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+  }catch(e){
+    alert(e.message||"Could not create QR code.");
+  }finally{
+    holder.remove();
+  }
 }
 
 async function deleteCert(certificateId){
@@ -4259,8 +4426,12 @@ $("certCreate").onclick=async()=>{
      ?"Certificate updated successfully."
      :"Certificate saved successfully. It is now available for verification.");
 
-   ["certNo","certName","certDob","certCourse","certDuration","certDate","certCompletionDate"].forEach(id=>$(id).value="");
+   ["certNo","certName","certDob","certCourse","certDuration","certDate","certCompletionDate","certDurationValue"].forEach(id=>$(id).value="");
    $("certSex").value="";
+   $("certCourseSelect").value="";
+   $("certCourseManual").value="";
+   $("certCourseManual").style.display="none";
+   $("certDurationUnit").value="day";
    $("certFile").value="";
    resetCertificateStudentLookup();
     $("certNo").readOnly=false;
