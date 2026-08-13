@@ -868,6 +868,23 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="invoice-a4-only-buttons">
+#invoiceOverlay .invoice-actions{
+  display:grid!important;
+  grid-template-columns:1fr 1fr auto!important;
+  gap:10px!important;
+}
+#invoiceOverlay .invoice-actions .mf-action-btn{
+  width:100%!important;
+}
+@media(max-width:700px){
+  #invoiceOverlay .invoice-actions{
+    grid-template-columns:1fr 1fr!important;
+  }
+}
+</style>
+
 </head>
 <body>
 
@@ -2355,10 +2372,8 @@ function showSaleInvoice(id,size="A4"){
    </div>
 
    <div class="invoice-actions" id="invoiceActions">
-  <button type="button" class="mf-action-btn" onclick="printInvoice(window.currentInvoiceId,'A4')">🖨️ Print A4</button>
-  <button type="button" class="mf-action-btn" onclick="printInvoice(window.currentInvoiceId,'A5')">🖨️ Print A5</button>
-  <button type="button" class="mf-action-btn" onclick="downloadInvoicePDF(window.currentInvoiceId,'A4')">⬇️ Save PDF A4</button>
-  <button type="button" class="mf-action-btn" onclick="downloadInvoicePDF(window.currentInvoiceId,'A5')">⬇️ Save PDF A5</button>
+  <button type="button" class="mf-action-btn" onclick="printInvoice(window.currentInvoiceId,'A4')">🖨️ Print</button>
+  <button type="button" class="mf-action-btn" onclick="downloadInvoicePDF(window.currentInvoiceId,'A4')">⬇️ Save PDF</button>
   <button type="button" class="mf-action-btn" onclick="closeInvoicePreview()">✕ Close</button>
 </div>
  </div>`;
