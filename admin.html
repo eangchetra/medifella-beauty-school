@@ -1165,6 +1165,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div style="display:grid;gap:10px;margin-top:10px">
 <label style="font-weight:400"><input id="permDashboard" type="checkbox"> View Dashboard</label>
 <label style="font-weight:400"><input id="permStudents" type="checkbox"> Student Registration</label>
+<label style="font-weight:400"><input id="permSales" type="checkbox"> List Sales</label>
 <label style="font-weight:400"><input id="permCertificates" type="checkbox"> Certificate Verification</label>
 <label style="font-weight:400"><input id="permPosts" type="checkbox"> News Feed</label>
 <label style="font-weight:400"><input id="permCourses" type="checkbox"> Course Management</label>
@@ -2871,6 +2872,7 @@ $("certCreate").onclick=async()=>{
 const STAFF_PERMISSION_KEYS = [
   ["dashboard","permDashboard"],
   ["students","permStudents"],
+  ["sales","permSales"],
   ["certificates","permCertificates"],
   ["posts","permPosts"],
   ["courses","permCourses"],
@@ -2903,7 +2905,7 @@ function renderStaff(){
     const role=String(p.role||"staff").toLowerCase();
     const permissions=p.permissions||{};
     const labels=[
-      ["dashboard","Dashboard"],["students","Students"],["certificates","Certificates"],
+      ["dashboard","Dashboard"],["students","Students"],["sales","List Sales"],["certificates","Certificates"],
       ["posts","News"],["courses","Courses"],["admins","Admin / Users"]
     ].filter(([k])=>permissions[k]).map(([,label])=>label);
     const summary=role==="admin" ? "Full administrator access" :
