@@ -1474,6 +1474,80 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="invoice-info-spacing-definitive">
+/*
+  DEFINITIVE FIX
+  The earlier rules were losing because the original invoice selector
+  "#invoiceOverlay .mf-invoice .mf-info-row" has higher CSS specificity.
+  This rule uses that same specificity, so the new spacing actually wins.
+*/
+
+/* Customer Information + Invoice Information */
+#invoiceOverlay .mf-invoice .mf-info-row,
+#invoiceExportContent .mf-invoice .mf-info-row{
+  display:grid!important;
+  grid-template-columns:max-content minmax(0,1fr)!important;
+  column-gap:8px!important;
+  gap:8px!important;
+  align-items:center!important;
+  width:100%!important;
+}
+
+#invoiceOverlay .mf-invoice .mf-info-row .label,
+#invoiceExportContent .mf-invoice .mf-info-row .label{
+  width:max-content!important;
+  min-width:0!important;
+  max-width:none!important;
+  white-space:nowrap!important;
+  padding:0!important;
+  margin:0!important;
+}
+
+#invoiceOverlay .mf-invoice .mf-info-row > div:last-child,
+#invoiceExportContent .mf-invoice .mf-info-row > div:last-child{
+  width:auto!important;
+  min-width:0!important;
+  white-space:nowrap!important;
+  padding:0!important;
+  margin:0!important;
+}
+
+#invoiceOverlay .mf-invoice .mf-rate,
+#invoiceExportContent .mf-invoice .mf-rate{
+  display:block!important;
+  white-space:nowrap!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+/* A4 export/print: same close spacing. */
+#invoicePrint.invoice-print-a4 .mf-invoice .mf-info-row{
+  display:grid!important;
+  grid-template-columns:max-content minmax(0,1fr)!important;
+  column-gap:8px!important;
+  gap:8px!important;
+}
+#invoicePrint.invoice-print-a4 .mf-invoice .mf-info-row .label{
+  width:max-content!important;
+  min-width:0!important;
+}
+
+/* A5: close spacing while allowing the smaller page width. */
+#invoiceOverlay.preview-a5 .mf-invoice .mf-info-row,
+#invoiceExportContent .invoice-export-a5 .mf-invoice .mf-info-row{
+  display:grid!important;
+  grid-template-columns:max-content minmax(0,1fr)!important;
+  column-gap:5px!important;
+  gap:5px!important;
+}
+#invoiceOverlay.preview-a5 .mf-invoice .mf-info-row .label,
+#invoiceExportContent .invoice-export-a5 .mf-invoice .mf-info-row .label{
+  width:max-content!important;
+  min-width:0!important;
+}
+</style>
+
 </head>
 <body>
 
