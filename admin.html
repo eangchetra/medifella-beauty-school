@@ -1600,32 +1600,75 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </style>
 
 
-<style id="invoice-logo-larger-final">
-/* Larger school logo — keep original logo, only increase display size. */
-#invoiceOverlay .mf-invoice img,
-#invoiceExportContent .mf-invoice img,
-#invoicePrint .mf-invoice img{
-  width:92px!important;
-  height:92px!important;
-  max-width:92px!important;
-  max-height:92px!important;
+<style id="invoice-logo-box-title-final">
+/* Slightly larger school logo */
+#invoicePrint .mf-invoice-logo,
+#invoiceOverlay .mf-invoice-logo,
+#invoiceExportContent .mf-invoice-logo{
+  width:86px!important;
+  height:86px!important;
+  max-width:86px!important;
+  max-height:86px!important;
   object-fit:contain!important;
 }
 
-/* Preserve the larger logo on A5 while keeping the page compact. */
-#invoiceOverlay.preview-a5 .mf-invoice img,
-#invoiceExportContent .invoice-export-a5 .mf-invoice img,
-#invoicePrint.invoice-print-a5 .mf-invoice img{
-  width:72px!important;
-  height:72px!important;
-  max-width:72px!important;
-  max-height:72px!important;
+/* A5: slightly smaller, but still larger than the previous version */
+#invoicePrint.invoice-print-a5 .mf-invoice-logo,
+#invoiceOverlay.preview-a5 .mf-invoice-logo,
+#invoiceExportContent .invoice-export-a5 .mf-invoice-logo{
+  width:68px!important;
+  height:68px!important;
+  max-width:68px!important;
+  max-height:68px!important;
+}
+
+/* Information-box titles: bold, larger than body, Khmer OS Moul */
+#invoicePrint .mf-invoice .mf-info-title,
+#invoiceOverlay .mf-invoice .mf-info-title,
+#invoiceExportContent .mf-invoice .mf-info-title{
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",Arial,sans-serif!important;
+  font-weight:700!important;
+  font-size:13px!important;
+  line-height:1.35!important;
+  padding:5px 7px!important;
+}
+
+/* Keep A4 title slightly larger than table/body text */
+#invoicePrint.invoice-print-a4 .mf-invoice .mf-info-title{
+  font-size:12.5px!important;
+  font-weight:700!important;
+}
+
+/* A5 compact but still clearly larger/bolder than body */
+#invoicePrint.invoice-print-a5 .mf-invoice .mf-info-title,
+#invoiceOverlay.preview-a5 .mf-invoice .mf-info-title,
+#invoiceExportContent .invoice-export-a5 .mf-invoice .mf-info-title{
+  font-size:10.5px!important;
+  font-weight:700!important;
+}
+
+/* Ensure the body remains smaller than the box titles */
+#invoicePrint .mf-invoice .mf-info-body,
+#invoiceOverlay .mf-invoice .mf-info-body,
+#invoiceExportContent .mf-invoice .mf-info-body{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang",Arial,sans-serif!important;
+  font-size:10px!important;
+}
+
+/* A4 body */
+#invoicePrint.invoice-print-a4 .mf-invoice .mf-info-body{
+  font-size:10px!important;
+}
+
+/* A5 body */
+#invoicePrint.invoice-print-a5 .mf-invoice .mf-info-body,
+#invoiceOverlay.preview-a5 .mf-invoice .mf-info-body,
+#invoiceExportContent .invoice-export-a5 .mf-invoice .mf-info-body{
+  font-size:8px!important;
 }
 </style>
 
-<style id="staff-permission-ui-fix">
-.nav.hidden{display:none!important;pointer-events:none!important}
-</style>\n</head>
+</head>
 <body>
 
 <div id="loginView" class="login-wrap">
@@ -2194,23 +2237,16 @@ async function getCurrentAccount(){
  return {user,profile};
 }
 
-function accountCan(key){
- const role=String(currentProfile?.role||"").toLowerCase();
- if(role==="admin") return true;
- const p=currentProfile?.permissions||{};
- return p[key]===true || p[key]==="true" || p[key]===1 || p[key]==="1";
-}
-
 function applyAccountPermissions(){
  const role=String(currentProfile?.role||"").toLowerCase();
+ const permissions=currentProfile?.permissions||{};
+ const allowed = key => role==="admin" || permissions[key]===true;
 
  document.querySelectorAll(".nav").forEach(btn=>{
    const key=btn.dataset.section;
-   // Staff/Admin account management is always administrator-only.
-   const isAdminOnly=(key==="staff"||key==="admins");
-   const show=!isAdminOnly && accountCan(key);
+   const isStaffSection=(key==="staff"||key==="admins");
+   let show = role==="admin" ? true : (isStaffSection ? false : allowed(key));
    btn.classList.toggle("hidden",!show);
-   btn.setAttribute("aria-hidden",show?"false":"true");
  });
 
  // If the current section is not allowed, switch to the first allowed section.
@@ -2219,18 +2255,12 @@ function applyAccountPermissions(){
    const first=[...document.querySelectorAll(".nav")].find(x=>!x.classList.contains("hidden"));
    document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
    document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
-   if(first){
-     first.classList.add("active");
-     const section=$(first.dataset.section);
-     if(section) section.classList.add("active");
-   }
+   if(first){first.classList.add("active");$(first.dataset.section).classList.add("active");}
  }
-
  $("currentAdmin").textContent=currentProfile.username || currentProfile.email || adminUser.email || adminUser.id;
  $("adminRole").innerHTML=role==="admin"
    ? '<span class="badge verified">Administrator</span>'
    : '<span class="badge pending">Staff</span>';
-
  if($("saleForm") && !$("saleForm").classList.contains("hidden")){
    updateSaleDateTimeDisplay();
    $("saleReference").value=nextSaleReference();
@@ -2352,28 +2382,7 @@ sb.auth.onAuthStateChange(async (event)=>{
     if(account){adminUser=account.user;currentProfile=account.profile;applyAccountPermissions();}
   }
 });
-async function refreshAll(){
- const role=String(currentProfile?.role||"").toLowerCase();
- const isAdmin=role==="admin";
- const jobs=[];
-
- // Dashboard needs the same read-only data used by the admin metrics.
- // Other staff sections only load when that permission was granted.
- const dashboard= isAdmin || accountCan("dashboard");
- if(isAdmin || accountCan("students") || dashboard) jobs.push(loadStudents());
- if(isAdmin || accountCan("certificates") || dashboard) jobs.push(loadCertificates());
- if(isAdmin || accountCan("courses") || dashboard) jobs.push(loadCourses());
- if(isAdmin || accountCan("posts")) jobs.push(loadPosts());
- if(isAdmin || accountCan("sales") || dashboard) jobs.push(loadSales());
-
- // Never load the profiles/staff-account list for staff users.
- if(isAdmin) jobs.push(loadStaff());
-
- // One restricted table must not prevent the rest of the permitted dashboard
- // from loading. This is important when Supabase RLS blocks admin-only tables.
- await Promise.allSettled(jobs);
- updateMetrics();
-}
+async function refreshAll(){await Promise.all([loadStudents(),loadCertificates(),loadCourses(),loadPosts(),loadStaff(),loadSales()]);updateMetrics()}
 
 async function loadStudents(){
  const {data,error}=await sb.from("students").select("*").order("created_at",{ascending:false});
