@@ -856,6 +856,18 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 #invoiceOverlay.preview-a5 .mf-invoice .mf-signatures{gap:20px!important}
 </style>
 
+
+<style id="invoice-date-label-fix">
+#invoiceOverlay .mf-info-row .label,
+#invoiceExportContent .mf-info-row .label{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
+}
+#invoiceOverlay .mf-info-row .label,
+#invoiceExportContent .mf-info-row .label{
+  white-space:nowrap!important;
+}
+</style>
+
 </head>
 <body>
 
@@ -2289,7 +2301,7 @@ function showSaleInvoice(id,size="A4"){
        <div class="mf-info-title">ព័ត៌មានវិក្កយបត្រ / INVOICE INFORMATION</div>
        <div class="mf-info-body">
          <div class="mf-info-row"><div class="label" style="white-space:nowrap">លេខវិក្កយបត្រ / Invoice No.</div><div>${esc(invoiceNumber)}</div></div>
-         <div class="mf-info-row"><div class="label">កាលបរិច្ឆេត/Date Time</div><div>${esc(dateTime)}</div></div>
+         <div class="mf-info-row"><div class="label">កាលបរិច្ឆេទ / Date Time</div><div>${esc(dateTime)}</div></div>
          <div class="mf-info-row"><div class="label">អ្នកគិតលុយ / Cashier</div><div>${esc(adminUser?.full_name||adminUser?.username||"Admin")}</div></div>
          <div class="mf-info-row"><div class="label" style="white-space:nowrap">អត្រាប្តូរប្រាក់ / Exchange Rate</div><div class="mf-rate">1 USD = ${rate.toLocaleString("en-US")} ៛</div></div>
        </div>
@@ -2392,369 +2404,75 @@ async function loadHtml2Canvas(){
 }
 
 async function buildInvoicePaperCanvas(size){
- await loadHtml2Canvas();
+  await loadHtml2Canvas();
 
- const clone=getInvoiceCloneForExport();
- if(!clone)throw new Error("Invoice preview is not available.");
+  const overlay=document.getElementById("invoiceOverlay");
+  const source=document.querySelector("#invoicePrint .mf-invoice");
+  if(!overlay || !source) throw new Error("Invoice preview is not available.");
 
- clone.classList.add(size==="A5" ? "invoice-export-a5" : "invoice-export-a4");
+  /* IMPORTANT: capture the actual dashboard invoice, not a separately styled
+     export copy. This makes Save PDF and Print pixel-for-pixel match the
+     invoice the user sees in the dashboard. */
+  const oldClassName=overlay.className;
+  const oldStyle=overlay.getAttribute("style");
+  const wanted=size==="A5" ? "preview-a5" : "preview-a4";
+  overlay.classList.remove("preview-a4","preview-a5");
+  overlay.classList.add(wanted);
 
- const paper=getInvoicePaper(size);
- const px=96/25.4;
- const pageW=Math.round(paper.widthMm*px);
- const pageH=Math.round(paper.heightMm*px);
- const margin=Math.round((size==="A5"?4:5)*px);
- const contentW=pageW-(margin*2);
- const contentH=pageH-(margin*2);
+  if(document.fonts && document.fonts.ready){
+    try{await document.fonts.ready}catch(_){ }
+  }
+  await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
 
- const host=document.createElement("div");
- host.style.cssText=[
-   "position:fixed",
-   "left:-200000px",
-   "top:0",
-   `width:${pageW}px`,
-   `height:${pageH}px`,
-   "overflow:hidden",
-   "background:#fff",
-   "z-index:-99999"
- ].join(";");
+  const rect=source.getBoundingClientRect();
+  const captureW=Math.max(1,Math.ceil(rect.width));
+  const captureH=Math.max(1,Math.ceil(rect.height));
 
- const style=document.createElement("style");
- style.textContent=`
-   *{box-sizing:border-box}
-   #invoiceExportPaper{
-     width:${pageW}px!important;
-     height:${pageH}px!important;
-     padding:${margin}px!important;
-     overflow:hidden!important;
-     background:#fff!important;
-     position:relative!important;
-   }
-   #invoiceExportContent{
-     width:${contentW}px!important;
-     max-width:${contentW}px!important;
-     margin:0 auto!important;
-     padding:0!important;
-     background:#fff!important;
-     transform-origin:top center!important;
-   }
-   #invoiceExportContent .mf-invoice{
-     width:${contentW}px!important;
-     max-width:${contentW}px!important;
-     min-width:0!important;
-     margin:0!important;
-     padding:${Math.max(8,Math.round(margin*.65))}px!important;
-     background:#fff!important;
-     box-sizing:border-box!important;
-   }
-   #invoiceExportContent .invoice-actions,
-   #invoiceExportContent .mf-actions{display:none!important}
-   #invoiceExportContent table{max-width:100%!important}
+  const invoiceCanvas=await html2canvas(source,{
+    scale:3,
+    useCORS:true,
+    allowTaint:false,
+    backgroundColor:"#ffffff",
+    width:captureW,
+    height:captureH,
+    windowWidth:Math.max(document.documentElement.clientWidth,captureW),
+    windowHeight:Math.max(document.documentElement.clientHeight,captureH),
+    scrollX:0,
+    scrollY:0
+  });
 
-   #invoiceExportContent .invoice-export-a4{
-     font-size:10px!important;line-height:1.25!important;
-     width:100%!important;max-width:100%!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-info-grid{
-     display:grid!important;
-     grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
-     gap:7px!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-lower-grid{
-     display:grid!important;
-     grid-template-columns:minmax(0,38%) minmax(0,62%)!important;
-     gap:7px!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-signatures{
-     display:grid!important;
-     grid-template-columns:repeat(3,minmax(0,1fr))!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-top{grid-template-columns:78px 1fr!important;gap:8px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-logo{width:70px!important;height:70px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-school-kh{font-size:15px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-school-en{font-size:18px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-school-info{font-size:9px!important;line-height:1.25!important}
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-label .kh{font-size:15px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-label .en{font-size:21px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-info-grid{gap:7px!important;margin-bottom:7px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-info-title{padding:5px 7px!important;font-size:10px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-info-body{padding:5px 7px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-info-row{grid-template-columns:120px 1fr!important;gap:4px!important;padding:2px 0!important}
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-table{margin-top:4px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-table th,
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-table td{padding:4px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-table th{font-size:9px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-lower-grid{gap:7px!important;margin-top:6px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-refund-box,
-   #invoiceExportContent .invoice-export-a4 .mf-note{padding:6px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-signatures{margin-top:8px!important}
+  /* Restore the dashboard exactly as it was before export. */
+  overlay.className=oldClassName;
+  if(oldStyle===null) overlay.removeAttribute("style");
+  else overlay.setAttribute("style",oldStyle);
 
-   #invoiceExportContent .invoice-export-a5{
-     font-size:8px!important;line-height:1.16!important;
-     width:100%!important;max-width:100%!important;
-     font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,"Noto Sans",sans-serif!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-info-grid{
-     display:grid!important;
-     grid-template-columns:minmax(0,1fr) minmax(0,1fr)!important;
-     gap:4px!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-lower-grid{
-     display:grid!important;
-     grid-template-columns:minmax(0,38%) minmax(0,62%)!important;
-     gap:4px!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-signatures{
-     display:grid!important;
-     grid-template-columns:repeat(3,minmax(0,1fr))!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-top{grid-template-columns:58px 1fr!important;gap:6px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-logo{width:54px!important;height:54px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-school-kh{font-size:10px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-school-en{font-size:13px!important;margin-top:1px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-school-info{font-size:6.7px!important;line-height:1.18!important;margin-top:2px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-label{margin:4px 0!important;padding-top:3px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-label .kh{font-size:10px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-label .en{font-size:15px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-info-grid{gap:4px!important;margin-bottom:4px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-info-title{padding:4px 5px!important;font-size:7.5px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-info-body{padding:4px 5px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-info-row{grid-template-columns:78px 1fr!important;gap:2px!important;padding:1.5px 0!important}
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-table{margin-top:3px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-table th,
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-table td{padding:2.5px 2px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-table th{font-size:6.7px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-lower-grid{gap:4px!important;margin-top:4px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-refund-box,
-   #invoiceExportContent .invoice-export-a5 .mf-note{padding:4px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-signatures{margin-top:5px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-totals-table th,
-   #invoiceExportContent .invoice-export-a5 .mf-totals-table td{padding:2px 3px!important}
-   /* FINAL: PDF / PRINT must visually match the dashboard invoice */
-   #invoiceExportContent .invoice-export-a4 .mf-invoice,
-   #invoiceExportContent .invoice-export-a5 .mf-invoice{
-     font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,"Noto Sans",sans-serif!important;
-     color:#111!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-school-kh,
-   #invoiceExportContent .invoice-export-a4 .mf-school-en,
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-label .kh,
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-label .en,
-   #invoiceExportContent .invoice-export-a5 .mf-school-kh,
-   #invoiceExportContent .invoice-export-a5 .mf-school-en,
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-label .kh,
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-label .en{
-     color:#159caf!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-school-kh{
-     font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
-     font-size:25px!important;line-height:1.45!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-school-en{
-     font-size:29px!important;font-weight:900!important;margin-top:3px!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-school-info{
-     font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
-     font-size:14px!important;line-height:1.55!important;color:#111!important;margin-top:9px!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-label{
-     margin:15px 0 12px!important;padding-top:10px!important;border-top:1px solid #111!important;
-     text-align:center!important;white-space:nowrap!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-label .kh,
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-label .en{
-     display:inline!important;font-size:28px!important;font-weight:400!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-label .kh{
-     font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-label .en{
-     font-family:Arial,"Noto Sans",sans-serif!important;font-weight:900!important;margin-left:8px!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-info-box,
-   #invoiceExportContent .invoice-export-a5 .mf-info-box{
-     border:1px solid #111!important;border-radius:5px!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-info-title,
-   #invoiceExportContent .invoice-export-a5 .mf-info-title{
-     background:#fff!important;color:#111!important;border-bottom:1px solid #111!important;
-     font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
-     font-weight:700!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-info-title{font-size:13px!important;padding:7px 10px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-info-body{padding:9px 11px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-info-row{
-     grid-template-columns:150px minmax(0,1fr)!important;gap:7px!important;padding:4px 0!important;
-     color:#111!important;white-space:nowrap!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-info-row .label{
-     color:#111!important;font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-rate{color:#111!important}
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-table{
-     border-collapse:collapse!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-table th,
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-table td{
-     border:1px solid #111!important;color:#111!important;background:#fff!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-table th{
-     font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
-     font-size:12px!important;font-weight:700!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-invoice-table td{font-size:12px!important}
-   #invoiceExportContent .invoice-export-a4 .mf-refund-box,
-   #invoiceExportContent .invoice-export-a4 .mf-note{
-     border-color:#111!important;color:#111!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-refund-box .kh,
-   #invoiceExportContent .invoice-export-a4 .mf-note-title{
-     font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
-     color:#111!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-refund-box .kh{font-size:11px!important;line-height:1.35!important}
-   #invoiceExportContent .invoice-export-a4 .mf-refund-box .en{font-size:10px!important;line-height:1.25!important}
-   #invoiceExportContent .invoice-export-a4 .mf-totals-table th,
-   #invoiceExportContent .invoice-export-a4 .mf-totals-table td{
-     color:#111!important;background:#fff!important;border-color:#111!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-signatures{
-     grid-template-columns:1fr 1fr!important;gap:65px!important;
-   }
-   #invoiceExportContent .invoice-export-a4 .mf-signature{
-     color:#111!important;border-top-color:#111!important;
-     font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
-   }
+  const paper=getInvoicePaper(size);
+  const px=96/25.4;
+  const pageW=Math.round(paper.widthMm*px);
+  const pageH=Math.round(paper.heightMm*px);
 
-   /* A5: same design, proportionally compact for A5 */
-   #invoiceExportContent .invoice-export-a5 .mf-school-kh{
-     font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
-     font-size:13px!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-school-en{font-size:16px!important;font-weight:900!important}
-   #invoiceExportContent .invoice-export-a5 .mf-school-info{
-     font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
-     font-size:7.5px!important;color:#111!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-label{
-     margin:5px 0!important;padding-top:5px!important;border-top:1px solid #111!important;
-     white-space:nowrap!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-label .kh,
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-label .en{
-     display:inline!important;font-size:17px!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-label .kh{
-     font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-label .en{
-     font-family:Arial,"Noto Sans",sans-serif!important;font-weight:900!important;margin-left:5px!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-info-title{
-     font-size:8px!important;padding:4px 5px!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-info-body{padding:5px 6px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-info-row{
-     grid-template-columns:78px minmax(0,1fr)!important;gap:3px!important;padding:2px 0!important;
-     color:#111!important;white-space:nowrap!important;font-size:7.5px!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-info-row .label{
-     color:#111!important;font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-rate{color:#111!important}
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-table th,
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-table td{
-     border:1px solid #111!important;color:#111!important;background:#fff!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-table th{
-     font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
-     font-size:6.5px!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-invoice-table td{font-size:7px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-refund-box,
-   #invoiceExportContent .invoice-export-a5 .mf-note{
-     border-color:#111!important;color:#111!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-refund-box .kh,
-   #invoiceExportContent .invoice-export-a5 .mf-note-title{
-     font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
-     color:#111!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-refund-box .kh{font-size:8px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-refund-box .en{font-size:7.5px!important}
-   #invoiceExportContent .invoice-export-a5 .mf-totals-table th,
-   #invoiceExportContent .invoice-export-a5 .mf-totals-table td{
-     color:#111!important;background:#fff!important;border-color:#111!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-signatures{
-     grid-template-columns:1fr 1fr!important;gap:20px!important;
-   }
-   #invoiceExportContent .invoice-export-a5 .mf-signature{
-     color:#111!important;border-top-color:#111!important;
-     font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
-   }
+  /* Put the captured dashboard invoice on a physical A4/A5 white sheet.
+     It is uniformly scaled only if needed; no font/layout substitutions. */
+  const page=document.createElement("canvas");
+  page.width=pageW*3;
+  page.height=pageH*3;
+  const ctx=page.getContext("2d");
+  ctx.fillStyle="#ffffff";
+  ctx.fillRect(0,0,page.width,page.height);
 
- 
- `;
+  const marginPx=Math.round((size==="A5"?4:5)*px)*3;
+  const maxW=page.width-marginPx*2;
+  const maxH=page.height-marginPx*2;
+  const scale=Math.min(maxW/invoiceCanvas.width,maxH/invoiceCanvas.height);
+  const drawW=Math.round(invoiceCanvas.width*scale);
+  const drawH=Math.round(invoiceCanvas.height*scale);
+  const dx=Math.round((page.width-drawW)/2);
+  const dy=Math.round((page.height-drawH)/2);
+  ctx.imageSmoothingEnabled=true;
+  ctx.imageSmoothingQuality="high";
+  ctx.drawImage(invoiceCanvas,dx,dy,drawW,drawH);
 
- const page=document.createElement("div");
- page.id="invoiceExportPaper";
-
- const content=document.createElement("div");
- content.id="invoiceExportContent";
- content.appendChild(clone);
-
- page.appendChild(content);
- host.appendChild(style);
- host.appendChild(page);
- document.body.appendChild(host);
-
- if(document.fonts && document.fonts.ready){
-   try{await document.fonts.ready}catch(_){}
- }
- await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-
- // Measure the real invoice at the target paper width, then uniformly scale
- // only when its height is too large. This preserves the exact font ratios.
- const naturalH=Math.max(
-   content.scrollHeight,
-   content.getBoundingClientRect().height
- );
- const naturalW=Math.max(
-   content.scrollWidth,
-   content.getBoundingClientRect().width
- );
-
- // Fit the complete invoice inside the selected physical paper size.
- // Do not stretch it; only scale down when necessary so A4/A5 remain
- // one-page documents with the same proportions.
- const scale=Math.min(
-   1,
-   contentW/Math.max(1,naturalW),
-   contentH/Math.max(1,naturalH)
- );
-
- content.style.transform=`scale(${scale})`;
- content.style.width=`${contentW}px`;
- content.style.height=`${Math.ceil(naturalH*scale)}px`;
-
- await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-
- const canvas=await html2canvas(page,{
-   scale:3,
-   useCORS:true,
-   allowTaint:false,
-   backgroundColor:"#ffffff",
-   width:pageW,
-   height:pageH,
-   windowWidth:pageW,
-   windowHeight:pageH,
-   scrollX:0,
-   scrollY:0
- });
-
- document.body.removeChild(host);
- return {canvas,paper};
+  return {canvas:page,paper};
 }
 
 function openPrintFromCanvas(canvas,paper,sale){
