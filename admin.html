@@ -897,6 +897,113 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="invoice-final-spacing-one-page">
+/* Exchange rate: keep label and value visually separated */
+#invoiceOverlay .mf-info-row,
+#invoiceExportContent .mf-info-row{
+  grid-template-columns:170px minmax(0,1fr)!important;
+}
+#invoiceOverlay .mf-info-row .label,
+#invoiceExportContent .mf-info-row .label{
+  white-space:nowrap!important;
+  padding-right:14px!important;
+}
+#invoiceOverlay .mf-info-row .value,
+#invoiceExportContent .mf-info-row .value{
+  white-space:nowrap!important;
+}
+
+/* Everything below INVOICE: bigger than before, but still clearly smaller
+   than the main INVOICE title. */
+#invoiceOverlay .mf-info-title,
+#invoiceExportContent .mf-info-title{
+  font-size:14px!important;
+}
+#invoiceOverlay .mf-info-row,
+#invoiceExportContent .mf-info-row{
+  font-size:13px!important;
+}
+#invoiceOverlay .mf-invoice-table th,
+#invoiceExportContent .mf-invoice-table th{
+  font-size:13px!important;
+}
+#invoiceOverlay .mf-invoice-table td,
+#invoiceExportContent .mf-invoice-table td{
+  font-size:13px!important;
+}
+#invoiceOverlay .mf-refund-box .kh,
+#invoiceExportContent .mf-refund-box .kh{
+  font-size:12px!important;
+}
+#invoiceOverlay .mf-refund-box .en,
+#invoiceExportContent .mf-refund-box .en{
+  font-size:10.5px!important;
+}
+#invoiceOverlay .mf-totals-table,
+#invoiceExportContent .mf-totals-table{
+  font-size:13px!important;
+}
+#invoiceOverlay .mf-note-title,
+#invoiceExportContent .mf-note-title{
+  font-size:13px!important;
+}
+#invoiceOverlay .mf-signature,
+#invoiceExportContent .mf-signature{
+  font-size:12px!important;
+}
+
+/* Keep A4 invoice together on one printed page */
+@media print{
+  @page{size:A4 portrait;margin:7mm}
+  #invoiceOverlay .mf-invoice,
+  #invoiceExportContent .mf-invoice{
+    width:196mm!important;
+    max-width:196mm!important;
+    min-height:0!important;
+    height:auto!important;
+    box-sizing:border-box!important;
+    overflow:visible!important;
+  }
+  #invoiceOverlay .mf-info-grid,
+  #invoiceExportContent .mf-info-grid,
+  #invoiceOverlay .mf-lower-grid,
+  #invoiceExportContent .mf-lower-grid,
+  #invoiceOverlay .mf-signatures,
+  #invoiceExportContent .mf-signatures{
+    break-inside:avoid!important;
+    page-break-inside:avoid!important;
+  }
+  #invoiceOverlay .mf-invoice-table,
+  #invoiceExportContent .mf-invoice-table{
+    break-inside:avoid!important;
+    page-break-inside:avoid!important;
+  }
+}
+
+/* PDF canvas/export: compact vertical spacing so the complete A4 invoice fits */
+#invoiceExportContent .mf-invoice{
+  height:auto!important;
+  min-height:0!important;
+}
+#invoiceExportContent .mf-info-body{
+  padding-top:7px!important;
+  padding-bottom:7px!important;
+}
+#invoiceExportContent .mf-info-row{
+  padding-top:3px!important;
+  padding-bottom:3px!important;
+}
+#invoiceExportContent .mf-invoice-table th,
+#invoiceExportContent .mf-invoice-table td{
+  padding-top:3px!important;
+  padding-bottom:3px!important;
+}
+#invoiceExportContent .mf-signatures{
+  margin-top:10px!important;
+}
+</style>
+
 </head>
 <body>
 
