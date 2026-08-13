@@ -17,7 +17,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .main{flex:1;padding:24px;max-width:1450px}.section{display:none}.section.active{display:block}.grid{display:grid;grid-template-columns:repeat(4,1fr);gap:15px}.card{background:#fff;border:1px solid var(--line);border-radius:16px;padding:18px;box-shadow:0 5px 20px #075e6609}.metric{font-size:28px;font-weight:900;color:var(--teal)}.muted{color:var(--muted);font-size:13px}
 .two{display:grid;grid-template-columns:1fr 1fr;gap:18px}.row{display:flex;gap:10px;align-items:end}.row>*{flex:1}.toolbar{display:flex;gap:10px;margin-bottom:15px}.toolbar>*{flex:1}
 .table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.table th{color:var(--teal);font-size:13px;white-space:nowrap}
-.actions{display:flex;gap:6px;flex-wrap:wrap}.actions button{pointer-events:auto}.actions button:disabled{opacity:.55;cursor:wait}.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800;background:#edf3f3}.verified,.published,.open{background:#e5f5ee;color:#176b49}.pending{background:#fff6dc;color:#8b6510}.rejected,.closed{background:#ffe8e8;color:#9d2d2d}
+.actions{display:flex;gap:6px;flex-wrap:wrap}.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800;background:#edf3f3}.verified,.published,.open{background:#e5f5ee;color:#176b49}.pending{background:#fff6dc;color:#8b6510}.rejected,.closed{background:#ffe8e8;color:#9d2d2d}
 .post{border-top:1px solid var(--line);padding:14px 0}.post:first-child{border-top:0}.post img,.post video{width:100%;max-height:300px;object-fit:cover;border-radius:10px;margin-top:10px}
 @media(max-width:1100px){.grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:850px){.two{grid-template-columns:1fr}.side{width:190px}.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.layout{display:block}.side{width:100%;display:flex;overflow:auto}.nav{min-width:max-content}.main{padding:15px}.grid{grid-template-columns:1fr}.toolbar{display:grid}.row{display:grid}.top{height:auto;padding:14px}}
 
@@ -2590,47 +2590,12 @@ function renderStudents(){
 <td>${esc(s.date_of_birth||"—")}</td>
 <td>${esc(s.course||"—")}</td>
 <td><span class="badge ${esc(s.status||"pending")}">${esc(s.status||"pending")}</span></td>
-<td><div class="actions">
-<button type="button" class="gold" data-student-action="${attr(s.id)}" onclick="setStudent('${attr(s.id)}','verified');return false;">Approve</button>
-<button type="button" class="light" data-student-action="${attr(s.id)}" onclick="setStudent('${attr(s.id)}','pending');return false;">Pending</button>
-<button type="button" class="danger" data-student-action="${attr(s.id)}" onclick="setStudent('${attr(s.id)}','rejected');return false;">Reject</button>
-<button type="button" class="light" onclick="editStudent('${attr(s.id)}');return false;">Edit</button>
-<button type="button" class="gold" onclick="startSaleForStudent('${attr(s.id)}');return false;">+ Sale</button>
-</div></td>
+<td><div class="actions"><button class="gold" onclick="setStudent('${attr(s.id)}','verified')">Approve</button><button class="light" onclick="setStudent('${attr(s.id)}','pending')">Pending</button><button class="danger" onclick="setStudent('${attr(s.id)}','rejected')">Reject</button><button class="light" onclick="editStudent('${attr(s.id)}')">Edit</button><button class="gold" onclick="startSaleForStudent('${attr(s.id)}')">+ Sale</button></div></td>
 </tr>`).join("")}</table></div>`:'<p class="muted">No students found.</p>';
  $("recentStudents").innerHTML=students.slice(0,5).map(s=>`<div class="post"><strong>${esc(s.full_name||"Unnamed")}</strong>${s.full_name_km?`<div>${esc(s.full_name_km)}</div>`:""}<div class="muted">${esc(s.email||"")} · ${esc(s.phone||"")} · ${esc(s.status||"pending")}</div></div>`).join("")||'<p class="muted">No students.</p>';
 }
 $("studentSearch").oninput=renderStudents;$("studentFilter").onchange=renderStudents;$("studentRefresh").onclick=loadStudents;
-async function setStudent(id,status){
-  clearMsg($("studentStatus"));
-  const role=String(currentProfile?.role||"").toLowerCase();
-  const permissions=currentProfile?.permissions||{};
-  if(role!=="admin" && permissions.students!==true){
-    msg($("studentStatus"),"Your staff account does not have Student permission.",true);
-    return;
-  }
-
-  const labels={verified:"Approve",pending:"Pending",rejected:"Reject"};
-  const action=labels[status]||"Update";
-  const buttons=document.querySelectorAll(`[data-student-action="${CSS.escape(String(id))}"]`);
-  buttons.forEach(b=>b.disabled=true);
-
-  try{
-    const{error}=await sb.from("students")
-      .update({status,verified:status==="verified"})
-      .eq("id",id);
-
-    if(error)throw error;
-
-    msg($("studentStatus"),`Student ${action.toLowerCase()}d successfully.`);
-    await loadStudents();
-    updateMetrics();
-  }catch(e){
-    msg($("studentStatus"),e.message||`Could not ${action.toLowerCase()} student.`,true);
-  }finally{
-    document.querySelectorAll(`[data-student-action="${CSS.escape(String(id))}"]`).forEach(b=>b.disabled=false);
-  }
-}
+async function setStudent(id,status){const{error}=await sb.from("students").update({status,verified:status==="verified"}).eq("id",id);if(error)msg($("studentStatus"),error.message,true);else{msg($("studentStatus"),"Student updated.");await loadStudents();updateMetrics()}}
 function editStudent(id){
  const s=students.find(x=>x.id===id);
  if(!s)return;
@@ -3335,12 +3300,17 @@ function showSaleInvoice(id,size="A4"){
  }
  const dateTime=[datePart,timePart].filter(Boolean).join(" ");
 
- const studentId=saleStudentId(s)||saleField(s,["student_id"],"—");
+ const storedStudentId=saleStudentId(s)||saleField(s,["student_id"],"");
+ const linkedStudent=students.find(x=>String(x.id)===String(storedStudentId));
+ const studentId=String(
+   linkedStudent?.student_id ||
+   (String(storedStudentId).startsWith("MFS-") ? storedStudentId : "—")
+ );
  const phone=saleField(s,["student_phone","phone"],"—");
  const student=saleCustomer(s)||"—";
  const subInitial=Number(saleField(s,["subtotal"],total))||0;
  const overallDiscount=Number(saleField(s,["discount"],0))||0;
- const studentGrandDue=Math.max(0,studentOutstanding(studentId));
+ const studentGrandDue=Math.max(0,studentOutstanding(storedStudentId));
  const khr=v=>Math.round(Number(v||0)*rate).toLocaleString("en-US")+" ៛";
  const usd=v=>money(v);
  const note=saleField(s,["notes","note"],"");
