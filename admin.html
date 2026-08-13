@@ -62,6 +62,19 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 @page{size:A4;margin:10mm}
 
+/* Add Sale show/hide control */
+.sale-page-title{
+  display:flex;
+  align-items:center;
+  justify-content:flex-start;
+  gap:10px;
+  margin-bottom:14px;
+}
+.sale-page-title h1{margin:0}
+#toggleSaleForm{
+  white-space:nowrap;
+}
+
 /* Medi Fella Beauty School sales design */
 .sale-form-shell{padding:22px;border-top:4px solid #49bfd0}
 .sale-header-grid{display:grid;grid-template-columns:1.25fr 1fr 1fr;gap:18px}
@@ -421,7 +434,10 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
 
 <section id="sales" class="section">
-<h1>Add Sale</h1>
+<div class="sale-page-title">
+  <h1>Add Sale</h1>
+  <button id="toggleSaleForm" class="light" type="button" aria-expanded="true">Hide Add Sale ▲</button>
+</div>
 
 <div id="saleForm" class="card sale-form-shell">
   <div class="sale-header-grid">
@@ -919,7 +935,7 @@ document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{
  document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
  $(b.dataset.section).classList.add("active");
  if(b.dataset.section==="sales"){
-   $("saleForm").classList.remove("hidden");
+   setSaleFormCollapsed(false);
    resetSaleForm();
    updateSaleDateTimeDisplay();
    $("saleReference").value=nextSaleReference();
@@ -1438,6 +1454,19 @@ function resetSaleForm(){
  $("saleNote").value="";clearMsg($("newSaleStatus"));renderSaleStudentOptions();updateSaleTotals();
 }
 
+const toggleSaleFormBtn=$("toggleSaleForm");
+function setSaleFormCollapsed(collapsed){
+  const form=$("saleForm");
+  if(!form || !toggleSaleFormBtn)return;
+  form.classList.toggle("hidden",collapsed);
+  toggleSaleFormBtn.setAttribute("aria-expanded",String(!collapsed));
+  toggleSaleFormBtn.textContent=collapsed ? "Show Add Sale ▼" : "Hide Add Sale ▲";
+}
+toggleSaleFormBtn.onclick=()=>{
+  const form=$("saleForm");
+  setSaleFormCollapsed(!form.classList.contains("hidden"));
+};
+
 $("addSaleItem").onclick=()=>addSaleItemRow();
 $("saleStudentSearch").addEventListener("input",renderSaleStudentOptions);
 $("saleStudentSearch").addEventListener("change",selectSaleStudentByInput);
@@ -1451,7 +1480,7 @@ setInterval(()=>{
 },1000);
 $("saleAmountPaidNow").addEventListener("input",()=>{if($("salePaymentStatus").value==="Partial")updateSaleTotals()});
 
-$("cancelSale").onclick=()=>{$("saleForm").classList.add("hidden");clearMsg($("newSaleStatus"))};
+$("cancelSale").onclick=()=>{setSaleFormCollapsed(true);clearMsg($("newSaleStatus"))};
 $("salesRefresh").onclick=loadSales;
 $("salesSearch").oninput=renderSales;
 $("salesPaymentFilter").onchange=renderSales;
