@@ -1669,89 +1669,121 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </style>
 
 
-<style id="user-final-invoice-logo-and-table-title">
-/* USER FINAL INVOICE UPDATE
-   1) Make the school logo a little larger.
-   2) Make the product-table header titles match the upper information-box
-      titles: Khmer OS Moul, bold, and larger than table body text.
+<style id="invoice-table-and-total-moul-final">
+/* FINAL REQUEST:
+   - Product-table column titles use Khmer OS Moul and bold.
+   - Specifically "តម្លៃឯកតា / Unit Price (USD)" uses Khmer OS Moul.
+   - The complete totals table below uses Khmer OS Moul and bold text.
+   - Apply the same rules to the live invoice, PDF/export copy, A4 and A5.
 */
 
-/* Larger logo for the normal invoice preview/export */
-#invoiceOverlay .mf-invoice .mf-invoice-logo,
-#invoicePrint .mf-invoice .mf-invoice-logo,
-#invoiceExportContent .mf-invoice .mf-invoice-logo{
-  width:100px!important;
-  height:100px!important;
-  max-width:100px!important;
-  max-height:100px!important;
-  object-fit:contain!important;
-}
-
-/* Give the logo column enough room for the larger logo */
-#invoiceOverlay .mf-invoice .mf-invoice-top{
-  grid-template-columns:112px minmax(0,1fr)!important;
-  gap:14px!important;
-}
-
-/* Product table titles: same font family/style as the upper box titles */
+/* Product table headers */
 #invoiceOverlay .mf-invoice .mf-invoice-table th,
-#invoicePrint .mf-invoice .mf-invoice-table th,
-#invoiceExportContent .mf-invoice .mf-invoice-table th{
-  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",Arial,sans-serif!important;
+#invoiceExportContent .mf-invoice .mf-invoice-table th,
+#invoicePrint .mf-invoice .mf-invoice-table th{
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
+  font-weight:400!important;
+}
+
+/* Keep the English portion readable while the whole header uses Moul */
+#invoiceOverlay .mf-invoice .mf-invoice-table th *,
+#invoiceExportContent .mf-invoice .mf-invoice-table th *,
+#invoicePrint .mf-invoice .mf-invoice-table th *{
+  font-family:inherit!important;
+  font-weight:inherit!important;
+}
+
+/* Complete lower totals table: Khmer OS Moul + bold */
+#invoiceOverlay .mf-invoice .mf-totals-table,
+#invoiceOverlay .mf-invoice .mf-totals-table th,
+#invoiceOverlay .mf-invoice .mf-totals-table td,
+#invoiceExportContent .mf-invoice .mf-totals-table,
+#invoiceExportContent .mf-invoice .mf-totals-table th,
+#invoiceExportContent .mf-invoice .mf-totals-table td,
+#invoicePrint .mf-invoice .mf-totals-table,
+#invoicePrint .mf-invoice .mf-totals-table th,
+#invoicePrint .mf-invoice .mf-totals-table td{
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
   font-weight:700!important;
-  font-size:15px!important;
-  line-height:1.3!important;
 }
 
-/* Keep table body clearly smaller than its title */
-#invoiceOverlay .mf-invoice .mf-invoice-table td,
-#invoicePrint .mf-invoice .mf-invoice-table td,
-#invoiceExportContent .mf-invoice .mf-invoice-table td{
-  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
-  font-size:14px!important;
-  line-height:1.3!important;
+/* Keep totals values clearly bold as well */
+#invoiceOverlay .mf-invoice .mf-totals-table td:not(:first-child),
+#invoiceExportContent .mf-invoice .mf-totals-table td:not(:first-child),
+#invoicePrint .mf-invoice .mf-totals-table td:not(:first-child){
+  font-weight:700!important;
 }
 
-/* A4 print/export */
-#invoicePrint.invoice-print-a4 .mf-invoice-logo,
-#invoiceExportContent .invoice-export-a4 .mf-invoice-logo{
-  width:82px!important;
-  height:82px!important;
-  max-width:82px!important;
-  max-height:82px!important;
-}
-#invoicePrint.invoice-print-a4 .mf-invoice-table th,
-#invoiceExportContent .invoice-export-a4 .mf-invoice-table th{
-  font-size:12.5px!important;
-}
-
-/* A5: proportionally smaller, but keep the same Moul title style */
-#invoiceOverlay.preview-a5 .mf-invoice .mf-invoice-logo,
-#invoiceExportContent .invoice-export-a5 .mf-invoice-logo,
-#invoicePrint.invoice-print-a5 .mf-invoice-logo{
-  width:62px!important;
-  height:62px!important;
-  max-width:62px!important;
-  max-height:62px!important;
-}
+/* A5: preserve the compact sizing while using the requested font */
 #invoiceOverlay.preview-a5 .mf-invoice .mf-invoice-table th,
-#invoiceExportContent .invoice-export-a5 .mf-invoice-table th,
-#invoicePrint.invoice-print-a5 .mf-invoice-table th{
-  font-size:10.5px!important;
-  line-height:1.2!important;
-}
-#invoiceOverlay.preview-a5 .mf-invoice .mf-invoice-table td,
-#invoiceExportContent .invoice-export-a5 .mf-invoice-table td,
-#invoicePrint.invoice-print-a5 .mf-invoice-table td{
-  font-size:9px!important;
+#invoiceExportContent .invoice-export-a5 .mf-invoice-table th{
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
+  font-weight:400!important;
 }
 
-/* A5 preview top row must accommodate the larger logo */
-#invoiceOverlay.preview-a5 .mf-invoice .mf-invoice-top{
-  grid-template-columns:68px minmax(0,1fr)!important;
-  gap:7px!important;
+#invoiceOverlay.preview-a5 .mf-invoice .mf-totals-table,
+#invoiceOverlay.preview-a5 .mf-invoice .mf-totals-table th,
+#invoiceOverlay.preview-a5 .mf-invoice .mf-totals-table td,
+#invoiceExportContent .invoice-export-a5 .mf-totals-table,
+#invoiceExportContent .invoice-export-a5 .mf-totals-table th,
+#invoiceExportContent .invoice-export-a5 .mf-totals-table td{
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
+  font-weight:700!important;
 }
 </style>
+
+
+<style id="invoice-logo-final-10-percent-larger">
+/* FINAL LOGO SIZE:
+   Make the invoice logo 10% larger than the current version.
+   A4: 70px -> 77px
+   A5: 54px -> 59.4px
+   Keep the logo column/gap aligned so it does not touch other content.
+*/
+
+/* A4 live preview / print */
+#invoiceOverlay .invoice-preview-a4 .mf-invoice-logo,
+#invoicePrint.invoice-print-a4 .mf-invoice-logo{
+  width:77px!important;
+  height:77px!important;
+}
+
+/* A4 exported PDF/image */
+#invoiceExportContent .invoice-export-a4 .mf-invoice-logo{
+  width:77px!important;
+  height:77px!important;
+}
+
+/* A4 top layout: give the larger logo its own space */
+#invoiceOverlay .invoice-preview-a4 .mf-invoice-top,
+#invoicePrint.invoice-print-a4 .mf-invoice-top,
+#invoiceExportContent .invoice-export-a4 .mf-invoice-top{
+  grid-template-columns:85px minmax(0,1fr)!important;
+  gap:8px!important;
+}
+
+/* A5 live preview / print */
+#invoiceOverlay.preview-a5 .mf-invoice-logo,
+#invoicePrint.invoice-print-a5 .mf-invoice-logo{
+  width:59.4px!important;
+  height:59.4px!important;
+}
+
+/* A5 exported PDF/image */
+#invoiceExportContent .invoice-export-a5 .mf-invoice-logo{
+  width:59.4px!important;
+  height:59.4px!important;
+}
+
+/* A5 top layout: give the larger logo its own space */
+#invoiceOverlay.preview-a5 .mf-invoice-top,
+#invoicePrint.invoice-print-a5 .mf-invoice-top,
+#invoiceExportContent .invoice-export-a5 .mf-invoice-top{
+  grid-template-columns:64px minmax(0,1fr)!important;
+  gap:6px!important;
+}
+</style>
+
 </head>
 <body>
 
