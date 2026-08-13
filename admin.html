@@ -37,7 +37,9 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .invoice-table{width:100%;border-collapse:collapse;margin-top:18px}
 .invoice-table th,.invoice-table td{border:1px solid #aaa;padding:8px}
 .invoice-table th{background:#075e66;color:#fff}
-.invoice-actions{display:flex;gap:8px;justify-content:flex-end;margin-top:18px}
+.invoice-actions{display:flex;gap:8px;justify-content:flex-end;align-items:center;flex-wrap:wrap;margin-top:18px}
+.invoice-actions button{min-height:42px;padding:10px 14px;white-space:nowrap;font-weight:800}
+
 .sale-student-tools{display:flex;gap:8px;align-items:end}
 .sale-student-tools>div{flex:1}
 .sale-student-tools button{white-space:nowrap}
@@ -53,15 +55,16 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 @media(max-width:900px){.sales-summary{grid-template-columns:repeat(2,1fr)}.sales-item{grid-template-columns:1fr 90px 110px 110px 40px}}
 @media(max-width:650px){.sales-summary{grid-template-columns:1fr}.sales-item{grid-template-columns:1fr 1fr}.invoice-overlay{padding:5px}.invoice-box{padding:14px}}
 @media print{
-  .invoice-print-a5{max-width:148mm!important}
-  .invoice-print-a4{max-width:210mm!important}
+  @page{size:A4 portrait;margin:0}
+  html,body{margin:0!important;padding:0!important;background:#fff!important}
   body *{visibility:hidden!important}
   #invoicePrint,#invoicePrint *{visibility:visible!important}
-  #invoicePrint{position:absolute;left:0;top:0;width:100%;padding:0!important}
+  #invoicePrint{position:absolute!important;left:0!important;top:0!important;margin:0!important;padding:0!important;
+    width:210mm!important;max-width:210mm!important;background:#fff!important}
+  #invoicePrint.invoice-print-a5{width:148mm!important;max-width:148mm!important}
+  #invoicePrint.invoice-print-a4{width:210mm!important;max-width:210mm!important}
   .invoice-actions{display:none!important}
 }
-@page{size:A4;margin:10mm}
-@media print{.invoice-print-a5{width:148mm!important;max-width:148mm!important}.invoice-print-a4{width:210mm!important;max-width:210mm!important}}
 
 /* Add Sale show/hide control */
 .sale-page-title{
@@ -1726,9 +1729,11 @@ function showSaleInvoice(id,size="A4"){
 
    <div class="mf-actions invoice-actions">
      <button class="teal" onclick="showSaleInvoice('${attr(id)}','A4')">👁 View</button>
+     <button class="teal" onclick="printInvoice('${attr(id)}','A4')">🖨 Print A4</button>
      <button class="gold" onclick="showSaleInvoice('${attr(id)}','A5')">👁 View A5</button>
-     <button class="teal" onclick="printInvoice('${size}')">🖨 Print</button>
-     <button class="teal" onclick="downloadInvoicePDF('${attr(id)}','${size}')">⬇ Save PDF</button>
+     <button class="gold" onclick="printInvoice('${attr(id)}','A5')">🖨 Print A5</button>
+     <button class="teal" onclick="downloadInvoicePDF('${attr(id)}','A4')">⬇ PDF A4</button>
+     <button class="gold" onclick="downloadInvoicePDF('${attr(id)}','A5')">⬇ PDF A5</button>
      <button class="light" onclick="closeInvoice()">✕ Close</button>
    </div>
  </div>`;
@@ -1741,27 +1746,70 @@ function closeInvoice(){
  $("invoiceOverlay").classList.remove("show");
 }
 
-function printInvoice(size="A4"){
- const printBox=$("invoicePrint");
- if(!printBox)return;
- const oldClass=printBox.className;
- const oldOverlay=$("invoiceOverlay")?.className||"invoice-overlay";
- printBox.classList.remove("invoice-print-a4","invoice-print-a5");
- printBox.classList.add(size==="A5"?"invoice-print-a5":"invoice-print-a4");
- if($("invoiceOverlay")){
-   $("invoiceOverlay").classList.remove("preview-a4","preview-a5");
-   $("invoiceOverlay").classList.add(size==="A5"?"preview-a5":"preview-a4");
- }
- setTimeout(()=>window.print(),50);
+function printInvoice(id,size="A4"){
+ const source=$("invoicePrint");
+ if(!source)return;
+ const sale=salesRecords.find(x=>String(x.id)===String(id));
+ if(!sale)return;
+
+ // Re-render in the requested paper size so Print A4 / Print A5 are always explicit.
+ showSaleInvoice(id,size);
+
  setTimeout(()=>{
-   printBox.className=oldClass;
-   if($("invoiceOverlay"))$("invoiceOverlay").className=oldOverlay;
- },1200);
+   const invoiceHTML=source.innerHTML;
+   const isA5=size==="A5";
+   const paper=isA5?"A5":"A4";
+   const win=window.open("","_blank","width=1000,height=900");
+   if(!win){
+     alert("Please allow pop-ups for this site so the A4/A5 print preview can open.");
+     return;
+   }
+
+   const css=[...document.querySelectorAll("style")].map(s=>s.textContent).join("\n");
+   win.document.open();
+   win.document.write(`<!doctype html><html><head><meta charset="utf-8">
+     <title>${String(saleRef(sale)||"Invoice")} - ${paper}</title>
+     <style>
+       ${css}
+       @page{size:${paper} portrait;margin:0}
+       html,body{margin:0!important;padding:0!important;background:#fff!important}
+       body{width:${isA5?"148mm":"210mm"}!important;min-width:${isA5?"148mm":"210mm"}!important}
+       #printInvoiceRoot{width:${isA5?"148mm":"210mm"}!important;max-width:${isA5?"148mm":"210mm"}!important;
+         margin:0!important;padding:0!important;background:#fff!important}
+       .mf-invoice{width:${isA5?"148mm":"210mm"}!important;max-width:${isA5?"148mm":"210mm"}!important;
+         box-sizing:border-box!important;margin:0!important;background:#fff!important}
+       .invoice-actions{display:none!important}
+       @media print{
+         html,body{width:${isA5?"148mm":"210mm"}!important;min-width:0!important}
+         #printInvoiceRoot,.mf-invoice{width:${isA5?"148mm":"210mm"}!important;max-width:${isA5?"148mm":"210mm"}!important}
+       }
+     </style></head><body>
+       <div id="printInvoiceRoot">${invoiceHTML}</div>
+     </body></html>`);
+   win.document.close();
+   win.focus();
+
+   // Wait for fonts/images, then open the browser's native print dialog.
+   const doPrint=()=>{
+     try{win.print();}catch(e){win.close();}
+   };
+   if(win.document.fonts && win.document.fonts.ready){
+     win.document.fonts.ready.then(()=>setTimeout(doPrint,250));
+   }else{
+     setTimeout(doPrint,500);
+   }
+ },100);
 }
 
 async function downloadInvoicePDF(id,size="A4"){
- const box=$("invoicePrint");
- if(!box)return;
+ const source=$("invoicePrint");
+ if(!source)return;
+ const sale=salesRecords.find(x=>String(x.id)===String(id));
+ if(!sale)return;
+
+ // Make the requested A4/A5 preview active before generating the PDF.
+ showSaleInvoice(id,size);
+
  try{
    if(!window.html2pdf){
      await new Promise((resolve,reject)=>{
@@ -1770,24 +1818,54 @@ async function downloadInvoicePDF(id,size="A4"){
        s.onload=resolve;s.onerror=reject;document.head.appendChild(s);
      });
    }
-   const sale=salesRecords.find(x=>String(x.id)===String(id));
-   const filename=`${String(saleRef(sale)||"invoice").replace(/[^a-z0-9_-]/gi,"_")}-${size}.pdf`;
+
    const isA5=size==="A5";
-   const oldClass=box.className;
-   box.classList.remove("invoice-print-a4","invoice-print-a5");
-   box.classList.add(isA5?"invoice-print-a5":"invoice-print-a4");
+   const paper=isA5?"a5":"a4";
+   const filename=`${String(saleRef(sale)||"invoice").replace(/[^a-z0-9_-]/gi,"_")}-${size}.pdf`;
+
+   const oldClass=source.className;
+   source.classList.remove("invoice-print-a4","invoice-print-a5","invoice-preview-a4","invoice-preview-a5");
+   source.classList.add(isA5?"invoice-print-a5":"invoice-print-a4");
+
+   // Clone only the invoice so the dashboard/overlay never affects the PDF.
+   const clone=source.cloneNode(true);
+   clone.id="invoicePdfClone";
+   clone.className="invoice-box "+(isA5?"invoice-print-a5":"invoice-print-a4");
+   clone.style.width=isA5?"148mm":"210mm";
+   clone.style.maxWidth=isA5?"148mm":"210mm";
+   clone.style.margin="0";
+   clone.style.padding="0";
+   clone.style.background="#fff";
+   clone.querySelectorAll(".invoice-actions").forEach(el=>el.remove());
+
+   const holder=document.createElement("div");
+   holder.style.position="fixed";
+   holder.style.left="-100000px";
+   holder.style.top="0";
+   holder.style.width=isA5?"148mm":"210mm";
+   holder.style.background="#fff";
+   holder.appendChild(clone);
+   document.body.appendChild(holder);
+
    await window.html2pdf().set({
-     margin:0.15,
+     margin:0,
      filename,
      image:{type:"jpeg",quality:0.98},
-     html2canvas:{scale:2,useCORS:true,backgroundColor:"#ffffff"},
-     jsPDF:{unit:"mm",format:isA5?"a5":"a4",orientation:"portrait"},
-     pagebreak:{mode:["avoid-all","css","legacy"]}
-   }).from(box).save();
-   box.className=oldClass;
+     html2canvas:{
+       scale:2,
+       useCORS:true,
+       backgroundColor:"#ffffff",
+       width:Math.ceil(isA5?559:794)
+     },
+     jsPDF:{unit:"mm",format:paper,orientation:"portrait"},
+     pagebreak:{mode:["css","legacy"]}
+   }).from(clone).save();
+
+   holder.remove();
+   source.className=oldClass;
  }catch(e){
-   alert("PDF download could not start. The invoice will open in the browser print dialog; choose Save as PDF.");
-   printInvoice(size);
+   console.error("PDF error:",e);
+   alert("PDF could not be created automatically. Click Print A4 or Print A5 and choose “Save as PDF” in the print dialog.");
  }
 }
 
