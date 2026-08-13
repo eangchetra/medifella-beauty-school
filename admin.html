@@ -472,6 +472,56 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 
 </style>
+
+<style id="final-invoice-action-buttons">
+#invoiceOverlay .invoice-actions{
+  display:flex!important;
+  width:100%!important;
+  gap:14px!important;
+  justify-content:stretch!important;
+  align-items:stretch!important;
+  margin-top:22px!important;
+  padding:0!important;
+}
+#invoiceOverlay .invoice-actions .mf-action-btn{
+  flex:1 1 0!important;
+  min-width:0!important;
+  height:68px!important;
+  min-height:68px!important;
+  box-sizing:border-box!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  text-align:center!important;
+  white-space:nowrap!important;
+  border:2px solid #0b6d78!important;
+  border-radius:12px!important;
+  padding:12px 14px!important;
+  font-size:17px!important;
+  font-weight:800!important;
+  line-height:1.1!important;
+  color:#fff!important;
+  background:#075e66!important;
+  box-shadow:0 3px 8px rgba(0,0,0,.18)!important;
+  cursor:pointer!important;
+  transition:transform .12s ease,filter .12s ease!important;
+}
+#invoiceOverlay .invoice-actions .mf-action-btn:hover{filter:brightness(1.08)!important;transform:translateY(-1px)!important}
+#invoiceOverlay .invoice-actions .mf-action-btn:last-child{
+  background:#e9eef2!important;
+  border-color:#c9d3d9!important;
+  color:#222!important;
+}
+@media(max-width:900px){
+  #invoiceOverlay .invoice-actions{flex-wrap:wrap!important;gap:10px!important}
+  #invoiceOverlay .invoice-actions .mf-action-btn{
+    flex:1 1 calc(50% - 10px)!important;
+    height:60px!important;
+    min-height:60px!important;
+    font-size:15px!important;
+  }
+}
+</style>
 </head>
 <body>
 
@@ -2026,51 +2076,51 @@ async function buildInvoicePaperCanvas(size){
    #invoiceExportContent .invoice-export-a4{
      font-size:10px!important;line-height:1.25!important;
    }
-   #invoiceExportContent .invoice-export-a4.mf-invoice-top{grid-template-columns:78px 1fr!important;gap:8px!important}
-   #invoiceExportContent .invoice-export-a4.mf-invoice-logo{width:70px!important;height:70px!important}
-   #invoiceExportContent .invoice-export-a4.mf-school-kh{font-size:15px!important}
-   #invoiceExportContent .invoice-export-a4.mf-school-en{font-size:18px!important}
-   #invoiceExportContent .invoice-export-a4.mf-school-info{font-size:9px!important;line-height:1.25!important}
-   #invoiceExportContent .invoice-export-a4.mf-invoice-label .kh{font-size:15px!important}
-   #invoiceExportContent .invoice-export-a4.mf-invoice-label .en{font-size:21px!important}
-   #invoiceExportContent .invoice-export-a4.mf-info-grid{gap:7px!important;margin-bottom:7px!important}
-   #invoiceExportContent .invoice-export-a4.mf-info-title{padding:5px 7px!important;font-size:10px!important}
-   #invoiceExportContent .invoice-export-a4.mf-info-body{padding:5px 7px!important}
-   #invoiceExportContent .invoice-export-a4.mf-info-row{grid-template-columns:120px 1fr!important;gap:4px!important;padding:2px 0!important}
-   #invoiceExportContent .invoice-export-a4.mf-invoice-table{margin-top:4px!important}
-   #invoiceExportContent .invoice-export-a4.mf-invoice-table th,
-   #invoiceExportContent .invoice-export-a4.mf-invoice-table td{padding:4px!important}
-   #invoiceExportContent .invoice-export-a4.mf-invoice-table th{font-size:9px!important}
-   #invoiceExportContent .invoice-export-a4.mf-lower-grid{gap:7px!important;margin-top:6px!important}
-   #invoiceExportContent .invoice-export-a4.mf-refund-box,
-   #invoiceExportContent .invoice-export-a4.mf-note{padding:6px!important}
-   #invoiceExportContent .invoice-export-a4.mf-signatures{margin-top:8px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-invoice-top{grid-template-columns:78px 1fr!important;gap:8px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-invoice-logo{width:70px!important;height:70px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-school-kh{font-size:15px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-school-en{font-size:18px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-school-info{font-size:9px!important;line-height:1.25!important}
+   #invoiceExportContent .invoice-export-a4 .mf-invoice-label .kh{font-size:15px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-invoice-label .en{font-size:21px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-info-grid{gap:7px!important;margin-bottom:7px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-info-title{padding:5px 7px!important;font-size:10px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-info-body{padding:5px 7px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-info-row{grid-template-columns:120px 1fr!important;gap:4px!important;padding:2px 0!important}
+   #invoiceExportContent .invoice-export-a4 .mf-invoice-table{margin-top:4px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-invoice-table th,
+   #invoiceExportContent .invoice-export-a4 .mf-invoice-table td{padding:4px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-invoice-table th{font-size:9px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-lower-grid{gap:7px!important;margin-top:6px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-refund-box,
+   #invoiceExportContent .invoice-export-a4 .mf-note{padding:6px!important}
+   #invoiceExportContent .invoice-export-a4 .mf-signatures{margin-top:8px!important}
 
    #invoiceExportContent .invoice-export-a5{
      font-size:8px!important;line-height:1.16!important;
    }
-   #invoiceExportContent .invoice-export-a5.mf-invoice-top{grid-template-columns:58px 1fr!important;gap:6px!important}
-   #invoiceExportContent .invoice-export-a5.mf-invoice-logo{width:54px!important;height:54px!important}
-   #invoiceExportContent .invoice-export-a5.mf-school-kh{font-size:10px!important}
-   #invoiceExportContent .invoice-export-a5.mf-school-en{font-size:13px!important;margin-top:1px!important}
-   #invoiceExportContent .invoice-export-a5.mf-school-info{font-size:6.7px!important;line-height:1.18!important;margin-top:2px!important}
-   #invoiceExportContent .invoice-export-a5.mf-invoice-label{margin:4px 0!important;padding-top:3px!important}
-   #invoiceExportContent .invoice-export-a5.mf-invoice-label .kh{font-size:10px!important}
-   #invoiceExportContent .invoice-export-a5.mf-invoice-label .en{font-size:15px!important}
-   #invoiceExportContent .invoice-export-a5.mf-info-grid{gap:4px!important;margin-bottom:4px!important}
-   #invoiceExportContent .invoice-export-a5.mf-info-title{padding:4px 5px!important;font-size:7.5px!important}
-   #invoiceExportContent .invoice-export-a5.mf-info-body{padding:4px 5px!important}
-   #invoiceExportContent .invoice-export-a5.mf-info-row{grid-template-columns:78px 1fr!important;gap:2px!important;padding:1.5px 0!important}
-   #invoiceExportContent .invoice-export-a5.mf-invoice-table{margin-top:3px!important}
-   #invoiceExportContent .invoice-export-a5.mf-invoice-table th,
-   #invoiceExportContent .invoice-export-a5.mf-invoice-table td{padding:2.5px 2px!important}
-   #invoiceExportContent .invoice-export-a5.mf-invoice-table th{font-size:6.7px!important}
-   #invoiceExportContent .invoice-export-a5.mf-lower-grid{gap:4px!important;margin-top:4px!important}
-   #invoiceExportContent .invoice-export-a5.mf-refund-box,
-   #invoiceExportContent .invoice-export-a5.mf-note{padding:4px!important}
-   #invoiceExportContent .invoice-export-a5.mf-signatures{margin-top:5px!important}
-   #invoiceExportContent .invoice-export-a5.mf-totals-table th,
-   #invoiceExportContent .invoice-export-a5.mf-totals-table td{padding:2px 3px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-invoice-top{grid-template-columns:58px 1fr!important;gap:6px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-invoice-logo{width:54px!important;height:54px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-school-kh{font-size:10px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-school-en{font-size:13px!important;margin-top:1px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-school-info{font-size:6.7px!important;line-height:1.18!important;margin-top:2px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-invoice-label{margin:4px 0!important;padding-top:3px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-invoice-label .kh{font-size:10px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-invoice-label .en{font-size:15px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-info-grid{gap:4px!important;margin-bottom:4px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-info-title{padding:4px 5px!important;font-size:7.5px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-info-body{padding:4px 5px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-info-row{grid-template-columns:78px 1fr!important;gap:2px!important;padding:1.5px 0!important}
+   #invoiceExportContent .invoice-export-a5 .mf-invoice-table{margin-top:3px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-invoice-table th,
+   #invoiceExportContent .invoice-export-a5 .mf-invoice-table td{padding:2.5px 2px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-invoice-table th{font-size:6.7px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-lower-grid{gap:4px!important;margin-top:4px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-refund-box,
+   #invoiceExportContent .invoice-export-a5 .mf-note{padding:4px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-signatures{margin-top:5px!important}
+   #invoiceExportContent .invoice-export-a5 .mf-totals-table th,
+   #invoiceExportContent .invoice-export-a5 .mf-totals-table td{padding:2px 3px!important}
  
  `;
 
@@ -2229,50 +2279,6 @@ async function printInvoice(id,size="A4"){
  #paper{width:${paper.widthMm}mm;height:${paper.heightMm}mm;margin:0;padding:0;overflow:hidden;background:#fff}
  #paper img{display:block;width:${paper.widthMm}mm;height:${paper.heightMm}mm;max-width:none;max-height:none;margin:0;padding:0}
 
-/* FINAL INVOICE ACTION BUTTON SIZE */
-#invoiceOverlay .invoice-actions{
-  display:flex!important;
-  width:100%!important;
-  gap:12px!important;
-  justify-content:stretch!important;
-  align-items:stretch!important;
-  margin-top:20px!important;
-  padding:0 2px!important;
-}
-#invoiceOverlay .invoice-actions .mf-action-btn{
-  flex:1 1 0!important;
-  min-width:0!important;
-  min-height:64px!important;
-  height:64px!important;
-  display:flex!important;
-  align-items:center!important;
-  justify-content:center!important;
-  text-align:center!important;
-  white-space:nowrap!important;
-  border:1px solid #0b6d78!important;
-  border-radius:12px!important;
-  padding:14px 12px!important;
-  font-size:16px!important;
-  font-weight:800!important;
-  line-height:1.1!important;
-  color:#fff!important;
-  background:#075e66!important;
-  box-shadow:0 3px 7px rgba(0,0,0,.15)!important;
-}
-#invoiceOverlay .invoice-actions .mf-action-btn:last-child{
-  background:#e9eef2!important;
-  border-color:#d2dbe0!important;
-  color:#222!important;
-}
-@media(max-width:900px){
-  #invoiceOverlay .invoice-actions{flex-wrap:wrap!important;gap:10px!important}
-  #invoiceOverlay .invoice-actions .mf-action-btn{
-    flex:1 1 calc(50% - 10px)!important;
-    min-height:58px!important;
-    height:58px!important;
-    font-size:15px!important;
-  }
-}
 
 </style>
 </head>
