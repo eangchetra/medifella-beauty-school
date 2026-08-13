@@ -885,6 +885,18 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="invoice-actions-dashboard-only">
+@media print{
+  #invoiceOverlay .invoice-actions,
+  #invoiceOverlay #invoiceActions,
+  #invoiceOverlay .mf-actions{
+    display:none!important;
+    visibility:hidden!important;
+  }
+}
+</style>
+
 </head>
 <body>
 
@@ -2516,6 +2528,7 @@ function openPrintFromCanvas(canvas,paper,sale){
    overflow:hidden;
    background:#fff;
  }
+ #paper .invoice-actions,#paper .mf-actions{display:none!important}
  #paper img{
    display:block;
    width:${paper.widthMm}mm;
@@ -2583,6 +2596,7 @@ async function printInvoice(id,size="A4"){
  html,body{margin:0!important;padding:0!important;width:${paper.widthMm}mm!important;height:${paper.heightMm}mm!important;background:#fff!important}
  body{display:block!important}
  #paper{width:${paper.widthMm}mm;height:${paper.heightMm}mm;margin:0;padding:0;overflow:hidden;background:#fff}
+ #paper .invoice-actions,#paper .mf-actions{display:none!important}
  #paper img{display:block;width:${paper.widthMm}mm;height:${paper.heightMm}mm;max-width:none;max-height:none;margin:0;padding:0}
 
 
