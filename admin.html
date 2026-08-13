@@ -1278,6 +1278,68 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="invoice-spacing-balanced-final">
+/* FINAL BALANCED SPACING
+   The previous 300px + 35px spacing was too wide.
+   Use a consistent moderate label column so values never touch labels,
+   but do not push the values unnecessarily far to the right. */
+#invoiceOverlay .mf-info-row,
+#invoiceExportContent .mf-info-row{
+  display:grid!important;
+  grid-template-columns:205px minmax(0,1fr)!important;
+  column-gap:15px!important;
+  align-items:center!important;
+}
+
+#invoiceOverlay .mf-info-row .label,
+#invoiceExportContent .mf-info-row .label{
+  width:205px!important;
+  min-width:205px!important;
+  white-space:nowrap!important;
+  overflow:visible!important;
+  padding:0!important;
+  margin:0!important;
+}
+
+#invoiceOverlay .mf-info-row > div:last-child,
+#invoiceExportContent .mf-info-row > div:last-child{
+  min-width:0!important;
+  white-space:nowrap!important;
+  padding:0!important;
+  margin:0!important;
+}
+
+#invoiceOverlay .mf-rate,
+#invoiceExportContent .mf-rate{
+  display:inline-block!important;
+  white-space:nowrap!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+/* Keep print/export aligned with the same balanced spacing. */
+#invoicePrint.invoice-print-a4 .mf-info-row{
+  grid-template-columns:155px minmax(0,1fr)!important;
+  column-gap:12px!important;
+}
+#invoicePrint.invoice-print-a4 .mf-info-row .label{
+  width:155px!important;
+  min-width:155px!important;
+  white-space:nowrap!important;
+}
+
+#invoicePrint.invoice-print-a5 .mf-info-row{
+  grid-template-columns:88px minmax(0,1fr)!important;
+  column-gap:7px!important;
+}
+#invoicePrint.invoice-print-a5 .mf-info-row .label{
+  width:88px!important;
+  min-width:88px!important;
+  white-space:nowrap!important;
+}
+</style>
+
 </head>
 <body>
 
