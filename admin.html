@@ -1739,6 +1739,7 @@ async function recordSalePayment(id){
 }
 
 function showSaleInvoice(id,size="A4"){
+ window.currentInvoiceId = id;
  const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
  const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
  const rate=4150;
@@ -1914,10 +1915,10 @@ function showSaleInvoice(id,size="A4"){
    </div>
 
    <div class="invoice-actions" id="invoiceActions">
-  <button type="button" class="mf-action-btn" onclick="printInvoice(currentInvoiceId,'A4')">🖨️ Print A4</button>
-  <button type="button" class="mf-action-btn" onclick="printInvoice(currentInvoiceId,'A5')">🖨️ Print A5</button>
-  <button type="button" class="mf-action-btn" onclick="downloadInvoicePDF(currentInvoiceId,'A4')">⬇️ Save PDF A4</button>
-  <button type="button" class="mf-action-btn" onclick="downloadInvoicePDF(currentInvoiceId,'A5')">⬇️ Save PDF A5</button>
+  <button type="button" class="mf-action-btn" onclick="printInvoice(window.currentInvoiceId,'A4')">🖨️ Print A4</button>
+  <button type="button" class="mf-action-btn" onclick="printInvoice(window.currentInvoiceId,'A5')">🖨️ Print A5</button>
+  <button type="button" class="mf-action-btn" onclick="downloadInvoicePDF(window.currentInvoiceId,'A4')">⬇️ Save PDF A4</button>
+  <button type="button" class="mf-action-btn" onclick="downloadInvoicePDF(window.currentInvoiceId,'A5')">⬇️ Save PDF A5</button>
   <button type="button" class="mf-action-btn" onclick="closeInvoicePreview()">✕ Close</button>
 </div>
  </div>`;
@@ -1928,6 +1929,10 @@ window.showSaleInvoice = showSaleInvoice;
 
 function closeInvoice(){
  $("invoiceOverlay").classList.remove("show");
+}
+
+function closeInvoicePreview(){
+ closeInvoice();
 }
 
 
@@ -2120,12 +2125,57 @@ function openPrintFromCanvas(canvas,paper,sale){
 
 async function printInvoice(id,size="A4"){
  const sale=salesRecords.find(x=>String(x.id)===String(id));
- if(!sale)return;
+ if(!sale){
+   alert("Invoice not found.");
+   return;
+ }
+
+ /* Open the print window immediately while Safari still considers this a
+    direct button click. Waiting for html2canvas before window.open() can make
+    Safari block the print window as a popup. */
+ const printWin=window.open("about:blank","_blank","width=1000,height=1300");
+ if(!printWin){
+   alert("Safari blocked the print window. Please allow pop-ups for this website, then click Print again.");
+   return;
+ }
+
+ printWin.document.open();
+ printWin.document.write("<!doctype html><html><head><title>Preparing invoice...</title></head><body style='font-family:sans-serif;padding:30px'>Preparing invoice...</body></html>");
+ printWin.document.close();
+
  try{
    const result=await buildInvoicePaperCanvas(size);
-   openPrintFromCanvas(result.canvas,result.paper,sale);
+   const img=result.canvas.toDataURL("image/png");
+   const paper=result.paper;
+   const title=`${String(saleRef(sale)||"Invoice")} - ${paper.name}`;
+
+   const html=`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${title}</title>
+<style>
+ @page{size:${paper.name} portrait;margin:0}
+ html,body{margin:0!important;padding:0!important;width:${paper.widthMm}mm!important;height:${paper.heightMm}mm!important;background:#fff!important}
+ body{display:block!important}
+ #paper{width:${paper.widthMm}mm;height:${paper.heightMm}mm;margin:0;padding:0;overflow:hidden;background:#fff}
+ #paper img{display:block;width:${paper.widthMm}mm;height:${paper.heightMm}mm;max-width:none;max-height:none;margin:0;padding:0}
+</style>
+</head>
+<body>
+<div id="paper"><img src="${img}" alt="Invoice"></div>
+<script>
+window.onload=function(){setTimeout(function(){window.print();},250);};
+<\/script>
+</body>
+</html>`;
+
+   printWin.document.open();
+   printWin.document.write(html);
+   printWin.document.close();
  }catch(e){
    console.error(e);
+   try{printWin.close();}catch(_){}
    alert("Could not prepare the invoice for printing. Please try again.");
  }
 }
@@ -2170,6 +2220,10 @@ async function downloadInvoicePDF(id,size="A4"){
    alert("PDF could not be generated. Please try again.");
  }
 }
+window.printInvoice = printInvoice;
+window.downloadInvoicePDF = downloadInvoicePDF;
+window.closeInvoicePreview = closeInvoicePreview;
+
 function startSaleForStudent(studentId){
  document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
  document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
@@ -2775,14 +2829,4 @@ boot();
 </body>
 </html>
 
-<script>
-function closeInvoicePreview(){
-  const ids=['invoicePreviewModal','invoiceModal','invoicePreview'];
-  for(const id of ids){
-    const el=document.getElementById(id);
-    if(el){el.style.display='none'; return;}
-  }
-  const closeBtn=[...document.querySelectorAll('button')].find(b=>/close/i.test(b.textContent||''));
-  if(closeBtn && closeBtn !== document.activeElement) closeBtn.click();
-}
-</script>
+
