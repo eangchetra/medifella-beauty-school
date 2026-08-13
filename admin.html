@@ -706,6 +706,265 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
   font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
 }
 </style>
+
+<style id="medi-fella-final-invoice-a4-a5-update">
+/* =========================================================
+   MEDI FELLA FINAL INVOICE UPDATE — A4 + A5
+   Only school name + INVOICE title use the logo cyan color.
+   All other Khmer uses Khmer OS Battambang.
+   ========================================================= */
+:root{--mf-logo-cyan:#23c1da;--mf-invoice-black:#111}
+
+/* All invoice text defaults to Khmer OS Battambang. */
+#invoiceOverlay .mf-invoice,
+#invoiceExportContent .mf-invoice{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,"Noto Sans",sans-serif!important;
+  color:var(--mf-invoice-black)!important;
+}
+
+/* Only school name Khmer + English use the logo color. */
+#invoiceOverlay .mf-invoice .mf-school-kh,
+#invoiceExportContent .mf-invoice .mf-school-kh{
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
+  color:var(--mf-logo-cyan)!important;
+  font-weight:400!important;
+}
+#invoiceOverlay .mf-invoice .mf-school-en,
+#invoiceExportContent .mf-invoice .mf-school-en{
+  color:var(--mf-logo-cyan)!important;
+}
+
+/* Khmer + English INVOICE must be on ONE LINE and use Khmer OS Moul. */
+#invoiceOverlay .mf-invoice .mf-invoice-label,
+#invoiceExportContent .mf-invoice .mf-invoice-label{
+  display:flex!important;
+  justify-content:center!important;
+  align-items:baseline!important;
+  flex-wrap:nowrap!important;
+  white-space:nowrap!important;
+  color:var(--mf-logo-cyan)!important;
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
+}
+#invoiceOverlay .mf-invoice .mf-invoice-label .kh,
+#invoiceOverlay .mf-invoice .mf-invoice-label .en,
+#invoiceExportContent .mf-invoice .mf-invoice-label .kh,
+#invoiceExportContent .mf-invoice .mf-invoice-label .en{
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
+  color:var(--mf-logo-cyan)!important;
+}
+#invoiceOverlay .mf-invoice .mf-invoice-label .kh,
+#invoiceExportContent .mf-invoice .mf-invoice-label .kh{font-size:24px!important}
+#invoiceOverlay .mf-invoice .mf-invoice-label .en,
+#invoiceExportContent .mf-invoice .mf-invoice-label .en{
+  font-size:32px!important;
+  font-weight:400!important;
+  letter-spacing:.3px!important;
+}
+#invoiceOverlay .mf-invoice .mf-invoice-label .sep,
+#invoiceExportContent .mf-invoice .mf-invoice-label .sep{
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
+  color:var(--mf-logo-cyan)!important;
+  font-size:27px!important;
+  margin:0 5px!important;
+}
+
+/* School information and all other Khmer remain Battambang + black. */
+#invoiceOverlay .mf-invoice .mf-school-info,
+#invoiceOverlay .mf-invoice .mf-info-title,
+#invoiceOverlay .mf-invoice .mf-info-body,
+#invoiceOverlay .mf-invoice .mf-info-row,
+#invoiceOverlay .mf-invoice .mf-invoice-table,
+#invoiceOverlay .mf-invoice .mf-refund-box,
+#invoiceOverlay .mf-invoice .mf-totals-table,
+#invoiceOverlay .mf-invoice .mf-note,
+#invoiceOverlay .mf-invoice .mf-signatures,
+#invoiceExportContent .mf-invoice .mf-school-info,
+#invoiceExportContent .mf-invoice .mf-info-title,
+#invoiceExportContent .mf-invoice .mf-info-body,
+#invoiceExportContent .mf-invoice .mf-info-row,
+#invoiceExportContent .mf-invoice .mf-invoice-table,
+#invoiceExportContent .mf-invoice .mf-refund-box,
+#invoiceExportContent .mf-invoice .mf-totals-table,
+#invoiceExportContent .mf-invoice .mf-note,
+#invoiceExportContent .mf-invoice .mf-signatures{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,"Noto Sans",sans-serif!important;
+  color:var(--mf-invoice-black)!important;
+}
+
+/* Black table: no colored header fill and black text. */
+#invoiceOverlay .mf-invoice .mf-invoice-table,
+#invoiceOverlay .mf-invoice .mf-invoice-table th,
+#invoiceOverlay .mf-invoice .mf-invoice-table td,
+#invoiceExportContent .mf-invoice .mf-invoice-table,
+#invoiceExportContent .mf-invoice .mf-invoice-table th,
+#invoiceExportContent .mf-invoice .mf-invoice-table td{
+  border-color:#111!important;
+  color:#111!important;
+}
+#invoiceOverlay .mf-invoice .mf-invoice-table th,
+#invoiceExportContent .mf-invoice .mf-invoice-table th{
+  background:#fff!important;
+  color:#111!important;
+  font-weight:700!important;
+}
+
+/* Information boxes: black border/text, no teal fill. */
+#invoiceOverlay .mf-invoice .mf-info-box,
+#invoiceExportContent .mf-invoice .mf-info-box{
+  border-color:#111!important;
+}
+#invoiceOverlay .mf-invoice .mf-info-title,
+#invoiceExportContent .mf-invoice .mf-info-title{
+  background:#fff!important;
+  color:#111!important;
+  border-bottom:1px solid #111!important;
+}
+
+/* Invoice number and exchange rate stay on one line. */
+#invoiceOverlay .mf-invoice .mf-info-row,
+#invoiceExportContent .mf-invoice .mf-info-row{
+  grid-template-columns:max-content minmax(0,1fr)!important;
+  gap:7px!important;
+}
+#invoiceOverlay .mf-invoice .mf-info-row .label,
+#invoiceExportContent .mf-invoice .mf-info-row .label{
+  white-space:nowrap!important;
+  color:#111!important;
+}
+#invoiceOverlay .mf-invoice .mf-rate,
+#invoiceExportContent .mf-invoice .mf-rate{
+  color:#111!important;
+  font-weight:700!important;
+  white-space:nowrap!important;
+}
+
+/* Totals: black borders, white fill, black text. Bold/highlight remains black. */
+#invoiceOverlay .mf-invoice .mf-totals-table,
+#invoiceOverlay .mf-invoice .mf-totals-table th,
+#invoiceOverlay .mf-invoice .mf-totals-table td,
+#invoiceExportContent .mf-invoice .mf-totals-table,
+#invoiceExportContent .mf-invoice .mf-totals-table th,
+#invoiceExportContent .mf-invoice .mf-totals-table td{
+  border-color:#111!important;
+  color:#111!important;
+}
+#invoiceOverlay .mf-invoice .mf-totals-table th,
+#invoiceOverlay .mf-invoice .mf-totals-table .initial,
+#invoiceOverlay .mf-invoice .mf-totals-table .grand,
+#invoiceExportContent .mf-invoice .mf-totals-table th,
+#invoiceExportContent .mf-invoice .mf-totals-table .initial,
+#invoiceExportContent .mf-invoice .mf-totals-table .grand{
+  background:#fff!important;
+  color:#111!important;
+}
+#invoiceOverlay .mf-invoice .mf-totals-table .grand td:not(:first-child),
+#invoiceExportContent .mf-invoice .mf-totals-table .grand td:not(:first-child){
+  color:#111!important;
+}
+
+/* Payment note smaller and Battambang. */
+#invoiceOverlay .mf-invoice .mf-refund-box .kh,
+#invoiceExportContent .mf-invoice .mf-refund-box .kh{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
+  color:#111!important;
+  font-size:11px!important;
+  line-height:1.35!important;
+  font-weight:700!important;
+}
+#invoiceOverlay .mf-invoice .mf-refund-box .en,
+#invoiceExportContent .mf-invoice .mf-refund-box .en{
+  color:#111!important;
+  font-size:10px!important;
+  line-height:1.25!important;
+}
+
+/* Sale note and signatures are black. */
+#invoiceOverlay .mf-invoice .mf-note-title,
+#invoiceExportContent .mf-invoice .mf-note-title{
+  color:#111!important;
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
+}
+#invoiceOverlay .mf-invoice .mf-signatures,
+#invoiceExportContent .mf-invoice .mf-signatures{
+  grid-template-columns:1fr 1fr!important;
+  gap:70px!important;
+  margin-top:24px!important;
+}
+#invoiceOverlay .mf-invoice .mf-signature,
+#invoiceExportContent .mf-invoice .mf-signature{
+  border-top:0!important;
+  padding-top:0!important;
+  color:#111!important;
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
+}
+.mf-signature-kh{font-size:12px!important;font-weight:700!important;line-height:1.35!important}
+.mf-signature-en{font-family:Arial,"Noto Sans",sans-serif!important;font-size:11px!important;font-weight:700!important;margin-top:1px!important}
+.mf-signature-line{border-top:1px solid #111!important;margin:28px auto 5px!important;width:78%!important}
+.mf-signature-name{font-size:9px!important;color:#111!important}
+
+/* A4: larger logo and larger school title. */
+#invoiceOverlay.preview-a4 .mf-invoice-logo{width:88px!important;height:88px!important}
+#invoiceOverlay.preview-a4 .mf-invoice-top{grid-template-columns:98px 1fr!important;gap:12px!important}
+#invoiceOverlay.preview-a4 .mf-school-kh{font-size:23px!important;line-height:1.45!important}
+#invoiceOverlay.preview-a4 .mf-school-en{font-size:27px!important;font-weight:900!important}
+#invoiceOverlay.preview-a4 .mf-school-info{font-size:10px!important;line-height:1.35!important}
+#invoiceOverlay.preview-a4 .mf-invoice-label{margin:12px 0 10px!important;padding-top:8px!important}
+#invoiceOverlay.preview-a4 .mf-invoice-label .kh{font-size:21px!important}
+#invoiceOverlay.preview-a4 .mf-invoice-label .en{font-size:29px!important}
+
+/* A5: compact but still readable. */
+#invoiceOverlay.preview-a5 .mf-invoice-logo{width:62px!important;height:62px!important}
+#invoiceOverlay.preview-a5 .mf-invoice-top{grid-template-columns:68px 1fr!important;gap:7px!important}
+#invoiceOverlay.preview-a5 .mf-school-kh{font-size:11px!important;line-height:1.35!important}
+#invoiceOverlay.preview-a5 .mf-school-en{font-size:14px!important;font-weight:900!important}
+#invoiceOverlay.preview-a5 .mf-school-info{font-size:6.6px!important;line-height:1.15!important}
+#invoiceOverlay.preview-a5 .mf-invoice-label{margin:4px 0 5px!important;padding-top:3px!important}
+#invoiceOverlay.preview-a5 .mf-invoice-label .kh{font-size:10px!important}
+#invoiceOverlay.preview-a5 .mf-invoice-label .en{font-size:14px!important}
+#invoiceOverlay.preview-a5 .mf-invoice-label .sep{font-size:11px!important;margin:0 2px!important}
+#invoiceOverlay.preview-a5 .mf-info-row{grid-template-columns:max-content minmax(0,1fr)!important;gap:3px!important}
+#invoiceOverlay.preview-a5 .mf-info-row .label{font-size:6.5px!important}
+#invoiceOverlay.preview-a5 .mf-rate{font-size:6.5px!important}
+#invoiceOverlay.preview-a5 .mf-refund-box .kh{font-size:7.6px!important}
+#invoiceOverlay.preview-a5 .mf-refund-box .en{font-size:7px!important}
+#invoiceOverlay.preview-a5 .mf-signatures{gap:14px!important;margin-top:7px!important}
+#invoiceOverlay.preview-a5 .mf-signature-kh{font-size:7px!important}
+#invoiceOverlay.preview-a5 .mf-signature-en{font-size:6.5px!important}
+#invoiceOverlay.preview-a5 .mf-signature-line{margin-top:10px!important;margin-bottom:3px!important}
+#invoiceOverlay.preview-a5 .mf-signature-name{font-size:5.8px!important}
+
+/* Exported A4/A5 canvas gets the same colors/fonts/layout. */
+#invoiceExportContent .invoice-export-a4 .mf-invoice-logo{width:82px!important;height:82px!important}
+#invoiceExportContent .invoice-export-a4 .mf-invoice-top{grid-template-columns:92px 1fr!important;gap:9px!important}
+#invoiceExportContent .invoice-export-a4 .mf-school-kh{font-size:17px!important}
+#invoiceExportContent .invoice-export-a4 .mf-school-en{font-size:21px!important}
+#invoiceExportContent .invoice-export-a4 .mf-school-info{font-size:8.5px!important}
+#invoiceExportContent .invoice-export-a4 .mf-invoice-label{display:flex!important;white-space:nowrap!important}
+#invoiceExportContent .invoice-export-a4 .mf-invoice-label .kh{font-size:16px!important}
+#invoiceExportContent .invoice-export-a4 .mf-invoice-label .en{font-size:22px!important}
+#invoiceExportContent .invoice-export-a4 .mf-invoice-label .sep{font-size:18px!important}
+#invoiceExportContent .invoice-export-a4 .mf-signatures{grid-template-columns:1fr 1fr!important;gap:45px!important;margin-top:8px!important}
+#invoiceExportContent .invoice-export-a4 .mf-signature-kh{font-size:9px!important}
+#invoiceExportContent .invoice-export-a4 .mf-signature-en{font-size:8px!important}
+#invoiceExportContent .invoice-export-a4 .mf-signature-line{margin-top:16px!important}
+
+#invoiceExportContent .invoice-export-a5 .mf-invoice-logo{width:58px!important;height:58px!important}
+#invoiceExportContent .invoice-export-a5 .mf-invoice-top{grid-template-columns:64px 1fr!important;gap:6px!important}
+#invoiceExportContent .invoice-export-a5 .mf-school-kh{font-size:9px!important}
+#invoiceExportContent .invoice-export-a5 .mf-school-en{font-size:12px!important}
+#invoiceExportContent .invoice-export-a5 .mf-school-info{font-size:6.1px!important}
+#invoiceExportContent .invoice-export-a5 .mf-invoice-label{display:flex!important;white-space:nowrap!important}
+#invoiceExportContent .invoice-export-a5 .mf-invoice-label .kh{font-size:9px!important}
+#invoiceExportContent .invoice-export-a5 .mf-invoice-label .en{font-size:13px!important}
+#invoiceExportContent .invoice-export-a5 .mf-invoice-label .sep{font-size:10px!important;margin:0 2px!important}
+#invoiceExportContent .invoice-export-a5 .mf-info-row{grid-template-columns:max-content minmax(0,1fr)!important;gap:2px!important}
+#invoiceExportContent .invoice-export-a5 .mf-info-row .label{font-size:6px!important}
+#invoiceExportContent .invoice-export-a5 .mf-rate{font-size:6px!important}
+#invoiceExportContent .invoice-export-a5 .mf-signatures{grid-template-columns:1fr 1fr!important;gap:18px!important;margin-top:5px!important}
+#invoiceExportContent .invoice-export-a5 .mf-signature-kh{font-size:6.5px!important}
+#invoiceExportContent .invoice-export-a5 .mf-signature-en{font-size:6px!important}
+#invoiceExportContent .invoice-export-a5 .mf-signature-line{margin-top:10px!important}
+</style>
 </head>
 <body>
 
@@ -1484,7 +1743,8 @@ $("cancelNewStudent").onclick=()=>{
   resetNewStudentForm();
   $("studentRegisterCard").classList.add("hidden");
 };
-async function nextStudentId(){
+async /* Short student ID format: MFS-YYYY-0001, MFS-YYYY-0002, ... */
+function nextStudentId(){
   const year=new Date().getFullYear();
   const {data,error}=await sb.from("students").select("student_id").like("student_id",`MFS-${year}-%`);
   if(error)throw error;
@@ -2122,8 +2382,7 @@ function showSaleInvoice(id,size="A4"){
    </div>
 
    <div class="mf-invoice-label">
-     <div class="kh">វិក្កយបត្រ</div>
-     <div class="en">INVOICE</div>
+     <span class="kh">វិក្កយបត្រ</span><span class="sep"> / </span><span class="en">INVOICE</span>
    </div>
 
    <div class="mf-info-grid">
@@ -2188,9 +2447,18 @@ function showSaleInvoice(id,size="A4"){
    </div>
 
    <div class="mf-signatures">
-     <div class="mf-signature">ហត្ថលេខាអ្នកលក់ / Seller Signature</div>
-     <div class="mf-signature">ហត្ថលេខាអ្នកដឹកជញ្ជូន / Delivery Signature</div>
-     <div class="mf-signature">ហត្ថលេខាអ្នកទិញ / Buyer Signature</div>
+     <div class="mf-signature">
+       <div class="mf-signature-kh">ហត្ថលេខាអ្នកលក់</div>
+       <div class="mf-signature-en">Seller Signature</div>
+       <div class="mf-signature-line"></div>
+       <div class="mf-signature-name">ឈ្មោះ / Name</div>
+     </div>
+     <div class="mf-signature">
+       <div class="mf-signature-kh">ហត្ថលេខាអ្នកទិញ</div>
+       <div class="mf-signature-en">Buyer Signature</div>
+       <div class="mf-signature-line"></div>
+       <div class="mf-signature-name">ឈ្មោះ / Name</div>
+     </div>
    </div>
 
    <div class="invoice-actions" id="invoiceActions">
