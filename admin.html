@@ -1215,6 +1215,69 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="invoice-label-value-extra-space-final">
+/* EXTRA SPACE: keep long Khmer/English labels completely separate
+   from their values on both the invoice preview and PDF export. */
+#invoiceOverlay .mf-invoice .mf-info-row,
+#invoiceExportContent .mf-invoice .mf-info-row{
+  grid-template-columns:300px minmax(0,1fr)!important;
+  column-gap:35px!important;
+  align-items:center!important;
+}
+
+#invoiceOverlay .mf-invoice .mf-info-row .label,
+#invoiceExportContent .mf-invoice .mf-info-row .label{
+  width:300px!important;
+  min-width:300px!important;
+  white-space:nowrap!important;
+  overflow:visible!important;
+  padding:0!important;
+}
+
+#invoiceOverlay .mf-invoice .mf-info-row > div:last-child,
+#invoiceExportContent .mf-invoice .mf-info-row > div:last-child{
+  min-width:0!important;
+  white-space:nowrap!important;
+  padding-left:0!important;
+  margin-left:0!important;
+}
+
+#invoiceOverlay .mf-invoice .mf-rate,
+#invoiceExportContent .mf-invoice .mf-rate{
+  display:block!important;
+  white-space:nowrap!important;
+  margin-left:0!important;
+  padding-left:0!important;
+}
+
+/* A4 print/export version: give the labels enough width while
+   keeping the invoice on one page. */
+#invoicePrint.invoice-print-a4 .mf-info-row{
+  grid-template-columns:215px minmax(0,1fr)!important;
+  column-gap:18px!important;
+}
+#invoicePrint.invoice-print-a4 .mf-info-row .label{
+  white-space:nowrap!important;
+}
+
+/* A5: compact but still clearly separated. */
+#invoiceOverlay.preview-a5 .mf-invoice .mf-info-row,
+#invoiceExportContent .invoice-export-a5 .mf-invoice .mf-info-row{
+  grid-template-columns:100px minmax(0,1fr)!important;
+  column-gap:10px!important;
+}
+#invoiceOverlay.preview-a5 .mf-invoice .mf-info-row .label,
+#invoiceExportContent .invoice-export-a5 .mf-invoice .mf-info-row .label{
+  width:100px!important;
+  min-width:100px!important;
+}
+#invoicePrint.invoice-print-a5 .mf-info-row{
+  grid-template-columns:78px minmax(0,1fr)!important;
+  column-gap:8px!important;
+}
+</style>
+
 </head>
 <body>
 
