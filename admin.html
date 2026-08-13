@@ -1798,7 +1798,11 @@ function showSaleInvoice(id,size="A4"){
    if(x){
      const qty=x.quantity ?? 1;
      const discount=x.discount_input ?? (x.discount_percent ?? "");
-     const discountText = discount === "" ? "" : `${esc(String(discount))}%`;
+     const discountText = discount === "" ? "" : (
+       String(discount).trim().endsWith("%")
+         ? esc(String(discount).trim())
+         : `${esc(String(discount).trim())}%`
+     );
      return `<tr>
        <td>${i+1}</td>
        <td style="text-align:left">${esc(x.name||"")}</td>
@@ -1855,8 +1859,7 @@ function showSaleInvoice(id,size="A4"){
        <div class="mf-info-title">ព័ត៌មានវិក្កយបត្រ / INVOICE INFORMATION</div>
        <div class="mf-info-body">
          <div class="mf-info-row"><div class="label">លេខវិក្កយបត្រ / Invoice No.</div><div>${esc(invoiceNumber)}</div></div>
-         <div class="mf-info-row"><div class="label">កាលបរិច្ឆេទ / Date</div><div>${esc(datePart)}</div></div>
-         <div class="mf-info-row"><div class="label">ម៉ោង / Time</div><div>${esc(timePart||"—")}</div></div>
+         <div class="mf-info-row"><div class="label">កាលបរិច្ឆេត/Date Time</div><div>${esc(dateTime)}</div></div>
          <div class="mf-info-row"><div class="label">អ្នកគិតលុយ / Cashier</div><div>${esc(adminUser?.full_name||adminUser?.username||"Admin")}</div></div>
          <div class="mf-info-row"><div class="label">អត្រាប្តូរប្រាក់ / Exchange Rate</div><div class="mf-rate">1 USD = ${rate.toLocaleString("en-US")} ៛</div></div>
        </div>
@@ -1912,9 +1915,10 @@ function showSaleInvoice(id,size="A4"){
 
    <div class="mf-actions invoice-actions">
      <button class="teal" onclick="showSaleInvoice('${attr(id)}','A4')">👁 View</button>
-     <button class="gold" onclick="showSaleInvoice('${attr(id)}','A5')">👁 View A5</button>
-     <button class="teal" onclick="printInvoice('${size}')">🖨 Print</button>
-     <button class="teal" onclick="downloadInvoicePDF('${attr(id)}','${size}')">⬇ Save PDF</button>
+     <button class="teal" onclick="printInvoice('${attr(id)}','A4')">🖨 Print A4</button>
+     <button class="gold" onclick="printInvoice('${attr(id)}','A5')">🖨 Print A5</button>
+     <button class="teal" onclick="downloadInvoicePDF('${attr(id)}','A4')">⬇ Save PDF A4</button>
+     <button class="gold" onclick="downloadInvoicePDF('${attr(id)}','A5')">⬇ Save PDF A5</button>
      <button class="light" onclick="closeInvoice()">✕ Close</button>
    </div>
  </div>`;
@@ -1927,83 +1931,211 @@ function closeInvoice(){
  $("invoiceOverlay").classList.remove("show");
 }
 
-function printInvoice(size="A4"){
- const printBox=$("invoicePrint");
- if(!printBox)return;
- const oldClass=printBox.className;
- printBox.classList.remove("invoice-print-a4","invoice-print-a5");
- printBox.classList.add(size==="A5"?"invoice-print-a5":"invoice-print-a4");
- if($("invoiceOverlay")){
-   $("invoiceOverlay").classList.remove("preview-a4","preview-a5");
-   $("invoiceOverlay").classList.add(size==="A5"?"preview-a5":"preview-a4");
+
+function getInvoiceCloneForExport(){
+ const source=$("invoicePrint");
+ if(!source) return null;
+ const invoice=source.querySelector(".mf-invoice");
+ if(!invoice) return null;
+ const clone=invoice.cloneNode(true);
+ clone.querySelectorAll(".invoice-actions,.mf-actions").forEach(el=>el.remove());
+ return clone;
+}
+
+function getInvoicePaper(size){
+ return size==="A5"
+   ? {name:"A5", widthMm:148, heightMm:210}
+   : {name:"A4", widthMm:210, heightMm:297};
+}
+
+async function printInvoice(id,size="A4"){
+ const sale=salesRecords.find(x=>String(x.id)===String(id));
+ const clone=getInvoiceCloneForExport();
+ if(!clone || !sale)return;
+
+ const paper=getInvoicePaper(size);
+ const printWin=window.open("","_blank","width=900,height=1200");
+ if(!printWin){
+   alert("Please allow pop-ups for this Admin page so the invoice can open for printing.");
+   return;
  }
- setTimeout(()=>{
-   window.print();
- },80);
- setTimeout(()=>{
-   printBox.className=oldClass;
- },1500);
+
+ const uid="print-invoice-"+Date.now();
+ const html=`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>${String(saleRef(sale)||"Invoice")} - ${paper.name}</title>
+<style>
+@page{size:${paper.name} portrait;margin:0}
+*{box-sizing:border-box}
+html,body{margin:0;padding:0;background:#fff}
+body{display:flex;justify-content:center;align-items:flex-start}
+#page{
+  width:${paper.widthMm}mm;
+  height:${paper.heightMm}mm;
+  overflow:hidden;
+  background:#fff;
+  position:relative;
+}
+#content{
+  position:absolute;
+  left:0;
+  top:0;
+  width:${paper.widthMm}mm;
+  transform-origin:top left;
+}
+.mf-invoice{width:100%!important;max-width:none!important;margin:0!important;padding:5mm!important;box-sizing:border-box!important;background:#fff!important}
+.invoice-actions,.mf-actions{display:none!important}
+table{max-width:100%!important}
+
+/* FINAL EXACT A4/A5 EXPORT + PRINT */
+@media screen{
+  .invoice-actions{display:flex!important;flex-wrap:wrap;gap:8px;justify-content:flex-start}
+}
+@media print{
+  @page{size:A4 portrait;margin:0}
+  html,body{margin:0!important;padding:0!important;background:#fff!important}
+  body>*:not(#invoiceOverlay){display:none!important}
+  #invoiceOverlay{
+    position:static!important;
+    display:block!important;
+    padding:0!important;
+    margin:0!important;
+    background:#fff!important;
+    overflow:visible!important;
+  }
+  #invoicePrint{
+    width:100%!important;
+    max-width:none!important;
+    margin:0!important;
+    padding:0!important;
+    box-shadow:none!important;
+    border:0!important;
+    background:#fff!important;
+  }
+  #invoicePrint .invoice-actions{display:none!important}
+}
+
+</style>
+</head>
+<body>
+<div id="page"><div id="content" class="${uid}"></div></div>
+<script>
+const content=document.querySelector(".${uid}");
+content.innerHTML=${JSON.stringify(clone.outerHTML)};
+window.onload=()=>{
+  const page=document.getElementById("page");
+  const c=document.getElementById("content");
+  const naturalH=c.scrollHeight;
+  const naturalW=c.scrollWidth;
+  const pageW=page.clientWidth;
+  const pageH=page.clientHeight;
+  const scale=Math.min(1, pageW/naturalW, pageH/naturalH);
+  c.style.transform="scale("+scale+")";
+  setTimeout(()=>window.print(),250);
+};
+<\/script>
+</body>
+</html>`;
+ printWin.document.open();
+ printWin.document.write(html);
+ printWin.document.close();
 }
 
 async function downloadInvoicePDF(id,size="A4"){
- const box=$("invoicePrint");
- if(!box)return;
- const oldClass=box.className;
+ const sale=salesRecords.find(x=>String(x.id)===String(id));
+ const clone=getInvoiceCloneForExport();
+ if(!clone || !sale)return;
+
  try{
-   if(!window.html2pdf){
+   if(!window.html2canvas){
      await new Promise((resolve,reject)=>{
        const s=document.createElement("script");
-       s.src="https://cdnjs.cloudflare.com/ajax/libs/html2pdf.js/0.10.1/html2pdf.bundle.min.js";
-       s.onload=resolve;
-       s.onerror=reject;
-       document.head.appendChild(s);
+       s.src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js";
+       s.onload=resolve;s.onerror=reject;document.head.appendChild(s);
+     });
+   }
+   if(!window.jspdf || !window.jspdf.jsPDF){
+     await new Promise((resolve,reject)=>{
+       const s=document.createElement("script");
+       s.src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js";
+       s.onload=resolve;s.onerror=reject;document.head.appendChild(s);
      });
    }
 
-   const sale=salesRecords.find(x=>String(x.id)===String(id));
+   const paper=getInvoicePaper(size);
+   const pxPerMm=96/25.4;
+   const pageW=Math.round(paper.widthMm*pxPerMm);
+   const pageH=Math.round(paper.heightMm*pxPerMm);
+
+   const host=document.createElement("div");
+   host.style.position="fixed";
+   host.style.left="-100000px";
+   host.style.top="0";
+   host.style.width=pageW+"px";
+   host.style.height=pageH+"px";
+   host.style.overflow="hidden";
+   host.style.background="#fff";
+   host.style.zIndex="-1";
+
+   const wrap=document.createElement("div");
+   wrap.style.width=pageW+"px";
+   wrap.style.minHeight=pageH+"px";
+   wrap.style.background="#fff";
+   wrap.style.overflow="hidden";
+
+   clone.style.width=pageW+"px";
+   clone.style.maxWidth="none";
+   clone.style.margin="0";
+   clone.style.boxSizing="border-box";
+   clone.style.background="#fff";
+   clone.style.overflow="visible";
+
+   wrap.appendChild(clone);
+   host.appendChild(wrap);
+   document.body.appendChild(host);
+
+   await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+
+   const naturalW=wrap.scrollWidth;
+   const naturalH=wrap.scrollHeight;
+   const scale=Math.min(1,pageW/naturalW,pageH/naturalH);
+
+   const canvas=await html2canvas(wrap,{
+     scale:2,
+     useCORS:true,
+     backgroundColor:"#ffffff",
+     width:Math.ceil(naturalW),
+     height:Math.ceil(naturalH),
+     windowWidth:Math.ceil(naturalW),
+     windowHeight:Math.ceil(naturalH),
+     scrollX:0,
+     scrollY:0
+   });
+
+   document.body.removeChild(host);
+
+   const {jsPDF}=window.jspdf;
+   const pdf=new jsPDF({
+     unit:"mm",
+     format:size==="A5"?"a5":"a4",
+     orientation:"portrait",
+     compress:true
+   });
+
+   const imgW=paper.widthMm*scale;
+   const imgH=paper.heightMm*scale;
+   const x=(paper.widthMm-imgW)/2;
+   const y=(paper.heightMm-imgH)/2;
+
+   pdf.addImage(canvas.toDataURL("image/jpeg",0.98),"JPEG",x,y,imgW,imgH,undefined,"FAST");
+
    const filename=`${String(saleRef(sale)||"invoice").replace(/[^a-z0-9_-]/gi,"_")}-${size}.pdf`;
-   const isA5=size==="A5";
-
-   box.classList.remove("invoice-print-a4","invoice-print-a5");
-   box.classList.add(isA5?"invoice-print-a5":"invoice-print-a4");
-
-   const pageWidth=isA5?148:210;
-   const margin=isA5?3:4;
-
-   await window.html2pdf().set({
-     margin:[margin,margin,margin,margin],
-     filename,
-     image:{type:"jpeg",quality:0.98},
-     html2canvas:{
-       scale:2,
-       useCORS:true,
-       backgroundColor:"#ffffff",
-       scrollX:0,
-       scrollY:0
-     },
-     jsPDF:{
-       unit:"mm",
-       format:isA5?"a5":"a4",
-       orientation:"portrait",
-       compress:true
-     },
-     pagebreak:{mode:["avoid-all","css"]}
-   }).from(box).toPdf().get("pdf").then(pdf=>{
-     // Keep the PDF page size exact and prevent an oversized canvas from
-     // creating horizontal spill.
-     const pageW=pdf.internal.pageSize.getWidth();
-     const pageH=pdf.internal.pageSize.getHeight();
-     if(pageW!==pageWidth){
-       // jsPDF already uses the requested format; this is intentionally
-       // left as a safety check rather than scaling the invoice twice.
-     }
-     return pdf;
-   }).save();
-
-   box.className=oldClass;
+   pdf.save(filename);
  }catch(e){
-   box.className=oldClass;
-   alert("PDF could not be generated. Please use Print A4/A5 and choose Save as PDF.");
+   console.error(e);
+   alert("PDF could not be generated. Please use Print A4 or Print A5 and choose Save as PDF.");
  }
 }
 
