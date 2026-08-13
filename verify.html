@@ -27,7 +27,7 @@ h1{margin:0;font-size:29px;line-height:1.45}
 .profile{display:grid;grid-template-columns:160px 1fr;gap:24px;padding:22px;background:#f7fcfc;border:1px solid #cbe4e7;border-radius:18px}
 .photo{width:160px;height:190px;object-fit:cover;border-radius:12px;background:#e8f1f3;border:1px solid #d5e4e7}
 .label{display:block;color:#117f8c;font-size:15px;font-weight:700;margin-bottom:7px;line-height:1.4}
-.name{font-size:29px;font-weight:700;margin-bottom:19px}.value{font-size:20px;font-weight:700;margin:0 0 16px}
+.name{font-size:29px;font-weight:700;margin-bottom:19px}.name-en{display:block;font-weight:800}.name-km{display:block;font-size:25px;font-weight:700;margin-top:5px}.value{font-size:20px;font-weight:700;margin:0 0 16px}
 .id{display:block;font-family:Arial,"Noto Sans Khmer","Noto Sans KR",sans-serif;background:transparent;border:0;border-radius:0;padding:0;font-size:20px;font-weight:700;margin-top:0}
 .details{margin-top:20px;border:1px solid #d8e6e9;border-radius:15px;overflow:hidden}
 .detail{padding:18px 20px;border-bottom:1px solid #d8e6e9}
@@ -74,7 +74,7 @@ This certificate is authentic and officially verified.<br>
 <img id="photo" class="photo" alt="Student photo">
 <div>
 <span class="label">ឈ្មោះសិស្ស · STUDENT NAME · 학생 이름</span>
-<div id="name" class="name"></div>
+<div id="name" class="name"><div id="nameEnglish" class="name-en"></div><div id="nameKhmer" class="name-km"></div></div>
 
 <span class="label">ភេទ · SEX · 성별</span>
 <div id="sex" class="value"></div>
@@ -165,8 +165,29 @@ function showCertificate(student){
   document.getElementById("error").style.display = "none";
   document.getElementById("card").style.display = "block";
 
-  document.getElementById("name").textContent =
-    text(student.name);
+  const rawName = text(student.name).trim();
+  let englishName = "";
+  let khmerName = "";
+
+  // Certificate names may be stored as "English / Khmer" or as
+  // "Khmer English" in older records. Display English first and Khmer below.
+  if(rawName.includes("/")){
+    const parts = rawName.split("/");
+    englishName = (parts[0] || "").trim();
+    khmerName = (parts.slice(1).join("/") || "").trim();
+  }else{
+    const latinStart = rawName.search(/[A-Za-z]/);
+    if(latinStart > 0){
+      khmerName = rawName.slice(0, latinStart).trim();
+      englishName = rawName.slice(latinStart).trim();
+    }else{
+      englishName = rawName;
+    }
+  }
+
+  document.getElementById("nameEnglish").textContent = englishName;
+  document.getElementById("nameKhmer").textContent = khmerName;
+  document.getElementById("nameKhmer").style.display = khmerName ? "block" : "none";
 
   document.getElementById("sex").textContent =
     text(student.sex);
@@ -304,46 +325,38 @@ async function manualSearch(){
 }
 
 async function start(){
-  const params = new URLSearchParams(location.search);
+  const id = new URLSearchParams(location.search).get("id");
 
-  // Accept both formats so existing QR codes/links keep working:
-  // ?certificate=CERT-ID (new official format)
-  // ?id=CERT-ID (backward compatible)
-  const id = (params.get("certificate") || params.get("id") || "").trim();
-
-  // Normal visit to verify.html: show the search box.
+  // Keep the search box visible for normal verification.
   document.getElementById("searchBox").style.display = "block";
-  document.getElementById("card").style.display = "none";
-  document.getElementById("error").style.display = "none";
 
-  // Direct certificate link / QR code: load and display the certificate
-  // immediately, without showing the search box.
-  if(!id) return;
+  // If opened from a QR code/link with ?id=..., verify directly.
+  if(id){
+    document.getElementById("certInput").value = id;
 
-  document.getElementById("certInput").value = id;
-  document.getElementById("searchBox").style.display = "none";
+    try{
+      const student = await getCertificate(id);
 
-  try{
-    const student = await getCertificate(id);
+      if(!student){
+        showError();
+        return;
+      }
 
-    if(!student){
-      showError();
-      return;
-    }
+      document.getElementById("searchBox").style.display = "none";
+      records = [student];
+      showCertificate(student);
+    }catch(error){
+      console.error(error);
 
-    records = [student];
-    showCertificate(student);
-  }catch(error){
-    console.error(error);
-
-    if(error.message.includes("public key")){
-      showError(
-        "Certificate verification is not configured yet. Please add the Supabase public/publishable key to verify.html."
-      );
-    }else{
-      showError(
-        "Unable to connect to the certificate database. Please try again."
-      );
+      if(error.message.includes("public key")){
+        showError(
+          "Certificate verification is not configured yet. Please add the Supabase public/publishable key to verify.html."
+        );
+      }else{
+        showError(
+          "Unable to connect to the certificate database. Please try again."
+        );
+      }
     }
   }
 }
