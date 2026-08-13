@@ -1004,6 +1004,105 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="exchange-rate-final-spacing">
+/* Final fix: give the Exchange Rate label/value their own space so
+   "Exchange Rate" never touches "1 USD = 4,150 ៛". */
+#invoiceOverlay .mf-info-row,
+#invoiceExportContent .mf-info-row{
+  grid-template-columns:190px minmax(0,1fr)!important;
+  column-gap:16px!important;
+}
+#invoiceOverlay .mf-info-row .label,
+#invoiceExportContent .mf-info-row .label{
+  white-space:nowrap!important;
+  padding-right:0!important;
+}
+#invoiceOverlay .mf-rate,
+#invoiceExportContent .mf-rate{
+  display:inline-block!important;
+  white-space:nowrap!important;
+  padding-left:4px!important;
+  letter-spacing:0!important;
+}
+
+/* Keep the A4 export compact enough for one page. */
+#invoiceExportContent .mf-info-row{
+  padding-top:2px!important;
+  padding-bottom:2px!important;
+}
+</style>
+
+
+<style id="invoice-larger-body-text-final">
+/* Make ALL invoice content below the main INVOICE title larger,
+   while keeping the main title larger than everything else. */
+#invoiceOverlay .mf-info-title,
+#invoiceExportContent .mf-info-title{
+  font-size:15px!important;
+  line-height:1.35!important;
+}
+
+#invoiceOverlay .mf-info-row,
+#invoiceExportContent .mf-info-row{
+  font-size:14px!important;
+  line-height:1.4!important;
+}
+
+#invoiceOverlay .mf-invoice-table th,
+#invoiceExportContent .mf-invoice-table th{
+  font-size:14px!important;
+  line-height:1.25!important;
+}
+
+#invoiceOverlay .mf-invoice-table td,
+#invoiceExportContent .mf-invoice-table td{
+  font-size:14px!important;
+  line-height:1.3!important;
+}
+
+#invoiceOverlay .mf-refund-box .kh,
+#invoiceExportContent .mf-refund-box .kh{
+  font-size:13px!important;
+  line-height:1.35!important;
+}
+
+#invoiceOverlay .mf-refund-box .en,
+#invoiceExportContent .mf-refund-box .en{
+  font-size:11px!important;
+}
+
+#invoiceOverlay .mf-totals-table,
+#invoiceExportContent .mf-totals-table{
+  font-size:14px!important;
+}
+
+#invoiceOverlay .mf-note-title,
+#invoiceExportContent .mf-note-title{
+  font-size:14px!important;
+}
+
+#invoiceOverlay .mf-signature,
+#invoiceExportContent .mf-signature{
+  font-size:13px!important;
+}
+
+/* Preserve one-page A4 by keeping row padding compact. */
+#invoiceExportContent .mf-info-row{
+  padding-top:2px!important;
+  padding-bottom:2px!important;
+}
+#invoiceExportContent .mf-invoice-table th,
+#invoiceExportContent .mf-invoice-table td{
+  padding-top:2px!important;
+  padding-bottom:2px!important;
+}
+#invoiceExportContent .mf-info-body{
+  padding-top:6px!important;
+  padding-bottom:6px!important;
+}
+</style>
+
 </head>
 <body>
 
