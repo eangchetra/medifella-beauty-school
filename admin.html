@@ -1599,6 +1599,30 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="invoice-logo-larger-final">
+/* Larger school logo — keep original logo, only increase display size. */
+#invoiceOverlay .mf-invoice img,
+#invoiceExportContent .mf-invoice img,
+#invoicePrint .mf-invoice img{
+  width:92px!important;
+  height:92px!important;
+  max-width:92px!important;
+  max-height:92px!important;
+  object-fit:contain!important;
+}
+
+/* Preserve the larger logo on A5 while keeping the page compact. */
+#invoiceOverlay.preview-a5 .mf-invoice img,
+#invoiceExportContent .invoice-export-a5 .mf-invoice img,
+#invoicePrint.invoice-print-a5 .mf-invoice img{
+  width:72px!important;
+  height:72px!important;
+  max-width:72px!important;
+  max-height:72px!important;
+}
+</style>
+
 </head>
 <body>
 
