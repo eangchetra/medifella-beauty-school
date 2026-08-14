@@ -1855,6 +1855,13 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="inventory-management-style">
+#products .card,#staffManagement .card,#customers .card,#mtsSale .card,#dermedSale .card,#services .card{box-shadow:0 5px 20px #075e6609}
+#products h2,#staffManagement h2,#customers h2,#mtsSale h2,#dermedSale h2,#services h2{color:var(--teal)}
+#mtsBuyerResults,#dermedBuyerResults{display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 25px #075e6618;max-height:240px;overflow:auto}
+#mtsBuyerResults.show,#dermedBuyerResults.show{display:block}
+</style>
 </head>
 <body>
 
@@ -1885,6 +1892,12 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <button class="nav active" data-section="dashboard">🏠 Dashboard</button>
 <button class="nav" data-section="students">👨‍🎓 Student Registration</button>
 <button class="nav" data-section="sales">🧾 List Sales</button>
+<button class="nav" data-section="mtsSale">🧾 MTS Sale</button>
+<button class="nav" data-section="dermedSale">🧾 Dermed Sale</button>
+<button class="nav" data-section="products">📦 Product Management</button>
+<button class="nav" data-section="services">🧴 Services Management</button>
+<button class="nav" data-section="staffManagement">👥 Staff Management</button>
+<button class="nav" data-section="customers">👤 Customer Management</button>
 <button class="nav" data-section="certificates">📜 Certificate Verification</button>
 <button class="nav" data-section="posts">📰 News Feed</button>
 <button class="nav" data-section="courses">📚 Course Management</button>
@@ -2219,6 +2232,140 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </div>
 <div id="invoiceOverlay" class="invoice-overlay"><div id="invoicePrint" class="invoice-box"></div></div>
 
+
+<section id="products" class="section">
+<h1>Product Management</h1>
+<div class="two">
+<div class="card">
+<h2>Add New Product</h2>
+<input type="hidden" id="productEditId">
+<label>Product Name *</label><input id="productName" placeholder="Product name">
+<div class="row">
+<div><label>Cost (USD) *</label><input id="productCost" type="number" step="0.01" min="0"></div>
+<div><label>Price (USD) *</label><input id="productPrice" type="number" step="0.01" min="0"></div>
+</div>
+<label>Source *</label>
+<select id="productSource"><option value="Korean">Korean</option><option value="China">China</option><option value="Cambodian">Cambodian</option><option value="Others">Others</option></select>
+<label id="productSourceOtherLabel" class="hidden">Other Source</label>
+<input id="productSourceOther" class="hidden" placeholder="Fill source">
+<div class="actions" style="margin-top:14px"><button id="saveProduct" class="gold">Save Product</button><button id="clearProduct" class="light">Clear</button></div>
+<div id="productStatus"></div>
+</div>
+<div class="card">
+<h2>Add New Stock</h2>
+<label>Search Product *</label>
+<div style="position:relative"><input id="stockProductSearch" autocomplete="off" placeholder="Product ID or Product Name"><div id="stockProductResults" class="sale-course-picker-results"></div></div>
+<input id="stockProductId" type="hidden">
+<div id="stockProductHint" class="muted" style="margin-top:6px">Select a product from the search results.</div>
+<div class="row">
+<div><label>In Stock Amount *</label><input id="stockAmount" type="number" min="1" step="1"></div>
+<div><label>In Stock Staff *</label><select id="stockStaff"></select></div>
+</div>
+<label>In Stock Time</label><input id="stockTimeDisplay" readonly>
+<input id="stockTime" type="hidden">
+<button id="saveStock" class="gold" style="margin-top:14px">Save Stock</button>
+<div id="stockStatus"></div>
+</div>
+</div>
+<div class="card" style="margin-top:18px">
+<h2>Product List</h2>
+<div class="toolbar"><input id="productSearch" placeholder="Search Product ID or Product Name"><button id="productRefresh" class="light">Refresh</button></div>
+<div id="productList">Loading...</div>
+</div>
+<div class="card" style="margin-top:18px">
+<h2>Stock History</h2>
+<div class="toolbar"><input id="stockSearch" placeholder="Search Product ID or Product Name"><button id="stockRefresh" class="light">Refresh</button></div>
+<div id="stockList">Loading...</div>
+</div>
+<div class="card" style="margin-top:18px">
+<h2>Stock Report</h2>
+<div class="toolbar"><select id="stockReportType"><option value="out">Out of Stock Report</option><option value="alert">Alert Report (10 or less)</option><option value="daily">Daily Report</option><option value="weekly">Weekly Report</option><option value="monthly">Monthly Report</option><option value="yearly">Yearly Report</option></select><input id="stockReportDate" type="date"><button id="stockReportRefresh" class="light">Refresh</button></div>
+<div id="stockReportList">Loading...</div>
+</div>
+</section>
+
+<section id="staffManagement" class="section">
+<h1>Staff Management</h1>
+<div class="two">
+<div class="card">
+<h2>Add New Staff</h2>
+<input type="hidden" id="staffInfoEditId">
+<div class="row"><div><label>Staff Name (English) *</label><input id="staffInfoNameEn"></div><div><label>Staff Name (Khmer) *</label><input id="staffInfoNameKh"></div></div>
+<label>Phone Number *</label><input id="staffInfoPhone">
+<div class="row"><div><label>Enroll Date *</label><input id="staffInfoEnrollDate" type="date"></div><div><label>Status *</label><select id="staffInfoStatus"><option>Internship</option><option>Training</option><option>Full</option></select></div></div>
+<label>Job Title *</label><select id="staffInfoJob"><option>Counter</option><option>Sale</option><option>Marketing</option><option>Graphic Designer</option><option>Beauty Therapist</option><option>Beauty Trainer</option><option>Nurse</option><option>Other</option></select>
+<input id="staffInfoJobOther" class="hidden" placeholder="Fill other job title">
+<div class="actions" style="margin-top:14px"><button id="saveStaffInfo" class="gold">Save Staff</button><button id="clearStaffInfo" class="light">Clear</button></div>
+<div id="staffInfoStatus"></div>
+</div>
+<div class="card"><h2>Staff List</h2><div class="toolbar"><input id="staffInfoSearch" placeholder="Search Staff ID, Name or Phone"><button id="staffInfoRefresh" class="light">Refresh</button></div><div id="staffInfoList">Loading...</div></div>
+</div>
+</section>
+
+<section id="customers" class="section">
+<h1>Customer Management</h1>
+<div class="two">
+<div class="card">
+<h2>Add New Customer</h2>
+<input type="hidden" id="customerEditId">
+<label>Customer Name *</label><input id="customerName">
+<label>Phone Number *</label><input id="customerPhone">
+<div class="actions" style="margin-top:14px"><button id="saveCustomer" class="gold">Save Customer</button><button id="clearCustomer" class="light">Clear</button></div>
+<div id="customerStatus"></div>
+</div>
+<div class="card"><h2>Customer List</h2><div class="toolbar"><input id="customerSearch" placeholder="Search Customer ID, Name or Phone"><button id="customerRefresh" class="light">Refresh</button></div><div id="customerList">Loading...</div></div>
+</div>
+</section>
+
+<section id="mtsSale" class="section">
+<h1>MTS Sale</h1>
+<div class="card sale-form-shell">
+<div class="sale-header-grid">
+<div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="mtsBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="mtsNewCustomer" class="gold" type="button">+ Customer</button></div><div id="mtsBuyerResults" class="sale-course-picker-results"></div><input id="mtsBuyerType" type="hidden"><input id="mtsBuyerId" type="hidden"><div id="mtsBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
+<div><label>Sale Staff *</label><select id="mtsSaleStaff"></select></div>
+<div><label>Sale Date & Time</label><input id="mtsSaleTime" readonly></div>
+</div>
+<label style="margin-top:18px">Search Product</label><div style="position:relative"><input id="mtsProductSearch" autocomplete="off" placeholder="Search Product ID or Product Name"><div id="mtsProductResults" class="sale-course-picker-results"></div></div>
+<div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr></thead><tbody id="mtsItems"></tbody></table></div>
+<div class="sale-summary-row" style="margin-top:16px"><span>Total Price</span><strong id="mtsTotal">$0.00</strong></div>
+<div class="actions" style="justify-content:flex-end;margin-top:14px"><button id="saveMtsSale" class="gold">Save MTS Sale & Generate Invoice</button><button id="clearMtsSale" class="light">Clear</button></div>
+<div id="mtsStatus"></div>
+</div>
+<div class="card" style="margin-top:18px"><h2>MTS Sales</h2><div class="toolbar"><input id="mtsSaleSearch" placeholder="Search invoice, buyer or product"><button id="mtsSalesRefresh" class="light">Refresh</button></div><div id="mtsSalesList">Loading...</div></div>
+</section>
+
+<section id="dermedSale" class="section">
+<h1>Dermed Sale</h1>
+<div class="card sale-form-shell">
+<div class="sale-header-grid">
+<div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="dermedBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="dermedNewCustomer" class="gold" type="button">+ Customer</button></div><div id="dermedBuyerResults" class="sale-course-picker-results"></div><input id="dermedBuyerType" type="hidden"><input id="dermedBuyerId" type="hidden"><div id="dermedBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
+<div><label>Sale Staff *</label><select id="dermedSaleStaff"></select></div>
+<div><label>Sale Date & Time</label><input id="dermedSaleTime" readonly></div>
+</div>
+<label style="margin-top:18px">Search Product</label><div style="position:relative"><input id="dermedProductSearch" autocomplete="off" placeholder="Search Product ID or Product Name"><div id="dermedProductResults" class="sale-course-picker-results"></div></div>
+<div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr></thead><tbody id="dermedItems"></tbody></table></div>
+<h2 style="margin-top:22px">Services Fee</h2>
+<label>Search Service</label><div style="position:relative"><input id="dermedServiceSearch" autocomplete="off" placeholder="Search Service ID or Service Name"><div id="dermedServiceResults" class="sale-course-picker-results"></div></div>
+<div class="table-wrap"><table class="table"><thead><tr><th>Service</th><th>Type</th><th>Price</th><th></th></tr></thead><tbody id="dermedServices"></tbody></table></div>
+<div class="sale-summary-row" style="margin-top:16px"><span>Products + Services Total</span><strong id="dermedTotal">$0.00</strong></div>
+<div class="actions" style="justify-content:flex-end;margin-top:14px"><button id="saveDermedSale" class="gold">Save Dermed Sale & Generate Invoice</button><button id="clearDermedSale" class="light">Clear</button></div>
+<div id="dermedStatus"></div>
+</div>
+<div class="card" style="margin-top:18px"><h2>Dermed Sales</h2><div class="toolbar"><input id="dermedSaleSearch" placeholder="Search invoice, buyer or product"><button id="dermedSalesRefresh" class="light">Refresh</button></div><div id="dermedSalesList">Loading...</div></div>
+</section>
+
+<section id="services" class="section">
+<h1>Services Management</h1>
+<div class="two">
+<div class="card"><h2>Add New Service</h2><input type="hidden" id="serviceEditId">
+<label>Name of Service *</label><input id="serviceName">
+<label>Type *</label><select id="serviceType"><option>Service With Product</option><option>Only Service</option></select>
+<label>Price (USD) *</label><input id="servicePrice" type="number" min="0" step="0.01">
+<div class="actions" style="margin-top:14px"><button id="saveService" class="gold">Save Service</button><button id="clearService" class="light">Clear</button></div><div id="serviceStatus"></div></div>
+<div class="card"><h2>Service List</h2><div class="toolbar"><input id="serviceSearch" placeholder="Search Service ID or Service Name"><button id="serviceRefresh" class="light">Refresh</button></div><div id="serviceList">Loading...</div></div>
+</div>
+</section>
+
 <section id="certificates" class="section">
 <h1>Certificate Verification</h1>
 <div class="two">
@@ -2429,6 +2576,7 @@ function clearMsg(el){el.className="";el.textContent=""}
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
 function attr(v){return String(v??"").replace(/"/g,"&quot;").replace(/'/g,"&#039;")}
 let currentProfile=null,adminUser=null,students=[],certificates=[],courses=[],posts=[],staffProfiles=[],salesRecords=[],salePayments=[];
+let products=[],stockMovements=[],staffInfoRecords=[],customers=[],services=[];
 
 function syntheticEmail(username){
   return String(username||"").trim().toLowerCase()+"@accounts.medifella.local";
@@ -2603,6 +2751,12 @@ document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{
    updateSaleDateTimeDisplay();
    $("saleReference").value=nextSaleReference();
  }
+ if(["products","mtsSale","dermedSale","services","staffManagement","customers"].includes(b.dataset.section)){
+   renderInventoryControls(); renderBuyerControls(); renderServiceControls();
+   if(b.dataset.section==="products") renderProductList();
+   if(b.dataset.section==="mtsSale") renderMtsSales();
+   if(b.dataset.section==="dermedSale") renderDermedSales();
+ }
 });
 
 
@@ -2613,7 +2767,11 @@ sb.auth.onAuthStateChange(async (event)=>{
     if(account){adminUser=account.user;currentProfile=account.profile;applyAccountPermissions();}
   }
 });
-async function refreshAll(){await Promise.all([loadStudents(),loadCertificates(),loadCourses(),loadPosts(),loadStaff(),loadSales()]);updateMetrics()}
+async function refreshAll(){
+ await Promise.all([loadStudents(),loadCertificates(),loadCourses(),loadPosts(),loadStaff(),loadSales(),
+   loadProducts(),loadStockMovements(),loadStaffInfo(),loadCustomers(),loadServices()]);
+ renderInventoryControls(); renderBuyerControls(); renderServiceControls(); updateMetrics();
+}
 
 async function loadStudents(){
  const {data,error}=await sb.from("students").select("*").order("created_at",{ascending:false});
@@ -4574,6 +4732,12 @@ const STAFF_PERMISSION_KEYS = [
   ["dashboard","permDashboard"],
   ["students","permStudents"],
   ["sales","permSales"],
+  ["mtsSale","permMtsSale"],
+  ["dermedSale","permDermedSale"],
+  ["products","permProducts"],
+  ["services","permServices"],
+  ["staffManagement","permStaffManagement"],
+  ["customers","permCustomers"],
   ["certificates","permCertificates"],
   ["posts","permPosts"],
   ["courses","permCourses"],
@@ -4852,9 +5016,272 @@ async function deleteCourse(id){
  if(error)alert(error.message);else{await loadCourses();updateMetrics()}
 }
 
+
+/* ============================================================
+   PRODUCT / STOCK / STAFF / CUSTOMER / SERVICE / MTS / DERMED
+   ============================================================ */
+function phTime(){
+  const now=new Date();
+  return new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Phnom_Penh",year:"numeric",month:"2-digit",day:"2-digit",hour:"2-digit",minute:"2-digit",second:"2-digit",hour12:false}).format(now).replace(", ","T");
+}
+function setAutoTime(idDisplay,idHidden){
+  const t=phTime();
+  if($(idDisplay))$(idDisplay).value=t.replace("T"," ");
+  if($(idHidden))$(idHidden).value=t;
+}
+function genId(prefix,rows,field="code"){
+  let max=0;
+  (rows||[]).forEach(r=>{const m=String(r[field]||"").match(new RegExp("^"+prefix+"(\\d+)$","i"));if(m)max=Math.max(max,Number(m[1]))});
+  return prefix+String(max+1).padStart(4,"0");
+}
+function sourceLabel(p){return p.source==="Others"?(p.source_other||"Others"):String(p.source||"")}
+function productStock(pid){
+  return stockMovements.filter(m=>String(m.product_id)===String(pid)).reduce((n,m)=>{
+    const q=Number(m.quantity||0); return n+(String(m.movement_type)==="stock_in"?q:-q);
+  },0);
+}
+async function loadProducts(){
+ const {data,error}=await sb.from("medifella_products").select("*").order("created_at",{ascending:false});
+ if(error){products=[]; if($("productList"))$("productList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Product Management SQL setup.</p>`;return}
+ products=data||[]; renderProductList();
+}
+async function loadStockMovements(){
+ const {data,error}=await sb.from("medifella_inventory_movements").select("*").order("created_at",{ascending:false});
+ if(error){stockMovements=[];return}
+ stockMovements=data||[]; renderProductList(); renderStockList(); renderStockReport();
+}
+async function loadStaffInfo(){
+ const {data,error}=await sb.from("medifella_staff").select("*").order("created_at",{ascending:false});
+ if(error){staffInfoRecords=[]; if($("staffInfoList"))$("staffInfoList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Staff Management SQL setup.</p>`;return}
+ staffInfoRecords=data||[]; renderStaffInfoList(); renderInventoryControls(); renderBuyerControls();
+}
+async function loadCustomers(){
+ const {data,error}=await sb.from("medifella_customers").select("*").order("created_at",{ascending:false});
+ if(error){customers=[]; if($("customerList"))$("customerList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Customer Management SQL setup.</p>`;return}
+ customers=data||[]; renderCustomerList(); renderBuyerControls();
+}
+async function loadServices(){
+ const {data,error}=await sb.from("medifella_services").select("*").order("created_at",{ascending:false});
+ if(error){services=[]; if($("serviceList"))$("serviceList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Services Management SQL setup.</p>`;return}
+ services=data||[]; renderServiceList(); renderServiceControls();
+}
+
+function renderProductList(){
+ if(!$("productList"))return;
+ const q=($("productSearch")?.value||"").trim().toLowerCase();
+ const rows=products.filter(p=>(`${p.product_code||""} ${p.name||""}`).toLowerCase().includes(q));
+ $("productList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Product ID</th><th>Product Name</th><th>Price</th><th>Source</th><th>Stock</th><th>Action</th></tr>${rows.map(p=>`<tr><td>${esc(p.product_code)}</td><td>${esc(p.name)}</td><td>${money(p.price)}</td><td>${esc(sourceLabel(p))}</td><td><strong>${productStock(p.id)}</strong></td><td><div class="actions"><button class="light" onclick="editProduct('${attr(p.id)}')">Edit</button><button class="danger" onclick="deleteProduct('${attr(p.id)}')">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No products found.</p>';
+}
+function renderStockList(){
+ if(!$("stockList"))return;
+ const q=($("stockSearch")?.value||"").trim().toLowerCase();
+ const rows=stockMovements.filter(m=>String(m.movement_type)==="stock_in").filter(m=>{
+   const p=products.find(x=>String(x.id)===String(m.product_id)); return (`${p?.product_code||""} ${p?.name||""}`).toLowerCase().includes(q);
+ });
+ $("stockList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Product ID</th><th>Product</th><th>Amount</th><th>Staff</th><th>In Stock Time</th><th>Action</th></tr>${rows.map(m=>{const p=products.find(x=>String(x.id)===String(m.product_id));const st=staffInfoRecords.find(x=>String(x.id)===String(m.staff_id));return `<tr><td>${esc(p?.product_code||"")}</td><td>${esc(p?.name||"")}</td><td>${esc(m.quantity)}</td><td>${esc(st?.name_en||m.staff_name||"")}</td><td>${esc(m.stock_time||m.created_at||"")}</td><td><div class="actions"><button class="light" onclick="editStock('${attr(m.id)}')">Edit</button><button class="danger" onclick="deleteStock('${attr(m.id)}')">Delete</button></div></td></tr>`}).join("")}</table></div>`:'<p class="muted">No stock records found.</p>';
+}
+function renderStaffInfoList(){
+ if(!$("staffInfoList"))return;
+ const q=($("staffInfoSearch")?.value||"").trim().toLowerCase();
+ const rows=staffInfoRecords.filter(x=>(`${x.staff_code||""} ${x.name_en||""} ${x.name_kh||""} ${x.phone||""}`).toLowerCase().includes(q));
+ $("staffInfoList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Staff ID</th><th>English</th><th>Khmer</th><th>Phone</th><th>Enroll Date</th><th>Status</th><th>Job Title</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.staff_code)}</td><td>${esc(x.name_en)}</td><td>${esc(x.name_kh)}</td><td>${esc(x.phone)}</td><td>${esc(x.enroll_date||"")}</td><td>${esc(x.status)}</td><td>${esc(x.job_title)}</td><td><div class="actions"><button class="light" onclick="editStaffInfo('${attr(x.id)}')">Edit</button><button class="danger" onclick="deleteStaffInfo('${attr(x.id)}')">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No staff found.</p>';
+}
+function renderCustomerList(){
+ if(!$("customerList"))return;
+ const q=($("customerSearch")?.value||"").trim().toLowerCase();
+ const rows=customers.filter(x=>(`${x.customer_code||""} ${x.name||""} ${x.phone||""}`).toLowerCase().includes(q));
+ $("customerList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Customer ID</th><th>Name</th><th>Phone</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.customer_code)}</td><td>${esc(x.name)}</td><td>${esc(x.phone)}</td><td><div class="actions"><button class="light" onclick="editCustomer('${attr(x.id)}')">Edit</button><button class="danger" onclick="deleteCustomer('${attr(x.id)}')">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No customers found.</p>';
+}
+function renderServiceList(){
+ if(!$("serviceList"))return;
+ const q=($("serviceSearch")?.value||"").trim().toLowerCase();
+ const rows=services.filter(x=>(`${x.service_code||""} ${x.name||""}`).toLowerCase().includes(q));
+ $("serviceList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Service ID</th><th>Name of Service</th><th>Type</th><th>Price</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.service_code)}</td><td>${esc(x.name)}</td><td>${esc(x.service_type)}</td><td>${money(x.price)}</td><td><div class="actions"><button class="light" onclick="editService('${attr(x.id)}')">Edit</button><button class="danger" onclick="deleteService('${attr(x.id)}')">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No services found.</p>';
+}
+function renderInventoryControls(){
+ if($("stockStaff"))$("stockStaff").innerHTML='<option value="">Select staff</option>'+staffInfoRecords.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
+ ["mtsSaleStaff","dermedSaleStaff"].forEach(id=>{if($(id))$(id).innerHTML='<option value="">Select staff</option>'+staffInfoRecords.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("")});
+}
+function renderBuyerControls(){
+ ["mts","dermed"].forEach(type=>{
+   const input=$(type+"BuyerSearch"), results=$(type+"BuyerResults"); if(!input||!results)return;
+   const q=(input.value||"").toLowerCase().trim();
+   const arr=[];
+   students.filter(x=>(`${x.student_id||""} ${x.full_name||""} ${x.phone||""}`).toLowerCase().includes(q)).slice(0,10).forEach(x=>arr.push({type:"student",id:x.id,code:x.student_id,name:x.full_name,phone:x.phone}));
+   customers.filter(x=>(`${x.customer_code||""} ${x.name||""} ${x.phone||""}`).toLowerCase().includes(q)).slice(0,10).forEach(x=>arr.push({type:"customer",id:x.id,code:x.customer_code,name:x.name,phone:x.phone}));
+   results.innerHTML=arr.map(x=>`<button type="button" onclick="chooseBuyer('${type}','${attr(x.type)}','${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.type)} · ${esc(x.code||"")} · ${esc(x.phone||"")}</div></button>`).join("")||'<div class="muted" style="padding:10px">No student/customer found.</div>';
+   results.classList.toggle("show",!!q);
+ });
+}
+function renderServiceControls(){
+ const input=$("dermedServiceSearch"),res=$("dermedServiceResults"); if(!input||!res)return;
+ const q=(input.value||"").toLowerCase().trim();
+ const rows=services.filter(x=>(`${x.service_code||""} ${x.name||""}`).toLowerCase().includes(q)).slice(0,15);
+ res.innerHTML=rows.map(x=>`<button type="button" onclick="addDermedService('${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.service_code)} · ${esc(x.service_type)} · ${money(x.price)}</div></button>`).join("");
+ res.classList.toggle("show",!!q);
+}
+function productPicker(type){
+ const input=$(type+"ProductSearch"),res=$(type+"ProductResults"); if(!input||!res)return;
+ const q=(input.value||"").toLowerCase().trim();
+ const rows=products.filter(x=>(`${x.product_code||""} ${x.name||""}`).toLowerCase().includes(q)).slice(0,15);
+ res.innerHTML=rows.map(x=>`<button type="button" onclick="addSaleProduct('${type}','${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code)} · ${money(x.price)} · Stock: ${productStock(x.id)}</div></button>`).join("")||'<div class="muted" style="padding:10px">No product found.</div>';
+ res.classList.toggle("show",!!q);
+}
+function addSaleProduct(type,pid){
+ const p=products.find(x=>String(x.id)===String(pid));if(!p)return;
+ const arr=window[type+"SaleItems"]||(window[type+"SaleItems"]=[]);
+ if(arr.some(x=>String(x.product_id)===String(pid)))return;
+ arr.push({product_id:p.id,product_code:p.product_code,name:p.name,price:Number(p.price||0),quantity:1});
+ renderSaleProductRows(type); $(type+"ProductSearch").value="";$(type+"ProductResults").classList.remove("show");
+}
+function renderSaleProductRows(type){
+ const arr=window[type+"SaleItems"]||[], body=$(type+"Items"); if(!body)return;
+ body.innerHTML=arr.map((x,i)=>`<tr><td><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code)}</div></td><td><input type="number" min="1" max="${Math.max(0,productStock(x.product_id)+(Number(x.quantity)||0))}" value="${x.quantity}" onchange="${type}Qty(${i},this.value)"></td><td>${money(x.price)}</td><td>${money(Number(x.price)*Number(x.quantity))}</td><td><button class="danger" onclick="removeSaleProduct('${type}',${i})">×</button></td></tr>`).join("");
+ const total=arr.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0); if($(type+"Total"))$(type+"Total").textContent=money(total);
+}
+function setSaleQty(type,i,v){const arr=window[type+"SaleItems"]||[];const max=productStock(arr[i].product_id);arr[i].quantity=Math.max(1,Math.min(Number(v)||1,max));renderSaleProductRows(type)}
+window.mtsQty=(i,v)=>setSaleQty("mts",i,v);window.dermedQty=(i,v)=>setSaleQty("dermed",i,v);
+function removeSaleProduct(type,i){(window[type+"SaleItems"]||[]).splice(i,1);renderSaleProductRows(type)}
+function chooseBuyer(type,btype,id){
+ const data=btype==="student"?students.find(x=>String(x.id)===String(id)):customers.find(x=>String(x.id)===String(id)); if(!data)return;
+ $(type+"BuyerType").value=btype;$(type+"BuyerId").value=id;$(type+"BuyerSearch").value=btype==="student"?data.full_name:data.name;
+ $(type+"BuyerHint").textContent=`Selected: ${btype==="student"?data.full_name:data.name} · ${btype==="student"?(data.student_id||""):(data.customer_code||"")} · ${data.phone||""}`;
+ $(type+"BuyerResults").classList.remove("show");
+}
+function renderStockReport(){
+ const box=$("stockReportList");if(!box)return;
+ const type=$("stockReportType").value;
+ const date=$("stockReportDate").value||new Date().toISOString().slice(0,10);
+ if(type==="out"||type==="alert"){
+   const rows=products.filter(p=>type==="out"?productStock(p.id)<=0:productStock(p.id)<=10);
+   box.innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Product ID</th><th>Product</th><th>Price</th><th>Remaining Stock</th></tr>${rows.map(p=>`<tr><td>${esc(p.product_code)}</td><td>${esc(p.name)}</td><td>${money(p.price)}</td><td><strong>${productStock(p.id)}</strong></td></tr>`).join("")}</table></div>`:'<p class="muted">No products match this report.</p>';return;
+ }
+ const d=new Date(date+"T00:00:00");
+ const sales=salesRecords.filter(s=>String(s.sale_type||"").toLowerCase()===(type==="daily"?"":String(s.sale_type||"").toLowerCase())||true);
+ const rows=sales.filter(s=>{const sd=String(s.sale_date||s.created_at||"").slice(0,10);return type==="daily"?sd===date:true});
+ const aggregate=(list)=>list.reduce((a,s)=>{const items=Array.isArray(s.items)?s.items:[];items.forEach(it=>{if(it.product_id)a.push({date:String(s.sale_date||s.created_at||"").slice(0,10),product:it.name||it.product_name||"",qty:Number(it.quantity||it.qty||0),status:s.sale_type||"Sale",staff:s.sale_staff_name||s.staff_name||""})});return a},[]);
+ let details=aggregate(rows);
+ if(type!=="daily"){
+   const month=date.slice(0,7),year=date.slice(0,4);
+   details=aggregate(salesRecords.filter(s=>String(s.sale_date||s.created_at||"").startsWith(type==="monthly"?month:year)));
+ }
+ const totals=details.reduce((a,x)=>{const p=products.find(p=>p.name===x.product);const cost=Number(p?.cost||0)*x.qty,price=Number(p?.price||0)*x.qty;a.cost+=cost;a.price+=price;return a},{cost:0,price:0});
+ if(type==="weekly"||type==="monthly"||type==="yearly"){
+   const groups={};
+   details.forEach(x=>{let key=x.date;if(type==="weekly")key="Day "+(Math.floor((new Date(x.date+"T00:00:00").getDate()-1)/7)+1);else if(type==="monthly")key="W"+(Math.floor((new Date(x.date+"T00:00:00").getDate()-1)/7)+1);else key=x.date.slice(0,7);(groups[key]||(groups[key]=[])).push(x)});
+   box.innerHTML=`<div class="card"><strong>${type==="weekly"?"Week":type==="monthly"?"Month":"Year"} ${esc(date)}</strong><div class="muted">Total Cost ${money(totals.cost)} · Total Price ${money(totals.price)} · Total Income ${money(totals.price-totals.cost)}</div></div>`+
+   Object.entries(groups).map(([k,v])=>`<details class="card" style="margin-top:8px"><summary><strong>${esc(k)}</strong> · ${money(v.reduce((n,x)=>n+(products.find(p=>p.name===x.product)?.price||0)*x.qty,0))}</summary><div style="margin-top:10px">${v.map(x=>`${esc(x.date)} · ${esc(x.product)} · ${x.qty} · ${esc(x.status)} · ${esc(x.staff)}`).join("<br>")}</div></details>`).join("");
+ }else{
+   box.innerHTML=`<div class="card"><strong>${esc(date)}</strong><div class="muted">Total Cost ${money(totals.cost)} · Total Price ${money(totals.price)} · Total Income ${money(totals.price-totals.cost)}</div></div><div class="table-wrap" style="margin-top:10px"><table class="table"><tr><th>Date</th><th>Product Information</th><th>Sold Amount</th><th>Status</th><th>Sale Staff</th></tr>${details.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.product)}</td><td>${x.qty}</td><td>${esc(x.status)}</td><td>${esc(x.staff)}</td></tr>`).join("")}</table></div>`;
+ }
+}
+function renderProductSearchResults(){
+ const input=$("stockProductSearch"),res=$("stockProductResults");if(!input||!res)return;
+ const q=(input.value||"").toLowerCase().trim();const rows=products.filter(x=>(`${x.product_code||""} ${x.name||""}`).toLowerCase().includes(q)).slice(0,15);
+ res.innerHTML=rows.map(x=>`<button type="button" onclick="chooseStockProduct('${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code)} · ${money(x.price)}</div></button>`).join("");
+ res.classList.toggle("show",!!q);
+}
+function chooseStockProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p)return;$("stockProductId").value=p.id;$("stockProductSearch").value=`${p.product_code} · ${p.name}`;$("stockProductHint").textContent=`Selected: ${p.name}`;$("stockProductResults").classList.remove("show")}
+
+$("productSource").onchange=()=>{const o=$("productSource").value==="Others";$("productSourceOther").classList.toggle("hidden",!o);$("productSourceOtherLabel").classList.toggle("hidden",!o)};
+$("saveProduct").onclick=async()=>{
+ clearMsg($("productStatus"));const id=$("productEditId").value,name=$("productName").value.trim(),cost=Number($("productCost").value||0),price=Number($("productPrice").value||0),source=$("productSource").value,source_other=$("productSourceOther").value.trim();
+ if(!name||cost<0||price<0){msg($("productStatus"),"Please fill Product Name, Cost and Price.",true);return}
+ try{const payload={name,cost,price,source,source_other:source==="Others"?source_other:null};let r;
+ if(id)r=await sb.from("medifella_products").update(payload).eq("id",id);else{payload.product_code=genId("P",products,"product_code");r=await sb.from("medifella_products").insert(payload)}
+ if(r.error)throw r.error;msg($("productStatus"),id?"Product updated.":"Product added.");clearProductForm();await loadProducts()}catch(e){msg($("productStatus"),e.message,true)}
+};
+function clearProductForm(){$("productEditId").value="";$("productName").value="";$("productCost").value="";$("productPrice").value="";$("productSource").value="Korean";$("productSourceOther").value="";$("productSource").dispatchEvent(new Event("change"))}
+function editProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p)return;$("productEditId").value=p.id;$("productName").value=p.name||"";$("productCost").value=p.cost??"";$("productPrice").value=p.price??"";$("productSource").value=p.source||"Korean";$("productSourceOther").value=p.source_other||"";$("productSource").dispatchEvent(new Event("change"));$("products").scrollIntoView({behavior:"smooth"})}
+async function deleteProduct(id){if(!confirm("Delete this product?"))return;const r=await sb.from("medifella_products").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadProducts()}
+$("clearProduct").onclick=clearProductForm;
+$("saveStock").onclick=async()=>{clearMsg($("stockStatus"));const pid=$("stockProductId").value,q=Number($("stockAmount").value||0),staff=$("stockStaff").value;if(!pid||q<=0||!staff){msg($("stockStatus"),"Select product, amount and staff.",true);return}try{const t=$("stockTime").value||phTime();const p=products.find(x=>String(x.id)===String(pid));const r=await sb.from("medifella_inventory_movements").insert({product_id:pid,movement_type:"stock_in",quantity:q,staff_id:staff,staff_name:staffInfoRecords.find(x=>String(x.id)===String(staff))?.name_en||"",stock_time:t,created_by:adminUser.id,notes:"Stock In"});if(r.error)throw r.error;msg($("stockStatus"),`Stock added: ${p?.name||""}`);$("stockAmount").value="";$("stockProductId").value="";$("stockProductSearch").value="";$("stockProductHint").textContent="Select a product from the search results.";await loadStockMovements()}catch(e){msg($("stockStatus"),e.message,true)}};
+function editStock(id){const m=stockMovements.find(x=>String(x.id)===String(id));if(!m)return;$("stockProductId").value=m.product_id;const p=products.find(x=>String(x.id)===String(m.product_id));$("stockProductSearch").value=`${p?.product_code||""} · ${p?.name||""}`;$("stockAmount").value=m.quantity;$("stockStaff").value=m.staff_id||"";$("stockTime").value=m.stock_time||"";$("stockTimeDisplay").value=String(m.stock_time||"").replace("T"," ");window.editingStockId=id;$("products").scrollIntoView({behavior:"smooth"})}
+async function deleteStock(id){if(!confirm("Delete this stock entry?"))return;const r=await sb.from("medifella_inventory_movements").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadStockMovements()}
+
+$("saveStaffInfo").onclick=async()=>{clearMsg($("staffInfoStatus"));const id=$("staffInfoEditId").value,name_en=$("staffInfoNameEn").value.trim(),name_kh=$("staffInfoNameKh").value.trim(),phone=$("staffInfoPhone").value.trim(),enroll_date=$("staffInfoEnrollDate").value,status=$("staffInfoStatus").value,job=$("staffInfoJob").value,job_title=job==="Other"?$("staffInfoJobOther").value.trim():job;if(!name_en||!name_kh||!phone||!enroll_date||!job_title){msg($("staffInfoStatus"),"Please fill all staff fields.",true);return}try{const payload={name_en,name_kh,phone,enroll_date,status,job_title};let r=id?await sb.from("medifella_staff").update(payload).eq("id",id):await sb.from("medifella_staff").insert({...payload,staff_code:genId("ST",staffInfoRecords,"staff_code")});if(r.error)throw r.error;msg($("staffInfoStatus"),id?"Staff updated.":"Staff added.");clearStaffInfoForm();await loadStaffInfo()}catch(e){msg($("staffInfoStatus"),e.message,true)}};
+$("staffInfoJob").onchange=()=>{$("staffInfoJobOther").classList.toggle("hidden",$("staffInfoJob").value!=="Other")};
+function clearStaffInfoForm(){$("staffInfoEditId").value="";$("staffInfoNameEn").value="";$("staffInfoNameKh").value="";$("staffInfoPhone").value="";$("staffInfoEnrollDate").value="";$("staffInfoStatus").value="Internship";$("staffInfoJob").value="Counter";$("staffInfoJobOther").value="";$("staffInfoJob").dispatchEvent(new Event("change"))}
+function editStaffInfo(id){const x=staffInfoRecords.find(x=>String(x.id)===String(id));if(!x)return;$("staffInfoEditId").value=x.id;$("staffInfoNameEn").value=x.name_en||"";$("staffInfoNameKh").value=x.name_kh||"";$("staffInfoPhone").value=x.phone||"";$("staffInfoEnrollDate").value=x.enroll_date||"";$("staffInfoStatus").value=x.status||"Full";const jobs=["Counter","Sale","Marketing","Graphic Designer","Beauty Therapist","Beauty Trainer","Nurse"];if(jobs.includes(x.job_title)){$("staffInfoJob").value=x.job_title;$("staffInfoJobOther").value=""}else{$("staffInfoJob").value="Other";$("staffInfoJobOther").value=x.job_title}$("staffInfoJob").dispatchEvent(new Event("change"))}
+async function deleteStaffInfo(id){if(!confirm("Delete this staff member?"))return;const r=await sb.from("medifella_staff").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadStaffInfo()}
+$("clearStaffInfo").onclick=clearStaffInfoForm;
+
+$("saveCustomer").onclick=async()=>{clearMsg($("customerStatus"));const id=$("customerEditId").value,name=$("customerName").value.trim(),phone=$("customerPhone").value.trim();if(!name||!phone){msg($("customerStatus"),"Customer Name and Phone Number are required.",true);return}try{const payload={name,phone};let r=id?await sb.from("medifella_customers").update(payload).eq("id",id):await sb.from("medifella_customers").insert({...payload,customer_code:genId("C",customers,"customer_code")});if(r.error)throw r.error;msg($("customerStatus"),id?"Customer updated.":"Customer added.");clearCustomerForm();await loadCustomers()}catch(e){msg($("customerStatus"),e.message,true)}};
+function clearCustomerForm(){$("customerEditId").value="";$("customerName").value="";$("customerPhone").value=""}
+function editCustomer(id){const x=customers.find(x=>String(x.id)===String(id));if(!x)return;$("customerEditId").value=x.id;$("customerName").value=x.name||"";$("customerPhone").value=x.phone||""}
+async function deleteCustomer(id){if(!confirm("Delete this customer?"))return;const r=await sb.from("medifella_customers").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadCustomers()}
+$("clearCustomer").onclick=clearCustomerForm;
+
+$("saveService").onclick=async()=>{clearMsg($("serviceStatus"));const id=$("serviceEditId").value,name=$("serviceName").value.trim(),service_type=$("serviceType").value,price=Number($("servicePrice").value||0);if(!name||price<0){msg($("serviceStatus"),"Service Name and Price are required.",true);return}try{const payload={name,service_type,price};let r=id?await sb.from("medifella_services").update(payload).eq("id",id):await sb.from("medifella_services").insert({...payload,service_code:genId("SV",services,"service_code")});if(r.error)throw r.error;msg($("serviceStatus"),id?"Service updated.":"Service added.");clearServiceForm();await loadServices()}catch(e){msg($("serviceStatus"),e.message,true)}};
+function clearServiceForm(){$("serviceEditId").value="";$("serviceName").value="";$("serviceType").value="Service With Product";$("servicePrice").value=""}
+function editService(id){const x=services.find(x=>String(x.id)===String(id));if(!x)return;$("serviceEditId").value=x.id;$("serviceName").value=x.name||"";$("serviceType").value=x.service_type||"Only Service";$("servicePrice").value=x.price??""}
+async function deleteService(id){if(!confirm("Delete this service?"))return;const r=await sb.from("medifella_services").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadServices()}
+function addDermedService(id){const x=services.find(x=>String(x.id)===String(id));if(!x)return;const arr=window.dermedServiceItems||(window.dermedServiceItems=[]);if(arr.some(y=>String(y.service_id)===String(id)))return;arr.push({service_id:x.id,service_code:x.service_code,name:x.name,service_type:x.service_type,price:Number(x.price||0)});renderDermedServices();$("dermedServiceSearch").value="";$("dermedServiceResults").classList.remove("show")}
+function renderDermedServices(){const arr=window.dermedServiceItems||[];$("dermedServices").innerHTML=arr.map((x,i)=>`<tr><td>${esc(x.name)}<div class="muted">${esc(x.service_code)}</div></td><td>${esc(x.service_type)}</td><td>${money(x.price)}</td><td><button class="danger" onclick="removeDermedService(${i})">×</button></td></tr>`).join("");const p=(window.dermedSaleItems||[]).reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),sv=arr.reduce((n,x)=>n+Number(x.price),0);$("dermedTotal").textContent=money(p+sv)}
+function removeDermedService(i){(window.dermedServiceItems||[]).splice(i,1);renderDermedServices()}
+
+function resetNewInventorySale(type){
+ window[type+"SaleItems"]=[];if(type==="dermed")window.dermedServiceItems=[];
+ [type+"BuyerType",type+"BuyerId"].forEach(id=>$(id).value="");
+ $(type+"BuyerSearch").value="";$(type+"BuyerHint").textContent="Choose a student or customer. You can add a new customer.";
+ $(type+"SaleStaff").value="";setAutoTime(type+"SaleTime");
+ renderSaleProductRows(type);if(type==="dermed")renderDermedServices();
+}
+async function saveInventorySale(type){
+ const buyerType=$(type+"BuyerType").value,buyerId=$(type+"BuyerId").value,staffId=$(type+"SaleStaff").value,items=window[type+"SaleItems"]||[];
+ const serviceItems=type==="dermed"?(window.dermedServiceItems||[]):[];
+ if(!buyerType||!buyerId){msg($(type+"Status"),"Please select a Student or Customer.",true);return}
+ if(!staffId){msg($(type+"Status"),"Please select Sale Staff.",true);return}
+ if(!items.length&&!serviceItems.length){msg($(type+"Status"),"Add at least one product"+(type==="dermed"?" or service":"")+".",true);return}
+ for(const it of items){if(Number(it.quantity)>productStock(it.product_id)){msg($(type+"Status"),`Not enough stock for ${it.name}. Available: ${productStock(it.product_id)}.`,true);return}}
+ const buyer=buyerType==="student"?students.find(x=>String(x.id)===String(buyerId)):customers.find(x=>String(x.id)===String(buyerId));
+ const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
+ const productTotal=items.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),serviceTotal=serviceItems.reduce((n,x)=>n+Number(x.price),0),total=productTotal+serviceTotal;
+ try{
+  const code=type==="mts"?"MTS":"DERMED";
+  const prefix=code+"-"+new Date().getFullYear()+"-";
+  const existing=salesRecords.filter(x=>String(x.sale_type||"").toUpperCase()===code);
+  let max=0;existing.forEach(x=>{const m=String(x.reference_no||"").match(new RegExp("^"+code+"-"+new Date().getFullYear()+"-(\\d+)$"));if(m)max=Math.max(max,Number(m[1]))});
+  const reference=prefix+String(max+1).padStart(4,"0");
+  const now=phTime();
+  const payload={
+    reference_no:reference,sale_type:code,sale_date:now.slice(0,10),sale_time:now.slice(11),
+    student_id:buyerType==="student"?buyerId:null,student_name:buyer?.full_name||buyer?.name||"",
+    student_phone:buyer?.phone||"",customer_id:buyerType==="customer"?buyerId:null,customer_type:buyerType,
+    sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",subtotal:total,discount:0,shipping:0,grand_total:total,paid:total,balance:0,payment_status:"Paid",sale_status:"Completed",
+    items:items.map(x=>({...x,quantity:Number(x.quantity)})),service_items:serviceItems,service_total:serviceTotal,notes:""
+  };
+  const r=await sb.from("medifella_sales").insert({...payload,created_by:adminUser.id}).select().single();if(r.error)throw r.error;
+  const movements=items.map(x=>({product_id:x.product_id,movement_type:"sale",quantity:Number(x.quantity),staff_id:staffId,staff_name:staff?.name_en||"",stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));
+  if(movements.length){const mr=await sb.from("medifella_inventory_movements").insert(movements);if(mr.error)throw mr.error}
+  msg($(type+"Status"),`${code} sale saved. Invoice ${reference}.`);
+  resetNewInventorySale(type);await loadSales();await loadStockMovements();showSaleInvoice(r.data.id);
+ }catch(e){msg($(type+"Status"),e.message||"Could not save sale.",true)}
+}
+function renderMtsSales(){const box=$("mtsSalesList");if(!box)return;const q=($("mtsSaleSearch")?.value||"").toLowerCase();const rows=salesRecords.filter(x=>String(x.sale_type||"").toUpperCase()==="MTS"&&(`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])}`).toLowerCase().includes(q));box.innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Invoice</th><th>Buyer</th><th>Products</th><th>Total</th><th>Date</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.reference_no)}</td><td>${esc(x.student_name)}</td><td>${esc((x.items||[]).map(i=>i.name).join(", "))}</td><td>${money(x.grand_total)}</td><td>${esc(x.sale_date||"")}</td><td><button class="light" onclick="showSaleInvoice('${attr(x.id)}')">View Invoice</button></td></tr>`).join("")}</table></div>`:'<p class="muted">No MTS sales found.</p>'}
+function renderDermedSales(){const box=$("dermedSalesList");if(!box)return;const q=($("dermedSaleSearch")?.value||"").toLowerCase();const rows=salesRecords.filter(x=>String(x.sale_type||"").toUpperCase()==="DERMED"&&(`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])} ${JSON.stringify(x.service_items||[])}`).toLowerCase().includes(q));box.innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Invoice</th><th>Buyer</th><th>Products / Services</th><th>Total</th><th>Date</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.reference_no)}</td><td>${esc(x.student_name)}</td><td>${esc([...(x.items||[]).map(i=>i.name),...(x.service_items||[]).map(i=>i.name)].join(", "))}</td><td>${money(x.grand_total)}</td><td>${esc(x.sale_date||"")}</td><td><button class="light" onclick="showSaleInvoice('${attr(x.id)}')">View Invoice</button></td></tr>`).join("")}</table></div>`:'<p class="muted">No Dermed sales found.</p>'}
+
+$("stockProductSearch").oninput=renderProductSearchResults;
+$("productSearch").oninput=renderProductList;$("productRefresh").onclick=loadProducts;$("stockSearch").oninput=renderStockList;$("stockRefresh").onclick=loadStockMovements;
+$("stockReportType").onchange=renderStockReport;$("stockReportDate").onchange=renderStockReport;$("stockReportRefresh").onclick=renderStockReport;
+$("staffInfoSearch").oninput=renderStaffInfoList;$("staffInfoRefresh").onclick=loadStaffInfo;$("customerSearch").oninput=renderCustomerList;$("customerRefresh").onclick=loadCustomers;$("serviceSearch").oninput=renderServiceList;$("serviceRefresh").onclick=loadServices;
+$("mtsBuyerSearch").oninput=renderBuyerControls;$("dermedBuyerSearch").oninput=renderBuyerControls;
+$("mtsProductSearch").oninput=()=>productPicker("mts");$("dermedProductSearch").oninput=()=>productPicker("dermed");$("dermedServiceSearch").oninput=renderServiceControls;
+$("saveMtsSale").onclick=()=>saveInventorySale("mts");$("saveDermedSale").onclick=()=>saveInventorySale("dermed");$("clearMtsSale").onclick=()=>resetNewInventorySale("mts");$("clearDermedSale").onclick=()=>resetNewInventorySale("dermed");
+$("mtsSaleSearch").oninput=renderMtsSales;$("dermedSaleSearch").oninput=renderDermedSales;$("mtsSalesRefresh").onclick=loadSales;$("dermedSalesRefresh").onclick=loadSales;
+$("stockTimeDisplay").value=phTime().replace("T"," ");$("stockTime").value=phTime();$("stockReportDate").value=new Date().toISOString().slice(0,10);setAutoTime("mtsSaleTime");setAutoTime("dermedSaleTime");
+
+async function addCustomerFromSale(type){
+ const name=prompt("Customer Name");if(name===null)return;const phone=prompt("Phone Number");if(phone===null)return;
+ if(!name.trim()||!phone.trim()){alert("Customer Name and Phone Number are required.");return}
+ try{const r=await sb.from("medifella_customers").insert({customer_code:genId("C",customers,"customer_code"),name:name.trim(),phone:phone.trim()}).select().single();if(r.error)throw r.error;customers.unshift(r.data);chooseBuyer(type,"customer",r.data.id);renderCustomerList()}catch(e){alert(e.message||"Could not add customer.")}
+}
+$("mtsNewCustomer").onclick=()=>addCustomerFromSale("mts");$("dermedNewCustomer").onclick=()=>addCustomerFromSale("dermed");
+
 setupSaleCoursePicker();
 
 function updateMetrics(){$("mStudents").textContent=students.length;$("mPending").textContent=students.filter(s=>String(s.status||"pending")==="pending").length;$("mVerifiedStudents").textContent=students.filter(s=>String(s.status)==="verified"||s.verified===true).length;$("mCourses").textContent=courses.length;$("mCertificates").textContent=certificates.length;updateSalesMetrics()}
+const _oldUpdateMetrics=updateMetrics; updateMetrics=function(){_oldUpdateMetrics();renderMtsSales();renderDermedSales();renderProductList();renderStockList();renderStaffInfoList();renderCustomerList();renderServiceList();renderStockReport();};
 boot();
 
 
