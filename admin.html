@@ -5515,9 +5515,33 @@ async function saveSaleCustomer(){
 }
 $("mtsNewCustomer").onclick=()=>openSaleCustomerForm("mts");
 $("dermedNewCustomer").onclick=()=>openSaleCustomerForm("dermed");
-$("saleCustomerSave").onclick=saveSaleCustomer;
-$("saleCustomerCancel").onclick=closeSaleCustomerForm;
-$("saleCustomerModal").addEventListener("click",e=>{if(e.target.id==="saleCustomerModal")closeSaleCustomerForm()});
+
+// Delegated handlers are required because the modal is inserted later in the HTML.
+document.addEventListener("click", function(e){
+  const newCustomerBtn = e.target.closest && e.target.closest("#dermedNewCustomer, #mtsNewCustomer");
+  if(newCustomerBtn){
+    e.preventDefault();
+    openSaleCustomerForm(newCustomerBtn.id === "mtsNewCustomer" ? "mts" : "dermed");
+    return;
+  }
+
+  const saveBtn = e.target.closest && e.target.closest("#saleCustomerSave");
+  const cancelBtn = e.target.closest && e.target.closest("#saleCustomerCancel");
+
+  if(saveBtn){
+    e.preventDefault();
+    saveSaleCustomer();
+    return;
+  }
+  if(cancelBtn){
+    e.preventDefault();
+    closeSaleCustomerForm();
+    return;
+  }
+  if(e.target.id === "saleCustomerModal"){
+    closeSaleCustomerForm();
+  }
+});
 
 
 setupSaleCoursePicker();
