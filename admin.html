@@ -2390,7 +2390,8 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <h1>Dermed Sale</h1>
 <div class="card sale-form-shell">
 <div class="sale-header-grid">
-<div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="dermedBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="dermedNewCustomer" class="gold" type="button">+ Customer</button></div><div id="dermedBuyerResults" class="sale-course-picker-results"></div><input id="dermedBuyerType" type="hidden"><input id="dermedBuyerId" type="hidden"><div id="dermedBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
+<div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="dermedBuyerSearch" list="dermedBuyerDatalist" autocomplete="off" placeholder="Search Student or Customer">
+<datalist id="dermedBuyerDatalist"></datalist><button id="dermedNewCustomer" class="gold" type="button">+ Customer</button></div><div id="dermedBuyerResults" class="sale-course-picker-results"></div><input id="dermedBuyerType" type="hidden"><input id="dermedBuyerId" type="hidden"><div id="dermedBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
 <div><label>Sale Staff *</label><select id="dermedSaleStaff"></select></div>
 <div><label>Reference No.</label><input id="dermedReferenceNo" readonly placeholder="Auto-generate"></div>
 <div><label>Sale Date & Time</label><input id="dermedSaleTime" readonly></div>
@@ -5498,6 +5499,69 @@ document.addEventListener("DOMContentLoaded",function(){
  var max=0;salesRecords.forEach(function(r){var m=String(r.reference_no||"").match(/^DERMED-(\d{4})-(\d+)$/);if(m)max=Math.max(max,Number(m[2]))});
  x.value="DERMED-"+new Date().getFullYear()+"-"+String(max+1).padStart(4,"0");
 });
+</script>
+<script id="dermed-native-customer-search">
+(function(){
+  function E(id){return document.getElementById(id)}
+  function N(v){return String(v==null?"":v).trim().toLowerCase()}
+  function refreshDatalist(){
+    var input=E("dermedBuyerSearch"),list=E("dermedBuyerDatalist");
+    if(!input||!list)return;
+    var q=N(input.value), rows=[];
+    students.forEach(function(x){
+      var text=(x.full_name||x.full_name_km||"")+" | "+(x.student_id||"")+" | "+(x.phone||"");
+      if(!q || N(text).indexOf(q)>=0){
+        rows.push({t:"student",id:x.id,name:x.full_name||x.full_name_km||"Student",code:x.student_id||"",phone:x.phone||""});
+      }
+    });
+    customers.forEach(function(x){
+      var text=(x.name||"")+" | "+(x.customer_code||"")+" | "+(x.phone||"");
+      if(!q || N(text).indexOf(q)>=0){
+        rows.push({t:"customer",id:x.id,name:x.name||"Customer",code:x.customer_code||"",phone:x.phone||""});
+      }
+    });
+    rows=rows.slice(0,100);
+    list.innerHTML=rows.map(function(x){
+      var value=(x.name||"")+" | "+(x.code||"")+" | "+(x.phone||"");
+      return '<option value="'+(typeof esc==="function"?esc(value):value)+'"></option>';
+    }).join("");
+  }
+  function selectFromValue(){
+    var input=E("dermedBuyerSearch"),v=N(input&&input.value);
+    if(!v)return;
+    var found=null;
+    students.some(function(x){
+      var text=N((x.full_name||x.full_name_km||"")+" | "+(x.student_id||"")+" | "+(x.phone||""));
+      if(text===v){found={t:"student",id:x.id,name:x.full_name||x.full_name_km||"Student",code:x.student_id||"",phone:x.phone||""};return true}
+      return false;
+    });
+    if(!found)customers.some(function(x){
+      var text=N((x.name||"")+" | "+(x.customer_code||"")+" | "+(x.phone||""));
+      if(text===v){found={t:"customer",id:x.id,name:x.name||"Customer",code:x.customer_code||"",phone:x.phone||""};return true}
+      return false;
+    });
+    if(!found)return;
+    if(typeof chooseBuyer==="function"){
+      chooseBuyer("dermed",found.t,found.id);
+    }else{
+      E("dermedBuyerType").value=found.t;
+      E("dermedBuyerId").value=found.id;
+      input.value=found.name;
+      E("dermedBuyerHint").textContent="Selected: "+found.name+" · "+found.code+" · "+found.phone;
+    }
+  }
+  function bind(){
+    var input=E("dermedBuyerSearch");if(!input||input.dataset.nativeCustomer==="1")return;
+    input.dataset.nativeCustomer="1";
+    input.addEventListener("input",refreshDatalist,true);
+    input.addEventListener("change",selectFromValue,true);
+    input.addEventListener("blur",function(){setTimeout(selectFromValue,120)});
+    refreshDatalist();
+  }
+  document.addEventListener("DOMContentLoaded",function(){
+    bind();setTimeout(bind,300);setTimeout(bind,1000);
+  });
+})();
 </script>
 </body>
 </html>
