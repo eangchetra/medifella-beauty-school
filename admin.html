@@ -7157,3 +7157,108 @@ document.addEventListener("DOMContentLoaded",function(){
  },true);
 })();
 </script>
+
+
+<script id="medifella-all-buttons-final-v36">
+(function(){
+  function E(id){return document.getElementById(id)}
+
+  function bind(){
+    const toggle=E("toggleSaleForm");
+    const form=E("saleForm");
+    if(toggle && form){
+      toggle.onclick=function(e){
+        e.preventDefault();
+        const hidden=form.classList.contains("hidden");
+        if(typeof setSaleFormCollapsed==="function"){
+          setSaleFormCollapsed(!hidden);
+        }else{
+          form.classList.toggle("hidden",!hidden);
+          toggle.textContent=!hidden ? "+ Add Sale" : "Hide Sale Table";
+          toggle.setAttribute("aria-expanded",String(hidden));
+        }
+      };
+    }
+
+    const newStudent=E("newSaleStudentBtn");
+    if(newStudent){
+      newStudent.onclick=function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        const modal=E("saleStudentModal");
+        if(!modal)return;
+        modal.classList.add("show");
+        modal.style.display="flex";
+        const name=E("saleNewStudentName");
+        if(name)setTimeout(function(){name.focus()},50);
+      };
+    }
+
+    const close=E("closeSaleStudentModal");
+    if(close){
+      close.onclick=function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        closeModal();
+      };
+    }
+
+    const cancelStudent=E("cancelSaleNewStudent");
+    if(cancelStudent){
+      cancelStudent.onclick=function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        closeModal();
+      };
+    }
+
+    const cancelSale=E("cancelSale");
+    if(cancelSale){
+      cancelSale.onclick=function(e){
+        e.preventDefault();
+        if(typeof setSaleFormCollapsed==="function")setSaleFormCollapsed(true);
+        if(typeof clearSaleEditMode==="function")clearSaleEditMode();
+        if(typeof clearMsg==="function" && E("newSaleStatus"))clearMsg(E("newSaleStatus"));
+      };
+    }
+
+    const refresh=E("salesRefresh");
+    if(refresh){
+      refresh.onclick=async function(e){
+        e.preventDefault();
+        try{
+          if(typeof loadSales==="function")await loadSales();
+          if(typeof renderSales==="function")renderSales();
+        }catch(err){
+          console.error("Medi Fella Sale refresh error:",err);
+        }
+      };
+    }
+
+    // Save Sale and Save Student already have complete database handlers.
+    // Keep those handlers intact; just make sure the buttons are enabled.
+    const save=E("saveSale");
+    if(save)save.type="button";
+    const saveStudent=E("saveSaleNewStudent");
+    if(saveStudent)saveStudent.type="button";
+  }
+
+  function closeModal(){
+    const modal=E("saleStudentModal");
+    if(modal){
+      modal.classList.remove("show");
+      modal.style.display="none";
+    }
+    if(typeof clearMsg==="function" && E("saleNewStudentStatus"))
+      clearMsg(E("saleNewStudentStatus"));
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",bind,{once:true});
+  }else{
+    bind();
+  }
+  // Re-bind after the page's initialization code has completed.
+  setTimeout(bind,300);
+})();
+</script>
