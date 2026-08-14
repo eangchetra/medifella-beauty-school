@@ -2393,8 +2393,11 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </section>
 
 <section id="dermedSale" class="section">
-<h1>Dermed Sale</h1>
-<div class="card sale-form-shell">
+<div class="dermed-sale-titlebar">
+  <h1>Dermed Sale</h1>
+  <button id="dermedAddSaleToggle" class="gold" type="button">+ Add Sale</button>
+</div>
+<div id="dermedSaleFormCard" class="card sale-form-shell" style="display:none;">
 <div class="sale-header-grid">
 <div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="dermedBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="dermedNewCustomer" class="gold" type="button">+ Customer</button></div><div id="dermedBuyerResults" class="sale-course-picker-results"></div><input id="dermedBuyerType" type="hidden"><input id="dermedBuyerId" type="hidden"><div id="dermedBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
 <div><label>Sale Staff *</label><select id="dermedSaleStaff"></select></div>
@@ -6214,3 +6217,56 @@ document.addEventListener("DOMContentLoaded",function(){
 </html>
 
 
+
+<style id="dermed-add-sale-toggle-style">
+.dermed-sale-titlebar{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  gap:14px;
+  margin-bottom:14px;
+}
+.dermed-sale-titlebar h1{margin:0;}
+#dermedAddSaleToggle{
+  min-width:120px;
+  white-space:nowrap;
+}
+</style>
+
+<script id="dermed-add-sale-toggle-script">
+(function(){
+  function initDermedAddSaleToggle(){
+    const btn=document.getElementById("dermedAddSaleToggle");
+    const form=document.getElementById("dermedSaleFormCard");
+    if(!btn || !form || btn.dataset.bound==="1") return;
+    btn.dataset.bound="1";
+
+    function setOpen(open){
+      form.style.display=open ? "" : "none";
+      btn.textContent=open ? "− Hide Sale" : "+ Add Sale";
+      btn.setAttribute("aria-expanded", open ? "true" : "false");
+    }
+
+    setOpen(false);
+
+    btn.addEventListener("click",function(){
+      const open=form.style.display!=="none";
+      setOpen(!open);
+      if(!open){
+        setTimeout(function(){
+          const first=form.querySelector("#dermedBuyerSearch");
+          if(first) first.focus();
+        },60);
+      }
+    });
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",initDermedAddSaleToggle);
+  }else{
+    initDermedAddSaleToggle();
+  }
+  setTimeout(initDermedAddSaleToggle,500);
+  setTimeout(initDermedAddSaleToggle,1500);
+})();
+</script>
