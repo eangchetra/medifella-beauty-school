@@ -3684,8 +3684,26 @@ function showSaleInvoice(id,size="A4"){
  }catch(_){serviceItems=[]}
  if(!Array.isArray(serviceItems))serviceItems=[];
  if(String(s.sale_type||"").toUpperCase()==="DERMED" && serviceItems.length){
-   items=[...items,...serviceItems.map(x=>({...x,type:"service"}))];
+   items=[...items,...serviceItems.map(x=>({
+     ...x,
+     type:"service",
+     unit_price:Number(x.unit_price ?? x.price ?? 0),
+     subtotal:Number(x.subtotal ?? ((Number(x.price ?? x.unit_price ?? 0)) * (Number(x.quantity ?? x.qty ?? 1)))),
+     discount_input:x.discount_input ?? x.discount_percent ?? "",
+     discount_amount:Number(x.discount_amount ?? 0)
+   }))];
  }
+
+ // Normalize product rows too, so the invoice always has the same fields
+ // whether the item came from Product Management or Service Management.
+ items=items.map(x=>({
+   ...x,
+   unit_price:Number(x.unit_price ?? x.price ?? 0),
+   quantity:Number(x.quantity ?? x.qty ?? 1),
+   subtotal:Number(x.subtotal ?? ((Number(x.unit_price ?? x.price ?? 0)) * (Number(x.quantity ?? x.qty ?? 1)))),
+   discount_input:x.discount_input ?? x.discount_percent ?? "",
+   discount_amount:Number(x.discount_amount ?? 0)
+ }));
 
  const rawDateValue=String(saleField(s,["sale_date"],"")||"");
  const rawTimeValue=String(saleField(s,["sale_time","time"],"")||"");
@@ -3760,7 +3778,7 @@ function showSaleInvoice(id,size="A4"){
      );
      return `<tr>
        <td>${i+1}</td>
-       <td style="text-align:left">${esc(x.name||"")}</td>
+       <td style="text-align:left">${esc(x.name||"")}${String(x.type||"").toLowerCase()==="service" ? `<div class="muted" style="font-size:8px">Service</div>` : ""}</td>
        <td>${esc(qty)}</td>
        <td>${usd(x.unit_price)}</td>
        <td>${discountText}</td>
