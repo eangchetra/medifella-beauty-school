@@ -3923,6 +3923,64 @@ function openPrintFromCanvas(canvas,paper,sale){
      setTimeout(()=>window.print(),300);
    };
  <\/script>
+
+<style id="dermed-search-clear-fix">
+#dermedBuyerResults:empty,#dermedItemResults:empty{display:none!important}
+</style>
+<script id="dermed-search-clear-fix-js">
+document.addEventListener("DOMContentLoaded",function(){
+  function hide(el){
+    if(!el)return;
+    el.innerHTML="";
+    el.classList.remove("show");
+    el.style.display="none";
+  }
+  function bindClear(id,resultId,extra){
+    const input=document.getElementById(id), result=document.getElementById(resultId);
+    if(!input || input.dataset.clearFixBound==="1") return;
+    input.dataset.clearFixBound="1";
+    input.addEventListener("input",function(){
+      if(input.value.trim()===""){
+        hide(result);
+        if(typeof extra==="function") extra();
+      }
+    },true);
+    input.addEventListener("keyup",function(){
+      if(input.value.trim()==="") hide(result);
+    },true);
+  }
+
+  bindClear("dermedBuyerSearch","dermedBuyerResults",function(){
+    const t=document.getElementById("dermedBuyerType");
+    const i=document.getElementById("dermedBuyerId");
+    if(t)t.value="";
+    if(i)i.value="";
+  });
+
+  bindClear("dermedItemSearch","dermedItemResults");
+
+  /* Compatibility: also clear the old hidden product/service result boxes. */
+  bindClear("dermedProductSearch","dermedProductResults");
+  bindClear("dermedServiceSearch","dermedServiceResults");
+
+  /* If the existing code renders the buyer list after our listener,
+     run one final cleanup whenever the field becomes empty. */
+  const observer=new MutationObserver(function(){
+    ["dermedBuyerSearch","dermedItemSearch"].forEach(function(id){
+      const input=document.getElementById(id);
+      if(input && input.value.trim()===""){
+        const rid=id==="dermedBuyerSearch"?"dermedBuyerResults":"dermedItemResults";
+        hide(document.getElementById(rid));
+      }
+    });
+  });
+  const br=document.getElementById("dermedBuyerResults");
+  const ir=document.getElementById("dermedItemResults");
+  if(br)observer.observe(br,{childList:true,subtree:true});
+  if(ir)observer.observe(ir,{childList:true,subtree:true});
+});
+</script>
+
 </body>
 </html>`;
 
