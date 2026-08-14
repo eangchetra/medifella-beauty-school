@@ -4702,8 +4702,14 @@ async function saveMediFellaSale(){
 
    msg($("newSaleStatus"),isEdit?"Invoice updated successfully.":"Sale saved successfully.");
 
+   // After Save Sale, the invoice is now part of the Medi Fella Sale List.
+   // Keep Dermed/MTS records separate through renderSales().
+   await loadSales();
+   if(typeof renderSales==="function")renderSales();
    setSaleFormCollapsed(true);
 
+   // Keep the newly saved invoice available for View/Print, while the
+   // Medi Fella Sale List has already been refreshed underneath it.
    if(savedRow?.id && typeof showSaleInvoice==="function"){
      showSaleInvoice(savedRow.id,"A4");
    }
@@ -7489,5 +7495,94 @@ document.addEventListener("DOMContentLoaded",function(){
      console.error("Medi Fella + Add Sale reset error:",err);
    }
  },true);
+})();
+</script>
+
+
+<script id="medifella-save-button-final-v42">
+(function(){
+  function bindSave(){
+    const btn=document.getElementById("saveSale");
+    if(!btn)return;
+
+    // Never allow this button to submit/reload the page.
+    btn.type="button";
+
+    if(btn.dataset.v42Bound==="1")return;
+    btn.dataset.v42Bound="1";
+
+    document.addEventListener("click",function(e){
+      const target=e.target.closest("#saveSale");
+      if(!target)return;
+
+      e.preventDefault();
+      e.stopImmediatePropagation();
+
+      target.disabled=true;
+
+      try{
+        if(typeof saveMediFellaSale==="function"){
+          Promise.resolve(saveMediFellaSale()).catch(function(err){
+            console.error("Save Sale final handler error:",err);
+            target.disabled=false;
+            const status=document.getElementById("newSaleStatus");
+            if(status){
+              status.textContent="Save Sale failed: "+(err?.message||String(err));
+              status.style.color="#b00020";
+              status.style.display="block";
+            }
+          });
+        }else{
+          target.disabled=false;
+          const status=document.getElementById("newSaleStatus");
+          if(status){
+            status.textContent="Save Sale function is not available. Please reload the page.";
+            status.style.color="#b00020";
+            status.style.display="block";
+          }
+        }
+      }catch(err){
+        target.disabled=false;
+        console.error("Save Sale final handler error:",err);
+        const status=document.getElementById("newSaleStatus");
+        if(status){
+          status.textContent="Save Sale failed: "+(err?.message||String(err));
+          status.style.color="#b00020";
+          status.style.display="block";
+        }
+      }
+    },true);
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",bindSave,{once:true});
+  }else{
+    bindSave();
+  }
+  setTimeout(bindSave,500);
+  setTimeout(bindSave,1500);
+})();
+</script>
+
+<script id="medifella-save-list-final-v43">
+(function(){
+  const oldClose=window.closeInvoicePreview;
+  if(typeof oldClose==="function" && !oldClose.__v43Wrapped){
+    const wrapped=function(){
+      const r=oldClose.apply(this,arguments);
+      try{
+        if(typeof loadSales==="function"){
+          Promise.resolve(loadSales()).then(function(){
+            if(typeof renderSales==="function")renderSales();
+            const list=document.getElementById("salesList");
+            if(list)list.scrollIntoView({behavior:"smooth",block:"start"});
+          });
+        }
+      }catch(e){console.warn("Refresh Medi Fella Sale List:",e)}
+      return r;
+    };
+    wrapped.__v43Wrapped=true;
+    window.closeInvoicePreview=wrapped;
+  }
 })();
 </script>
