@@ -1986,6 +1986,16 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 #dermedListServiceResults button:hover{background:#eef9fa!important}
 </style>
 
+<style id="dermed-direct-search-final">
+#dermedListBuyerResults,#dermedListProductResults,#dermedListServiceResults{
+position:absolute!important;left:0!important;right:0!important;top:calc(100% + 4px)!important;
+max-height:260px!important;overflow-y:auto!important;z-index:99999!important}
+#dermedListBuyerResults button,#dermedListProductResults button,#dermedListServiceResults button{
+display:block!important;width:100%!important;min-height:48px!important;text-align:left!important;
+padding:10px 13px!important;background:#fff!important;color:#222!important;
+border:0!important;border-bottom:1px solid #e5eeee!important;cursor:pointer!important}
+#dermedListBuyerResults button:hover,#dermedListProductResults button:hover,#dermedListServiceResults button:hover{background:#eef9fa!important}
+</style>
 </head>
 <body>
 
@@ -6284,6 +6294,99 @@ boot();
   setTimeout(bind,1500);
   setTimeout(bind,3000);
   setTimeout(bind,5000);
+})();
+
+
+/* FINAL DERMED SEARCH: direct search of the existing database tables */
+(function(){
+ const D=id=>document.getElementById(id), N=v=>String(v??"").trim().toLowerCase();
+ const clean=v=>String(v??"").replace(/[,%]/g," ").trim();
+ const hide=id=>D(id)?.classList.remove("show"), show=id=>D(id)?.classList.add("show");
+
+ async function buyers(q){
+  const v=clean(q); if(!v)return [];
+  const l=`%${v}%`;
+  const rs=await Promise.all([
+   sb.from("students").select("*").ilike("full_name",l).limit(10),
+   sb.from("students").select("*").ilike("full_name_km",l).limit(10),
+   sb.from("students").select("*").ilike("student_id",l).limit(10),
+   sb.from("students").select("*").ilike("phone",l).limit(10),
+   sb.from("medifella_customers").select("*").ilike("name",l).limit(10),
+   sb.from("medifella_customers").select("*").ilike("customer_code",l).limit(10),
+   sb.from("medifella_customers").select("*").ilike("phone",l).limit(10)
+  ]);
+  const m=new Map(), add=(type,x)=>{if(x?.id)m.set(type+":"+x.id,{type,id:x.id,
+   name:type==="student"?(x.full_name||x.full_name_km||"Student"):(x.name||"Customer"),
+   code:type==="student"?(x.student_id||""):(x.customer_code||""),phone:x.phone||"",raw:x})};
+  rs.slice(0,4).forEach(r=>(r.data||[]).forEach(x=>add("student",x)));
+  rs.slice(4).forEach(r=>(r.data||[]).forEach(x=>add("customer",x)));
+  return [...m.values()].slice(0,20);
+ }
+ async function products(q){
+  const v=clean(q);if(!v)return[];const l=`%${v}%`;
+  const rs=await Promise.all([
+   sb.from("medifella_products").select("*").ilike("name",l).limit(15),
+   sb.from("medifella_products").select("*").ilike("product_code",l).limit(15)
+  ]);
+  const m=new Map();rs.forEach(r=>(r.data||[]).forEach(x=>m.set(String(x.id),x)));return [...m.values()].slice(0,20);
+ }
+ async function services(q){
+  const v=clean(q);if(!v)return[];const l=`%${v}%`;
+  const rs=await Promise.all([
+   sb.from("medifella_services").select("*").ilike("name",l).limit(15),
+   sb.from("medifella_services").select("*").ilike("service_code",l).limit(15)
+  ]);
+  const m=new Map();rs.forEach(r=>(r.data||[]).forEach(x=>m.set(String(x.id),x)));return [...m.values()].slice(0,20);
+ }
+ function chooseBuyer(x){
+  D("dermedListBuyerType").value=x.type;D("dermedListBuyerId").value=String(x.id);
+  D("dermedListBuyerSearch").value=x.name;
+  D("dermedListBuyerHint").textContent=`Selected: ${x.name} · ${x.code||""} · ${x.phone||""}`;
+  hide("dermedListBuyerResults");
+ }
+ async function renderBuyer(){
+  const i=D("dermedListBuyerSearch"),r=D("dermedListBuyerResults");if(!i||!r)return;
+  const q=i.value.trim();if(!q){r.innerHTML="";hide("dermedListBuyerResults");return}
+  r.innerHTML='<div class="muted" style="padding:12px">Searching...</div>';show("dermedListBuyerResults");
+  try{const a=await buyers(q);if(i.value.trim()!==q)return;
+   const e=a.find(x=>N(x.name)===N(q)||N(x.code)===N(q)||N(x.phone)===N(q));
+   if(e||a.length===1){chooseBuyer(e||a[0]);return}
+   r.innerHTML=a.length?a.map(x=>`<button type="button" data-fbuyer="${attr(x.type)}" data-fid="${attr(x.id)}"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.type==="student"?"Student":"Customer")} · ${esc(x.code)} · ${esc(x.phone)}</div></button>`).join(""):'<div class="muted" style="padding:12px">No student/customer found.</div>';
+   show("dermedListBuyerResults");
+  }catch(e){r.innerHTML='<div class="muted" style="padding:12px">Could not search. Please refresh and try again.</div>'}
+ }
+ async function renderProduct(){
+  const i=D("dermedListProductSearch"),r=D("dermedListProductResults");if(!i||!r)return;
+  const q=i.value.trim();if(!q){r.innerHTML="";hide("dermedListProductResults");return}
+  r.innerHTML='<div class="muted" style="padding:12px">Searching products...</div>';show("dermedListProductResults");
+  try{const a=await products(q);if(i.value.trim()!==q)return;
+   const e=a.find(x=>N(x.name)===N(q)||N(x.product_code)===N(q));
+   if(e||a.length===1){addDermedListProduct((e||a[0]).id);return}
+   r.innerHTML=a.length?a.map(x=>`<button type="button" data-fpid="${attr(x.id)}"><strong>${esc(x.name)}</strong><div class="muted">Product ID: ${esc(x.product_code)} · ${money(x.price)} · Stock: ${productStock(x.id)}</div></button>`).join(""):'<div class="muted" style="padding:12px">No product found.</div>';
+   show("dermedListProductResults");
+  }catch(e){r.innerHTML='<div class="muted" style="padding:12px">Could not search products. Please refresh and try again.</div>'}
+ }
+ async function renderService(){
+  const i=D("dermedListServiceSearch"),r=D("dermedListServiceResults");if(!i||!r)return;
+  const q=i.value.trim();if(!q){r.innerHTML="";hide("dermedListServiceResults");return}
+  r.innerHTML='<div class="muted" style="padding:12px">Searching services...</div>';show("dermedListServiceResults");
+  try{const a=await services(q);if(i.value.trim()!==q)return;
+   const e=a.find(x=>N(x.name)===N(q)||N(x.service_code)===N(q));
+   if(e||a.length===1){addDermedListService((e||a[0]).id);return}
+   r.innerHTML=a.length?a.map(x=>`<button type="button" data-fsid="${attr(x.id)}"><strong>${esc(x.name)}</strong><div class="muted">Service ID: ${esc(x.service_code)} · ${esc(x.service_type||"")} · ${money(x.price)}</div></button>`).join(""):'<div class="muted" style="padding:12px">No service found.</div>';
+   show("dermedListServiceResults");
+  }catch(e){r.innerHTML='<div class="muted" style="padding:12px">Could not search services. Please refresh and try again.</div>'}
+ }
+ function bind(){
+  const b=D("dermedListBuyerSearch"),br=D("dermedListBuyerResults"),p=D("dermedListProductSearch"),pr=D("dermedListProductResults"),v=D("dermedListServiceSearch"),vr=D("dermedListServiceResults");
+  if(b){b.oninput=renderBuyer;b.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();renderBuyer()}}}
+  if(p){p.oninput=renderProduct;p.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();renderProduct()}}}
+  if(v){v.oninput=renderService;v.onkeydown=e=>{if(e.key==="Enter"){e.preventDefault();renderService()}}}
+  if(br&&!br.dataset.finalClicks){br.dataset.finalClicks="1";br.addEventListener("mousedown",async e=>{const x=e.target.closest("[data-fbuyer]");if(!x)return;e.preventDefault();const a=await buyers(b.value),y=a.find(z=>z.type===x.dataset.fbuyer&&String(z.id)===String(x.dataset.fid));if(y)chooseBuyer(y)})}
+  if(pr&&!pr.dataset.finalClicks){pr.dataset.finalClicks="1";pr.addEventListener("mousedown",e=>{const x=e.target.closest("[data-fpid]");if(!x)return;e.preventDefault();addDermedListProduct(x.dataset.fpid);p.value="";hide("dermedListProductResults")})}
+  if(vr&&!vr.dataset.finalClicks){vr.dataset.finalClicks="1";vr.addEventListener("mousedown",e=>{const x=e.target.closest("[data-fsid]");if(!x)return;e.preventDefault();addDermedListService(x.dataset.fsid);v.value="";hide("dermedListServiceResults")})}
+ }
+ bind();setTimeout(bind,500);setTimeout(bind,1500);setTimeout(bind,3000);
 })();
 
 </script>
