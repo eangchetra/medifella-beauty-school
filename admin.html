@@ -3985,80 +3985,6 @@ function openPrintFromCanvas(canvas,paper,sale){
      setTimeout(()=>window.print(),300);
    };
  <\/script>
-<script id="dermed-search-only-fix">
-(function(){
-  function E(id){return document.getElementById(id)}
-  function A(n){return Array.isArray(window[n])?window[n]:[]}
-  function T(v){return String(v==null?"":v)}
-  function X(v){return T(v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-  function M(v){return "$"+(Number(v)||0).toFixed(2)}
-  function closeBox(id){var b=E(id);if(b){b.innerHTML="";b.classList.remove("show");b.style.display="none"}}
-
-  function buyerSearch(q){
-    q=T(q).trim().toLowerCase();if(!q){closeBox("dermedBuyerResults");return}
-    var rows=A("students").map(function(x){return Object.assign({_k:"student"},x)})
-      .concat(A("customers").map(function(x){return Object.assign({_k:"customer"},x)}))
-      .filter(function(x){return [x.name,x.phone,x.student_id,x.customer_id,x.code,x.id].map(T).join(" ").toLowerCase().indexOf(q)>=0}).slice(0,20);
-    var b=E("dermedBuyerResults");if(!b)return;
-    b.innerHTML=rows.map(function(x){
-      return '<button type="button" data-dbuyer="'+X(x.id)+'" data-dtype="'+X(x._k)+'"><strong>'+X(x.name||"")+'</strong><div class="muted">'+X(x._k==="student"?"Student":"Customer")+' · '+X(x.student_id||x.customer_id||x.code||x.id||"")+(x.phone?" · "+X(x.phone):"")+'</div></button>';
-    }).join("");
-    if(rows.length){b.classList.add("show");b.style.display="block"}else closeBox("dermedBuyerResults");
-  }
-
-  function itemSearch(q){
-    q=T(q).trim().toLowerCase();if(!q){closeBox("dermedItemResults");return}
-    var ps=A("products").filter(function(x){return [x.name,x.product_code,x.code,x.id].map(T).join(" ").toLowerCase().indexOf(q)>=0}).slice(0,20);
-    var ss=A("services").filter(function(x){return [x.name,x.service_code,x.code,x.service_type,x.id].map(T).join(" ").toLowerCase().indexOf(q)>=0}).slice(0,20);
-    var b=E("dermedItemResults");if(!b)return;
-    var html=[];
-    ps.forEach(function(x){html.push('<button type="button" data-ditem="product" data-did="'+X(x.id)+'"><strong>'+X(x.name||"Product")+'</strong><div class="muted">Product · '+X(x.product_code||x.code||x.id||"")+' · '+M(x.price)+'</div></button>')});
-    ss.forEach(function(x){html.push('<button type="button" data-ditem="service" data-did="'+X(x.id)+'"><strong>'+X(x.name||"Service")+'</strong><div class="muted">Service · '+X(x.service_code||x.code||x.id||"")+' · '+M(x.price)+'</div></button>')});
-    b.innerHTML=html.join("");
-    if(html.length){b.classList.add("show");b.style.display="block"}else closeBox("dermedItemResults");
-  }
-
-  function chooseBuyer(el){
-    var type=el.getAttribute("data-dtype"),id=el.getAttribute("data-dbuyer");
-    var list=type==="student"?A("students"):A("customers");
-    var x=list.find(function(v){return String(v.id)===String(id)});if(!x)return;
-    if(E("dermedBuyerType"))E("dermedBuyerType").value=type;
-    if(E("dermedBuyerId"))E("dermedBuyerId").value=id;
-    if(E("dermedBuyerSearch"))E("dermedBuyerSearch").value=x.name||"";
-    if(E("dermedBuyerHint"))E("dermedBuyerHint").textContent=(type==="student"?"Student: ":"Customer: ")+(x.name||"")+(x.phone?" | "+x.phone:"");
-    closeBox("dermedBuyerResults");
-  }
-
-  function addItem(kind,id){
-    if(kind==="product"){
-      var p=A("products").find(function(x){return String(x.id)===String(id)});if(!p)return;
-      window.dermedSaleItems=window.dermedSaleItems||[];
-      if(!window.dermedSaleItems.some(function(x){return String(x.product_id)===String(id)}))
-        window.dermedSaleItems.push({product_id:p.id,product_code:p.product_code||p.code||"",name:p.name||"Product",price:Number(p.price)||0,quantity:1,discount_type:"percent",discount_value:0});
-    }else{
-      var v=A("services").find(function(x){return String(x.id)===String(id)});if(!v)return;
-      window.dermedServiceItems=window.dermedServiceItems||[];
-      if(!window.dermedServiceItems.some(function(x){return String(x.service_id)===String(id)}))
-        window.dermedServiceItems.push({service_id:v.id,service_code:v.service_code||v.code||"",name:v.name||"Service",service_type:v.service_type||"Service",price:Number(v.price)||0,quantity:1,discount_type:"percent",discount_value:0});
-    }
-    if(typeof renderItems==="function")renderItems();
-    closeBox("dermedItemResults");
-    var p=E("dermedItemSearch");if(p)p.value="";
-  }
-
-  function bind(){
-    var b=E("dermedBuyerSearch"),br=E("dermedBuyerResults"),p=E("dermedItemSearch"),ir=E("dermedItemResults");
-    if(b&&br&&!b.dataset.dfix){b.dataset.dfix="1";b.addEventListener("input",function(){buyerSearch(b.value)});
-      br.addEventListener("pointerdown",function(e){var el=e.target.closest("[data-dbuyer]");if(el){e.preventDefault();e.stopPropagation();chooseBuyer(el)}},true);
-      br.addEventListener("click",function(e){var el=e.target.closest("[data-dbuyer]");if(el){e.preventDefault();e.stopPropagation();chooseBuyer(el)}},true);}
-    if(p&&ir&&!p.dataset.dfix){p.dataset.dfix="1";p.addEventListener("input",function(){itemSearch(p.value)});
-      ir.addEventListener("pointerdown",function(e){var el=e.target.closest("[data-ditem]");if(el){e.preventDefault();e.stopPropagation();addItem(el.getAttribute("data-ditem"),el.getAttribute("data-did"))}},true);
-      ir.addEventListener("click",function(e){var el=e.target.closest("[data-ditem]");if(el){e.preventDefault();e.stopPropagation();addItem(el.getAttribute("data-ditem"),el.getAttribute("data-did"))}},true);}
-  }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind);else bind();
-  setTimeout(bind,300);setTimeout(bind,1000);
-})();
-</script>
 </body>
 </html>`;
 
@@ -6074,7 +6000,7 @@ document.addEventListener("DOMContentLoaded",function(){
       reference_no:reference,sale_type:code,sale_date:now.slice(0,10),sale_time:now.slice(11),
       student_id:buyerType==="student"?buyerId:null,student_name:buyer?.full_name||buyer?.name||"",student_phone:buyer?.phone||"",
       customer_id:buyerType==="customer"?buyerId:null,customer_type:buyerType,sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",
-      subtotal:c.sub,discount:c.odAmount,discount_type:c.odType,discount_value:c.odValue,shipping:0,grand_total:c.initial,
+      subtotal:c.sub,discount:c.odAmount,shipping:0,grand_total:c.initial,
       paid:paid,balance:c.due,payment_status:status,payment_method:E("dermedPaymentMethod").value,sale_status:"Completed",
       items:itemPayload,service_items:servicePayload,service_total:servicePayload.reduce((n,x)=>n+Number(x.subtotal||0),0),
       notes:E("dermedSaleNote").value.trim()
@@ -6129,7 +6055,18 @@ document.addEventListener("DOMContentLoaded",function(){
   function norm(v){return String(v||"").toLowerCase().trim()}
   function escv(v){return typeof esc==="function"?esc(v):String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
   function moneyv(v){return typeof money==="function"?money(v):"$"+Number(v||0).toFixed(2)}
+
+  function syncLiveData(){
+    try{
+      if(typeof products!=="undefined")window.products=products;
+      if(typeof services!=="undefined")window.services=services;
+      if(typeof students!=="undefined")window.students=students;
+      if(typeof customers!=="undefined")window.customers=customers;
+    }catch(e){}
+  }
+
   function refreshCustomer(){
+    syncLiveData();
     const input=E("dermedBuyerSearch"),box=E("dermedBuyerResults"); if(!input||!box)return;
     const q=norm(input.value);
     if(!q){box.innerHTML="";hide(box);if(E("dermedBuyerType"))E("dermedBuyerType").value="";if(E("dermedBuyerId"))E("dermedBuyerId").value="";return}
@@ -6137,30 +6074,104 @@ document.addEventListener("DOMContentLoaded",function(){
     (Array.isArray(students)?students:[]).filter(x=>norm((x.student_id||"")+" "+(x.full_name||"")+" "+(x.full_name_km||"")+" "+(x.phone||"")).includes(q)).slice(0,10).forEach(x=>rows.push({t:"student",id:x.id,code:x.student_id||"",name:x.full_name||x.full_name_km||"Student",phone:x.phone||""}));
     (Array.isArray(customers)?customers:[]).filter(x=>norm((x.customer_code||"")+" "+(x.name||"")+" "+(x.phone||"")).includes(q)).slice(0,10).forEach(x=>rows.push({t:"customer",id:x.id,code:x.customer_code||"",name:x.name||"Customer",phone:x.phone||""}));
     box.innerHTML=rows.map(x=>`<button type="button" data-latest-buyer-type="${escv(x.t)}" data-latest-buyer-id="${escv(x.id)}"><strong>${escv(x.name)}</strong><div class="muted">${escv(x.t)} · ${escv(x.code)} · ${escv(x.phone)}</div></button>`).join("");
-    show(box);
+    if(rows.length)show(box);else hide(box);
   }
+
   function refreshItem(){
+    syncLiveData();
     const input=E("dermedItemSearch"),box=E("dermedItemResults"); if(!input||!box)return;
     const q=norm(input.value);
     if(!q){box.innerHTML="";hide(box);return}
-    const ps=(Array.isArray(products)?products:[]).filter(x=>norm((x.product_code||"")+" "+(x.name||"")).includes(q)).slice(0,10);
-    const ss=(Array.isArray(services)?services:[]).filter(x=>norm((x.service_code||"")+" "+(x.name||"")+" "+(x.service_type||"")).includes(q)).slice(0,10);
+    const ps=(Array.isArray(products)?products:[]).filter(x=>norm((x.product_code||"")+" "+(x.name||"")+" "+(x.id||"")).includes(q)).slice(0,10);
+    const ss=(Array.isArray(services)?services:[]).filter(x=>norm((x.service_code||"")+" "+(x.name||"")+" "+(x.service_type||"")+" "+(x.id||"")).includes(q)).slice(0,10);
     let h="";
-    if(ps.length){h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">PRODUCTS</div>';h+=ps.map(x=>`<button type="button" data-latest-product-id="${escv(x.id)}"><strong>${escv(x.name)}</strong><div class="muted">Product · ${escv(x.product_code||"")} · ${moneyv(x.price)} · Stock: ${typeof productStock==="function"?productStock(x.id):""}</div></button>`).join("")}
-    if(ss.length){h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">SERVICES</div>';h+=ss.map(x=>`<button type="button" data-latest-service-id="${escv(x.id)}"><strong>${escv(x.name)}</strong><div class="muted">Service · ${escv(x.service_code||"")} · ${escv(x.service_type||"")} · ${moneyv(x.price)}</div></button>`).join("")}
-    box.innerHTML=h||'<div class="muted" style="padding:10px">No product or service found.</div>';show(box);
+    if(ps.length){
+      h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">PRODUCTS</div>';
+      h+=ps.map(x=>`<button type="button" data-latest-product-id="${escv(x.id)}"><strong>${escv(x.name)}</strong><div class="muted">Product · ${escv(x.product_code||"")} · ${moneyv(x.price)} · Stock: ${typeof productStock==="function"?productStock(x.id):""}</div></button>`).join("")
+    }
+    if(ss.length){
+      h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">SERVICES</div>';
+      h+=ss.map(x=>`<button type="button" data-latest-service-id="${escv(x.id)}"><strong>${escv(x.name)}</strong><div class="muted">Service · ${escv(x.service_code||"")} · ${escv(x.service_type||"")} · ${moneyv(x.price)}</div></button>`).join("")
+    }
+    box.innerHTML=h||'<div class="muted" style="padding:10px">No product or service found.</div>';
+    if(h)show(box);else hide(box);
   }
+
+  function chooseCustomerFromButton(b){
+    syncLiveData();
+    if(typeof chooseBuyer==="function")chooseBuyer("dermed",b.dataset.latestBuyerType,b.dataset.latestBuyerId);
+  }
+
+  function chooseItemFromButton(el){
+    syncLiveData();
+    const p=el.closest("[data-latest-product-id]"),v=el.closest("[data-latest-service-id]");
+    if(p&&typeof addSaleProduct==="function")addSaleProduct("dermed",p.dataset.latestProductId);
+    if(v&&typeof addDermedService==="function")addDermedService(v.dataset.latestServiceId);
+  }
+
   function bind(){
+    syncLiveData();
     const bi=E("dermedBuyerSearch"),br=E("dermedBuyerResults"),ii=E("dermedItemSearch"),ir=E("dermedItemResults");
-    if(bi&&!bi.dataset.latestSafe){bi.dataset.latestSafe="1";bi.addEventListener("input",refreshCustomer);bi.addEventListener("keyup",refreshCustomer);}
-    if(ii&&!ii.dataset.latestSafe){ii.dataset.latestSafe="1";ii.addEventListener("input",refreshItem);ii.addEventListener("keyup",refreshItem);}
-    if(br&&!br.dataset.latestSafe){br.dataset.latestSafe="1";br.addEventListener("mousedown",function(e){const b=e.target.closest("[data-latest-buyer-id]");if(!b)return;e.preventDefault();e.stopPropagation();if(typeof chooseBuyer==="function")chooseBuyer("dermed",b.dataset.latestBuyerType,b.dataset.latestBuyerId);hide(br);});br.addEventListener("click",function(e){const b=e.target.closest("[data-latest-buyer-id]");if(!b)return;e.preventDefault();if(typeof chooseBuyer==="function")chooseBuyer("dermed",b.dataset.latestBuyerType,b.dataset.latestBuyerId);hide(br);});}
-    if(ir&&!ir.dataset.latestSafe){ir.dataset.latestSafe="1";ir.addEventListener("mousedown",function(e){const p=e.target.closest("[data-latest-product-id]"),v=e.target.closest("[data-latest-service-id]");if(!p&&!v)return;e.preventDefault();e.stopPropagation();if(p&&typeof addSaleProduct==="function")addSaleProduct("dermed",p.dataset.latestProductId);if(v&&typeof addDermedService==="function")addDermedService(v.dataset.latestServiceId);hide(ir);});ir.addEventListener("click",function(e){const p=e.target.closest("[data-latest-product-id]"),v=e.target.closest("[data-latest-service-id]");if(!p&&!v)return;e.preventDefault();if(p&&typeof addSaleProduct==="function")addSaleProduct("dermed",p.dataset.latestProductId);if(v&&typeof addDermedService==="function")addDermedService(v.dataset.latestServiceId);hide(ir);});}
-    const nc=E("dermedNewCustomer");if(nc&&!nc.dataset.latestSafe){nc.dataset.latestSafe="1";nc.addEventListener("click",function(e){e.preventDefault();e.stopPropagation();if(typeof openSaleCustomerForm==="function")openSaleCustomerForm("dermed");});}
+
+    if(bi&&!bi.dataset.latestSafe){
+      bi.dataset.latestSafe="1";
+      bi.addEventListener("input",refreshCustomer);
+      bi.addEventListener("keyup",refreshCustomer);
+      bi.addEventListener("focus",syncLiveData);
+    }
+
+    if(ii&&!ii.dataset.latestSafe){
+      ii.dataset.latestSafe="1";
+      ii.addEventListener("input",refreshItem);
+      ii.addEventListener("keyup",refreshItem);
+      ii.addEventListener("focus",syncLiveData);
+    }
+
+    if(br&&!br.dataset.latestSafe){
+      br.dataset.latestSafe="1";
+      br.addEventListener("mousedown",function(e){
+        const b=e.target.closest("[data-latest-buyer-id]");if(!b)return;
+        e.preventDefault();e.stopPropagation();chooseCustomerFromButton(b);hide(br);
+      },true);
+      br.addEventListener("click",function(e){
+        const b=e.target.closest("[data-latest-buyer-id]");if(!b)return;
+        e.preventDefault();e.stopPropagation();chooseCustomerFromButton(b);hide(br);
+      },true);
+    }
+
+    if(ir&&!ir.dataset.latestSafe){
+      ir.dataset.latestSafe="1";
+      ir.addEventListener("mousedown",function(e){
+        const target=e.target.closest("[data-latest-product-id],[data-latest-service-id]");
+        if(!target)return;
+        e.preventDefault();e.stopPropagation();chooseItemFromButton(target);hide(ir);
+      },true);
+      ir.addEventListener("click",function(e){
+        const target=e.target.closest("[data-latest-product-id],[data-latest-service-id]");
+        if(!target)return;
+        e.preventDefault();e.stopPropagation();chooseItemFromButton(target);hide(ir);
+      },true);
+    }
+
+    const nc=E("dermedNewCustomer");
+    if(nc&&!nc.dataset.latestSafe){
+      nc.dataset.latestSafe="1";
+      nc.addEventListener("click",function(e){
+        e.preventDefault();e.stopPropagation();
+        if(typeof openSaleCustomerForm==="function")openSaleCustomerForm("dermed");
+      });
+    }
   }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",function(){bind();setTimeout(bind,300);setTimeout(bind,1000)});else{bind();setTimeout(bind,300);setTimeout(bind,1000)}
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",function(){bind();setTimeout(bind,300);setTimeout(bind,1000)})
+  }else{
+    bind();setTimeout(bind,300);setTimeout(bind,1000)
+  }
+  setInterval(syncLiveData,1000);
 })();
 </script>
 </body>
 </html>
+
 
