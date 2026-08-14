@@ -3273,11 +3273,8 @@ function findCourseMatch(query){
 function addSaleItemRow(name="",price=0,qty=1,courseId=""){
  const tr=document.createElement("tr");tr.className="sale-item";
  tr.innerHTML=`<td>
-   <div class="sale-course-search-wrap">
-     <input class="sale-course-search" type="text" autocomplete="off" placeholder="Search course name or ID" value="${attr(name)}">
-     <input class="sale-course-id" type="hidden" value="${attr(courseId)}">
-     <div class="sale-course-search-results"></div>
-   </div>
+   <strong class="sale-course-name">${esc(name||"")}</strong>
+   <input class="sale-course-id" type="hidden" value="${attr(courseId)}">
  </td>
  <td><input class="sale-item-qty" type="text" inputmode="numeric" autocomplete="off" value="${Number(qty||1)}"></td>
  <td><input class="sale-item-price" type="text" inputmode="decimal" autocomplete="off" value="${Number(price||0)}"></td>
@@ -3289,43 +3286,33 @@ function addSaleItemRow(name="",price=0,qty=1,courseId=""){
  <td><button class="danger sale-remove-btn remove-sale-item" type="button">×</button></td>`;
  $("saleItems").appendChild(tr);
 
- const search=tr.querySelector(".sale-course-search");
- const idInput=tr.querySelector(".sale-course-id");
- const results=tr.querySelector(".sale-course-search-results");
  const priceInput=tr.querySelector(".sale-item-price");
  const qtyInput=tr.querySelector(".sale-item-qty");
  const discountType=tr.querySelector(".sale-item-discount-type");
  const discountValue=tr.querySelector(".sale-item-discount-value");
 
- function renderCourseSearch(){
-   const q=search.value.trim().toLowerCase();
-   const matches=getSalesCourses().filter(c=>[c.name,c.id].join(" ").toLowerCase().includes(q)).slice(0,12);
-   results.innerHTML=matches.map(c=>`<button type="button" data-course-id="${attr(c.id)}"><strong>${esc(c.name)}</strong><div class="muted">ID: ${esc(c.id)} · ${money(c.price)}</div></button>`).join("");
-   results.classList.toggle("show",!!q&&matches.length>0);
-   const exact=findCourseMatch(search.value);
-   if(exact){idInput.value=String(exact.id);if(document.activeElement!==priceInput)priceInput.value=Number(exact.price||0)}
-   else idInput.value="";
+ [qtyInput,priceInput,discountValue].forEach(i=>i.addEventListener("input",updateSaleTotals));
+ discountType.addEventListener("change",updateSaleTotals);
+
+ tr.querySelector(".remove-sale-item").onclick=()=>{
+   tr.remove();
    updateSaleTotals();
- }
- search.addEventListener("input",renderCourseSearch);
- search.addEventListener("focus",()=>{if(search.value.trim())renderCourseSearch()});
- results.addEventListener("click",e=>{
-   const btn=e.target.closest("button[data-course-id]");if(!btn)return;
-   const c=getSalesCourses().find(x=>String(x.id)===String(btn.dataset.courseId));if(!c)return;
-   search.value=c.name||"";idInput.value=String(c.id);priceInput.value=Number(c.price||0);
-   results.classList.remove("show");updateSaleTotals();
- });
- search.addEventListener("blur",()=>setTimeout(()=>results.classList.remove("show"),180));
- [qtyInput,priceInput,discountType,discountValue].forEach(i=>i.addEventListener("input",updateSaleTotals));
- [discountType].forEach(i=>i.addEventListener("change",updateSaleTotals));
- tr.querySelector(".remove-sale-item").onclick=()=>{tr.remove();if(!$("saleItems").children.length)addSaleItemRow();updateSaleTotals()};
+ };
 
  if(courseId){
    const c=getSalesCourses().find(x=>String(x.id)===String(courseId));
-   if(c){search.value=c.name||name;idInput.value=String(c.id);priceInput.value=Number(price||c.price||0)}
+   if(c){
+     tr.querySelector(".sale-course-name").textContent=c.name||name;
+     tr.querySelector(".sale-course-id").value=String(c.id);
+     priceInput.value=Number(price||c.price||0);
+   }
  }else if(name){
    const c=findCourseMatch(name);
-   if(c){search.value=c.name||name;idInput.value=String(c.id);priceInput.value=Number(price||c.price||0)}
+   if(c){
+     tr.querySelector(".sale-course-name").textContent=c.name||name;
+     tr.querySelector(".sale-course-id").value=String(c.id);
+     priceInput.value=Number(price||c.price||0);
+   }
  }
  updateSaleTotals();
 }
@@ -3334,6 +3321,8 @@ function setupSaleCoursePicker(){
  const search=$("saleCourseSearch");
  const results=$("saleCourseSearchResults");
  if(!search||!results)return;
+ if(search.dataset.pickerReady==="1")return;
+ search.dataset.pickerReady="1";
 
  function render(){
    const q=search.value.trim().toLowerCase();
@@ -3342,17 +3331,18 @@ function setupSaleCoursePicker(){
      results.classList.remove("show");
      return;
    }
-   const matches=getSalesCourses()
+   const source=Array.isArray(courses)?courses:[];
+   const matches=source
+     .filter(c=>courseType(c)==="sales")
      .filter(c=>[c.name,c.id].join(" ").toLowerCase().includes(q))
      .slice(0,12);
 
    results.innerHTML=matches.length
      ? matches.map(c=>`<button type="button" data-course-id="${attr(c.id)}">
-         <div class="course-picker-name">${esc(c.name)}</div>
-         <div class="course-picker-meta">Course ID: ${esc(c.id)} · ${money(c.price)}</div>
+         <div class="course-picker-name">${esc(c.name||"")}</div>
+         <div class="course-picker-meta">Course ID: ${esc(c.id||"")} · ${money(c.price||0)}</div>
        </button>`).join("")
      : `<div class="muted" style="padding:14px">No matching course found.</div>`;
-
    results.classList.add("show");
  }
 
@@ -3363,7 +3353,9 @@ function setupSaleCoursePicker(){
    const btn=e.target.closest("button[data-course-id]");
    if(!btn)return;
    e.preventDefault();
-   const c=getSalesCourses().find(x=>String(x.id)===String(btn.dataset.courseId));
+
+   const source=Array.isArray(courses)?courses:[];
+   const c=source.find(x=>String(x.id)===String(btn.dataset.courseId));
    if(!c)return;
 
    addSaleItemRow(c.name||"",Number(c.price||0),1,String(c.id));
@@ -3371,13 +3363,6 @@ function setupSaleCoursePicker(){
    results.innerHTML="";
    results.classList.remove("show");
    updateSaleTotals();
-
-   const rows=document.querySelectorAll("#saleItems .sale-item");
-   const last=rows[rows.length-1];
-   if(last){
-     const field=last.querySelector(".sale-item-qty");
-     if(field)field.focus();
-   }
  });
 
  search.addEventListener("blur",()=>setTimeout(()=>results.classList.remove("show"),180));
@@ -3385,10 +3370,9 @@ function setupSaleCoursePicker(){
 
 function getSaleItems(){
  return [...document.querySelectorAll("#saleItems .sale-item")].map(w=>{
-   const search=w.querySelector(".sale-course-search").value.trim();
    const courseId=w.querySelector(".sale-course-id").value;
    const course=getSalesCourses().find(c=>String(c.id)===String(courseId));
-   const name=course?course.name:search;
+   const name=(course?.name||w.querySelector(".sale-course-name")?.textContent||"").trim();
    const price=parseMoneyInput(w.querySelector(".sale-item-price").value);
    const quantity=Math.max(1,parseInt(w.querySelector(".sale-item-qty").value,10)||1);
    const base=price*quantity;
@@ -6860,4 +6844,13 @@ document.addEventListener("DOMContentLoaded",function(){
 #invoicePrint .mf-invoice[data-sale-type]:not([data-sale-type="DERMED"]) .mf-invoice-label{
   border-top-color:#46C3D9 !important;
 }
+</style>
+
+<style id="medifella-course-table-clean-v29">
+#saleItems .sale-course-name{
+  display:block;
+  padding:8px 4px;
+  font-weight:600;
+}
+#saleItems .sale-course-id{display:none!important}
 </style>
