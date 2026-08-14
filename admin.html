@@ -20,6 +20,12 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .table-wrap{overflow:auto}.table{width:100%;border-collapse:collapse}.table th,.table td{padding:10px;border-bottom:1px solid var(--line);text-align:left;vertical-align:top}.table th{color:var(--teal);font-size:13px;white-space:nowrap}
 .actions{display:flex;gap:6px;flex-wrap:wrap}.badge{display:inline-block;border-radius:999px;padding:5px 9px;font-size:12px;font-weight:800;background:#edf3f3}.verified,.published,.open{background:#e5f5ee;color:#176b49}.pending{background:#fff6dc;color:#8b6510}.rejected,.closed{background:#ffe8e8;color:#9d2d2d}
 .post{border-top:1px solid var(--line);padding:14px 0}.post:first-child{border-top:0}.post img,.post video{width:100%;max-height:300px;object-fit:cover;border-radius:10px;margin-top:10px}
+/* Product Management tabs */
+.product-tabs{display:flex;gap:10px;align-items:stretch;margin-top:18px;border-bottom:1px solid var(--line);padding-bottom:0;overflow-x:auto}
+.product-tab{flex:1;min-width:150px;border:1px solid var(--line);border-bottom:0;border-radius:10px 10px 0 0;background:#eef5f5;color:var(--text);padding:12px 16px;font-weight:700;cursor:pointer}
+.product-tab:hover{filter:brightness(.98)}
+.product-tab.active{background:var(--teal);color:#fff}
+.product-panel{border-top-left-radius:0}
 @media(max-width:1100px){.grid{grid-template-columns:repeat(3,1fr)}}@media(max-width:850px){.two{grid-template-columns:1fr}.side{width:190px}.grid{grid-template-columns:repeat(2,1fr)}}@media(max-width:650px){.layout{display:block}.side{width:100%;display:flex;overflow:auto}.nav{min-width:max-content}.main{padding:15px}.grid{grid-template-columns:1fr}.toolbar{display:grid}.row{display:grid}.top{height:auto;padding:14px}}
 
 .account-row{display:flex;justify-content:space-between;gap:12px;align-items:center}
@@ -2267,17 +2273,25 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div id="stockStatus"></div>
 </div>
 </div>
-<div class="card" style="margin-top:18px">
+<div class="product-tabs" role="tablist" aria-label="Product Management">
+<button type="button" class="product-tab active" data-product-tab="productListPanel">Product List</button>
+<button type="button" class="product-tab" data-product-tab="stockHistoryPanel">Stock History</button>
+<button type="button" class="product-tab" data-product-tab="stockReportPanel">Stock Report</button>
+</div>
+
+<div id="productListPanel" class="product-panel card" style="margin-top:12px">
 <h2>Product List</h2>
 <div class="toolbar"><input id="productSearch" placeholder="Search Product ID or Product Name"><button id="productRefresh" class="light">Refresh</button></div>
 <div id="productList">Loading...</div>
 </div>
-<div class="card" style="margin-top:18px">
+
+<div id="stockHistoryPanel" class="product-panel card hidden" style="margin-top:12px">
 <h2>Stock History</h2>
 <div class="toolbar"><input id="stockSearch" placeholder="Search Product ID or Product Name"><button id="stockRefresh" class="light">Refresh</button></div>
 <div id="stockList">Loading...</div>
 </div>
-<div class="card" style="margin-top:18px">
+
+<div id="stockReportPanel" class="product-panel card hidden" style="margin-top:12px">
 <h2>Stock Report</h2>
 <div class="toolbar"><select id="stockReportType"><option value="out">Out of Stock Report</option><option value="alert">Alert Report (10 or less)</option><option value="daily">Daily Report</option><option value="weekly">Weekly Report</option><option value="monthly">Monthly Report</option><option value="yearly">Yearly Report</option></select><input id="stockReportDate" type="date"><button id="stockReportRefresh" class="light">Refresh</button></div>
 <div id="stockReportList">Loading...</div>
@@ -5070,7 +5084,7 @@ function renderProductList(){
  if(!$("productList"))return;
  const q=($("productSearch")?.value||"").trim().toLowerCase();
  const rows=products.filter(p=>(`${p.product_code||""} ${p.name||""}`).toLowerCase().includes(q));
- $("productList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Product ID</th><th>Product Name</th><th>Price</th><th>Source</th><th>Stock</th><th>Action</th></tr>${rows.map(p=>`<tr><td>${esc(p.product_code)}</td><td>${esc(p.name)}</td><td>${money(p.price)}</td><td>${esc(sourceLabel(p))}</td><td><strong>${productStock(p.id)}</strong></td><td><div class="actions"><button class="light" onclick="editProduct('${attr(p.id)}')">Edit</button><button class="danger" onclick="deleteProduct('${attr(p.id)}')">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No products found.</p>';
+ $("productList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Product ID</th><th>Product Name</th><th>Price</th><th>Source</th><th>Action</th></tr>${rows.map(p=>`<tr><td>${esc(p.product_code)}</td><td>${esc(p.name)}</td><td>${money(p.price)}</td><td>${esc(sourceLabel(p))}</td><td><div class="actions"><button type="button" class="light" onclick="editProduct('${attr(p.id)}')">Edit</button><button type="button" class="danger" onclick="deleteProduct('${attr(p.id)}')">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No products found.</p>';
 }
 function renderStockList(){
  if(!$("stockList"))return;
@@ -5078,7 +5092,7 @@ function renderStockList(){
  const rows=stockMovements.filter(m=>String(m.movement_type)==="stock_in").filter(m=>{
    const p=products.find(x=>String(x.id)===String(m.product_id)); return (`${p?.product_code||""} ${p?.name||""}`).toLowerCase().includes(q);
  });
- $("stockList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Product ID</th><th>Product</th><th>Amount</th><th>Staff</th><th>In Stock Time</th><th>Action</th></tr>${rows.map(m=>{const p=products.find(x=>String(x.id)===String(m.product_id));const st=staffInfoRecords.find(x=>String(x.id)===String(m.staff_id));return `<tr><td>${esc(p?.product_code||"")}</td><td>${esc(p?.name||"")}</td><td>${esc(m.quantity)}</td><td>${esc(st?.name_en||m.staff_name||"")}</td><td>${esc(m.stock_time||m.created_at||"")}</td><td><div class="actions"><button class="light" onclick="editStock('${attr(m.id)}')">Edit</button><button class="danger" onclick="deleteStock('${attr(m.id)}')">Delete</button></div></td></tr>`}).join("")}</table></div>`:'<p class="muted">No stock records found.</p>';
+ $("stockList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Product ID</th><th>Product</th><th>Amount</th><th>Staff</th><th>In Stock Time</th><th>Action</th></tr>${rows.map(m=>{const p=products.find(x=>String(x.id)===String(m.product_id));const st=staffInfoRecords.find(x=>String(x.id)===String(m.staff_id));return `<tr><td>${esc(p?.product_code||"")}</td><td>${esc(p?.name||"")}</td><td>${esc(m.quantity)}</td><td>${esc(st?.name_en||m.staff_name||"")}</td><td>${esc(m.stock_time||m.created_at||"")}</td><td><div class="actions"><button type="button" class="light" onclick="editStock('${attr(m.id)}')">Edit</button><button type="button" class="danger" onclick="deleteStock('${attr(m.id)}')">Delete</button></div></td></tr>`}).join("")}</table></div>`:'<p class="muted">No stock records found.</p>';
 }
 function renderStaffInfoList(){
  if(!$("staffInfoList"))return;
@@ -5183,6 +5197,12 @@ function renderProductSearchResults(){
 }
 function chooseStockProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p)return;$("stockProductId").value=p.id;$("stockProductSearch").value=`${p.product_code} · ${p.name}`;$("stockProductHint").textContent=`Selected: ${p.name}`;$("stockProductResults").classList.remove("show")}
 
+// Product Management sub-tabs
+function openProductTab(panelId){
+  document.querySelectorAll(".product-tab").forEach(b=>b.classList.toggle("active",b.dataset.productTab===panelId));
+  document.querySelectorAll(".product-panel").forEach(p=>p.classList.toggle("hidden",p.id!==panelId));
+}
+document.querySelectorAll(".product-tab").forEach(b=>b.addEventListener("click",()=>openProductTab(b.dataset.productTab)));
 $("productSource").onchange=()=>{const o=$("productSource").value==="Others";$("productSourceOther").classList.toggle("hidden",!o);$("productSourceOtherLabel").classList.toggle("hidden",!o)};
 $("saveProduct").onclick=async()=>{
  clearMsg($("productStatus"));const id=$("productEditId").value,name=$("productName").value.trim(),cost=Number($("productCost").value||0),price=Number($("productPrice").value||0),source=$("productSource").value,source_other=$("productSourceOther").value.trim();
@@ -5193,11 +5213,11 @@ $("saveProduct").onclick=async()=>{
 };
 function clearProductForm(){$("productEditId").value="";$("productName").value="";$("productCost").value="";$("productPrice").value="";$("productSource").value="Korean";$("productSourceOther").value="";$("productSource").dispatchEvent(new Event("change"))}
 function editProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p)return;$("productEditId").value=p.id;$("productName").value=p.name||"";$("productCost").value=p.cost??"";$("productPrice").value=p.price??"";$("productSource").value=p.source||"Korean";$("productSourceOther").value=p.source_other||"";$("productSource").dispatchEvent(new Event("change"));$("products").scrollIntoView({behavior:"smooth"})}
-async function deleteProduct(id){if(!confirm("Delete this product?"))return;const r=await sb.from("medifella_products").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadProducts()}
+async function deleteProduct(id){if(!confirm("Delete this product? Its stock history will also be deleted. Continue?"))return;const r=await sb.from("medifella_products").delete().eq("id",id);if(r.error){alert("Delete failed: "+r.error.message);return}await loadProducts();await loadStockMovements();}
 $("clearProduct").onclick=clearProductForm;
-$("saveStock").onclick=async()=>{clearMsg($("stockStatus"));const pid=$("stockProductId").value,q=Number($("stockAmount").value||0),staff=$("stockStaff").value;if(!pid||q<=0||!staff){msg($("stockStatus"),"Select product, amount and staff.",true);return}try{const t=$("stockTime").value||phTime();const p=products.find(x=>String(x.id)===String(pid));const r=await sb.from("medifella_inventory_movements").insert({product_id:pid,movement_type:"stock_in",quantity:q,staff_id:staff,staff_name:staffInfoRecords.find(x=>String(x.id)===String(staff))?.name_en||"",stock_time:t,created_by:adminUser.id,notes:"Stock In"});if(r.error)throw r.error;msg($("stockStatus"),`Stock added: ${p?.name||""}`);$("stockAmount").value="";$("stockProductId").value="";$("stockProductSearch").value="";$("stockProductHint").textContent="Select a product from the search results.";await loadStockMovements()}catch(e){msg($("stockStatus"),e.message,true)}};
-function editStock(id){const m=stockMovements.find(x=>String(x.id)===String(id));if(!m)return;$("stockProductId").value=m.product_id;const p=products.find(x=>String(x.id)===String(m.product_id));$("stockProductSearch").value=`${p?.product_code||""} · ${p?.name||""}`;$("stockAmount").value=m.quantity;$("stockStaff").value=m.staff_id||"";$("stockTime").value=m.stock_time||"";$("stockTimeDisplay").value=String(m.stock_time||"").replace("T"," ");window.editingStockId=id;$("products").scrollIntoView({behavior:"smooth"})}
-async function deleteStock(id){if(!confirm("Delete this stock entry?"))return;const r=await sb.from("medifella_inventory_movements").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadStockMovements()}
+$("saveStock").onclick=async()=>{clearMsg($("stockStatus"));const editId=window.editingStockId||"";const pid=$("stockProductId").value,q=Number($("stockAmount").value||0),staff=$("stockStaff").value;if(!pid||q<=0||!staff){msg($("stockStatus"),"Select product, amount and staff.",true);return}try{const t=$("stockTime").value||phTime();const p=products.find(x=>String(x.id)===String(pid));const payload={product_id:pid,movement_type:"stock_in",quantity:q,staff_id:staff,staff_name:staffInfoRecords.find(x=>String(x.id)===String(staff))?.name_en||"",stock_time:t,created_by:adminUser.id,notes:"Stock In"};const r=editId?await sb.from("medifella_inventory_movements").update(payload).eq("id",editId):await sb.from("medifella_inventory_movements").insert(payload);if(r.error)throw r.error;msg($("stockStatus"),editId?"Stock entry updated.":`Stock added: ${p?.name||""}`);window.editingStockId="";$("saveStock").textContent="Save Stock";$("stockAmount").value="";$("stockProductId").value="";$("stockProductSearch").value="";$("stockProductHint").textContent="Select a product from the search results.";setAutoTime("stockTimeDisplay","stockTime");await loadStockMovements()}catch(e){msg($("stockStatus"),e.message,true)}};
+function editStock(id){const m=stockMovements.find(x=>String(x.id)===String(id));if(!m)return;$("stockProductId").value=m.product_id;const p=products.find(x=>String(x.id)===String(m.product_id));$("stockProductSearch").value=`${p?.product_code||""} · ${p?.name||""}`;$("stockProductHint").textContent=`Selected: ${p?.name||""}`;$("stockAmount").value=m.quantity;$("stockStaff").value=m.staff_id||"";$("stockTime").value=m.stock_time||"";$("stockTimeDisplay").value=String(m.stock_time||"").replace("T"," ");window.editingStockId=id;$("saveStock").textContent="Update Stock";$("products").scrollIntoView({behavior:"smooth",block:"start"})}
+async function deleteStock(id){if(!confirm("Delete this stock entry? The product's available stock will decrease by this amount. Continue?"))return;const r=await sb.from("medifella_inventory_movements").delete().eq("id",id);if(r.error){alert("Delete failed: "+r.error.message);return}await loadStockMovements();}
 
 $("saveStaffInfo").onclick=async()=>{clearMsg($("staffInfoStatus"));const id=$("staffInfoEditId").value,name_en=$("staffInfoNameEn").value.trim(),name_kh=$("staffInfoNameKh").value.trim(),phone=$("staffInfoPhone").value.trim(),enroll_date=$("staffInfoEnrollDate").value,status=$("staffInfoStatus").value,job=$("staffInfoJob").value,job_title=job==="Other"?$("staffInfoJobOther").value.trim():job;if(!name_en||!name_kh||!phone||!enroll_date||!job_title){msg($("staffInfoStatus"),"Please fill all staff fields.",true);return}try{const payload={name_en,name_kh,phone,enroll_date,status,job_title};let r=id?await sb.from("medifella_staff").update(payload).eq("id",id):await sb.from("medifella_staff").insert({...payload,staff_code:genId("ST",staffInfoRecords,"staff_code")});if(r.error)throw r.error;msg($("staffInfoStatus"),id?"Staff updated.":"Staff added.");clearStaffInfoForm();await loadStaffInfo()}catch(e){msg($("staffInfoStatus"),e.message,true)}};
 $("staffInfoJob").onchange=()=>{$("staffInfoJobOther").classList.toggle("hidden",$("staffInfoJob").value!=="Other")};
