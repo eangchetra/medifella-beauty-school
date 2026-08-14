@@ -6001,7 +6001,7 @@ document.addEventListener("DOMContentLoaded",function(){
       student_id:buyerType==="student"?buyerId:null,student_name:buyer?.full_name||buyer?.name||"",student_phone:buyer?.phone||"",
       customer_id:buyerType==="customer"?buyerId:null,customer_type:buyerType,sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",
       subtotal:c.sub,discount:c.odAmount,shipping:0,grand_total:c.initial,
-      paid:paid,balance:c.due,payment_status:status,payment_method:E("dermedPaymentMethod").value,sale_status:"Completed",
+      paid:paid,balance:c.due,payment_status:status,sale_status:"Completed",
       items:itemPayload,service_items:servicePayload,service_total:servicePayload.reduce((n,x)=>n+Number(x.subtotal||0),0),
       notes:E("dermedSaleNote").value.trim()
     };
