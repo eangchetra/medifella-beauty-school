@@ -2381,23 +2381,113 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </section>
 
 <section id="dermedSale" class="section">
-<h1>Dermed Sale</h1>
-<div class="card sale-form-shell">
-<div class="sale-header-grid">
-<div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="dermedBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="dermedNewCustomer" class="gold" type="button">+ Customer</button></div><div id="dermedBuyerResults" class="sale-course-picker-results"></div><input id="dermedBuyerType" type="hidden"><input id="dermedBuyerId" type="hidden"><div id="dermedBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
-<div><label>Sale Staff *</label><select id="dermedSaleStaff"></select></div>
-<div><label>Sale Date & Time</label><input id="dermedSaleTime" readonly></div>
+<div class="sale-page-title">
+  <h1>Add Dermed Sale</h1>
+  <button id="toggleDermedSaleForm" class="light" type="button" aria-expanded="true">Hide Add Dermed Sale ▲</button>
 </div>
-<label style="margin-top:18px">Search Product</label><div style="position:relative"><input id="dermedProductSearch" autocomplete="off" placeholder="Search Product ID or Product Name"><div id="dermedProductResults" class="sale-course-picker-results"></div></div>
-<div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr></thead><tbody id="dermedItems"></tbody></table></div>
-<h2 style="margin-top:22px">Services Fee</h2>
-<label>Search Service</label><div style="position:relative"><input id="dermedServiceSearch" autocomplete="off" placeholder="Search Service ID or Service Name"><div id="dermedServiceResults" class="sale-course-picker-results"></div></div>
-<div class="table-wrap"><table class="table"><thead><tr><th>Service</th><th>Type</th><th>Price</th><th></th></tr></thead><tbody id="dermedServices"></tbody></table></div>
-<div class="sale-summary-row" style="margin-top:16px"><span>Products + Services Total</span><strong id="dermedTotal">$0.00</strong></div>
-<div class="actions" style="justify-content:flex-end;margin-top:14px"><button id="saveDermedSale" class="gold">Save Dermed Sale & Generate Invoice</button><button id="clearDermedSale" class="light">Clear</button></div>
-<div id="dermedStatus"></div>
+
+<div id="dermedSaleForm" class="card sale-form-shell">
+  <div class="sale-header-grid">
+    <div>
+      <label>Customer / Student *</label>
+      <div class="sale-student-tools">
+        <div class="sale-course-picker-wrap">
+          <span class="sale-search-icon">⌕</span>
+          <input id="dermedListBuyerSearch" type="text" autocomplete="off" placeholder="Search student/customer name, ID or phone">
+          <div id="dermedListBuyerResults" class="sale-course-picker-results"></div>
+        </div>
+        <button id="dermedListNewCustomerBtn" class="gold" type="button">+ Customer</button>
+      </div>
+      <input id="dermedListBuyerType" type="hidden"><input id="dermedListBuyerId" type="hidden">
+      <div id="dermedListBuyerHint" class="muted" style="margin-top:6px">Search and select a student or customer.</div>
+    </div>
+    <div>
+      <label>Reference No.</label>
+      <input id="dermedListReference" placeholder="Auto-generate" readonly>
+    </div>
+    <div>
+      <label>Sale Date &amp; Time — Phnom Penh, Cambodia *</label>
+      <input id="dermedListDateDisplay" type="text" readonly placeholder="Automatically added">
+      <input id="dermedListDate" type="hidden">
+      <div class="muted" style="margin-top:5px">Automatic Cambodia time (GMT+7). You do not need to enter it.</div>
+    </div>
+  </div>
+
+  <div class="sale-section-title"><h2>Product</h2></div>
+  <div class="sale-course-picker">
+    <div class="sale-course-picker-wrap">
+      <span class="sale-search-icon">⌕</span>
+      <input id="dermedListProductSearch" type="text" autocomplete="off" placeholder="Search Product name or Product ID...">
+      <div id="dermedListProductResults" class="sale-course-picker-results"></div>
+    </div>
+    <div class="muted sale-course-picker-help">Search directly from Product Management / Product List, then click the product to add it.</div>
+  </div>
+  <div class="sale-table-wrap">
+    <table class="sale-entry-table">
+      <thead><tr><th style="width:32%">Product</th><th style="width:9%">Qty</th><th style="width:14%">Unit Price (USD)</th><th style="width:17%">Discount</th><th style="width:15%">Subtotal (USD)</th><th style="width:46px"></th></tr></thead>
+      <tbody id="dermedListProductItems"></tbody>
+    </table>
+  </div>
+
+  <div class="sale-section-title"><h2>Service</h2></div>
+  <div class="sale-course-picker">
+    <div class="sale-course-picker-wrap">
+      <span class="sale-search-icon">⌕</span>
+      <input id="dermedListServiceSearch" type="text" autocomplete="off" placeholder="Search Service name or Service ID...">
+      <div id="dermedListServiceResults" class="sale-course-picker-results"></div>
+    </div>
+    <div class="muted sale-course-picker-help">Search directly from Services Management / Service List, then click the service to add it.</div>
+  </div>
+  <div class="sale-table-wrap">
+    <table class="sale-entry-table">
+      <thead><tr><th style="width:32%">Service</th><th style="width:9%">Qty</th><th style="width:14%">Unit Price (USD)</th><th style="width:17%">Discount</th><th style="width:15%">Subtotal (USD)</th><th style="width:46px"></th></tr></thead>
+      <tbody id="dermedListServiceItems"></tbody>
+    </table>
+  </div>
+
+  <div class="sale-subtotal-line"><span>Sub Initial Total</span><strong id="dermedListItemsSubtotal">$0.00</strong></div>
+
+  <div class="sale-controls-grid">
+    <div><label>Overall Discount</label><div class="discount-control"><select id="dermedListOverallDiscountType"><option value="percent">%</option><option value="usd">USD</option></select><input id="dermedListOverallDiscountValue" type="text" inputmode="decimal" placeholder="0"></div></div>
+    <div><label>Payment Method *</label><select id="dermedListPaymentMethod"><option value="Cash">Cash</option><option value="ABA">ABA</option><option value="Bank Transfer">Bank Transfer</option><option value="Card">Card</option><option value="Other">Other</option></select></div>
+    <div><label>Payment Status *</label><select id="dermedListPaymentStatus"><option value="Paid">Paid</option><option value="Partial">Partial Payment</option><option value="Due">Due</option></select></div>
+    <div><label>Amount Paid Now (USD)</label><input id="dermedListAmountPaidNow" class="sale-money-input" type="text" inputmode="decimal" placeholder="0.00"><div class="muted" style="margin-top:5px">Paid = full amount · Due = $0 · Partial = enter amount</div></div>
+  </div>
+
+  <div class="sale-summary-card">
+    <div class="sale-summary-col">
+      <div class="sale-summary-row"><span>Sub Initial Total</span><strong id="dermedListSummarySubtotal">$0.00</strong></div>
+      <div class="sale-summary-row"><span>Overall Discount</span><strong id="dermedListSummaryDiscount" class="discount-number">$0.00</strong></div>
+      <div class="sale-summary-divider"></div>
+      <div class="sale-summary-row sale-initial-row"><span>Initial Total</span><strong id="dermedListInitialTotal">$0.00</strong></div>
+    </div>
+    <div class="sale-summary-col">
+      <div class="sale-summary-row"><span>Paid Balance</span><strong id="dermedListPaidDisplay" class="paid-number">$0.00</strong></div>
+      <div class="sale-summary-row"><span>Due</span><strong id="dermedListDueDisplay" class="due-number">$0.00</strong></div>
+      <div class="sale-summary-divider"></div>
+      <div class="sale-summary-row sale-grand-row"><span>Grand Total Due</span><strong id="dermedListGrandDue">$0.00</strong></div>
+    </div>
+  </div>
+
+  <label>Sale Note (Optional)</label><textarea id="dermedListNote" rows="4" placeholder="Enter note here..."></textarea>
+  <div class="sale-actions"><button id="saveDermedListSale" class="gold">Save Dermed Sale</button><button id="cancelDermedListSale" class="light">Cancel</button></div>
+  <div id="dermedListStatus"></div>
 </div>
-<div class="card" style="margin-top:18px"><h2>Dermed Sales</h2><div class="toolbar"><input id="dermedSaleSearch" placeholder="Search invoice, buyer or product"><button id="dermedSalesRefresh" class="light">Refresh</button></div><div id="dermedSalesList">Loading...</div></div>
+
+<div class="card" style="margin-top:18px">
+  <div class="toolbar">
+    <input id="dermedListSearch" placeholder="Search reference, student/customer, phone, product or service">
+    <select id="dermedListPaymentFilter"><option value="all">All Payment Status</option><option value="Paid">Paid</option><option value="Partial">Partial Payment</option><option value="Due">Due</option></select>
+    <button id="dermedListRefresh" class="light">Refresh</button>
+  </div>
+  <div class="sales-summary">
+    <div class="card"><div class="muted">Dermed Sales</div><div id="dermedListMetricSales" class="metric">0</div></div>
+    <div class="card"><div class="muted">Paid</div><div id="dermedListMetricPaid" class="metric">$0.00</div></div>
+    <div class="card"><div class="muted">Outstanding</div><div id="dermedListMetricBalance" class="metric">$0.00</div></div>
+    <div class="card"><div class="muted">Due Invoices</div><div id="dermedListMetricDue" class="metric">0</div></div>
+  </div>
+  <div id="dermedSalesList">Loading...</div>
+</div>
 </section>
 
 <section id="services" class="section">
@@ -5472,25 +5562,67 @@ async function saveInventorySale(type){
  }catch(e){msg($(type+"Status"),e.message||"Could not save sale.",true)}
 }
 function renderMtsSales(){const box=$("mtsSalesList");if(!box)return;const q=($("mtsSaleSearch")?.value||"").toLowerCase();const rows=salesRecords.filter(x=>String(x.sale_type||"").toUpperCase()==="MTS"&&(`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])}`).toLowerCase().includes(q));box.innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Invoice</th><th>Buyer</th><th>Products</th><th>Total</th><th>Date</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.reference_no)}</td><td>${esc(x.student_name)}</td><td>${esc((x.items||[]).map(i=>i.name).join(", "))}</td><td>${money(x.grand_total)}</td><td>${esc(x.sale_date||"")}</td><td><button class="light" onclick="showSaleInvoice('${attr(x.id)}')">View Invoice</button></td></tr>`).join("")}</table></div>`:'<p class="muted">No MTS sales found.</p>'}
-function renderDermedSales(){const box=$("dermedSalesList");if(!box)return;const q=($("dermedSaleSearch")?.value||"").toLowerCase();const rows=salesRecords.filter(x=>String(x.sale_type||"").toUpperCase()==="DERMED"&&(`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])} ${JSON.stringify(x.service_items||[])}`).toLowerCase().includes(q));box.innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Invoice</th><th>Buyer</th><th>Products / Services</th><th>Total</th><th>Date</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.reference_no)}</td><td>${esc(x.student_name)}</td><td>${esc([...(x.items||[]).map(i=>i.name),...(x.service_items||[]).map(i=>i.name)].join(", "))}</td><td>${money(x.grand_total)}</td><td>${esc(x.sale_date||"")}</td><td><button class="light" onclick="showSaleInvoice('${attr(x.id)}')">View Invoice</button></td></tr>`).join("")}</table></div>`:'<p class="muted">No Dermed sales found.</p>'}
+function dermedListNow(){return phTime()}
+function dermedListReference(){const now=dermedListNow(),prefix=`DERMED-${now.slice(0,4)}${now.slice(5,7)}${now.slice(8,10)}-`;let max=0;salesRecords.filter(x=>String(x.sale_type||'').toUpperCase()==='DERMED').forEach(x=>{const m=String(x.reference_no||'').match(new RegExp('^'+prefix+'(\\d+)$'));if(m)max=Math.max(max,Number(m[1]))});return prefix+String(max+1).padStart(3,'0')}
+function dermedListSetDate(){const dt=dermedListNow();$("dermedListDate").value=dt;$("dermedListDateDisplay").value=dt.replace('T',' ');if(!$("dermedListReference").value)$("dermedListReference").value=dermedListReference()}
+function dermedListBuyerRender(){const input=$("dermedListBuyerSearch"),res=$("dermedListBuyerResults");if(!input||!res)return;const q=input.value.trim().toLowerCase();if(!q){res.innerHTML='';res.classList.remove('show');return}let arr=[];students.filter(x=>(`${x.student_id||''} ${x.full_name||''} ${x.full_name_km||''} ${x.phone||''} ${x.email||''}`).toLowerCase().includes(q)).slice(0,12).forEach(x=>arr.push({type:'student',id:x.id,code:x.student_id,name:x.full_name,phone:x.phone}));customers.filter(x=>(`${x.customer_code||''} ${x.name||''} ${x.phone||''}`).toLowerCase().includes(q)).slice(0,12).forEach(x=>arr.push({type:'customer',id:x.id,code:x.customer_code,name:x.name,phone:x.phone}));res.innerHTML=arr.length?arr.map(x=>`<button type="button" onclick="chooseDermedListBuyer('${attr(x.type)}','${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.type==='student'?'Student':'Customer')} · ${esc(x.code||'')} · ${esc(x.phone||'')}</div></button>`).join(''):'<div class="muted" style="padding:12px">No student/customer found.</div>';res.classList.add('show')}
+function chooseDermedListBuyer(type,id){const x=type==='student'?students.find(s=>String(s.id)===String(id)):customers.find(c=>String(c.id)===String(id));if(!x)return;$("dermedListBuyerType").value=type;$("dermedListBuyerId").value=String(id);$("dermedListBuyerSearch").value=type==='student'?x.full_name:x.name;$("dermedListBuyerHint").textContent=`Selected: ${type==='student'?x.full_name:x.name} · ${type==='student'?(x.student_id||''):(x.customer_code||'')} · ${x.phone||''}`;$("dermedListBuyerResults").classList.remove('show')}
+function dermedLineDiscount(base,type,value){const v=Math.max(0,parseMoneyInput(value));return type==='percent'?Math.min(base,base*v/100):Math.min(base,v)}
+function dermedLineSubtotal(x){const base=Number(x.price||0)*Math.max(1,Number(x.quantity||1));return Math.max(0,base-dermedLineDiscount(base,x.discount_type||'percent',x.discount_value||0))}
+function renderDermedListProducts(){const arr=window.dermedListProducts||[],body=$("dermedListProductItems");if(!body)return;body.innerHTML=arr.map((x,i)=>`<tr><td><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code||'')}</div></td><td><input type="number" min="1" max="${Math.max(1,productStock(x.product_id)+Number(x.quantity||0))}" value="${x.quantity}" data-i="${i}" class="dermed-row-qty"></td><td>${money(x.price)}</td><td><div class="sale-item-discount-wrap"><select data-i="${i}" class="dermed-row-discount-type"><option value="percent" ${x.discount_type==='percent'?'selected':''}>%</option><option value="usd" ${x.discount_type==='usd'?'selected':''}>USD</option></select><input type="text" inputmode="decimal" value="${attr(x.discount_value||'')}" data-i="${i}" class="dermed-row-discount-value"></div></td><td><input class="sale-item-subtotal" readonly value="${money(dermedLineSubtotal(x))}"></td><td><button type="button" class="danger sale-remove-btn" onclick="removeDermedListProduct(${i})">×</button></td></tr>`).join('');body.querySelectorAll('.dermed-row-qty').forEach(e=>e.oninput=()=>{const i=+e.dataset.i,a=window.dermedListProducts;a[i].quantity=Math.max(1,Math.min(+e.value||1,productStock(a[i].product_id)));updateDermedListTotals()});body.querySelectorAll('.dermed-row-discount-type').forEach(e=>e.onchange=()=>{window.dermedListProducts[+e.dataset.i].discount_type=e.value;updateDermedListTotals()});body.querySelectorAll('.dermed-row-discount-value').forEach(e=>e.oninput=()=>{window.dermedListProducts[+e.dataset.i].discount_value=e.value;updateDermedListTotals()})}
+function addDermedListProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p)return;const a=window.dermedListProducts||(window.dermedListProducts=[]);if(a.some(x=>String(x.product_id)===String(id)))return;a.push({product_id:p.id,product_code:p.product_code,name:p.name,price:+p.price||0,quantity:1,discount_type:'percent',discount_value:''});renderDermedListProducts();$("dermedListProductSearch").value='';$("dermedListProductResults").classList.remove('show');updateDermedListTotals()}
+function removeDermedListProduct(i){(window.dermedListProducts||[]).splice(i,1);renderDermedListProducts();updateDermedListTotals()}
+function renderDermedListServices(){const arr=window.dermedListServices||[],body=$("dermedListServiceItems");if(!body)return;body.innerHTML=arr.map((x,i)=>`<tr><td><strong>${esc(x.name)}</strong><div class="muted">${esc(x.service_code||'')} · ${esc(x.service_type||'')}</div></td><td><input type="number" min="1" value="${x.quantity||1}" data-i="${i}" class="dermed-service-qty"></td><td>${money(x.price)}</td><td><div class="sale-item-discount-wrap"><select data-i="${i}" class="dermed-service-discount-type"><option value="percent" ${x.discount_type==='percent'?'selected':''}>%</option><option value="usd" ${x.discount_type==='usd'?'selected':''}>USD</option></select><input type="text" inputmode="decimal" value="${attr(x.discount_value||'')}" data-i="${i}" class="dermed-service-discount-value"></div></td><td><input class="sale-item-subtotal" readonly value="${money(dermedLineSubtotal(x))}"></td><td><button type="button" class="danger sale-remove-btn" onclick="removeDermedListService(${i})">×</button></td></tr>`).join('');body.querySelectorAll('.dermed-service-qty').forEach(e=>e.oninput=()=>{window.dermedListServices[+e.dataset.i].quantity=Math.max(1,+e.value||1);updateDermedListTotals()});body.querySelectorAll('.dermed-service-discount-type').forEach(e=>e.onchange=()=>{window.dermedListServices[+e.dataset.i].discount_type=e.value;updateDermedListTotals()});body.querySelectorAll('.dermed-service-discount-value').forEach(e=>e.oninput=()=>{window.dermedListServices[+e.dataset.i].discount_value=e.value;updateDermedListTotals()})}
+function addDermedListService(id){const x=services.find(s=>String(s.id)===String(id));if(!x)return;const a=window.dermedListServices||(window.dermedListServices=[]);if(a.some(y=>String(y.service_id)===String(id)))return;a.push({service_id:x.id,service_code:x.service_code,name:x.name,service_type:x.service_type,price:+x.price||0,quantity:1,discount_type:'percent',discount_value:''});renderDermedListServices();$("dermedListServiceSearch").value='';$("dermedListServiceResults").classList.remove('show');updateDermedListTotals()}
+function removeDermedListService(i){(window.dermedListServices||[]).splice(i,1);renderDermedListServices();updateDermedListTotals()}
+function updateDermedListTotals(){const pa=window.dermedListProducts||[],sa=window.dermedListServices||[];const sub=pa.reduce((n,x)=>n+dermedLineSubtotal(x),0)+sa.reduce((n,x)=>n+dermedLineSubtotal(x),0);const type=$("dermedListOverallDiscountType").value,val=parseMoneyInput($("dermedListOverallDiscountValue").value),disc=type==='percent'?Math.min(sub,sub*val/100):Math.min(sub,val),initial=Math.max(0,sub-disc);const status=$("dermedListPaymentStatus").value;let paid=parseMoneyInput($("dermedListAmountPaidNow").value);if(status==='Paid')paid=initial;if(status==='Due')paid=0;paid=Math.min(initial,Math.max(0,paid));$("dermedListItemsSubtotal").textContent=money(sub);$("dermedListSummarySubtotal").textContent=money(sub);$("dermedListSummaryDiscount").textContent=disc?`-${money(disc)}${type==='percent'?` (${val}%)`:''}`:money(0);$("dermedListInitialTotal").textContent=money(initial);$("dermedListPaidDisplay").textContent=money(paid);$("dermedListDueDisplay").textContent=money(Math.max(0,initial-paid));$("dermedListGrandDue").textContent=money(Math.max(0,initial-paid));document.querySelectorAll('#dermedListProductItems .sale-item-subtotal').forEach((e,i)=>{if(pa[i])e.value=money(dermedLineSubtotal(pa[i]))});document.querySelectorAll('#dermedListServiceItems .sale-item-subtotal').forEach((e,i)=>{if(sa[i])e.value=money(dermedLineSubtotal(sa[i]))})}
+function resetDermedListSale(){window.dermedListProducts=[];window.dermedListServices=[];$("dermedListBuyerType").value='';$("dermedListBuyerId").value='';$("dermedListBuyerSearch").value='';$("dermedListBuyerHint").textContent='Search and select a student or customer.';$("dermedListOverallDiscountType").value='percent';$("dermedListOverallDiscountValue").value='';$("dermedListPaymentMethod").value='Cash';$("dermedListPaymentStatus").value='Paid';$("dermedListAmountPaidNow").value='';$("dermedListNote").value='';$("dermedListReference").value='';dermedListSetDate();renderDermedListProducts();renderDermedListServices();updateDermedListTotals();$("dermedListStatus").innerHTML=''}
+function setupDermedListPickers(){const bind=(id,rid,fn)=>{const i=$(id),r=$(rid);if(!i)return;i.oninput=()=>fn();i.onfocus=()=>{if(i.value.trim())fn()};i.onblur=()=>setTimeout(()=>r?.classList.remove('show'),180)};bind('dermedListBuyerSearch','dermedListBuyerResults',dermedListBuyerRender);bind('dermedListProductSearch','dermedListProductResults',()=>{const q=$("dermedListProductSearch").value.trim().toLowerCase(),r=$("dermedListProductResults"),rows=products.filter(p=>(`${p.product_code||''} ${p.name||''}`).toLowerCase().includes(q)).slice(0,15);if(!q){r.innerHTML='';r.classList.remove('show');return}r.innerHTML=rows.length?rows.map(p=>`<button type="button" onclick="addDermedListProduct('${attr(p.id)}')"><strong>${esc(p.name)}</strong><div class="muted">Product ID: ${esc(p.product_code)} · ${money(p.price)} · Stock: ${productStock(p.id)}</div></button>`).join(''):'<div class="muted" style="padding:12px">No product found.</div>';r.classList.add('show')});bind('dermedListServiceSearch','dermedListServiceResults',()=>{const q=$("dermedListServiceSearch").value.trim().toLowerCase(),r=$("dermedListServiceResults"),rows=services.filter(x=>(`${x.service_code||''} ${x.name||''}`).toLowerCase().includes(q)).slice(0,15);if(!q){r.innerHTML='';r.classList.remove('show');return}r.innerHTML=rows.length?rows.map(x=>`<button type="button" onclick="addDermedListService('${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">Service ID: ${esc(x.service_code)} · ${esc(x.service_type||'')} · ${money(x.price)}</div></button>`).join(''):'<div class="muted" style="padding:12px">No service found.</div>';r.classList.add('show')})}
+async function addDermedListCustomer(){const name=prompt('Customer Name');if(name===null)return;const phone=prompt('Phone Number');if(phone===null)return;if(!name.trim()||!phone.trim()){alert('Customer Name and Phone Number are required.');return}try{const r=await sb.from('medifella_customers').insert({customer_code:genId('C',customers,'customer_code'),name:name.trim(),phone:phone.trim()}).select().single();if(r.error)throw r.error;customers.unshift(r.data);chooseDermedListBuyer('customer',r.data.id);renderCustomerList()}catch(e){alert(e.message||'Could not add customer.')}}
+async function saveDermedListSale(){clearMsg($("dermedListStatus"));dermedListSetDate();const bt=$("dermedListBuyerType").value,bid=$("dermedListBuyerId").value,buyer=bt==='student'?students.find(x=>String(x.id)===String(bid)):customers.find(x=>String(x.id)===String(bid)),pa=window.dermedListProducts||[],sa=window.dermedListServices||[];if(!buyer){msg($("dermedListStatus"),'Please select a Student or Customer.',true);return}if(!pa.length&&!sa.length){msg($("dermedListStatus"),'Add at least one product or service.',true);return}for(const x of pa)if(Number(x.quantity)>productStock(x.product_id)){msg($("dermedListStatus"),`Not enough stock for ${x.name}. Available: ${productStock(x.product_id)}.`,true);return}const sub=pa.reduce((n,x)=>n+dermedLineSubtotal(x),0)+sa.reduce((n,x)=>n+dermedLineSubtotal(x),0),dtp=$("dermedListOverallDiscountType").value,dv=parseMoneyInput($("dermedListOverallDiscountValue").value),disc=dtp==='percent'?Math.min(sub,sub*dv/100):Math.min(sub,dv),initial=Math.max(0,sub-disc),ps=$("dermedListPaymentStatus").value;let paid=parseMoneyInput($("dermedListAmountPaidNow").value);if(ps==='Paid')paid=initial;if(ps==='Due')paid=0;if(ps==='Partial'&&(paid<=0||paid>=initial-0.005)){msg($("dermedListStatus"),'Partial Payment must be greater than $0 and less than the Initial Total.',true);return}if(ps==='Paid'&&paid+0.005<initial){msg($("dermedListStatus"),'Paid status requires the full Initial Total.',true);return}const dt=$("dermedListDate").value,date=saleDateForDb(dt),time=saleTimeForDb(dt),ref=$("dermedListReference").value||dermedListReference();const payload={reference_no:ref,sale_type:'DERMED',sale_date:date,sale_time:time,student_id:bt==='student'?String(bid):null,student_name:buyer.full_name||buyer.name||'',student_phone:buyer.phone||'',customer_id:bt==='customer'?String(bid):null,customer_type:bt,subtotal:sub,discount:disc,shipping:0,grand_total:initial,paid,balance:Math.max(0,initial-paid),payment_status:saleStatus(initial,paid),sale_status:'Completed',items:pa.map(x=>({...x,unit_price:+x.price||0,subtotal:dermedLineSubtotal(x),discount_percent:x.discount_type==='percent'?parseMoneyInput(x.discount_value):0,discount_amount:dermedLineDiscount(+x.price*+x.quantity,x.discount_type,x.discount_value)})),service_items:sa.map(x=>({...x,subtotal:dermedLineSubtotal(x),discount_percent:x.discount_type==='percent'?parseMoneyInput(x.discount_value):0,discount_amount:dermedLineDiscount(+x.price*+x.quantity,x.discount_type,x.discount_value)})),service_total:sa.reduce((n,x)=>n+dermedLineSubtotal(x),0),notes:$("dermedListNote").value.trim(),sale_staff_id:null,sale_staff_name:adminUser?.full_name||adminUser?.username||''};try{const r=await sb.from('medifella_sales').insert({...payload,created_by:adminUser.id}).select().single();if(r.error)throw r.error;if(paid>0){const pe=await sb.from('medifella_sale_payments').insert({sale_id:String(r.data.id),amount:paid,payment_method:$("dermedListPaymentMethod").value,payment_date:date,note:ps==='Partial'?'Partial Payment':'Paid in Full',created_by:adminUser.id});if(pe.error)throw pe.error}const moves=pa.map(x=>({product_id:x.product_id,movement_type:'sale',quantity:+x.quantity,staff_id:null,staff_name:adminUser?.full_name||adminUser?.username||'',stock_time:dt,created_by:adminUser.id,sale_id:r.data.id,notes:'DERMED'}));if(moves.length){const mr=await sb.from('medifella_inventory_movements').insert(moves);if(mr.error)throw mr.error}msg($("dermedListStatus"),`Dermed sale saved. Invoice ${ref}.`);resetDermedListSale();await loadSales();await loadStockMovements();showSaleInvoice(r.data.id,'A4')}catch(e){msg($("dermedListStatus"),e.message||'Could not save Dermed sale.',true)}}
+
+function renderDermedSales(){
+ const box=$("dermedSalesList");
+ if(!box)return;
+ const q=($("dermedListSearch")?.value||"").toLowerCase();
+ const filter=$("dermedListPaymentFilter")?.value||"all";
+ const rows=salesRecords
+  .filter(x=>String(x.sale_type||"").toUpperCase()==="DERMED")
+  .filter(s=>{
+    const total=saleTotal(s), paid=salePaid(s), status=saleStatus(total,paid);
+    const hay=[saleRef(s)||"",saleCustomer(s)||"",saleField(s,["student_phone","phone"],""),JSON.stringify(s.items||[]),JSON.stringify(s.service_items||[])].join(" ").toLowerCase();
+    return (filter==="all"||status===filter)&&hay.includes(q);
+  });
+ const total=rows.reduce((a,s)=>a+saleTotal(s),0);
+ const paid=rows.reduce((a,s)=>a+salePaid(s),0);
+ $("dermedListMetricSales").textContent=rows.length;
+ $("dermedListMetricPaid").textContent=money(paid);
+ $("dermedListMetricBalance").textContent=money(Math.max(0,total-paid));
+ $("dermedListMetricDue").textContent=rows.filter(s=>saleStatus(saleTotal(s),salePaid(s))!=="Paid").length;
+ box.innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date / Time</th><th>Reference</th><th>Student / Customer</th><th>Products / Services</th><th>Total</th><th>Paid</th><th>Due</th><th>Status</th><th>Action</th></tr>${rows.map(s=>{
+   const t=saleTotal(s), p=salePaid(s), b=Math.max(0,t-p), st=saleStatus(t,p);
+   const badge=st==="Paid"?"verified":st==="Partial"?"pending":"rejected";
+   const dt=saleDateValue(s), tm=saleField(s,["sale_time","time"],"");
+   const productsText=formatSaleItems(saleItemsValue(s));
+   const servicesText=Array.isArray(s.service_items)?s.service_items.map(x=>x.name).join(", "):"";
+   return `<tr><td>${esc(String(dt).slice(0,10))}${tm?`<div class="muted">${esc(String(tm).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(productsText)}${servicesText?`<div class="muted">${esc(servicesText)}</div>`:""}</td><td>${money(t)}</td><td>${money(p)}</td><td>${money(b)}</td><td><span class="badge ${badge}">${st==="Partial"?"Partial Payment":esc(st)}</span></td><td><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4');return false;">View Invoice</button>${b>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</td></tr>`;
+ }).join("")}</table></div>`:'<p class="muted">No Dermed sales found.</p>';
+}
+function resetDermedSaleListToggle(){const f=$("dermedSaleForm"),b=$("toggleDermedSaleForm");if(!f||!b)return;b.onclick=()=>{const hidden=f.classList.toggle('hidden');b.setAttribute('aria-expanded',String(!hidden));b.textContent=hidden?'Show Add Dermed Sale ▼':'Hide Add Dermed Sale ▲'}}
 
 $("stockProductSearch").oninput=renderProductSearchResults;
-$("productSearch").oninput=renderProductList;$("productRefresh").onclick=loadProducts;$("stockSearch").oninput=renderStockList;$("stockRefresh").onclick=loadStockMovements;
+$("productSearch").oninput=renderProductList;$("productRefresh").onclick=loadProducts;
+$("stockSearch").oninput=renderStockList;$("stockRefresh").onclick=loadStockMovements;
 $("stockReportType").onchange=renderStockReport;$("stockReportDate").onchange=renderStockReport;$("stockReportRefresh").onclick=renderStockReport;
 $("staffInfoSearch").oninput=renderStaffInfoList;$("staffInfoRefresh").onclick=loadStaffInfo;$("customerSearch").oninput=renderCustomerList;$("customerRefresh").onclick=loadCustomers;$("serviceSearch").oninput=renderServiceList;$("serviceRefresh").onclick=loadServices;
-$("mtsBuyerSearch").oninput=()=>renderBuyerControls(false);$("dermedBuyerSearch").oninput=()=>renderBuyerControls(false);
-$("mtsProductSearch").oninput=()=>productPicker("mts",false);$("dermedProductSearch").oninput=()=>productPicker("dermed",false);$("dermedServiceSearch").oninput=()=>renderServiceControls(false);
 setupInventorySearchPickers();
-$("saveMtsSale").onclick=()=>saveInventorySale("mts");$("saveDermedSale").onclick=()=>saveInventorySale("dermed");$("clearMtsSale").onclick=()=>resetNewInventorySale("mts");$("clearDermedSale").onclick=()=>resetNewInventorySale("dermed");
-$("mtsSaleSearch").oninput=renderMtsSales;$("dermedSaleSearch").oninput=renderDermedSales;$("mtsSalesRefresh").onclick=loadSales;$("dermedSalesRefresh").onclick=loadSales;
-$("stockTimeDisplay").value=phTime().replace("T"," ");$("stockTime").value=phTime();$("stockReportDate").value=new Date().toISOString().slice(0,10);setAutoTime("mtsSaleTime");setAutoTime("dermedSaleTime");
-
-async function addCustomerFromSale(type){
- const name=prompt("Customer Name");if(name===null)return;const phone=prompt("Phone Number");if(phone===null)return;
- if(!name.trim()||!phone.trim()){alert("Customer Name and Phone Number are required.");return}
- try{const r=await sb.from("medifella_customers").insert({customer_code:genId("C",customers,"customer_code"),name:name.trim(),phone:phone.trim()}).select().single();if(r.error)throw r.error;customers.unshift(r.data);chooseBuyer(type,"customer",r.data.id);renderCustomerList()}catch(e){alert(e.message||"Could not add customer.")}
-}
-$("mtsNewCustomer").onclick=()=>addCustomerFromSale("mts");$("dermedNewCustomer").onclick=()=>addCustomerFromSale("dermed");
+$("saveMtsSale").onclick=()=>saveInventorySale("mts");$("clearMtsSale").onclick=()=>resetNewInventorySale("mts");
+$("mtsSalesRefresh").onclick=loadSales;$("mtsSaleSearch").oninput=renderMtsSales;
+setupDermedListPickers();resetDermedSaleListToggle();resetDermedListSale();
+$("dermedListOverallDiscountType").onchange=updateDermedListTotals;$("dermedListOverallDiscountValue").oninput=updateDermedListTotals;$("dermedListPaymentStatus").onchange=updateDermedListTotals;$("dermedListAmountPaidNow").oninput=updateDermedListTotals;
+$("saveDermedListSale").onclick=saveDermedListSale;$("cancelDermedListSale").onclick=resetDermedListSale;
+$("dermedListSearch").oninput=renderDermedSales;$("dermedListPaymentFilter").onchange=renderDermedSales;$("dermedListRefresh").onclick=loadSales;
+$("stockTimeDisplay").value=phTime().replace("T"," ");$("stockTime").value=phTime();$("stockReportDate").value=new Date().toISOString().slice(0,10);setAutoTime("mtsSaleTime");
 
 setupSaleCoursePicker();
 
