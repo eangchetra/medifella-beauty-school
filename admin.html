@@ -3827,9 +3827,9 @@ function showSaleInvoice(id,size="A4"){
  $("invoiceOverlay").classList.remove("preview-a4","preview-a5");
  $("invoiceOverlay").classList.add(size==="A5"?"preview-a5":"preview-a4");
 
- $("invoicePrint").innerHTML=`<div class="mf-invoice">
+ $("invoicePrint").innerHTML=`<div class="mf-invoice" data-sale-type="${esc(saleType)}">
    <div class="mf-invoice-top">
-     <div><img class="mf-invoice-logo" style="width:320px;height:310px;max-width:none;max-height:none;object-fit:contain;display:block" src="${logoData}" alt="Dermed Beauty Center Logo"></div>
+     <div><img class="mf-invoice-logo" style="width:${isDermedSale?200:150}px;height:${isDermedSale?200:150}px;max-width:none;max-height:none;object-fit:contain;display:block" src="${logoData}" alt="${esc(invoiceBrand.en)} Logo"></div>
      <div class="mf-school-head">
        <div class="mf-school-kh" style="color:${invoiceBrand.color} !important">${esc(invoiceBrand.kh)}</div>
        <div class="mf-school-en" style="color:${invoiceBrand.color} !important">${esc(invoiceBrand.en)}</div>
@@ -4243,7 +4243,7 @@ async function printInvoice(id,size="A4"){
 #invoiceOverlay .mf-invoice .mf-invoice-label,
 #invoicePrint .mf-invoice-label,
 #invoiceExportContent .mf-invoice-label{
-  border-top-color:#C9901E !important;
+  border-top-color:currentColor !important;
 }
 /* Keep the larger logo proportional on A5 */
 #invoiceOverlay.preview-a5 .mf-invoice .mf-invoice-logo,
@@ -6747,6 +6747,20 @@ document.addEventListener("DOMContentLoaded",function(){
   color:#46C3D9 !important;
 }
 #invoicePrint .mf-invoice-label{
+  border-top-color:#46C3D9 !important;
+}
+</style>
+
+
+<style id="medifella-invoice-render-final-v24">
+/* Actual rendered Medi Fella invoice: Sea Blue from the school logo */
+#invoicePrint .mf-invoice[data-sale-type]:not([data-sale-type="DERMED"]) .mf-school-kh,
+#invoicePrint .mf-invoice[data-sale-type]:not([data-sale-type="DERMED"]) .mf-school-en,
+#invoicePrint .mf-invoice[data-sale-type]:not([data-sale-type="DERMED"]) .mf-invoice-label .kh,
+#invoicePrint .mf-invoice[data-sale-type]:not([data-sale-type="DERMED"]) .mf-invoice-label .en{
+  color:#46C3D9 !important;
+}
+#invoicePrint .mf-invoice[data-sale-type]:not([data-sale-type="DERMED"]) .mf-invoice-label{
   border-top-color:#46C3D9 !important;
 }
 </style>
