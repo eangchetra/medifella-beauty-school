@@ -6669,3 +6669,42 @@ document.addEventListener("DOMContentLoaded",function(){
   gap:10px!important;align-items:start!important;
 }
 </style>
+
+
+<style id="listsale-branding-v20">
+/* Regular / List Sale invoice: 150 x 150 logo */
+#invoicePrint.invoice-preview-a4 .mf-invoice-logo,
+#invoicePrint.invoice-print-a4 .mf-invoice-logo,
+#invoicePrint.invoice-preview-a5 .mf-invoice-logo,
+#invoicePrint.invoice-print-a5 .mf-invoice-logo{
+  width:150px!important;
+  height:150px!important;
+  min-width:150px!important;
+  min-height:150px!important;
+  max-width:150px!important;
+  max-height:150px!important;
+  object-fit:contain!important;
+  display:block!important;
+}
+
+/* Keep enough space for the 150px school logo */
+#invoicePrint.invoice-preview-a4 .mf-invoice-top,
+#invoicePrint.invoice-print-a4 .mf-invoice-top,
+#invoicePrint.invoice-preview-a5 .mf-invoice-top,
+#invoicePrint.invoice-print-a5 .mf-invoice-top{
+  grid-template-columns:165px minmax(0,1fr)!important;
+  gap:10px!important;
+  align-items:start!important;
+}
+
+/* Medi Fella school name + INVOICE follow the school logo color */
+#invoicePrint .mf-school-kh,
+#invoicePrint .mf-school-en,
+#invoicePrint .mf-invoice-label .kh,
+#invoicePrint .mf-invoice-label .en{
+  color:#C9901E!important;
+}
+#invoicePrint .mf-invoice-label{
+  border-top-color:#C9901E!important;
+}
+</style>
