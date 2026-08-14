@@ -5469,16 +5469,16 @@ boot();
     var i=el("dermedBuyerSearch"),b=el("dermedBuyerResults");if(!i||!b)return;
     var q=norm(i.value);if(!q){hide(b);if(el("dermedBuyerType"))el("dermedBuyerType").value="";if(el("dermedBuyerId"))el("dermedBuyerId").value="";return}
     var rows=[];
-    (window.students||[]).filter(function(x){return norm((x.student_id||"")+" "+(x.full_name||"")+" "+(x.full_name_km||"")+" "+(x.phone||"")).indexOf(q)>=0}).slice(0,10).forEach(function(x){rows.push({t:"student",id:x.id,code:x.student_id,name:x.full_name||x.full_name_km||"Student",phone:x.phone||""})});
-    (window.customers||[]).filter(function(x){return norm((x.customer_code||"")+" "+(x.name||"")+" "+(x.phone||"")).indexOf(q)>=0}).slice(0,10).forEach(function(x){rows.push({t:"customer",id:x.id,code:x.customer_code,name:x.name||"Customer",phone:x.phone||""})});
+    students.filter(function(x){return norm((x.student_id||"")+" "+(x.full_name||"")+" "+(x.full_name_km||"")+" "+(x.phone||"")).indexOf(q)>=0}).slice(0,10).forEach(function(x){rows.push({t:"student",id:x.id,code:x.student_id,name:x.full_name||x.full_name_km||"Student",phone:x.phone||""})});
+    customers.filter(function(x){return norm((x.customer_code||"")+" "+(x.name||"")+" "+(x.phone||"")).indexOf(q)>=0}).slice(0,10).forEach(function(x){rows.push({t:"customer",id:x.id,code:x.customer_code,name:x.name||"Customer",phone:x.phone||""})});
     b.innerHTML=rows.length?rows.map(function(x){return '<button type="button" data-bt="'+escL(x.t)+'" data-bi="'+escL(x.id)+'"><strong>'+escL(x.name)+'</strong><div class="muted">'+escL(x.t)+' · '+escL(x.code||"")+' · '+escL(x.phone||"")+'</div></button>'}).join(""):'<div class="muted" style="padding:10px">No student/customer found.</div>';
     show(b);
   }
   function item(){
     var i=el("dermedItemSearch"),b=el("dermedItemResults");if(!i||!b)return;
     var q=norm(i.value);if(!q){hide(b);return}
-    var ps=(window.products||[]).filter(function(x){return norm((x.product_code||"")+" "+(x.name||"")).indexOf(q)>=0}).slice(0,10);
-    var ss=(window.services||[]).filter(function(x){return norm((x.service_code||"")+" "+(x.name||"")+" "+(x.service_type||"")).indexOf(q)>=0}).slice(0,10);
+    var ps=products.filter(function(x){return norm((x.product_code||"")+" "+(x.name||"")).indexOf(q)>=0}).slice(0,10);
+    var ss=services.filter(function(x){return norm((x.service_code||"")+" "+(x.name||"")+" "+(x.service_type||"")).indexOf(q)>=0}).slice(0,10);
     var h="";
     if(ps.length){h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">PRODUCTS</div>';h+=ps.map(function(x){return '<button type="button" data-pid="'+escL(x.id)+'"><strong>'+escL(x.name)+'</strong><div class="muted">Product · '+escL(x.product_code||"")+' · '+moneyL(x.price)+' · Stock: '+(typeof productStock==="function"?productStock(x.id):"")+'</div></button>'}).join("")}
     if(ss.length){h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">SERVICES</div>';h+=ss.map(function(x){return '<button type="button" data-sid="'+escL(x.id)+'"><strong>'+escL(x.name)+'</strong><div class="muted">Service · '+escL(x.service_code||"")+' · '+escL(x.service_type||"")+' · '+moneyL(x.price)+'</div></button>'}).join("")}
@@ -5495,7 +5495,7 @@ boot();
 <script id="dermed-reference-display">
 document.addEventListener("DOMContentLoaded",function(){
  var x=document.getElementById("dermedReferenceNo");if(!x)return;
- var max=0;(window.salesRecords||[]).forEach(function(r){var m=String(r.reference_no||"").match(/^DERMED-(\d{4})-(\d+)$/);if(m)max=Math.max(max,Number(m[2]))});
+ var max=0;salesRecords.forEach(function(r){var m=String(r.reference_no||"").match(/^DERMED-(\d{4})-(\d+)$/);if(m)max=Math.max(max,Number(m[2]))});
  x.value="DERMED-"+new Date().getFullYear()+"-"+String(max+1).padStart(4,"0");
 });
 </script>
