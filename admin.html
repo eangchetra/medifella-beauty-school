@@ -5443,12 +5443,39 @@ $("saveMtsSale").onclick=()=>saveInventorySale("mts");$("saveDermedSale").onclic
 $("mtsSaleSearch").oninput=renderMtsSales;$("dermedSaleSearch").oninput=renderDermedSales;$("mtsSalesRefresh").onclick=loadSales;$("dermedSalesRefresh").onclick=loadSales;
 $("stockTimeDisplay").value=phTime().replace("T"," ");$("stockTime").value=phTime();if($("stockReportDate"))$("stockReportDate").value=new Date().toISOString().slice(0,10);setAutoTime("mtsSaleTime");setAutoTime("dermedSaleTime");
 
-async function addCustomerFromSale(type){
- const name=prompt("Customer Name");if(name===null)return;const phone=prompt("Phone Number");if(phone===null)return;
- if(!name.trim()||!phone.trim()){alert("Customer Name and Phone Number are required.");return}
- try{const r=await sb.from("medifella_customers").insert({customer_code:genId("C",customers,"customer_code"),name:name.trim(),phone:phone.trim()}).select().single();if(r.error)throw r.error;customers.unshift(r.data);chooseBuyer(type,"customer",r.data.id);renderCustomerList()}catch(e){alert(e.message||"Could not add customer.")}
+let saleCustomerTargetType="dermed";
+function openSaleCustomerForm(type){
+ saleCustomerTargetType=type||"dermed";
+ $("saleCustomerName").value="";
+ $("saleCustomerPhone").value="";
+ $("saleCustomerStatus").textContent="";
+ $("saleCustomerModal").style.display="flex";
+ setTimeout(()=>$("saleCustomerName").focus(),50);
 }
-$("mtsNewCustomer").onclick=()=>addCustomerFromSale("mts");$("dermedNewCustomer").onclick=()=>addCustomerFromSale("dermed");
+function closeSaleCustomerForm(){ $("saleCustomerModal").style.display="none"; }
+async function saveSaleCustomer(){
+ const name=$("saleCustomerName").value.trim(),phone=$("saleCustomerPhone").value.trim(),status=$("saleCustomerStatus");
+ if(!name||!phone){status.textContent="Customer Name and Phone Number are required.";return}
+ if(!confirm("Add this customer to Customer List?\\n\\nName: "+name+"\\nPhone: "+phone))return;
+ try{
+   status.textContent="Saving...";
+   const r=await sb.from("medifella_customers").insert({
+     customer_code:genId("C",customers,"customer_code"),
+     name:name,phone:phone
+   }).select().single();
+   if(r.error)throw r.error;
+   customers.unshift(r.data);
+   renderCustomerList();
+   chooseBuyer(saleCustomerTargetType,"customer",r.data.id);
+   closeSaleCustomerForm();
+ }catch(e){status.textContent=e.message||"Could not add customer."; }
+}
+$("mtsNewCustomer").onclick=()=>openSaleCustomerForm("mts");
+$("dermedNewCustomer").onclick=()=>openSaleCustomerForm("dermed");
+$("saleCustomerSave").onclick=saveSaleCustomer;
+$("saleCustomerCancel").onclick=closeSaleCustomerForm;
+$("saleCustomerModal").addEventListener("click",e=>{if(e.target.id==="saleCustomerModal")closeSaleCustomerForm()});
+
 
 setupSaleCoursePicker();
 
@@ -5563,6 +5590,35 @@ document.addEventListener("DOMContentLoaded",function(){
   });
 })();
 </script>
+
+<div id="saleCustomerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:200000;align-items:center;justify-content:center;padding:20px">
+  <div class="card" style="width:min(560px,96vw);background:#fff;box-shadow:0 18px 50px rgba(0,0,0,.25);border-radius:14px">
+    <h2>Add New Customer</h2>
+    <label>Customer Name *</label>
+    <input id="saleCustomerName" autocomplete="name" placeholder="Enter customer name">
+    <label>Phone Number *</label>
+    <input id="saleCustomerPhone" autocomplete="tel" placeholder="Enter phone number">
+    <div class="actions" style="margin-top:14px">
+      <button id="saleCustomerSave" class="gold" type="button">Save Customer</button>
+      <button id="saleCustomerCancel" class="light" type="button">Cancel</button>
+    </div>
+    <div id="saleCustomerStatus"></div>
+  </div>
+</div>
+
+
+<script id="sale-customer-form-keyboard">
+document.addEventListener("DOMContentLoaded",function(){
+ const n=document.getElementById("saleCustomerName"),p=document.getElementById("saleCustomerPhone");
+ if(n&&p){
+   [n,p].forEach(x=>x.addEventListener("keydown",function(e){
+     if(e.key==="Escape")closeSaleCustomerForm();
+     if(e.key==="Enter"){e.preventDefault();saveSaleCustomer();}
+   }));
+ }
+});
+</script>
+
 </body>
 </html>
 
