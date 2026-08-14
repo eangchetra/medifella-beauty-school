@@ -2406,7 +2406,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div class="card"><h2>Add New Service</h2><input type="hidden" id="serviceEditId">
 <label>Name of Service *</label><input id="serviceName">
 <label>Type *</label><select id="serviceType"><option>Service With Product</option><option>Only Service</option></select>
-<label>Price (USD) *</label><input id="servicePrice" type="number" min="0" step="0.01">
+<label>Price (USD) *</label><input id="servicePrice" type="text" inputmode="decimal" autocomplete="off" placeholder="e.g. 0.01, 10, 50.50" oninput="this.value=this.value.replace(/[^0-9.]/g,'').replace(/(\..*)\./g,'$1')">
 <div class="actions" style="margin-top:14px"><button id="saveService" class="gold">Save Service</button><button id="clearService" class="light">Clear</button></div><div id="serviceStatus"></div></div>
 <div class="card"><h2>Service List</h2><div class="toolbar"><input id="serviceSearch" placeholder="Search Service ID or Service Name"><button id="serviceRefresh" class="light">Refresh</button></div><div id="serviceList">Loading...</div></div>
 </div>
@@ -5337,7 +5337,7 @@ function editCustomer(id){const x=customers.find(x=>String(x.id)===String(id));i
 async function deleteCustomer(id){if(!confirm("Delete this customer?"))return;const r=await sb.from("medifella_customers").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadCustomers()}
 $("clearCustomer").onclick=clearCustomerForm;
 
-$("saveService").onclick=async()=>{clearMsg($("serviceStatus"));const id=$("serviceEditId").value,name=$("serviceName").value.trim(),service_type=$("serviceType").value,price=Number($("servicePrice").value||0);if(!name||price<0){msg($("serviceStatus"),"Service Name and Price are required.",true);return}try{const payload={name,service_type,price};let r=id?await sb.from("medifella_services").update(payload).eq("id",id):await sb.from("medifella_services").insert({...payload,service_code:genId("SV",services,"service_code")});if(r.error)throw r.error;msg($("serviceStatus"),id?"Service updated.":"Service added.");clearServiceForm();await loadServices()}catch(e){msg($("serviceStatus"),e.message,true)}};
+$("saveService").onclick=async()=>{clearMsg($("serviceStatus"));const id=$("serviceEditId").value,name=$("serviceName").value.trim(),service_type=$("serviceType").value,rawPrice=$("servicePrice").value.trim(),price=Number(rawPrice);if(!name||rawPrice===""||!Number.isFinite(price)||price<0){msg($("serviceStatus"),"Service Name and Price are required.",true);return}try{const payload={name,service_type,price};let r=id?await sb.from("medifella_services").update(payload).eq("id",id):await sb.from("medifella_services").insert({...payload,service_code:genId("SV",services,"service_code")});if(r.error)throw r.error;msg($("serviceStatus"),id?"Service updated.":"Service added.");clearServiceForm();await loadServices()}catch(e){msg($("serviceStatus"),e.message,true)}};
 function clearServiceForm(){$("serviceEditId").value="";$("serviceName").value="";$("serviceType").value="Service With Product";$("servicePrice").value=""}
 function editService(id){const x=services.find(x=>String(x.id)===String(id));if(!x)return;$("serviceEditId").value=x.id;$("serviceName").value=x.name||"";$("serviceType").value=x.service_type||"Only Service";$("servicePrice").value=x.price??""}
 async function deleteService(id){if(!confirm("Delete this service?"))return;const r=await sb.from("medifella_services").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadServices()}
