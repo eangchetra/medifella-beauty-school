@@ -5472,47 +5472,45 @@ async function saveSaleCustomer(){
   status.textContent = "Saving customer...";
 
   try{
+    // IMPORTANT: use the exact same insert pattern as Customer Management.
+    // Do NOT require .select().single() after INSERT, because an RLS
+    // SELECT policy can otherwise make a successful INSERT look like a failure.
     const customerCode = genId("C", customers, "customer_code");
-    const result = await sb.from("medifella_customers")
-      .insert({customer_code: customerCode, name: name, phone: phone})
-      .select("*")
-      .single();
+    const result = await sb.from("medifella_customers").insert({
+      name: name,
+      phone: phone,
+      customer_code: customerCode
+    });
 
     if(result.error) throw result.error;
-    if(!result.data || !result.data.id) throw new Error("Customer was not returned after saving.");
 
-    const savedCustomer = result.data;
+    // Reload the authoritative Customer List from Supabase.
+    await loadCustomers();
 
-    // Update the local customer list immediately.
-    const i = customers.findIndex(x => String(x.id) === String(savedCustomer.id));
-    if(i >= 0) customers[i] = savedCustomer;
-    else customers.unshift(savedCustomer);
+    // Find the newly-created customer and select it in this sale.
+    const savedCustomer = customers.find(x =>
+      String(x.name||"").trim() === name &&
+      String(x.phone||"").trim() === phone
+    ) || customers.find(x =>
+      String(x.customer_code||"").trim() === customerCode
+    );
 
-    // Refresh Customer Management's visible list.
-    if(typeof renderCustomerList === "function") renderCustomerList();
-
-    // If the page has a customer loader, refresh from the database.
-    if(typeof loadCustomers === "function"){
-      await loadCustomers();
-    }
-
-    // Automatically select the newly saved customer for this Dermed Sale.
-    if(typeof chooseBuyer === "function"){
+    if(savedCustomer && typeof chooseBuyer === "function"){
       chooseBuyer(saleCustomerTargetType, "customer", savedCustomer.id);
-    }else{
-      if($("dermedBuyerSearch")) $("dermedBuyerSearch").value = savedCustomer.name || name;
-      if($("dermedBuyerType")) $("dermedBuyerType").value = "customer";
-      if($("dermedBuyerId")) $("dermedBuyerId").value = savedCustomer.id;
+    }else if(savedCustomer){
+      if($("dermedBuyerSearch")) $("dermedBuyerSearch").value=savedCustomer.name||name;
+      if($("dermedBuyerType")) $("dermedBuyerType").value="customer";
+      if($("dermedBuyerId")) $("dermedBuyerId").value=savedCustomer.id;
     }
 
     closeSaleCustomerForm();
     alert("Customer saved successfully to Customer List.");
   }catch(e){
-    console.error("Save customer error:", e);
+    console.error("Dermed Sale customer save error:",e);
     status.textContent = "Could not save customer: " + (e.message || "Unknown error");
-    alert("Could not save customer.\n\n" + (e.message || "Unknown error"));
+    alert("Customer was NOT saved.\n\n" + (e.message || "Unknown error"));
   }finally{
-    btn.disabled = false;
+    btn.disabled=false;
   }
 }
 $("mtsNewCustomer").onclick=()=>openSaleCustomerForm("mts");
