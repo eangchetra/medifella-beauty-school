@@ -2802,6 +2802,13 @@ document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{
    if(b.dataset.section==="products") renderProductList();
    if(b.dataset.section==="mtsSale") renderMtsSales();
    if(b.dataset.section==="dermedSale") renderDermedSales();
+   if(b.dataset.section==="mtsSale" || b.dataset.section==="dermedSale"){
+     const saleType=b.dataset.section==="dermedSale"?"dermed":"mts";
+     setAutoTime(saleType+"SaleTime");
+     renderBuyerControls(true);
+     productPicker(saleType,true);
+     if(saleType==="dermed") renderServiceControls(true);
+   }
  }
 });
 
@@ -5161,30 +5168,49 @@ function renderInventoryControls(){
  if($("stockStaff"))$("stockStaff").innerHTML='<option value="">Select staff</option>'+staffInfoRecords.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
  ["mtsSaleStaff","dermedSaleStaff"].forEach(id=>{if($(id))$(id).innerHTML='<option value="">Select staff</option>'+staffInfoRecords.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("")});
 }
-function renderBuyerControls(){
+function renderBuyerControls(showWhenEmpty=false){
  ["mts","dermed"].forEach(type=>{
    const input=$(type+"BuyerSearch"), results=$(type+"BuyerResults"); if(!input||!results)return;
    const q=(input.value||"").toLowerCase().trim();
    const arr=[];
    students.filter(x=>(`${x.student_id||""} ${x.full_name||""} ${x.phone||""}`).toLowerCase().includes(q)).slice(0,10).forEach(x=>arr.push({type:"student",id:x.id,code:x.student_id,name:x.full_name,phone:x.phone}));
    customers.filter(x=>(`${x.customer_code||""} ${x.name||""} ${x.phone||""}`).toLowerCase().includes(q)).slice(0,10).forEach(x=>arr.push({type:"customer",id:x.id,code:x.customer_code,name:x.name,phone:x.phone}));
-   results.innerHTML=arr.map(x=>`<button type="button" onclick="chooseBuyer('${type}','${attr(x.type)}','${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.type)} · ${esc(x.code||"")} · ${esc(x.phone||"")}</div></button>`).join("")||'<div class="muted" style="padding:10px">No student/customer found.</div>';
-   results.classList.toggle("show",!!q);
+   results.innerHTML=arr.map(x=>`<button type="button" onclick="chooseBuyer('${type}','${attr(x.type)}','${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.type==="student"?"Student":"Customer")} · ${esc(x.code||"")} · ${esc(x.phone||"")}</div></button>`).join("")||'<div class="muted" style="padding:10px">No student/customer found.</div>';
+   results.classList.toggle("show",!!q || showWhenEmpty);
  });
 }
-function renderServiceControls(){
+function renderServiceControls(showWhenEmpty=false){
  const input=$("dermedServiceSearch"),res=$("dermedServiceResults"); if(!input||!res)return;
  const q=(input.value||"").toLowerCase().trim();
  const rows=services.filter(x=>(`${x.service_code||""} ${x.name||""}`).toLowerCase().includes(q)).slice(0,15);
- res.innerHTML=rows.map(x=>`<button type="button" onclick="addDermedService('${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.service_code)} · ${esc(x.service_type)} · ${money(x.price)}</div></button>`).join("");
- res.classList.toggle("show",!!q);
+ res.innerHTML=rows.map(x=>`<button type="button" onclick="addDermedService('${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">Service ID: ${esc(x.service_code)} · ${esc(x.service_type)} · ${money(x.price)}</div></button>`).join("")||'<div class="muted" style="padding:10px">No service found.</div>';
+ res.classList.toggle("show",!!q || showWhenEmpty);
 }
-function productPicker(type){
+function productPicker(type,showWhenEmpty=false){
  const input=$(type+"ProductSearch"),res=$(type+"ProductResults"); if(!input||!res)return;
  const q=(input.value||"").toLowerCase().trim();
  const rows=products.filter(x=>(`${x.product_code||""} ${x.name||""}`).toLowerCase().includes(q)).slice(0,15);
- res.innerHTML=rows.map(x=>`<button type="button" onclick="addSaleProduct('${type}','${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code)} · ${money(x.price)} · Stock: ${productStock(x.id)}</div></button>`).join("")||'<div class="muted" style="padding:10px">No product found.</div>';
- res.classList.toggle("show",!!q);
+ res.innerHTML=rows.map(x=>`<button type="button" onclick="addSaleProduct('${type}','${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">Product ID: ${esc(x.product_code)} · ${money(x.price)} · Stock: ${productStock(x.id)}</div></button>`).join("")||'<div class="muted" style="padding:10px">No product found.</div>';
+ res.classList.toggle("show",!!q || showWhenEmpty);
+}
+function setupInventorySearchPickers(){
+ ["mts","dermed"].forEach(type=>{
+   const buyer=$(type+"BuyerSearch"), buyerResults=$(type+"BuyerResults");
+   if(buyer){
+     buyer.addEventListener("focus",()=>renderBuyerControls(true));
+     buyer.addEventListener("blur",()=>setTimeout(()=>buyerResults?.classList.remove("show"),180));
+   }
+   const product=$(type+"ProductSearch"), productResults=$(type+"ProductResults");
+   if(product){
+     product.addEventListener("focus",()=>productPicker(type,true));
+     product.addEventListener("blur",()=>setTimeout(()=>productResults?.classList.remove("show"),180));
+   }
+ });
+ const service=$("dermedServiceSearch"),serviceResults=$("dermedServiceResults");
+ if(service){
+   service.addEventListener("focus",()=>renderServiceControls(true));
+   service.addEventListener("blur",()=>setTimeout(()=>serviceResults?.classList.remove("show"),180));
+ }
 }
 function addSaleProduct(type,pid){
  const p=products.find(x=>String(x.id)===String(pid));if(!p)return;
@@ -5391,6 +5417,8 @@ function resetNewInventorySale(type){
  renderSaleProductRows(type);if(type==="dermed")renderDermedServices();
 }
 async function saveInventorySale(type){
+ // Refresh the automatic Phnom Penh transaction time immediately before saving.
+ setAutoTime(type+"SaleTime");
  const buyerType=$(type+"BuyerType").value,buyerId=$(type+"BuyerId").value,staffId=$(type+"SaleStaff").value,items=window[type+"SaleItems"]||[];
  const serviceItems=type==="dermed"?(window.dermedServiceItems||[]):[];
  if(!buyerType||!buyerId){msg($(type+"Status"),"Please select a Student or Customer.",true);return}
@@ -5428,8 +5456,9 @@ $("stockProductSearch").oninput=renderProductSearchResults;
 $("productSearch").oninput=renderProductList;$("productRefresh").onclick=loadProducts;$("stockSearch").oninput=renderStockList;$("stockRefresh").onclick=loadStockMovements;
 $("stockReportType").onchange=renderStockReport;$("stockReportDate").onchange=renderStockReport;$("stockReportRefresh").onclick=renderStockReport;
 $("staffInfoSearch").oninput=renderStaffInfoList;$("staffInfoRefresh").onclick=loadStaffInfo;$("customerSearch").oninput=renderCustomerList;$("customerRefresh").onclick=loadCustomers;$("serviceSearch").oninput=renderServiceList;$("serviceRefresh").onclick=loadServices;
-$("mtsBuyerSearch").oninput=renderBuyerControls;$("dermedBuyerSearch").oninput=renderBuyerControls;
-$("mtsProductSearch").oninput=()=>productPicker("mts");$("dermedProductSearch").oninput=()=>productPicker("dermed");$("dermedServiceSearch").oninput=renderServiceControls;
+$("mtsBuyerSearch").oninput=()=>renderBuyerControls(false);$("dermedBuyerSearch").oninput=()=>renderBuyerControls(false);
+$("mtsProductSearch").oninput=()=>productPicker("mts",false);$("dermedProductSearch").oninput=()=>productPicker("dermed",false);$("dermedServiceSearch").oninput=()=>renderServiceControls(false);
+setupInventorySearchPickers();
 $("saveMtsSale").onclick=()=>saveInventorySale("mts");$("saveDermedSale").onclick=()=>saveInventorySale("dermed");$("clearMtsSale").onclick=()=>resetNewInventorySale("mts");$("clearDermedSale").onclick=()=>resetNewInventorySale("dermed");
 $("mtsSaleSearch").oninput=renderMtsSales;$("dermedSaleSearch").oninput=renderDermedSales;$("mtsSalesRefresh").onclick=loadSales;$("dermedSalesRefresh").onclick=loadSales;
 $("stockTimeDisplay").value=phTime().replace("T"," ");$("stockTime").value=phTime();$("stockReportDate").value=new Date().toISOString().slice(0,10);setAutoTime("mtsSaleTime");setAutoTime("dermedSaleTime");
