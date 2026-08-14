@@ -1884,65 +1884,36 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 #dermedBuyerResults:empty,#dermedItemResults:empty{display:none!important}
 </style>
 
-<style id="dermed-invoice-logo-color-v8">
-/* Dermed Beauty Center invoice branding:
-   logo is 2x the previous displayed size; headings use the logo's gold tone. */
+<style id="dermed-invoice-logo-color-v9">
+/* FINAL DERMED INVOICE BRANDING */
+#invoicePrint .mf-invoice-logo{
+  width:140px !important;
+  height:140px !important;
+  max-width:none !important;
+  max-height:none !important;
+  object-fit:contain !important;
+}
 #invoicePrint .mf-school-kh,
 #invoicePrint .mf-school-en,
 #invoicePrint .mf-invoice-label .kh,
 #invoicePrint .mf-invoice-label .en{
   color:#C9901E !important;
 }
-
 #invoicePrint .mf-invoice-label{
   border-top-color:#C9901E !important;
 }
-
-@media screen {
-  #invoicePrint.invoice-preview-a4 .mf-invoice-top,
-  #invoicePrint.invoice-print-a4 .mf-invoice-top{
-    grid-template-columns:150px minmax(0,1fr) !important;
-    gap:10px !important;
-  }
-  #invoicePrint.invoice-preview-a4 .mf-invoice-logo,
-  #invoicePrint.invoice-print-a4 .mf-invoice-logo{
-    width:140px !important;
-    height:140px !important;
-    object-fit:contain !important;
-  }
-
-  #invoicePrint.invoice-preview-a5 .mf-invoice-top,
-  #invoicePrint.invoice-print-a5 .mf-invoice-top{
-    grid-template-columns:98px minmax(0,1fr) !important;
-    gap:7px !important;
-  }
-  #invoicePrint.invoice-preview-a5 .mf-invoice-logo,
-  #invoicePrint.invoice-print-a5 .mf-invoice-logo{
-    width:92px !important;
-    height:92px !important;
-    object-fit:contain !important;
-  }
+#invoicePrint .mf-invoice-top{
+  grid-template-columns:150px minmax(0,1fr) !important;
+  gap:10px !important;
 }
-
-@media print {
-  #invoicePrint.invoice-print-a4 .mf-invoice-top{
-    grid-template-columns:150px minmax(0,1fr) !important;
-    gap:10px !important;
-  }
-  #invoicePrint.invoice-print-a4 .mf-invoice-logo{
+@media print{
+  #invoicePrint .mf-invoice-logo{
     width:140px !important;
     height:140px !important;
-    object-fit:contain !important;
   }
-
-  #invoicePrint.invoice-print-a5 .mf-invoice-top{
-    grid-template-columns:98px minmax(0,1fr) !important;
-    gap:7px !important;
-  }
-  #invoicePrint.invoice-print-a5 .mf-invoice-logo{
-    width:92px !important;
-    height:92px !important;
-    object-fit:contain !important;
+  #invoicePrint .mf-invoice-top{
+    grid-template-columns:150px minmax(0,1fr) !important;
+    gap:10px !important;
   }
 }
 </style>
