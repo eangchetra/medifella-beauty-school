@@ -5454,21 +5454,66 @@ function openSaleCustomerForm(type){
 }
 function closeSaleCustomerForm(){ $("saleCustomerModal").style.display="none"; }
 async function saveSaleCustomer(){
- const name=$("saleCustomerName").value.trim(),phone=$("saleCustomerPhone").value.trim(),status=$("saleCustomerStatus");
- if(!name||!phone){status.textContent="Customer Name and Phone Number are required.";return}
- if(!confirm("Add this customer to Customer List?\\n\\nName: "+name+"\\nPhone: "+phone))return;
- try{
-   status.textContent="Saving...";
-   const r=await sb.from("medifella_customers").insert({
-     customer_code:genId("C",customers,"customer_code"),
-     name:name,phone:phone
-   }).select().single();
-   if(r.error)throw r.error;
-   customers.unshift(r.data);
-   renderCustomerList();
-   chooseBuyer(saleCustomerTargetType,"customer",r.data.id);
-   closeSaleCustomerForm();
- }catch(e){status.textContent=e.message||"Could not add customer."; }
+  const name = $("saleCustomerName").value.trim();
+  const phone = $("saleCustomerPhone").value.trim();
+  const status = $("saleCustomerStatus");
+
+  if(!name || !phone){
+    status.textContent = "Customer Name and Phone Number are required.";
+    return;
+  }
+
+  if(!confirm("Save this customer to Customer List?\n\nName: " + name + "\nPhone: " + phone)){
+    return;
+  }
+
+  const btn = $("saleCustomerSave");
+  btn.disabled = true;
+  status.textContent = "Saving customer...";
+
+  try{
+    const customerCode = genId("C", customers, "customer_code");
+    const result = await sb.from("medifella_customers")
+      .insert({customer_code: customerCode, name: name, phone: phone})
+      .select("*")
+      .single();
+
+    if(result.error) throw result.error;
+    if(!result.data || !result.data.id) throw new Error("Customer was not returned after saving.");
+
+    const savedCustomer = result.data;
+
+    // Update the local customer list immediately.
+    const i = customers.findIndex(x => String(x.id) === String(savedCustomer.id));
+    if(i >= 0) customers[i] = savedCustomer;
+    else customers.unshift(savedCustomer);
+
+    // Refresh Customer Management's visible list.
+    if(typeof renderCustomerList === "function") renderCustomerList();
+
+    // If the page has a customer loader, refresh from the database.
+    if(typeof loadCustomers === "function"){
+      await loadCustomers();
+    }
+
+    // Automatically select the newly saved customer for this Dermed Sale.
+    if(typeof chooseBuyer === "function"){
+      chooseBuyer(saleCustomerTargetType, "customer", savedCustomer.id);
+    }else{
+      if($("dermedBuyerSearch")) $("dermedBuyerSearch").value = savedCustomer.name || name;
+      if($("dermedBuyerType")) $("dermedBuyerType").value = "customer";
+      if($("dermedBuyerId")) $("dermedBuyerId").value = savedCustomer.id;
+    }
+
+    closeSaleCustomerForm();
+    alert("Customer saved successfully to Customer List.");
+  }catch(e){
+    console.error("Save customer error:", e);
+    status.textContent = "Could not save customer: " + (e.message || "Unknown error");
+    alert("Could not save customer.\n\n" + (e.message || "Unknown error"));
+  }finally{
+    btn.disabled = false;
+  }
 }
 $("mtsNewCustomer").onclick=()=>openSaleCustomerForm("mts");
 $("dermedNewCustomer").onclick=()=>openSaleCustomerForm("dermed");
