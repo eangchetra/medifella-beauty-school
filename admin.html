@@ -1946,7 +1946,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <aside class="side">
 <button class="nav active" data-section="dashboard">🏠 Dashboard</button>
 <button class="nav" data-section="students">👨‍🎓 Student Registration</button>
-<button class="nav" data-section="sales">🧾 List Sales</button>
+<button class="nav" data-section="sales">🧾 Medi Fella Sale</button>
 <button class="nav" data-section="mtsSale">🧾 MTS Sale</button>
 <button class="nav" data-section="dermedSale">🧾 Dermed Sale</button>
 <button class="nav" data-section="products">📦 Product Management</button>
@@ -2034,7 +2034,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
       <div>
         <label>Registration</label>
         <input type="text" value="Student information only" readonly>
-        <div class="muted" style="margin-top:5px">Course is selected later in List Sales. Photo can be uploaded now or later.</div>
+        <div class="muted" style="margin-top:5px">Course is selected later in Medi Fella Sale. Photo can be uploaded now or later.</div>
       </div>
     </div>
 
@@ -2075,7 +2075,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </div>
 <div class="row">
 <div><label>Student ID</label><input id="editStudentStudentId" readonly></div>
-<div><label>Course</label><input value="Assigned through List Sales" readonly></div>
+<div><label>Course</label><input value="Assigned through Medi Fella Sale" readonly></div>
 </div>
 <label>Address</label><textarea id="editStudentAddress" style="min-height:80px"></textarea>
 <label>Student Photo</label>
@@ -2636,7 +2636,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <label>Course Type *</label>
 <select id="courseType">
   <option value="online">Online Course — show on front end</option>
-  <option value="sales">Sales Course — selectable in List Sales</option>
+  <option value="sales">Sales Course — selectable in Medi Fella Sale</option>
 </select>
 <div class="muted" style="margin-top:5px">Online courses are for the public website. Sales courses are the courses staff can select when creating a sale.</div>
 <label>Course Name</label><input id="courseName"><label>Description</label><textarea id="courseDescription"></textarea>
@@ -2697,7 +2697,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div style="display:grid;gap:10px;margin-top:10px">
 <label style="font-weight:400"><input id="permDashboard" type="checkbox"> View Dashboard</label>
 <label style="font-weight:400"><input id="permStudents" type="checkbox"> Student Registration</label>
-<label style="font-weight:400"><input id="permSales" type="checkbox"> List Sales</label>
+<label style="font-weight:400"><input id="permSales" type="checkbox"> Medi Fella Sale</label>
 <label style="font-weight:400"><input id="permCertificates" type="checkbox"> Certificate Verification</label>
 <label style="font-weight:400"><input id="permPosts" type="checkbox"> News Feed</label>
 <label style="font-weight:400"><input id="permCourses" type="checkbox"> Course Management</label>
@@ -3206,7 +3206,7 @@ async function loadSales(){
    sb.from("medifella_sale_payments").select("*").order("created_at",{ascending:false})
  ]);
  if(sr.error){
-   $("salesList").innerHTML=`<p class="muted">Sales database is not ready yet. Run the List Sales SQL setup in Supabase SQL Editor first.</p><p class="error status">${esc(sr.error.message)}</p>`;
+   $("salesList").innerHTML=`<p class="muted">Sales database is not ready yet. Run the Medi Fella Sale SQL setup in Supabase SQL Editor first.</p><p class="error status">${esc(sr.error.message)}</p>`;
    salesRecords=[];salePayments=[];renderSaleStudentOptions();updateSalesMetrics();return;
  }
  salesRecords=sr.data||[];
@@ -3628,7 +3628,7 @@ function formatSaleItems(v){
 function renderSales(){
  const q=$("salesSearch").value.trim().toLowerCase(),f=$("salesPaymentFilter").value;
  const rows=salesRecords.filter(s=>{
-   // List Sale is for the regular sales list only.
+   // Medi Fella Sale is for the regular sales list only.
    // Dermed sales are shown separately under Dermed Sale.
    if(String(s.sale_type||"").toUpperCase()==="DERMED") return false;
    const total=saleTotal(s),paid=salePaid(s),status=saleStatus(total,paid);
@@ -3644,7 +3644,7 @@ function renderSales(){
 }
 
 function updateSalesMetrics(){
- // Keep List Sale totals consistent with the table: exclude Dermed sales.
+ // Keep Medi Fella Sale totals consistent with the table: exclude Dermed sales.
  const listSaleRecords=salesRecords.filter(s=>String(s.sale_type||"").toUpperCase()!=="DERMED");
  const total=listSaleRecords.reduce((a,s)=>a+saleTotal(s),0);
  const paid=listSaleRecords.reduce((a,s)=>a+salePaid(s),0);
@@ -5058,7 +5058,7 @@ function renderStaff(){
     const role=String(p.role||"staff").toLowerCase();
     const permissions=p.permissions||{};
     const labels=[
-      ["dashboard","Dashboard"],["students","Students"],["sales","List Sales"],["certificates","Certificates"],
+      ["dashboard","Dashboard"],["students","Students"],["sales","Medi Fella Sale"],["certificates","Certificates"],
       ["posts","News"],["courses","Courses"],["admins","Admin / Users"]
     ].filter(([k])=>permissions[k]).map(([,label])=>label);
     const summary=role==="admin" ? "Full administrator access" :
@@ -5212,7 +5212,7 @@ function courseType(c){return String(c.course_type||"sales").toLowerCase()==="on
 function courseTypeLabel(c){
   return courseType(c)==="online"
     ? '<span class="badge verified">Online Course · Front End</span>'
-    : '<span class="badge pending">Sales Course · List Sales</span>';
+    : '<span class="badge pending">Sales Course · Medi Fella Sale</span>';
 }
 function renderCourses(){
  $("courseList").innerHTML=courses.map(c=>`<div class="post">
@@ -6651,7 +6651,7 @@ document.addEventListener("DOMContentLoaded",function(){
 </style>
 
 <style id="invoice-brand-separation-v19">
-/* List Sale / regular invoice logo */
+/* Medi Fella Sale / regular invoice logo */
 #invoicePrint.invoice-preview-a4 .mf-invoice-logo,
 #invoicePrint.invoice-print-a4 .mf-invoice-logo,
 #invoicePrint.invoice-preview-a5 .mf-invoice-logo,
@@ -6672,7 +6672,7 @@ document.addEventListener("DOMContentLoaded",function(){
 
 
 <style id="listsale-branding-v20">
-/* Regular / List Sale invoice: 150 x 150 logo */
+/* Regular / Medi Fella Sale invoice: 150 x 150 logo */
 #invoicePrint.invoice-preview-a4 .mf-invoice-logo,
 #invoicePrint.invoice-print-a4 .mf-invoice-logo,
 #invoicePrint.invoice-preview-a5 .mf-invoice-logo,
@@ -6706,5 +6706,33 @@ document.addEventListener("DOMContentLoaded",function(){
 }
 #invoicePrint .mf-invoice-label{
   border-top-color:#C9901E!important;
+}
+</style>
+
+
+<style id="listsale-exact-school-logo-color-v21">
+/* Exact sampled brand color from the Medi Fella school logo: #46C3D9 */
+#invoicePrint .mf-school-kh,
+#invoicePrint .mf-school-en,
+#invoicePrint .mf-invoice-label .kh,
+#invoicePrint .mf-invoice-label .en{
+  color:#46C3D9!important;
+}
+#invoicePrint .mf-invoice-label{
+  border-top-color:#46C3D9!important;
+}
+</style>
+
+
+<style id="medifella-sale-branding-v22">
+/* Medi Fella Sale invoice branding */
+#invoicePrint .mf-school-kh,
+#invoicePrint .mf-school-en,
+#invoicePrint .mf-invoice-label .kh,
+#invoicePrint .mf-invoice-label .en{
+  color:#46C3D9!important;
+}
+#invoicePrint .mf-invoice-label{
+  border-top-color:#46C3D9!important;
 }
 </style>
