@@ -2132,7 +2132,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     <div class="sale-course-picker-wrap">
       <span class="sale-search-icon">⌕</span>
       <input id="saleCourseSearch" type="text" autocomplete="off"
-             placeholder="Search course name or Course ID...">
+             placeholder="Search Course Name Or ID">
       <div id="saleCourseSearchResults" class="sale-course-picker-results"></div>
     </div>
     <div class="muted sale-course-picker-help">
@@ -3548,7 +3548,7 @@ function resetSaleForm(){
  clearSaleEditMode();
  $("saleStudentSearch").value="";$("saleStudentId").value="";
  updateSaleDateTimeDisplay();$("saleReference").value=nextSaleReference();
- $("saleItems").innerHTML="";addSaleItemRow();
+ $("saleItems").innerHTML="";
  $("saleOverallDiscountType").value="percent";$("saleOverallDiscountValue").value="0";
  $("salePaymentMethod").value="Cash";$("salePaymentStatus").value="Due";$("saleAmountPaidNow").value="0.00";
  $("saleAmountPaidNow").readOnly=true;$("saleAmountPaidNow").style.background="#f3f7f7";
@@ -6854,3 +6854,113 @@ document.addEventListener("DOMContentLoaded",function(){
 }
 #saleItems .sale-course-id{display:none!important}
 </style>
+
+
+<script id="medifella-sale-course-picker-final-v30">
+(function(){
+  function el(id){return document.getElementById(id)}
+  function norm(v){return String(v==null?"":v).trim().toLowerCase()}
+  function escV(v){
+    return typeof esc==="function"?esc(v):String(v==null?"":v).replace(/[&<>"']/g,function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]
+    })
+  }
+  function attrV(v){
+    return typeof attr==="function"?attr(v):String(v==null?"":v).replace(/"/g,"&quot;")
+  }
+  function moneyV(v){
+    return typeof money==="function"?money(v):"$"+Number(v||0).toFixed(2)
+  }
+  function isSalesCourse(c){
+    var t=norm(c && (c.course_type || c.type || ""));
+    return t==="" || t==="sales" || t==="sale" || t==="offline";
+  }
+
+  function init(){
+    var search=el("saleCourseSearch");
+    var results=el("saleCourseSearchResults");
+    if(!search||!results)return;
+
+    function getCourses(){
+      return Array.isArray(window.courses)?window.courses:[];
+    }
+
+    function render(){
+      var q=norm(search.value);
+      if(!q){
+        results.innerHTML="";
+        results.classList.remove("show");
+        results.style.display="none";
+        return;
+      }
+
+      var matches=getCourses().filter(function(c){
+        if(!isSalesCourse(c))return false;
+        var hay=norm((c.name||"")+" "+(c.id||"")+" "+(c.course_id||""));
+        return hay.indexOf(q)>=0;
+      }).slice(0,12);
+
+      if(!matches.length){
+        results.innerHTML='<div class="muted" style="padding:12px">No matching course found.</div>';
+      }else{
+        results.innerHTML=matches.map(function(c){
+          return '<button type="button" data-final-course-id="'+attrV(c.id)+'" style="display:block;width:100%;text-align:left;border:0;background:transparent;padding:10px 12px;cursor:pointer">'+
+            '<strong>'+escV(c.name||"")+'</strong>'+
+            '<div class="muted">Course ID: '+escV(c.id||"")+' · '+moneyV(c.price||0)+'</div>'+
+          '</button>';
+        }).join("");
+      }
+      results.classList.add("show");
+      results.style.display="block";
+    }
+
+    if(search.dataset.finalPicker!=="1"){
+      search.dataset.finalPicker="1";
+      search.addEventListener("input",render);
+      search.addEventListener("keyup",render);
+      search.addEventListener("focus",function(){
+        if(norm(search.value))render();
+      });
+
+      results.addEventListener("mousedown",function(e){
+        var btn=e.target.closest("[data-final-course-id]");
+        if(!btn)return;
+        e.preventDefault();
+
+        var c=getCourses().find(function(x){return String(x.id)===String(btn.getAttribute("data-final-course-id"))});
+        if(!c)return;
+
+        if(typeof addSaleItemRow==="function"){
+          addSaleItemRow(c.name||"",Number(c.price||0),1,String(c.id));
+        }
+
+        search.value="";
+        results.innerHTML="";
+        results.classList.remove("show");
+        results.style.display="none";
+        if(typeof updateSaleTotals==="function")updateSaleTotals();
+      });
+
+      search.addEventListener("blur",function(){
+        setTimeout(function(){
+          results.classList.remove("show");
+          results.style.display="none";
+        },250);
+      });
+    }
+  }
+
+  // Initialize now and again after course data refreshes.
+  init();
+  var oldLoadCourses=window.loadCourses;
+  if(typeof oldLoadCourses==="function" && !oldLoadCourses.__v30Wrapped){
+    var wrapped=async function(){
+      var r=await oldLoadCourses.apply(this,arguments);
+      init();
+      return r;
+    };
+    wrapped.__v30Wrapped=true;
+    window.loadCourses=wrapped;
+  }
+})();
+</script>
