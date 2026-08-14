@@ -1871,121 +1871,6 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 #mtsBuyerResults,#dermedBuyerResults{display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 25px #075e6618;max-height:240px;overflow:auto}
 #mtsBuyerResults.show,#dermedBuyerResults.show{display:block}
 </style>
-<style id="dermed-final-layout">
-#dermedBuyerResults,#dermedItemResults{position:absolute!important;left:0!important;right:0!important;top:calc(100% + 3px)!important;z-index:99999!important;max-height:240px!important;overflow-y:auto!important}
-#dermedBuyerResults button,#dermedItemResults button{display:block!important;width:100%!important;text-align:left!important;padding:11px 13px!important;background:#fff!important;border:0!important;border-bottom:1px solid #e4eeee!important;cursor:pointer!important}
-#dermedBuyerResults button:hover,#dermedItemResults button:hover{background:#eef9fa!important}
-#dermedBuyerResults:empty,#dermedItemResults:empty{display:none!important}
-</style>
-
-<style id="dermed-final-fix-20260814">
-#dermedBuyerResults,#dermedItemResults{position:absolute!important;left:0!important;right:0!important;top:calc(100% + 4px)!important;z-index:999999!important;background:#fff!important;border:1px solid #d6e5e5!important;border-radius:10px!important;box-shadow:0 10px 25px rgba(0,0,0,.12)!important;max-height:300px!important;overflow-y:auto!important}
-#dermedBuyerSearch,#dermedItemSearch{position:relative!important}
-#dermedBuyerResults button,#dermedItemResults button{display:block!important;width:100%!important;text-align:left!important;padding:11px 13px!important;background:#fff!important;border:0!important;border-bottom:1px solid #e4eeee!important;cursor:pointer!important}
-#dermedBuyerResults button:hover,#dermedItemResults button:hover{background:#eef9fa!important}
-.dermed-search-heading{padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc;border-bottom:1px solid #e4eeee}
-</style>
-
-<script id="dermed-final-fix-20260814-script">
-(function(){
-  function $id(id){return document.getElementById(id)}
-  function norm(v){return String(v==null?'':v).trim().toLowerCase()}
-  function escx(v){return typeof esc==='function'?esc(v):String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
-  function moneyx(v){return typeof money==='function'?money(v):'$'+Number(v||0).toFixed(2)}
-  function show(box){if(!box)return;box.style.display='block';box.classList.add('show')}
-  function hide(box){if(!box)return;box.innerHTML='';box.classList.remove('show');box.style.display='none'}
-
-  function renderCustomerResults(){
-    const input=$id('dermedBuyerSearch'), box=$id('dermedBuyerResults');
-    if(!input||!box)return;
-    const q=norm(input.value);
-    if(!q){hide(box);return}
-    const rows=[];
-    (Array.isArray(window.students)?window.students:[]).filter(x=>norm([x.student_id,x.full_name,x.full_name_km,x.phone].join(' ')).includes(q)).slice(0,10)
-      .forEach(x=>rows.push({type:'student',id:x.id,code:x.student_id||'',name:x.full_name||x.full_name_km||'Student',phone:x.phone||''}));
-    (Array.isArray(window.customers)?window.customers:[]).filter(x=>norm([x.customer_code,x.name,x.phone].join(' ')).includes(q)).slice(0,10)
-      .forEach(x=>rows.push({type:'customer',id:x.id,code:x.customer_code||'',name:x.name||'Customer',phone:x.phone||''}));
-    box.innerHTML=rows.map(x=>`<button type="button" class="dermed-buyer-result" data-buyer-type="${escx(x.type)}" data-buyer-id="${escx(x.id)}"><strong>${escx(x.name)}</strong><div class="muted">${escx(x.type)} · ${escx(x.code)} · ${escx(x.phone)}</div></button>`).join('');
-    if(rows.length)show(box);else hide(box);
-  }
-
-  function chooseCustomerFromResult(btn){
-    if(!btn)return;
-    const type=btn.dataset.buyerType,id=btn.dataset.buyerId;
-    if(typeof chooseBuyer==='function') chooseBuyer('dermed',type,id);
-    else {
-      const arr=type==='student'?window.students:window.customers;
-      const x=(arr||[]).find(v=>String(v.id)===String(id));
-      if(x){$id('dermedBuyerType').value=type;$id('dermedBuyerId').value=id;$id('dermedBuyerSearch').value=type==='student'?x.full_name:x.name;$id('dermedBuyerHint').textContent=`Selected: ${type==='student'?x.full_name:x.name} · ${type==='student'?(x.student_id||''):(x.customer_code||'')} · ${x.phone||''}`;}
-    }
-    hide($id('dermedBuyerResults'));
-  }
-
-  function renderItemResults(){
-    const input=$id('dermedItemSearch'),box=$id('dermedItemResults');
-    if(!input||!box)return;
-    const q=norm(input.value);
-    if(!q){hide(box);return}
-    const ps=(Array.isArray(window.products)?window.products:[]).filter(x=>norm([x.product_code,x.name].join(' ')).includes(q)).slice(0,15);
-    const ss=(Array.isArray(window.services)?window.services:[]).filter(x=>norm([x.service_code,x.name,x.service_type].join(' ')).includes(q)).slice(0,15);
-    let html='';
-    if(ps.length){html+='<div class="dermed-search-heading">PRODUCTS</div>';html+=ps.map(x=>`<button type="button" class="dermed-item-result" data-kind="product" data-id="${escx(x.id)}"><strong>${escx(x.name)}</strong><div class="muted">Product · ${escx(x.product_code||'')} · ${moneyx(x.price)} · Stock: ${typeof productStock==='function'?productStock(x.id):''}</div></button>`).join('')}
-    if(ss.length){html+='<div class="dermed-search-heading">SERVICES</div>';html+=ss.map(x=>`<button type="button" class="dermed-item-result" data-kind="service" data-id="${escx(x.id)}"><strong>${escx(x.name)}</strong><div class="muted">Service · ${escx(x.service_code||'')} · ${escx(x.service_type||'')} · ${moneyx(x.price)}</div></button>`).join('')}
-    box.innerHTML=html;
-    if(html)show(box);else hide(box);
-  }
-
-  function addItem(btn){
-    if(!btn)return;
-    const kind=btn.dataset.kind,id=btn.dataset.id;
-    if(kind==='product' && typeof window.addSaleProduct==='function') window.addSaleProduct('dermed',id);
-    if(kind==='service' && typeof window.addDermedService==='function') window.addDermedService(id);
-    const input=$id('dermedItemSearch');if(input)input.value='';hide($id('dermedItemResults'));
-  }
-
-  function updateTime(){
-    const el=$id('dermedSaleTime');
-    if(!el)return;
-    try{
-      if(typeof phTime==='function') el.value=String(phTime()).replace('T',' ');
-      else el.value=new Date().toLocaleString('sv-SE',{hour12:false}).replace(' ',' ');
-    }catch(e){el.value=new Date().toLocaleString('sv-SE',{hour12:false})}
-  }
-
-  function bind(){
-    const bi=$id('dermedBuyerSearch'),br=$id('dermedBuyerResults');
-    const ii=$id('dermedItemSearch'),ir=$id('dermedItemResults');
-    if(bi&&!bi.dataset.fixedSearch){
-      bi.dataset.fixedSearch='1';
-      bi.addEventListener('input',renderCustomerResults,true);
-      bi.addEventListener('keyup',renderCustomerResults,true);
-      bi.addEventListener('focus',function(){if(this.value.trim())renderCustomerResults()});
-      bi.addEventListener('keydown',e=>{if(e.key==='Escape')hide(br)});
-    }
-    if(br&&!br.dataset.fixedClicks){
-      br.dataset.fixedClicks='1';
-      br.addEventListener('pointerdown',e=>{const b=e.target.closest('.dermed-buyer-result');if(b){e.preventDefault();e.stopPropagation();chooseCustomerFromResult(b)}},true);
-    }
-    if(ii&&!ii.dataset.fixedSearch){
-      ii.dataset.fixedSearch='1';
-      ii.addEventListener('input',renderItemResults,true);
-      ii.addEventListener('keyup',renderItemResults,true);
-      ii.addEventListener('focus',function(){if(this.value.trim())renderItemResults()});
-      ii.addEventListener('keydown',e=>{if(e.key==='Escape')hide(ir)});
-    }
-    if(ir&&!ir.dataset.fixedClicks){
-      ir.dataset.fixedClicks='1';
-      ir.addEventListener('pointerdown',e=>{const b=e.target.closest('.dermed-item-result');if(b){e.preventDefault();e.stopPropagation();addItem(b)}},true);
-    }
-    updateTime();
-    if(!window.__dermedTimeTimer) window.__dermedTimeTimer=setInterval(updateTime,1000);
-  }
-
-  function start(){bind();setTimeout(bind,300);setTimeout(bind,1000);setTimeout(bind,2000);updateTime()}
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
-})();
-
-</script>
 </head>
 <body>
 
@@ -2501,95 +2386,18 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div class="sale-header-grid">
 <div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="dermedBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="dermedNewCustomer" class="gold" type="button">+ Customer</button></div><div id="dermedBuyerResults" class="sale-course-picker-results"></div><input id="dermedBuyerType" type="hidden"><input id="dermedBuyerId" type="hidden"><div id="dermedBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
 <div><label>Sale Staff *</label><select id="dermedSaleStaff"></select></div>
-<div><label>Reference No.</label><input id="dermedReferenceNo" readonly placeholder="Auto-generate"></div>
 <div><label>Sale Date & Time</label><input id="dermedSaleTime" readonly></div>
 </div>
-
-<label style="margin-top:18px">Search Product / Service</label>
-<div class="sale-course-picker">
-  <div class="sale-course-picker-wrap">
-    <span class="sale-search-icon">⌕</span>
-    <input id="dermedItemSearch" type="text" autocomplete="off" placeholder="Search Product or Service name / ID">
-    <div id="dermedItemResults" class="sale-course-picker-results"></div>
-  </div>
-  <div class="muted sale-course-picker-help">Search a Product or Service by name or ID, then click it to add.</div>
-</div>
-
-<div class="sale-table-wrap">
-<table class="sale-entry-table">
-<thead><tr>
-<th style="width:42%">Product / Service Detail</th>
-<th style="width:10%">Qty</th>
-<th style="width:14%">Unit Price (USD)</th>
-<th style="width:19%">Discount</th>
-<th style="width:15%">Subtotal (USD)</th>
-<th style="width:46px"></th>
-</tr></thead>
-<tbody id="dermedItems"></tbody>
-</table>
-</div>
-
-<div class="sale-subtotal-line">
-<span>Sub Initial Total</span><strong id="dermedItemsSubtotal">$0.00</strong>
-</div>
-
-<div class="sale-controls-grid">
-<div>
-<label>Overall Discount</label>
-<div class="discount-control">
-<select id="dermedOverallDiscountType"><option value="percent">%</option><option value="usd">USD</option></select>
-<input id="dermedOverallDiscountValue" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
-</div>
-</div>
-<div>
-<label>Payment Method *</label>
-<select id="dermedPaymentMethod">
-<option value="Cash">Cash</option><option value="ABA">ABA</option><option value="Bank Transfer">Bank Transfer</option><option value="Card">Card</option><option value="Other">Other</option>
-</select>
-</div>
-<div>
-<label>Payment Status *</label>
-<select id="dermedPaymentStatus">
-<option value="Paid">Paid</option><option value="Partial">Partial Payment</option><option value="Due">Due</option>
-</select>
-</div>
-<div>
-<label>Amount Paid Now (USD)</label>
-<input id="dermedAmountPaidNow" class="sale-money-input" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00">
-<div class="muted" style="margin-top:5px">Paid = full amount · Due = $0 · Partial = enter amount</div>
-</div>
-</div>
-
-<div class="sale-summary-card">
-<div class="sale-summary-col">
-<div class="sale-summary-row"><span>Sub Initial Total</span><strong id="dermedSummarySubtotal">$0.00</strong></div>
-<div class="sale-summary-row"><span>Overall Discount</span><strong id="dermedSummaryDiscount" class="discount-number">$0.00</strong></div>
-<div class="sale-summary-divider"></div>
-<div class="sale-summary-row sale-initial-row"><span>Initial Total</span><strong id="dermedInitialTotal">$0.00</strong></div>
-</div>
-<div class="sale-summary-col">
-<div class="sale-summary-row"><span>Paid Balance</span><strong id="dermedPaidBalanceDisplay" class="paid-number">$0.00</strong></div>
-<div class="sale-summary-row"><span>Due</span><strong id="dermedDueDisplay" class="due-number">$0.00</strong></div>
-<div class="sale-summary-divider"></div>
-<div class="sale-summary-row sale-grand-row"><span>Grand Total Due</span><strong id="dermedGrandTotalDue">$0.00</strong></div>
-</div>
-</div>
-
-<label>Sale Note (Optional)</label>
-<textarea id="dermedSaleNote" rows="4" placeholder="Enter note here..."></textarea>
-
-<div class="sale-actions">
-<button id="saveDermedSale" class="gold" type="button">Save Dermed Sale & Generate Invoice</button>
-<button id="clearDermedSale" class="light" type="button">Clear</button>
-</div>
+<label style="margin-top:18px">Search Product</label><div style="position:relative"><input id="dermedProductSearch" autocomplete="off" placeholder="Search Product ID or Product Name"><div id="dermedProductResults" class="sale-course-picker-results"></div></div>
+<div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr></thead><tbody id="dermedItems"></tbody></table></div>
+<h2 style="margin-top:22px">Services Fee</h2>
+<label>Search Service</label><div style="position:relative"><input id="dermedServiceSearch" autocomplete="off" placeholder="Search Service ID or Service Name"><div id="dermedServiceResults" class="sale-course-picker-results"></div></div>
+<div class="table-wrap"><table class="table"><thead><tr><th>Service</th><th>Type</th><th>Price</th><th></th></tr></thead><tbody id="dermedServices"></tbody></table></div>
+<div class="sale-summary-row" style="margin-top:16px"><span>Products + Services Total</span><strong id="dermedTotal">$0.00</strong></div>
+<div class="actions" style="justify-content:flex-end;margin-top:14px"><button id="saveDermedSale" class="gold">Save Dermed Sale & Generate Invoice</button><button id="clearDermedSale" class="light">Clear</button></div>
 <div id="dermedStatus"></div>
 </div>
-
-<div class="card" style="margin-top:18px">
-<h2>Dermed Sales</h2>
-<div class="toolbar"><input id="dermedSaleSearch" placeholder="Search invoice, buyer or product"><button id="dermedSalesRefresh" class="light">Refresh</button></div>
-<div id="dermedSalesList">Loading...</div>
-</div>
+<div class="card" style="margin-top:18px"><h2>Dermed Sales</h2><div class="toolbar"><input id="dermedSaleSearch" placeholder="Search invoice, buyer or product"><button id="dermedSalesRefresh" class="light">Refresh</button></div><div id="dermedSalesList">Loading...</div></div>
 </section>
 
 <section id="services" class="section">
@@ -4088,36 +3896,6 @@ function openPrintFromCanvas(canvas,paper,sale){
      setTimeout(()=>window.print(),300);
    };
  <\/script>
-<style id="dermed-final-position-fix">
-#dermedSale .sale-header-grid > div:first-child{position:relative!important}
-#dermedBuyerResults{z-index:999999!important}
-#dermedItemResults{z-index:999999!important}
-</style>
-<script id="dermed-final-interaction-fix">
-(function(){
-function E(id){return document.getElementById(id)}
-function hide(id){var x=E(id);if(x){x.innerHTML="";x.classList.remove("show");x.style.display="none"}}
-document.addEventListener("pointerdown",function(e){
- var t=e.target&&e.target.closest?e.target.closest("#dermedItemResults [data-pid],#dermedItemResults [data-sid]"):null;
- if(!t)return;
- e.preventDefault();e.stopPropagation();
- if(t.hasAttribute("data-pid")&&typeof window.addSaleProduct==="function")window.addSaleProduct("dermed",t.getAttribute("data-pid"));
- if(t.hasAttribute("data-sid")&&typeof window.addDermedService==="function")window.addDermedService(t.getAttribute("data-sid"));
- var i=E("dermedItemSearch");if(i)i.value="";hide("dermedItemResults");
-},true);
-document.addEventListener("pointerdown",function(e){
- var t=e.target&&e.target.closest?e.target.closest("#dermedBuyerResults [data-bi]"):null;
- if(!t)return;
- e.preventDefault();e.stopPropagation();
- if(typeof window.chooseBuyer==="function")window.chooseBuyer("dermed",t.getAttribute("data-bt"),t.getAttribute("data-bi"));
- hide("dermedBuyerResults");
-},true);
-document.addEventListener("input",function(e){
- if(e.target&&e.target.id==="dermedItemSearch"&&!e.target.value.trim())hide("dermedItemResults");
- if(e.target&&e.target.id==="dermedBuyerSearch"&&!e.target.value.trim())hide("dermedBuyerResults");
-},true);
-})();
-</script>
 </body>
 </html>`;
 
@@ -4143,37 +3921,7 @@ async function printInvoice(id,size="A4"){
  }
 
  printWin.document.open();
- printWin.document.write("<!doctype html><html><head><title>Preparing invoice...</title></head><body style='font-family:sans-serif;padding:30px'>Preparing invoice...<style id="dermed-final-position-fix">
-#dermedSale .sale-header-grid > div:first-child{position:relative!important}
-#dermedBuyerResults{z-index:999999!important}
-#dermedItemResults{z-index:999999!important}
-</style>
-<script id="dermed-final-interaction-fix">
-(function(){
-function E(id){return document.getElementById(id)}
-function hide(id){var x=E(id);if(x){x.innerHTML="";x.classList.remove("show");x.style.display="none"}}
-document.addEventListener("pointerdown",function(e){
- var t=e.target&&e.target.closest?e.target.closest("#dermedItemResults [data-pid],#dermedItemResults [data-sid]"):null;
- if(!t)return;
- e.preventDefault();e.stopPropagation();
- if(t.hasAttribute("data-pid")&&typeof window.addSaleProduct==="function")window.addSaleProduct("dermed",t.getAttribute("data-pid"));
- if(t.hasAttribute("data-sid")&&typeof window.addDermedService==="function")window.addDermedService(t.getAttribute("data-sid"));
- var i=E("dermedItemSearch");if(i)i.value="";hide("dermedItemResults");
-},true);
-document.addEventListener("pointerdown",function(e){
- var t=e.target&&e.target.closest?e.target.closest("#dermedBuyerResults [data-bi]"):null;
- if(!t)return;
- e.preventDefault();e.stopPropagation();
- if(typeof window.chooseBuyer==="function")window.chooseBuyer("dermed",t.getAttribute("data-bt"),t.getAttribute("data-bi"));
- hide("dermedBuyerResults");
-},true);
-document.addEventListener("input",function(e){
- if(e.target&&e.target.id==="dermedItemSearch"&&!e.target.value.trim())hide("dermedItemResults");
- if(e.target&&e.target.id==="dermedBuyerSearch"&&!e.target.value.trim())hide("dermedBuyerResults");
-},true);
-})();
-</script>
-</body></html>");
+ printWin.document.write("<!doctype html><html><head><title>Preparing invoice...</title></head><body style='font-family:sans-serif;padding:30px'>Preparing invoice...</body></html>");
  printWin.document.close();
 
  try{
@@ -4275,36 +4023,6 @@ document.addEventListener("input",function(e){
 <script>
 window.onload=function(){setTimeout(function(){window.print();},250);};
 <\/script>
-<style id="dermed-final-position-fix">
-#dermedSale .sale-header-grid > div:first-child{position:relative!important}
-#dermedBuyerResults{z-index:999999!important}
-#dermedItemResults{z-index:999999!important}
-</style>
-<script id="dermed-final-interaction-fix">
-(function(){
-function E(id){return document.getElementById(id)}
-function hide(id){var x=E(id);if(x){x.innerHTML="";x.classList.remove("show");x.style.display="none"}}
-document.addEventListener("pointerdown",function(e){
- var t=e.target&&e.target.closest?e.target.closest("#dermedItemResults [data-pid],#dermedItemResults [data-sid]"):null;
- if(!t)return;
- e.preventDefault();e.stopPropagation();
- if(t.hasAttribute("data-pid")&&typeof window.addSaleProduct==="function")window.addSaleProduct("dermed",t.getAttribute("data-pid"));
- if(t.hasAttribute("data-sid")&&typeof window.addDermedService==="function")window.addDermedService(t.getAttribute("data-sid"));
- var i=E("dermedItemSearch");if(i)i.value="";hide("dermedItemResults");
-},true);
-document.addEventListener("pointerdown",function(e){
- var t=e.target&&e.target.closest?e.target.closest("#dermedBuyerResults [data-bi]"):null;
- if(!t)return;
- e.preventDefault();e.stopPropagation();
- if(typeof window.chooseBuyer==="function")window.chooseBuyer("dermed",t.getAttribute("data-bt"),t.getAttribute("data-bi"));
- hide("dermedBuyerResults");
-},true);
-document.addEventListener("input",function(e){
- if(e.target&&e.target.id==="dermedItemSearch"&&!e.target.value.trim())hide("dermedItemResults");
- if(e.target&&e.target.id==="dermedBuyerSearch"&&!e.target.value.trim())hide("dermedBuyerResults");
-},true);
-})();
-</script>
 </body>
 </html>`;
 
@@ -5450,7 +5168,7 @@ function renderBuyerControls(){
    const arr=[];
    students.filter(x=>(`${x.student_id||""} ${x.full_name||""} ${x.phone||""}`).toLowerCase().includes(q)).slice(0,10).forEach(x=>arr.push({type:"student",id:x.id,code:x.student_id,name:x.full_name,phone:x.phone}));
    customers.filter(x=>(`${x.customer_code||""} ${x.name||""} ${x.phone||""}`).toLowerCase().includes(q)).slice(0,10).forEach(x=>arr.push({type:"customer",id:x.id,code:x.customer_code,name:x.name,phone:x.phone}));
-   results.innerHTML=arr.map(x=>`<button type="button" onclick="chooseBuyer('${type}','${attr(x.type)}','${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.type)} · ${esc(x.code||"")} · ${esc(x.phone||"")}</div></button>`).join("")||'';
+   results.innerHTML=arr.map(x=>`<button type="button" onclick="chooseBuyer('${type}','${attr(x.type)}','${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.type)} · ${esc(x.code||"")} · ${esc(x.phone||"")}</div></button>`).join("")||'<div class="muted" style="padding:10px">No student/customer found.</div>';
    results.classList.toggle("show",!!q);
  });
 }
@@ -5476,7 +5194,6 @@ function addSaleProduct(type,pid){
  renderSaleProductRows(type); $(type+"ProductSearch").value="";$(type+"ProductResults").classList.remove("show");
 }
 function renderSaleProductRows(type){
- if(type==="dermed"){ renderDermedCombinedItems(); return; }
  const arr=window[type+"SaleItems"]||[], body=$(type+"Items"); if(!body)return;
  body.innerHTML=arr.map((x,i)=>`<tr><td><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code)}</div></td><td><input type="number" min="1" max="${Math.max(0,productStock(x.product_id)+(Number(x.quantity)||0))}" value="${x.quantity}" onchange="${type}Qty(${i},this.value)"></td><td>${money(x.price)}</td><td>${money(Number(x.price)*Number(x.quantity))}</td><td><button class="danger" onclick="removeSaleProduct('${type}',${i})">×</button></td></tr>`).join("");
  const total=arr.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0); if($(type+"Total"))$(type+"Total").textContent=money(total);
@@ -5662,50 +5379,16 @@ async function deleteService(id){
    else alert("Delete failed: "+(e.message||e));
  }
 }
-function addDermedService(id){
- const x=services.find(x=>String(x.id)===String(id));if(!x)return;
- const arr=window.dermedServiceItems||(window.dermedServiceItems=[]);
- if(arr.some(y=>String(y.service_id)===String(id)))return;
- arr.push({service_id:x.id,service_code:x.service_code,name:x.name,service_type:x.service_type,price:Number(x.price||0),quantity:1});
- renderDermedCombinedItems();
- $("dermedServiceSearch").value="";$("dermedServiceResults").classList.remove("show");
-}
-function renderDermedCombinedItems(){
- const body=$("dermedItems");if(!body)return;
- const products=window.dermedSaleItems||[], servicesArr=window.dermedServiceItems||[];
- const productRows=products.map((x,i)=>`<tr>
-   <td><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code||"")}</div></td>
-   <td>Product</td>
-   <td><input type="number" min="1" max="${Math.max(0,productStock(x.product_id)+(Number(x.quantity)||0))}" value="${x.quantity}" onchange="dermedQty(${i},this.value)"></td>
-   <td>${money(x.price)}</td>
-   <td>${money(Number(x.price)*Number(x.quantity))}</td>
-   <td><button class="danger" onclick="removeSaleProduct('dermed',${i})">×</button></td>
- </tr>`).join("");
- const serviceRows=servicesArr.map((x,i)=>`<tr>
-   <td><strong>${esc(x.name)}</strong><div class="muted">${esc(x.service_code||"")}</div></td>
-   <td>${esc(x.service_type||"Service")}</td>
-   <td><input type="number" min="1" value="${Number(x.quantity||1)}" onchange="setDermedServiceQty(${i},this.value)"></td>
-   <td>${money(x.price)}</td>
-   <td>${money(Number(x.price)*Number(x.quantity||1))}</td>
-   <td><button class="danger" onclick="removeDermedService(${i})">×</button></td>
- </tr>`).join("");
- body.innerHTML=productRows+serviceRows||'<tr><td colspan="6" class="muted">No products or services added.</td></tr>';
- const p=products.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0);
- const sv=servicesArr.reduce((n,x)=>n+Number(x.price)*Number(x.quantity||1),0);
- $("dermedTotal").textContent=money(p+sv);
-}
-function renderDermedServices(){renderDermedCombinedItems()}
-function setDermedServiceQty(i,v){
- const arr=window.dermedServiceItems||[];if(!arr[i])return;
- arr[i].quantity=Math.max(1,Number(v)||1);renderDermedCombinedItems();
-}
-function removeDermedService(i){(window.dermedServiceItems||[]).splice(i,1);renderDermedCombinedItems()}
+function addDermedService(id){const x=services.find(x=>String(x.id)===String(id));if(!x)return;const arr=window.dermedServiceItems||(window.dermedServiceItems=[]);if(arr.some(y=>String(y.service_id)===String(id)))return;arr.push({service_id:x.id,service_code:x.service_code,name:x.name,service_type:x.service_type,price:Number(x.price||0)});renderDermedServices();$("dermedServiceSearch").value="";$("dermedServiceResults").classList.remove("show")}
+function renderDermedServices(){const arr=window.dermedServiceItems||[];$("dermedServices").innerHTML=arr.map((x,i)=>`<tr><td>${esc(x.name)}<div class="muted">${esc(x.service_code)}</div></td><td>${esc(x.service_type)}</td><td>${money(x.price)}</td><td><button class="danger" onclick="removeDermedService(${i})">×</button></td></tr>`).join("");const p=(window.dermedSaleItems||[]).reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),sv=arr.reduce((n,x)=>n+Number(x.price),0);$("dermedTotal").textContent=money(p+sv)}
+function removeDermedService(i){(window.dermedServiceItems||[]).splice(i,1);renderDermedServices()}
+
 function resetNewInventorySale(type){
  window[type+"SaleItems"]=[];if(type==="dermed")window.dermedServiceItems=[];
  [type+"BuyerType",type+"BuyerId"].forEach(id=>$(id).value="");
  $(type+"BuyerSearch").value="";$(type+"BuyerHint").textContent="Choose a student or customer. You can add a new customer.";
  $(type+"SaleStaff").value="";setAutoTime(type+"SaleTime");
- renderSaleProductRows(type);if(type==="dermed")renderDermedCombinedItems();
+ renderSaleProductRows(type);if(type==="dermed")renderDermedServices();
 }
 async function saveInventorySale(type){
  const buyerType=$(type+"BuyerType").value,buyerId=$(type+"BuyerId").value,staffId=$(type+"SaleStaff").value,items=window[type+"SaleItems"]||[];
@@ -5716,7 +5399,7 @@ async function saveInventorySale(type){
  for(const it of items){if(Number(it.quantity)>productStock(it.product_id)){msg($(type+"Status"),`Not enough stock for ${it.name}. Available: ${productStock(it.product_id)}.`,true);return}}
  const buyer=buyerType==="student"?students.find(x=>String(x.id)===String(buyerId)):customers.find(x=>String(x.id)===String(buyerId));
  const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
- const productTotal=items.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),serviceTotal=serviceItems.reduce((n,x)=>n+Number(x.price)*Number(x.quantity||1),0),total=productTotal+serviceTotal;
+ const productTotal=items.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),serviceTotal=serviceItems.reduce((n,x)=>n+Number(x.price),0),total=productTotal+serviceTotal;
  try{
   const code=type==="mts"?"MTS":"DERMED";
   const prefix=code+"-"+new Date().getFullYear()+"-";
@@ -5729,7 +5412,7 @@ async function saveInventorySale(type){
     student_id:buyerType==="student"?buyerId:null,student_name:buyer?.full_name||buyer?.name||"",
     student_phone:buyer?.phone||"",customer_id:buyerType==="customer"?buyerId:null,customer_type:buyerType,
     sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",subtotal:total,discount:0,shipping:0,grand_total:total,paid:total,balance:0,payment_status:"Paid",sale_status:"Completed",
-    items:items.map(x=>({...x,quantity:Number(x.quantity)})),service_items:serviceItems.map(x=>({...x,quantity:Number(x.quantity||1)})),service_total:serviceTotal,notes:""
+    items:items.map(x=>({...x,quantity:Number(x.quantity)})),service_items:serviceItems,service_total:serviceTotal,notes:""
   };
   const r=await sb.from("medifella_sales").insert({...payload,created_by:adminUser.id}).select().single();if(r.error)throw r.error;
   const movements=items.map(x=>({product_id:x.product_id,movement_type:"sale",quantity:Number(x.quantity),staff_id:staffId,staff_name:staff?.name_en||"",stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));
@@ -5751,102 +5434,12 @@ $("saveMtsSale").onclick=()=>saveInventorySale("mts");$("saveDermedSale").onclic
 $("mtsSaleSearch").oninput=renderMtsSales;$("dermedSaleSearch").oninput=renderDermedSales;$("mtsSalesRefresh").onclick=loadSales;$("dermedSalesRefresh").onclick=loadSales;
 $("stockTimeDisplay").value=phTime().replace("T"," ");$("stockTime").value=phTime();if($("stockReportDate"))$("stockReportDate").value=new Date().toISOString().slice(0,10);setAutoTime("mtsSaleTime");setAutoTime("dermedSaleTime");
 
-let saleCustomerTargetType="dermed";
-function openSaleCustomerForm(type){
- saleCustomerTargetType=type||"dermed";
- $("saleCustomerName").value="";
- $("saleCustomerPhone").value="";
- $("saleCustomerStatus").textContent="";
- $("saleCustomerModal").style.display="flex";
- setTimeout(()=>$("saleCustomerName").focus(),50);
+async function addCustomerFromSale(type){
+ const name=prompt("Customer Name");if(name===null)return;const phone=prompt("Phone Number");if(phone===null)return;
+ if(!name.trim()||!phone.trim()){alert("Customer Name and Phone Number are required.");return}
+ try{const r=await sb.from("medifella_customers").insert({customer_code:genId("C",customers,"customer_code"),name:name.trim(),phone:phone.trim()}).select().single();if(r.error)throw r.error;customers.unshift(r.data);chooseBuyer(type,"customer",r.data.id);renderCustomerList()}catch(e){alert(e.message||"Could not add customer.")}
 }
-function closeSaleCustomerForm(){ $("saleCustomerModal").style.display="none"; }
-async function saveSaleCustomer(){
-  const name = $("saleCustomerName").value.trim();
-  const phone = $("saleCustomerPhone").value.trim();
-  const status = $("saleCustomerStatus");
-
-  if(!name || !phone){
-    status.textContent = "Customer Name and Phone Number are required.";
-    return;
-  }
-
-  const btn = $("saleCustomerSave");
-  btn.disabled = true;
-  status.textContent = "Saving customer...";
-
-  try{
-    // IMPORTANT: use the exact same insert pattern as Customer Management.
-    // Do NOT require .select().single() after INSERT, because an RLS
-    // SELECT policy can otherwise make a successful INSERT look like a failure.
-    const customerCode = genId("C", customers, "customer_code");
-    const result = await sb.from("medifella_customers").insert({
-      name: name,
-      phone: phone,
-      customer_code: customerCode
-    });
-
-    if(result.error) throw result.error;
-
-    // Reload the authoritative Customer List from Supabase.
-    await loadCustomers();
-
-    // Find the newly-created customer and select it in this sale.
-    const savedCustomer = customers.find(x =>
-      String(x.name||"").trim() === name &&
-      String(x.phone||"").trim() === phone
-    ) || customers.find(x =>
-      String(x.customer_code||"").trim() === customerCode
-    );
-
-    if(savedCustomer && typeof chooseBuyer === "function"){
-      chooseBuyer(saleCustomerTargetType, "customer", savedCustomer.id);
-    }else if(savedCustomer){
-      if($("dermedBuyerSearch")) $("dermedBuyerSearch").value=savedCustomer.name||name;
-      if($("dermedBuyerType")) $("dermedBuyerType").value="customer";
-      if($("dermedBuyerId")) $("dermedBuyerId").value=savedCustomer.id;
-    }
-
-    closeSaleCustomerForm();
-    alert("Customer saved successfully to Customer List.");
-  }catch(e){
-    console.error("Dermed Sale customer save error:",e);
-    status.textContent = "Could not save customer: " + (e.message || "Unknown error");
-    alert("Customer was NOT saved.\n\n" + (e.message || "Unknown error"));
-  }finally{
-    btn.disabled=false;
-  }
-}
-$("mtsNewCustomer").onclick=()=>openSaleCustomerForm("mts");
-$("dermedNewCustomer").onclick=()=>openSaleCustomerForm("dermed");
-
-// Delegated handlers are required because the modal is inserted later in the HTML.
-document.addEventListener("click", function(e){
-  const newCustomerBtn = e.target.closest && e.target.closest("#dermedNewCustomer, #mtsNewCustomer");
-  if(newCustomerBtn){
-    e.preventDefault();
-    openSaleCustomerForm(newCustomerBtn.id === "mtsNewCustomer" ? "mts" : "dermed");
-    return;
-  }
-
-  const saveBtn = e.target.closest && e.target.closest("#saleCustomerSave");
-  const cancelBtn = e.target.closest && e.target.closest("#saleCustomerCancel");
-
-  if(saveBtn){
-    e.preventDefault();
-    saveSaleCustomer();
-    return;
-  }
-  if(cancelBtn){
-    e.preventDefault();
-    closeSaleCustomerForm();
-    return;
-  }
-  if(e.target.id === "saleCustomerModal"){
-    closeSaleCustomerForm();
-  }
-});
-
+$("mtsNewCustomer").onclick=()=>addCustomerFromSale("mts");$("dermedNewCustomer").onclick=()=>addCustomerFromSale("dermed");
 
 setupSaleCoursePicker();
 
@@ -5855,416 +5448,6 @@ const _oldUpdateMetrics=updateMetrics; updateMetrics=function(){_oldUpdateMetric
 boot();
 
 
-</script>
-<script id="dermed-final-search-only">
-(function(){
-  function el(id){return document.getElementById(id)}
-  function norm(v){return String(v==null?"":v).trim().toLowerCase()}
-  function escL(v){return typeof esc==="function"?esc(v):String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-  function moneyL(v){return typeof money==="function"?money(v):"$"+Number(v||0).toFixed(2)}
-  function hide(box){if(box){box.innerHTML="";box.classList.remove("show");box.style.display="none"}}
-  function show(box){if(box){box.style.display="block";box.classList.add("show")}}
-  function buyer(){
-    var i=el("dermedBuyerSearch"),b=el("dermedBuyerResults");if(!i||!b)return;
-    var q=norm(i.value);if(!q){hide(b);if(el("dermedBuyerType"))el("dermedBuyerType").value="";if(el("dermedBuyerId"))el("dermedBuyerId").value="";return}
-    var rows=[];
-    students.filter(function(x){return norm((x.student_id||"")+" "+(x.full_name||"")+" "+(x.full_name_km||"")+" "+(x.phone||"")).indexOf(q)>=0}).slice(0,10).forEach(function(x){rows.push({t:"student",id:x.id,code:x.student_id,name:x.full_name||x.full_name_km||"Student",phone:x.phone||""})});
-    customers.filter(function(x){return norm((x.customer_code||"")+" "+(x.name||"")+" "+(x.phone||"")).indexOf(q)>=0}).slice(0,10).forEach(function(x){rows.push({t:"customer",id:x.id,code:x.customer_code,name:x.name||"Customer",phone:x.phone||""})});
-    b.innerHTML=rows.length?rows.map(function(x){return '<button type="button" data-bt="'+escL(x.t)+'" data-bi="'+escL(x.id)+'"><strong>'+escL(x.name)+'</strong><div class="muted">'+escL(x.t)+' · '+escL(x.code||"")+' · '+escL(x.phone||"")+'</div></button>'}).join(""):'';
-    show(b);
-  }
-  function item(){
-    var i=el("dermedItemSearch"),b=el("dermedItemResults");if(!i||!b)return;
-    var q=norm(i.value);if(!q){hide(b);return}
-    var ps=products.filter(function(x){return norm((x.product_code||"")+" "+(x.name||"")).indexOf(q)>=0}).slice(0,10);
-    var ss=services.filter(function(x){return norm((x.service_code||"")+" "+(x.name||"")+" "+(x.service_type||"")).indexOf(q)>=0}).slice(0,10);
-    var h="";
-    if(ps.length){h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">PRODUCTS</div>';h+=ps.map(function(x){return '<button type="button" data-pid="'+escL(x.id)+'"><strong>'+escL(x.name)+'</strong><div class="muted">Product · '+escL(x.product_code||"")+' · '+moneyL(x.price)+' · Stock: '+(typeof productStock==="function"?productStock(x.id):"")+'</div></button>'}).join("")}
-    if(ss.length){h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">SERVICES</div>';h+=ss.map(function(x){return '<button type="button" data-sid="'+escL(x.id)+'"><strong>'+escL(x.name)+'</strong><div class="muted">Service · '+escL(x.service_code||"")+' · '+escL(x.service_type||"")+' · '+moneyL(x.price)+'</div></button>'}).join("")}
-    b.innerHTML=h||'<div class="muted" style="padding:10px">No product or service found.</div>';show(b);
-  }
-  function bind(){
-    var bi=el("dermedBuyerSearch"),br=el("dermedBuyerResults"),ii=el("dermedItemSearch"),ir=el("dermedItemResults");
-    if(bi&&!bi.dataset.fsb){bi.dataset.fsb="1";bi.addEventListener("input",buyer);bi.addEventListener("keyup",buyer);bi.addEventListener("keydown",function(e){if(e.key==="Escape")hide(br)});br&&br.addEventListener("mousedown",function(e){
-      var x=e.target.closest("[data-bi]");
-      if(!x)return;
-      e.preventDefault();
-      e.stopPropagation();
-      if(typeof chooseBuyer==="function")chooseBuyer("dermed",x.dataset.bt,x.dataset.bi);
-      hide(br);
-    })}
-    if(ii&&!ii.dataset.fsb){ii.dataset.fsb="1";ii.addEventListener("input",item);ii.addEventListener("keyup",item);ii.addEventListener("keydown",function(e){if(e.key==="Escape")hide(ir)});ir&&ir.addEventListener("mousedown",function(e){var p=e.target.closest("[data-pid]"),v=e.target.closest("[data-sid]");if(!p&&!v)return;e.preventDefault();if(p&&typeof addSaleProduct==="function")addSaleProduct("dermed",p.dataset.pid);if(v&&typeof addDermedService==="function")addDermedService(v.dataset.sid);ii.value="";hide(ir)})}
-  }
-  document.addEventListener("DOMContentLoaded",function(){bind();setTimeout(bind,500);setTimeout(bind,1500)});
-})();
-</script>
-<script id="dermed-reference-display">
-document.addEventListener("DOMContentLoaded",function(){
- var x=document.getElementById("dermedReferenceNo");if(!x)return;
- var max=0;salesRecords.forEach(function(r){var m=String(r.reference_no||"").match(/^DERMED-(\d{4})-(\d+)$/);if(m)max=Math.max(max,Number(m[2]))});
- x.value="DERMED-"+new Date().getFullYear()+"-"+String(max+1).padStart(4,"0");
-});
-</script>
-<script id="dermed-native-customer-search">
-(function(){
-  function E(id){return document.getElementById(id)}
-  function N(v){return String(v==null?"":v).trim().toLowerCase()}
-  function refreshDatalist(){
-    var input=E("dermedBuyerSearch"),list=E("dermedBuyerDatalist");
-    if(!input||!list)return;
-    var q=N(input.value), rows=[];
-    students.forEach(function(x){
-      var text=(x.full_name||x.full_name_km||"")+" | "+(x.student_id||"")+" | "+(x.phone||"");
-      if(!q || N(text).indexOf(q)>=0){
-        rows.push({t:"student",id:x.id,name:x.full_name||x.full_name_km||"Student",code:x.student_id||"",phone:x.phone||""});
-      }
-    });
-    customers.forEach(function(x){
-      var text=(x.name||"")+" | "+(x.customer_code||"")+" | "+(x.phone||"");
-      if(!q || N(text).indexOf(q)>=0){
-        rows.push({t:"customer",id:x.id,name:x.name||"Customer",code:x.customer_code||"",phone:x.phone||""});
-      }
-    });
-    rows=rows.slice(0,100);
-    list.innerHTML=rows.map(function(x){
-      var value=(x.name||"")+" | "+(x.code||"")+" | "+(x.phone||"");
-      return '<option value="'+(typeof esc==="function"?esc(value):value)+'"></option>';
-    }).join("");
-  }
-  function selectFromValue(){
-    var input=E("dermedBuyerSearch"),v=N(input&&input.value);
-    if(!v)return;
-    var found=null;
-    students.some(function(x){
-      var text=N((x.full_name||x.full_name_km||"")+" | "+(x.student_id||"")+" | "+(x.phone||""));
-      if(text===v){found={t:"student",id:x.id,name:x.full_name||x.full_name_km||"Student",code:x.student_id||"",phone:x.phone||""};return true}
-      return false;
-    });
-    if(!found)customers.some(function(x){
-      var text=N((x.name||"")+" | "+(x.customer_code||"")+" | "+(x.phone||""));
-      if(text===v){found={t:"customer",id:x.id,name:x.name||"Customer",code:x.customer_code||"",phone:x.phone||""};return true}
-      return false;
-    });
-    if(!found)return;
-    if(typeof chooseBuyer==="function"){
-      chooseBuyer("dermed",found.t,found.id);
-    }else{
-      E("dermedBuyerType").value=found.t;
-      E("dermedBuyerId").value=found.id;
-      input.value=found.name;
-      E("dermedBuyerHint").textContent="Selected: "+found.name+" · "+found.code+" · "+found.phone;
-    }
-  }
-  function bind(){
-    var input=E("dermedBuyerSearch");if(!input||input.dataset.nativeCustomer==="1")return;
-    input.dataset.nativeCustomer="1";
-    input.addEventListener("input",refreshDatalist,true);
-    input.addEventListener("change",selectFromValue,true);
-    input.addEventListener("input",function(){
-      setTimeout(selectFromValue,0);
-    },true);
-    input.addEventListener("blur",function(){setTimeout(selectFromValue,80)});
-    refreshDatalist();
-  }
-  document.addEventListener("DOMContentLoaded",function(){
-    bind();setTimeout(bind,300);setTimeout(bind,1000);
-  });
-})();
-</script>
-
-<div id="saleCustomerModal" style="display:none;position:fixed;inset:0;background:rgba(0,0,0,.35);z-index:200000;align-items:center;justify-content:center;padding:20px">
-  <div class="card" style="width:min(560px,96vw);background:#fff;box-shadow:0 18px 50px rgba(0,0,0,.25);border-radius:14px">
-    <h2>Add New Customer</h2>
-    <label>Customer Name *</label>
-    <input id="saleCustomerName" autocomplete="name" placeholder="Enter customer name">
-    <label>Phone Number *</label>
-    <input id="saleCustomerPhone" autocomplete="tel" placeholder="Enter phone number">
-    <div class="actions" style="margin-top:14px">
-      <button id="saleCustomerSave" class="gold" type="button">Save Customer</button>
-      <button id="saleCustomerCancel" class="light" type="button">Cancel</button>
-    </div>
-    <div id="saleCustomerStatus"></div>
-  </div>
-</div>
-
-
-<script id="sale-customer-form-keyboard">
-document.addEventListener("DOMContentLoaded",function(){
- const n=document.getElementById("saleCustomerName"),p=document.getElementById("saleCustomerPhone");
- if(n&&p){
-   [n,p].forEach(x=>x.addEventListener("keydown",function(e){
-     if(e.key==="Escape")closeSaleCustomerForm();
-     if(e.key==="Enter"){e.preventDefault();saveSaleCustomer();}
-   }));
- }
-});
-</script>
-
-
-<script id="dermed-list-sale-style-v2">
-(function(){
-  const E=id=>document.getElementById(id);
-  const num=v=>Number(String(v??"").replace(/[^0-9.-]/g,""))||0;
-  const fmt=v=>typeof money==="function"?money(v):"$"+Number(v||0).toFixed(2);
-  const escv=v=>typeof esc==="function"?esc(v):String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
-  const attrv=v=>typeof attr==="function"?attr(v):String(v??"").replace(/"/g,"&quot;");
-  const getProducts=()=>Array.isArray(window.products)?window.products:[];
-  const getServices=()=>Array.isArray(window.services)?window.services:[];
-  const getPStock=id=>typeof productStock==="function"?productStock(id):999999;
-  const pItems=()=>window.dermedSaleItems||(window.dermedSaleItems=[]);
-  const sItems=()=>window.dermedServiceItems||(window.dermedServiceItems=[]);
-
-  function itemDiscount(base,type,value){
-    const v=Math.max(0,num(value));
-    return type==="percent"?Math.min(base,base*v/100):Math.min(base,v);
-  }
-
-  window.addSaleProduct=function(type,pid){
-    if(type!=="dermed"){ return; }
-    const p=getProducts().find(x=>String(x.id)===String(pid)); if(!p)return;
-    const arr=pItems();
-    if(arr.some(x=>String(x.product_id)===String(pid)))return;
-    arr.push({product_id:p.id,product_code:p.product_code,name:p.name,price:num(p.price),quantity:1,discount_type:"percent",discount_value:0});
-    renderItems();
-    const i=E("dermedItemSearch"); if(i)i.value="";
-    const r=E("dermedItemResults"); if(r){r.innerHTML="";r.classList.remove("show");}
-  };
-
-  window.addDermedService=function(id){
-    const s=getServices().find(x=>String(x.id)===String(id)); if(!s)return;
-    const arr=sItems();
-    if(arr.some(x=>String(x.service_id)===String(id)))return;
-    arr.push({service_id:s.id,service_code:s.service_code,name:s.name,service_type:s.service_type,price:num(s.price),quantity:1,discount_type:"percent",discount_value:0});
-    renderItems();
-    const i=E("dermedItemSearch"); if(i)i.value="";
-    const r=E("dermedItemResults"); if(r){r.innerHTML="";r.classList.remove("show");}
-  };
-
-  function renderItems(){
-    const body=E("dermedItems"); if(!body)return;
-    const rows=[];
-    pItems().forEach((x,i)=>rows.push(rowHtml(x,"product",i)));
-    sItems().forEach((x,i)=>rows.push(rowHtml(x,"service",i)));
-    body.innerHTML=rows.join("")||'<tr><td colspan="6" class="muted">No products or services added.</td></tr>';
-    bindRows();
-    updateTotals();
-  }
-
-  function rowHtml(x,kind,i){
-    const base=num(x.price)*Math.max(1,num(x.quantity));
-    const disc=itemDiscount(base,x.discount_type||"percent",x.discount_value||0);
-    const sub=Math.max(0,base-disc);
-    const label=kind==="product"?(x.name||"Product"):(x.name||"Service");
-    const code=kind==="product"?(x.product_code||""):(x.service_code||"");
-    const max=kind==="product"?Math.max(1,getPStock(x.product_id)+Math.max(0,num(x.quantity))):999999;
-    return `<tr class="dermed-item-row" data-kind="${kind}" data-index="${i}">
-      <td><strong>${escv(label)}</strong><div class="muted">${escv(code)}</div></td>
-      <td><input class="sale-item-qty dermed-qty" type="text" inputmode="numeric" value="${Math.max(1,num(x.quantity))}" ${kind==="product"?'max="'+max+'"':''}></td>
-      <td><input class="sale-item-price dermed-price" type="text" inputmode="decimal" value="${num(x.price).toFixed(2)}"></td>
-      <td><div class="sale-item-discount-wrap">
-        <select class="sale-item-discount-type dermed-disc-type"><option value="percent" ${(x.discount_type||"percent")==="percent"?"selected":""}>%</option><option value="usd" ${(x.discount_type||"percent")==="usd"?"selected":""}>USD</option></select>
-        <input class="sale-item-discount-value dermed-disc-value" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="${x.discount_value?attrv(x.discount_value):""}">
-      </div></td>
-      <td><input class="sale-item-subtotal dermed-subtotal" readonly value="${fmt(sub)}"></td>
-      <td><button class="danger" type="button" data-remove-dermed="${kind}:${i}">×</button></td>
-    </tr>`;
-  }
-
-  function bindRows(){
-    document.querySelectorAll("#dermedItems .dermed-item-row").forEach(tr=>{
-      const kind=tr.dataset.kind, i=Number(tr.dataset.index);
-      const arr=kind==="product"?pItems():sItems(), x=arr[i]; if(!x)return;
-      const q=tr.querySelector(".dermed-qty"), p=tr.querySelector(".dermed-price"), dt=tr.querySelector(".dermed-disc-type"), dv=tr.querySelector(".dermed-disc-value");
-      const sync=()=>{
-        x.quantity=Math.max(1,num(q.value));
-        if(kind==="product")x.quantity=Math.min(x.quantity,Math.max(1,getPStock(x.product_id)+1));
-        x.price=Math.max(0,num(p.value));
-        x.discount_type=dt.value;
-        x.discount_value=Math.max(0,num(dv.value));
-        updateTotals();
-        const base=x.price*x.quantity, d=itemDiscount(base,x.discount_type,x.discount_value);
-        const sub=tr.querySelector(".dermed-subtotal");if(sub)sub.value=fmt(Math.max(0,base-d));
-      };
-      [q,p,dv].forEach(el=>el.addEventListener("input",sync));
-      dt.addEventListener("change",sync);
-      const rm=tr.querySelector("[data-remove-dermed]");
-      if(rm)rm.onclick=()=>{arr.splice(i,1);renderItems()};
-    });
-  }
-
-  function calc(){
-    const productsTotal=pItems().reduce((sum,x)=>{
-      const base=num(x.price)*Math.max(1,num(x.quantity));return sum+Math.max(0,base-itemDiscount(base,x.discount_type||"percent",x.discount_value||0));
-    },0);
-    const servicesTotal=sItems().reduce((sum,x)=>{
-      const base=num(x.price)*Math.max(1,num(x.quantity));return sum+Math.max(0,base-itemDiscount(base,x.discount_type||"percent",x.discount_value||0));
-    },0);
-    const sub=productsTotal+servicesTotal;
-    const odType=E("dermedOverallDiscountType")?.value||"percent";
-    const odValue=num(E("dermedOverallDiscountValue")?.value);
-    const odAmount=itemDiscount(sub,odType,odValue);
-    const initial=Math.max(0,sub-odAmount);
-    const status=E("dermedPaymentStatus")?.value||"Paid";
-    const paid=Math.min(initial,num(E("dermedAmountPaidNow")?.value));
-    const due=Math.max(0,initial-paid);
-    let existingDue=0;
-    const bt=E("dermedBuyerType")?.value, bid=E("dermedBuyerId")?.value;
-    if(bt==="student" && typeof studentOutstanding==="function") existingDue=Math.max(0,studentOutstanding(bid));
-    return {sub,odType,odValue,odAmount,initial,status,paid,due,existingDue,grandDue:existingDue+due};
-  }
-
-  function updateTotals(){
-    const c=calc();
-    if(E("dermedItemsSubtotal"))E("dermedItemsSubtotal").textContent=fmt(c.sub);
-    if(E("dermedSummarySubtotal"))E("dermedSummarySubtotal").textContent=fmt(c.sub);
-    if(E("dermedSummaryDiscount"))E("dermedSummaryDiscount").textContent=c.odType==="percent"?`-${fmt(c.odAmount)} (${c.odValue}%)`:`-${fmt(c.odAmount)}`;
-    if(E("dermedInitialTotal"))E("dermedInitialTotal").textContent=fmt(c.initial);
-    if(E("dermedPaidBalanceDisplay"))E("dermedPaidBalanceDisplay").textContent=fmt(c.paid);
-    if(E("dermedDueDisplay"))E("dermedDueDisplay").textContent=fmt(c.due);
-    if(E("dermedGrandTotalDue"))E("dermedGrandTotalDue").textContent=fmt(c.grandDue);
-    if(E("dermedTotal"))E("dermedTotal").textContent=fmt(c.initial);
-  }
-
-  function paymentDefaults(){
-    const status=E("dermedPaymentStatus")?.value||"Paid", total=calc().initial, input=E("dermedAmountPaidNow");
-    if(!input)return;
-    if(status==="Paid")input.value=total.toFixed(2);
-    else if(status==="Due")input.value="0.00";
-    else input.value=Math.min(num(input.value),total).toFixed(2);
-    input.readOnly=status!=="Partial";
-    input.style.background=status==="Partial"?"#fff":"#f3f7f7";
-    updateTotals();
-  }
-
-  function reset(){
-    window.dermedSaleItems=[];window.dermedServiceItems=[];
-    if(E("dermedBuyerSearch"))E("dermedBuyerSearch").value="";
-    if(E("dermedBuyerType"))E("dermedBuyerType").value="";
-    if(E("dermedBuyerId"))E("dermedBuyerId").value="";
-    if(E("dermedBuyerHint"))E("dermedBuyerHint").textContent="Choose a student or customer. You can add a new customer.";
-    if(E("dermedSaleStaff"))E("dermedSaleStaff").value="";
-    if(E("dermedOverallDiscountType"))E("dermedOverallDiscountType").value="percent";
-    if(E("dermedOverallDiscountValue"))E("dermedOverallDiscountValue").value="";
-    if(E("dermedPaymentMethod"))E("dermedPaymentMethod").value="Cash";
-    if(E("dermedPaymentStatus"))E("dermedPaymentStatus").value="Paid";
-    if(E("dermedAmountPaidNow"))E("dermedAmountPaidNow").value="0.00";
-    if(E("dermedSaleNote"))E("dermedSaleNote").value="";
-    if(E("dermedItemSearch"))E("dermedItemSearch").value="";
-    if(E("dermedItemResults")){E("dermedItemResults").innerHTML="";E("dermedItemResults").classList.remove("show");}
-    if(E("dermedSaleTime")&&typeof setAutoTime==="function")setAutoTime("dermedSaleTime");
-    if(E("dermedReferenceNo")){
-      const max=(Array.isArray(window.salesRecords)?salesRecords:[]).filter(x=>String(x.sale_type||"").toUpperCase()==="DERMED").reduce((m,x)=>{const z=String(x.reference_no||"").match(/^DERMED-\d{4}-(\d+)$/);return z?Math.max(m,Number(z[1])):m},0);
-      E("dermedReferenceNo").value=`DERMED-${new Date().getFullYear()}-${String(max+1).padStart(4,"0")}`;
-    }
-    renderItems();paymentDefaults();
-  }
-
-  async function saveDermed(){
-    const buyerType=E("dermedBuyerType")?.value,buyerId=E("dermedBuyerId")?.value,staffId=E("dermedSaleStaff")?.value;
-    const c=calc(), items=pItems(), servicesArr=sItems();
-    if(!buyerType||!buyerId){msg(E("dermedStatus"),"Please select a Student or Customer.",true);return}
-    if(!staffId){msg(E("dermedStatus"),"Please select Sale Staff.",true);return}
-    if(!items.length&&!servicesArr.length){msg(E("dermedStatus"),"Add at least one product or service.",true);return}
-    for(const x of items){if(num(x.quantity)>getPStock(x.product_id)){msg(E("dermedStatus"),`Not enough stock for ${x.name}. Available: ${getPStock(x.product_id)}.`,true);return}}
-    const status=c.status, paid=c.paid;
-    if(status==="Paid" && paid+0.005<c.initial){msg(E("dermedStatus"),"Paid status requires the full Initial Total.",true);return}
-    if(status==="Due" && paid>0.005){msg(E("dermedStatus"),"Due status must have $0.00 paid.",true);return}
-    if(status==="Partial" && (paid<=0 || paid>=c.initial-0.005)){msg(E("dermedStatus"),"Partial Payment must be greater than $0 and less than the Initial Total.",true);return}
-    const buyer=buyerType==="student"?students.find(x=>String(x.id)===String(buyerId)):customers.find(x=>String(x.id)===String(buyerId));
-    const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
-    const now=phTime();
-    const code="DERMED", prefix=code+"-"+new Date().getFullYear()+"-";
-    const existing=(Array.isArray(salesRecords)?salesRecords:[]).filter(x=>String(x.sale_type||"").toUpperCase()===code);
-    let max=0;existing.forEach(x=>{const m=String(x.reference_no||"").match(new RegExp("^"+code+"-"+new Date().getFullYear()+"-(\\d+)$"));if(m)max=Math.max(max,Number(m[1]))});
-    const reference=prefix+String(max+1).padStart(4,"0");
-    const itemPayload=items.map(x=>{
-      const q=Math.max(1,num(x.quantity)),price=Math.max(0,num(x.price)),base=price*q,d=itemDiscount(base,x.discount_type||"percent",x.discount_value||0);
-      return {...x,quantity:q,unit_price:price,discount_type:x.discount_type||"percent",discount_value:num(x.discount_value),discount_amount:d,subtotal:Math.max(0,base-d),discount_input:(x.discount_type||"percent")==="percent"?`${num(x.discount_value)}%`:`$${num(x.discount_value).toFixed(2)}`};
-    });
-    const servicePayload=servicesArr.map(x=>{
-      const q=Math.max(1,num(x.quantity)),price=Math.max(0,num(x.price)),base=price*q,d=itemDiscount(base,x.discount_type||"percent",x.discount_value||0);
-      return {...x,quantity:q,unit_price:price,discount_type:x.discount_type||"percent",discount_value:num(x.discount_value),discount_amount:d,subtotal:Math.max(0,base-d),discount_input:(x.discount_type||"percent")==="percent"?`${num(x.discount_value)}%`:`$${num(x.discount_value).toFixed(2)}`};
-    });
-    const payload={
-      reference_no:reference,sale_type:code,sale_date:now.slice(0,10),sale_time:now.slice(11),
-      student_id:buyerType==="student"?buyerId:null,student_name:buyer?.full_name||buyer?.name||"",student_phone:buyer?.phone||"",
-      customer_id:buyerType==="customer"?buyerId:null,customer_type:buyerType,sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",
-      subtotal:c.sub,discount:c.odAmount,discount_type:c.odType,discount_value:c.odValue,shipping:0,grand_total:c.initial,
-      paid:paid,balance:c.due,payment_status:status,payment_method:E("dermedPaymentMethod").value,sale_status:"Completed",
-      items:itemPayload,service_items:servicePayload,service_total:servicePayload.reduce((n,x)=>n+Number(x.subtotal||0),0),
-      notes:E("dermedSaleNote").value.trim()
-    };
-    const btn=E("saveDermedSale");if(btn)btn.disabled=true;
-    try{
-      let r=await sb.from("medifella_sales").insert({...payload,created_by:adminUser.id}).select().single();
-      if(r.error && /sale_time|column .* does not exist/i.test(r.error.message||"")){
-        const p2={...payload};delete p2.sale_time;
-        r=await sb.from("medifella_sales").insert({...p2,created_by:adminUser.id}).select().single();
-      }
-      if(r.error)throw r.error;
-      if(paid>0){
-        const pr=await sb.from("medifella_sale_payments").insert({sale_id:String(r.data.id),amount:paid,payment_method:E("dermedPaymentMethod").value,payment_date:now.slice(0,10),note:status==="Partial"?"Partial Payment":"Paid in Full",created_by:adminUser.id});
-        if(pr.error)throw pr.error;
-      }
-      const movements=items.map(x=>({product_id:x.product_id,movement_type:"sale",quantity:Math.max(1,num(x.quantity)),staff_id:staffId,staff_name:staff?.name_en||"",stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));
-      if(movements.length){const mr=await sb.from("medifella_inventory_movements").insert(movements);if(mr.error)throw mr.error}
-      msg(E("dermedStatus"),`Dermed sale saved. Invoice ${reference}.`);
-      reset();
-      if(typeof loadSales==="function")await loadSales();
-      if(typeof loadStockMovements==="function")await loadStockMovements();
-      if(typeof showSaleInvoice==="function")showSaleInvoice(r.data.id);
-    }catch(e){console.error(e);msg(E("dermedStatus"),e.message||"Could not save Dermed sale.",true)}
-    finally{if(btn)btn.disabled=false}
-  }
-
-  function bind(){
-    if(!E("dermedItems"))return;
-    renderItems();
-    ["dermedOverallDiscountValue"].forEach(id=>E(id)?.addEventListener("input",updateTotals));
-    E("dermedOverallDiscountType")?.addEventListener("change",updateTotals);
-    E("dermedPaymentStatus")?.addEventListener("change",paymentDefaults);
-    E("dermedAmountPaidNow")?.addEventListener("input",updateTotals);
-    E("dermedPaymentMethod")?.addEventListener("change",updateTotals);
-    E("saveDermedSale")?.addEventListener("click",function(e){e.preventDefault();saveDermed()});
-    E("clearDermedSale")?.addEventListener("click",function(e){e.preventDefault();reset()});
-    E("dermedBuyerSearch")?.addEventListener("input",function(){setTimeout(updateTotals,0)});
-    E("dermedItemSearch")?.addEventListener("input",function(){if(!this.value.trim())E("dermedItemResults")&&(E("dermedItemResults").innerHTML="",E("dermedItemResults").classList.remove("show"))});
-    paymentDefaults();
-  }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind);else bind();
-  setTimeout(bind,800);
-})();
-</script>
-
-<style id="dermed-final-position-fix">
-#dermedSale .sale-header-grid > div:first-child{position:relative!important}
-#dermedBuyerResults{z-index:999999!important}
-#dermedItemResults{z-index:999999!important}
-</style>
-<script id="dermed-final-interaction-fix">
-(function(){
-function E(id){return document.getElementById(id)}
-function hide(id){var x=E(id);if(x){x.innerHTML="";x.classList.remove("show");x.style.display="none"}}
-document.addEventListener("pointerdown",function(e){
- var t=e.target&&e.target.closest?e.target.closest("#dermedItemResults [data-pid],#dermedItemResults [data-sid]"):null;
- if(!t)return;
- e.preventDefault();e.stopPropagation();
- if(t.hasAttribute("data-pid")&&typeof window.addSaleProduct==="function")window.addSaleProduct("dermed",t.getAttribute("data-pid"));
- if(t.hasAttribute("data-sid")&&typeof window.addDermedService==="function")window.addDermedService(t.getAttribute("data-sid"));
- var i=E("dermedItemSearch");if(i)i.value="";hide("dermedItemResults");
-},true);
-document.addEventListener("pointerdown",function(e){
- var t=e.target&&e.target.closest?e.target.closest("#dermedBuyerResults [data-bi]"):null;
- if(!t)return;
- e.preventDefault();e.stopPropagation();
- if(typeof window.chooseBuyer==="function")window.chooseBuyer("dermed",t.getAttribute("data-bt"),t.getAttribute("data-bi"));
- hide("dermedBuyerResults");
-},true);
-document.addEventListener("input",function(e){
- if(e.target&&e.target.id==="dermedItemSearch"&&!e.target.value.trim())hide("dermedItemResults");
- if(e.target&&e.target.id==="dermedBuyerSearch"&&!e.target.value.trim())hide("dermedBuyerResults");
-},true);
-})();
 </script>
 </body>
 </html>
