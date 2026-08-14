@@ -6401,3 +6401,81 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 }
 </style>
+
+
+<style id="dermed-logo-320x310-specificity-fix">
+/*
+ FINAL FIX:
+ The original invoice CSS uses the more-specific selector
+ #invoicePrint.invoice-print-a4 .mf-invoice-logo, so the previous
+ #invoicePrint .mf-invoice-logo rule could NOT override it.
+ Target the actual generated classes directly.
+*/
+
+/* A4 actual generated invoice */
+#invoicePrint.invoice-preview-a4 .mf-invoice-logo,
+#invoicePrint.invoice-print-a4 .mf-invoice-logo{
+  width:320px !important;
+  height:310px !important;
+  min-width:320px !important;
+  min-height:310px !important;
+  max-width:none !important;
+  max-height:none !important;
+  object-fit:contain !important;
+  display:block !important;
+}
+#invoicePrint.invoice-preview-a4 .mf-invoice-top,
+#invoicePrint.invoice-print-a4 .mf-invoice-top{
+  grid-template-columns:330px minmax(0,1fr) !important;
+  gap:10px !important;
+  align-items:start !important;
+}
+
+/* A5 actual generated invoice */
+#invoicePrint.invoice-preview-a5 .mf-invoice-logo,
+#invoicePrint.invoice-print-a5 .mf-invoice-logo{
+  width:320px !important;
+  height:310px !important;
+  min-width:320px !important;
+  min-height:310px !important;
+  max-width:none !important;
+  max-height:none !important;
+  object-fit:contain !important;
+  display:block !important;
+}
+#invoicePrint.invoice-preview-a5 .mf-invoice-top,
+#invoicePrint.invoice-print-a5 .mf-invoice-top{
+  grid-template-columns:330px minmax(0,1fr) !important;
+  gap:10px !important;
+  align-items:start !important;
+}
+
+/* Invoice export/print copies */
+#invoiceExportContent .invoice-export-a4 .mf-invoice-logo,
+#invoiceExportContent .invoice-export-a5 .mf-invoice-logo{
+  width:320px !important;
+  height:310px !important;
+  min-width:320px !important;
+  min-height:310px !important;
+  max-width:none !important;
+  max-height:none !important;
+  object-fit:contain !important;
+}
+#invoiceExportContent .invoice-export-a4 .mf-invoice-top,
+#invoiceExportContent .invoice-export-a5 .mf-invoice-top{
+  grid-template-columns:330px minmax(0,1fr) !important;
+  gap:10px !important;
+}
+
+/* Keep the requested Dermed gold branding */
+#invoicePrint .mf-school-kh,
+#invoicePrint .mf-school-en,
+#invoicePrint .mf-invoice-label .kh,
+#invoicePrint .mf-invoice-label .en,
+#invoiceOverlay .mf-school-kh,
+#invoiceOverlay .mf-school-en,
+#invoiceOverlay .mf-invoice-label .kh,
+#invoiceOverlay .mf-invoice-label .en{
+  color:#C9901E !important;
+}
+</style>
