@@ -5,6 +5,9 @@
 <title>Medi Fella Admin Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/jspdf-autotable@3.8.2/dist/jspdf.plugin.autotable.min.js"></script>
 <style>
 :root{--teal:#075e66;--gold:#c9a24e;--bg:#f5f8f8;--text:#203a3d;--muted:#6c7b7d;--line:#dce7e8;--danger:#9d2d2d}
 *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font-family:Arial,"Noto Sans",sans-serif}
@@ -2281,19 +2284,47 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
 <div id="productListPanel" class="product-panel card" style="margin-top:12px">
 <h2>Product List</h2>
-<div class="toolbar"><input id="productSearch" placeholder="Search Product ID or Product Name"><button id="productRefresh" class="light">Refresh</button></div>
+<div class="toolbar">
+<input id="productSearch" placeholder="Search Product ID or Product Name">
+<label style="display:flex;align-items:center;gap:6px">From <input id="productFromDate" type="date"></label>
+<label style="display:flex;align-items:center;gap:6px">To <input id="productToDate" type="date"></label>
+<button id="productRefresh" class="light">Refresh</button>
+<button id="productExcel" class="light">Download Excel</button>
+<button id="productPdf" class="light">Download PDF</button>
+</div>
 <div id="productList">Loading...</div>
 </div>
 
 <div id="stockHistoryPanel" class="product-panel card hidden" style="margin-top:12px">
 <h2>Stock History</h2>
-<div class="toolbar"><input id="stockSearch" placeholder="Search Product ID or Product Name"><button id="stockRefresh" class="light">Refresh</button></div>
+<div class="toolbar">
+<input id="stockSearch" placeholder="Search Product ID or Product Name">
+<label style="display:flex;align-items:center;gap:6px">From <input id="stockFromDate" type="date"></label>
+<label style="display:flex;align-items:center;gap:6px">To <input id="stockToDate" type="date"></label>
+<button id="stockRefresh" class="light">Refresh</button>
+<button id="stockExcel" class="light">Download Excel</button>
+<button id="stockPdf" class="light">Download PDF</button>
+</div>
 <div id="stockList">Loading...</div>
 </div>
 
 <div id="stockReportPanel" class="product-panel card hidden" style="margin-top:12px">
 <h2>Stock Report</h2>
-<div class="toolbar"><select id="stockReportType"><option value="out">Out of Stock Report</option><option value="alert">Alert Report (10 or less)</option><option value="daily">Daily Report</option><option value="weekly">Weekly Report</option><option value="monthly">Monthly Report</option><option value="yearly">Yearly Report</option></select><input id="stockReportDate" type="date"><button id="stockReportRefresh" class="light">Refresh</button></div>
+<div class="toolbar">
+<select id="stockReportType">
+<option value="out">Out of Stock Report</option>
+<option value="alert">Alert Report (10 or less)</option>
+<option value="daily">Daily Report</option>
+<option value="weekly">Weekly Report</option>
+<option value="monthly">Monthly Report</option>
+<option value="yearly">Yearly Report</option>
+</select>
+<label style="display:flex;align-items:center;gap:6px">From <input id="stockReportFromDate" type="date"></label>
+<label style="display:flex;align-items:center;gap:6px">To <input id="stockReportToDate" type="date"></label>
+<button id="stockReportRefresh" class="light">Refresh</button>
+<button id="stockReportExcel" class="light">Download Excel</button>
+<button id="stockReportPdf" class="light">Download PDF</button>
+</div>
 <div id="stockReportList">Loading...</div>
 </div>
 </section>
@@ -5080,19 +5111,30 @@ async function loadServices(){
  services=data||[]; renderServiceList(); renderServiceControls();
 }
 
+function inDateRange(value, fromId, toId){
+ const s=String(value||"").slice(0,10);
+ const from=$(fromId)?.value||"";
+ const to=$(toId)?.value||"";
+ if(from && s<from)return false;
+ if(to && s>to)return false;
+ return true;
+}
 function renderProductList(){
  if(!$("productList"))return;
  const q=($("productSearch")?.value||"").trim().toLowerCase();
- const rows=products.filter(p=>(`${p.product_code||""} ${p.name||""}`).toLowerCase().includes(q));
- $("productList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Product ID</th><th>Product Name</th><th>Price</th><th>Source</th><th>Action</th></tr>${rows.map(p=>`<tr><td>${esc(p.product_code)}</td><td>${esc(p.name)}</td><td>${money(p.price)}</td><td>${esc(sourceLabel(p))}</td><td><div class="actions"><button type="button" class="light" onclick="editProduct('${attr(p.id)}')">Edit</button><button type="button" class="danger" onclick="deleteProduct('${attr(p.id)}')">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No products found.</p>';
+ const rows=products.filter(p=>(`${p.product_code||""} ${p.name||""}`).toLowerCase().includes(q))
+   .filter(p=>inDateRange(p.created_at,"productFromDate","productToDate"));
+ $("productList").innerHTML=rows.length?`<div class="table-wrap"><table class="table" id="productListTable"><tr><th>Product ID</th><th>Product Name</th><th>Price</th><th>Source</th><th>Action</th></tr>${rows.map(p=>`<tr><td>${esc(p.product_code)}</td><td>${esc(p.name)}</td><td>${money(p.price)}</td><td>${esc(sourceLabel(p))}</td><td><div class="actions"><button type="button" class="light" onclick="editProduct('${attr(p.id)}')">Edit</button><button type="button" class="danger" onclick="deleteProduct('${attr(p.id)}')">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No products found.</p>';
 }
 function renderStockList(){
  if(!$("stockList"))return;
  const q=($("stockSearch")?.value||"").trim().toLowerCase();
  const rows=stockMovements.filter(m=>String(m.movement_type)==="stock_in").filter(m=>{
-   const p=products.find(x=>String(x.id)===String(m.product_id)); return (`${p?.product_code||""} ${p?.name||""}`).toLowerCase().includes(q);
+   const p=products.find(x=>String(x.id)===String(m.product_id));
+   return (`${p?.product_code||""} ${p?.name||""}`).toLowerCase().includes(q)
+     && inDateRange(m.stock_time||m.created_at,"stockFromDate","stockToDate");
  });
- $("stockList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Product ID</th><th>Product</th><th>Amount</th><th>Staff</th><th>In Stock Time</th><th>Action</th></tr>${rows.map(m=>{const p=products.find(x=>String(x.id)===String(m.product_id));const st=staffInfoRecords.find(x=>String(x.id)===String(m.staff_id));return `<tr><td>${esc(p?.product_code||"")}</td><td>${esc(p?.name||"")}</td><td>${esc(m.quantity)}</td><td>${esc(st?.name_en||m.staff_name||"")}</td><td>${esc(m.stock_time||m.created_at||"")}</td><td><div class="actions"><button type="button" class="light" onclick="editStock('${attr(m.id)}')">Edit</button><button type="button" class="danger" onclick="deleteStock('${attr(m.id)}')">Delete</button></div></td></tr>`}).join("")}</table></div>`:'<p class="muted">No stock records found.</p>';
+ $("stockList").innerHTML=rows.length?`<div class="table-wrap"><table class="table" id="stockListTable"><tr><th>Product ID</th><th>Product</th><th>Amount</th><th>Staff</th><th>In Stock Time</th><th>Action</th></tr>${rows.map(m=>{const p=products.find(x=>String(x.id)===String(m.product_id));const st=staffInfoRecords.find(x=>String(x.id)===String(m.staff_id));return `<tr><td>${esc(p?.product_code||"")}</td><td>${esc(p?.name||"")}</td><td>${esc(m.quantity)}</td><td>${esc(st?.name_en||m.staff_name||"")}</td><td>${esc(m.stock_time||m.created_at||"")}</td><td><div class="actions"><button type="button" class="light" onclick="editStock('${attr(m.id)}')">Edit</button><button type="button" class="danger" onclick="deleteStock('${attr(m.id)}')">Delete</button></div></td></tr>`}).join("")}</table></div>`:'<p class="muted">No stock records found.</p>';
 }
 function renderStaffInfoList(){
  if(!$("staffInfoList"))return;
@@ -5165,19 +5207,22 @@ function chooseBuyer(type,btype,id){
 function renderStockReport(){
  const box=$("stockReportList");if(!box)return;
  const type=$("stockReportType").value;
- const date=$("stockReportDate").value||new Date().toISOString().slice(0,10);
+ const date=($("stockReportFromDate")?.value||new Date().toISOString().slice(0,10));
+ const from=$("stockReportFromDate")?.value||date;
+ const to=$("stockReportToDate")?.value||from;
  if(type==="out"||type==="alert"){
    const rows=products.filter(p=>type==="out"?productStock(p.id)<=0:productStock(p.id)<=10);
    box.innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Product ID</th><th>Product</th><th>Price</th><th>Remaining Stock</th></tr>${rows.map(p=>`<tr><td>${esc(p.product_code)}</td><td>${esc(p.name)}</td><td>${money(p.price)}</td><td><strong>${productStock(p.id)}</strong></td></tr>`).join("")}</table></div>`:'<p class="muted">No products match this report.</p>';return;
  }
- const d=new Date(date+"T00:00:00");
- const sales=salesRecords.filter(s=>String(s.sale_type||"").toLowerCase()===(type==="daily"?"":String(s.sale_type||"").toLowerCase())||true);
- const rows=sales.filter(s=>{const sd=String(s.sale_date||s.created_at||"").slice(0,10);return type==="daily"?sd===date:true});
+ const sales=salesRecords;
+ const rows=sales.filter(s=>{
+   const sd=String(s.sale_date||s.created_at||"").slice(0,10);
+   return sd>=from && sd<=to;
+ });
  const aggregate=(list)=>list.reduce((a,s)=>{const items=Array.isArray(s.items)?s.items:[];items.forEach(it=>{if(it.product_id)a.push({date:String(s.sale_date||s.created_at||"").slice(0,10),product:it.name||it.product_name||"",qty:Number(it.quantity||it.qty||0),status:s.sale_type||"Sale",staff:s.sale_staff_name||s.staff_name||""})});return a},[]);
  let details=aggregate(rows);
  if(type!=="daily"){
-   const month=date.slice(0,7),year=date.slice(0,4);
-   details=aggregate(salesRecords.filter(s=>String(s.sale_date||s.created_at||"").startsWith(type==="monthly"?month:year)));
+   details=aggregate(rows);
  }
  const totals=details.reduce((a,x)=>{const p=products.find(p=>p.name===x.product);const cost=Number(p?.cost||0)*x.qty,price=Number(p?.price||0)*x.qty;a.cost+=cost;a.price+=price;return a},{cost:0,price:0});
  if(type==="weekly"||type==="monthly"||type==="yearly"){
@@ -5189,6 +5234,65 @@ function renderStockReport(){
    box.innerHTML=`<div class="card"><strong>${esc(date)}</strong><div class="muted">Total Cost ${money(totals.cost)} · Total Price ${money(totals.price)} · Total Income ${money(totals.price-totals.cost)}</div></div><div class="table-wrap" style="margin-top:10px"><table class="table"><tr><th>Date</th><th>Product Information</th><th>Sold Amount</th><th>Status</th><th>Sale Staff</th></tr>${details.map(x=>`<tr><td>${esc(x.date)}</td><td>${esc(x.product)}</td><td>${x.qty}</td><td>${esc(x.status)}</td><td>${esc(x.staff)}</td></tr>`).join("")}</table></div>`;
  }
 }
+
+function tableToRows(tableId){
+ const table=$(tableId); if(!table)return [];
+ return [...table.querySelectorAll("tr")].map(tr=>[...tr.children].map(td=>td.innerText.trim())).filter(r=>r.length);
+}
+function downloadExcel(rows,filename,sheetName="Report"){
+ if(!window.XLSX){alert("Excel export library is still loading. Please try again.");return;}
+ const ws=XLSX.utils.aoa_to_sheet(rows);
+ const wb=XLSX.utils.book_new();
+ XLSX.utils.book_append_sheet(wb,ws,sheetName.slice(0,31));
+ XLSX.writeFile(wb,filename);
+}
+function downloadPdf(rows,filename,title){
+ if(!window.jspdf){alert("PDF export library is still loading. Please try again.");return;}
+ const {jsPDF}=window.jspdf;
+ const doc=new jsPDF({orientation:"landscape",unit:"pt",format:"a4"});
+ doc.setFontSize(16); doc.text(title,40,36);
+ const body=rows.slice(1);
+ const head=rows.length?[rows[0]]:[[]];
+ if(doc.autoTable)doc.autoTable({head,body,startY:50,styles:{fontSize:8},margin:{left:30,right:30}});
+ else {let y=60; rows.forEach(r=>{doc.text(r.join(" | ").slice(0,150),40,y);y+=14;if(y>550){doc.addPage();y=40;}});}
+ doc.save(filename);
+}
+function reportExportRows(){
+ const type=$("stockReportType")?.value||"out";
+ const box=$("stockReportList");
+ const table=box?.querySelector("table");
+ if(table)return tableToRows(table.id||"stockReportTable");
+ const rows=[["Report","Details"]];
+ const cards=box?.querySelectorAll(".card,details")||[];
+ cards.forEach(el=>rows.push([el.innerText.replace(/\n+/g," | ").trim(),""]));
+ return rows.length>1?rows:[["Report","No data"]];
+}
+$("productExcel")?.addEventListener("click",()=>{
+ const rows=tableToRows("productListTable");
+ downloadExcel(rows,`Product_List_${$("productFromDate")?.value||"all"}_to_${$("productToDate")?.value||"all"}.xlsx`,"Product List");
+});
+$("productPdf")?.addEventListener("click",()=>{
+ const rows=tableToRows("productListTable");
+ downloadPdf(rows,`Product_List_${Date.now()}.pdf`,"Product List");
+});
+$("stockExcel")?.addEventListener("click",()=>{
+ const rows=tableToRows("stockListTable");
+ downloadExcel(rows,`Stock_History_${$("stockFromDate")?.value||"all"}_to_${$("stockToDate")?.value||"all"}.xlsx`,"Stock History");
+});
+$("stockPdf")?.addEventListener("click",()=>{
+ const rows=tableToRows("stockListTable");
+ downloadPdf(rows,`Stock_History_${Date.now()}.pdf`,"Stock History");
+});
+$("stockReportExcel")?.addEventListener("click",()=>{
+ downloadExcel(reportExportRows(),`Stock_Report_${$("stockReportFromDate")?.value||"all"}_to_${$("stockReportToDate")?.value||"all"}.xlsx`,"Stock Report");
+});
+$("stockReportPdf")?.addEventListener("click",()=>{
+ downloadPdf(reportExportRows(),`Stock_Report_${Date.now()}.pdf`,"Stock Report");
+});
+["productSearch","productFromDate","productToDate"].forEach(id=>$(id)?.addEventListener("input",renderProductList));
+["stockSearch","stockFromDate","stockToDate"].forEach(id=>$(id)?.addEventListener("input",renderStockList));
+["stockReportType","stockReportFromDate","stockReportToDate"].forEach(id=>$(id)?.addEventListener("change",renderStockReport));
+
 function renderProductSearchResults(){
  const input=$("stockProductSearch"),res=$("stockProductResults");if(!input||!res)return;
  const q=(input.value||"").toLowerCase().trim();const rows=products.filter(x=>(`${x.product_code||""} ${x.name||""}`).toLowerCase().includes(q)).slice(0,15);
