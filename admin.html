@@ -4088,6 +4088,36 @@ function openPrintFromCanvas(canvas,paper,sale){
      setTimeout(()=>window.print(),300);
    };
  <\/script>
+<style id="dermed-final-position-fix">
+#dermedSale .sale-header-grid > div:first-child{position:relative!important}
+#dermedBuyerResults{z-index:999999!important}
+#dermedItemResults{z-index:999999!important}
+</style>
+<script id="dermed-final-interaction-fix">
+(function(){
+function E(id){return document.getElementById(id)}
+function hide(id){var x=E(id);if(x){x.innerHTML="";x.classList.remove("show");x.style.display="none"}}
+document.addEventListener("pointerdown",function(e){
+ var t=e.target&&e.target.closest?e.target.closest("#dermedItemResults [data-pid],#dermedItemResults [data-sid]"):null;
+ if(!t)return;
+ e.preventDefault();e.stopPropagation();
+ if(t.hasAttribute("data-pid")&&typeof window.addSaleProduct==="function")window.addSaleProduct("dermed",t.getAttribute("data-pid"));
+ if(t.hasAttribute("data-sid")&&typeof window.addDermedService==="function")window.addDermedService(t.getAttribute("data-sid"));
+ var i=E("dermedItemSearch");if(i)i.value="";hide("dermedItemResults");
+},true);
+document.addEventListener("pointerdown",function(e){
+ var t=e.target&&e.target.closest?e.target.closest("#dermedBuyerResults [data-bi]"):null;
+ if(!t)return;
+ e.preventDefault();e.stopPropagation();
+ if(typeof window.chooseBuyer==="function")window.chooseBuyer("dermed",t.getAttribute("data-bt"),t.getAttribute("data-bi"));
+ hide("dermedBuyerResults");
+},true);
+document.addEventListener("input",function(e){
+ if(e.target&&e.target.id==="dermedItemSearch"&&!e.target.value.trim())hide("dermedItemResults");
+ if(e.target&&e.target.id==="dermedBuyerSearch"&&!e.target.value.trim())hide("dermedBuyerResults");
+},true);
+})();
+</script>
 </body>
 </html>`;
 
@@ -4113,7 +4143,37 @@ async function printInvoice(id,size="A4"){
  }
 
  printWin.document.open();
- printWin.document.write("<!doctype html><html><head><title>Preparing invoice...</title></head><body style='font-family:sans-serif;padding:30px'>Preparing invoice...</body></html>");
+ printWin.document.write("<!doctype html><html><head><title>Preparing invoice...</title></head><body style='font-family:sans-serif;padding:30px'>Preparing invoice...<style id="dermed-final-position-fix">
+#dermedSale .sale-header-grid > div:first-child{position:relative!important}
+#dermedBuyerResults{z-index:999999!important}
+#dermedItemResults{z-index:999999!important}
+</style>
+<script id="dermed-final-interaction-fix">
+(function(){
+function E(id){return document.getElementById(id)}
+function hide(id){var x=E(id);if(x){x.innerHTML="";x.classList.remove("show");x.style.display="none"}}
+document.addEventListener("pointerdown",function(e){
+ var t=e.target&&e.target.closest?e.target.closest("#dermedItemResults [data-pid],#dermedItemResults [data-sid]"):null;
+ if(!t)return;
+ e.preventDefault();e.stopPropagation();
+ if(t.hasAttribute("data-pid")&&typeof window.addSaleProduct==="function")window.addSaleProduct("dermed",t.getAttribute("data-pid"));
+ if(t.hasAttribute("data-sid")&&typeof window.addDermedService==="function")window.addDermedService(t.getAttribute("data-sid"));
+ var i=E("dermedItemSearch");if(i)i.value="";hide("dermedItemResults");
+},true);
+document.addEventListener("pointerdown",function(e){
+ var t=e.target&&e.target.closest?e.target.closest("#dermedBuyerResults [data-bi]"):null;
+ if(!t)return;
+ e.preventDefault();e.stopPropagation();
+ if(typeof window.chooseBuyer==="function")window.chooseBuyer("dermed",t.getAttribute("data-bt"),t.getAttribute("data-bi"));
+ hide("dermedBuyerResults");
+},true);
+document.addEventListener("input",function(e){
+ if(e.target&&e.target.id==="dermedItemSearch"&&!e.target.value.trim())hide("dermedItemResults");
+ if(e.target&&e.target.id==="dermedBuyerSearch"&&!e.target.value.trim())hide("dermedBuyerResults");
+},true);
+})();
+</script>
+</body></html>");
  printWin.document.close();
 
  try{
@@ -4215,6 +4275,36 @@ async function printInvoice(id,size="A4"){
 <script>
 window.onload=function(){setTimeout(function(){window.print();},250);};
 <\/script>
+<style id="dermed-final-position-fix">
+#dermedSale .sale-header-grid > div:first-child{position:relative!important}
+#dermedBuyerResults{z-index:999999!important}
+#dermedItemResults{z-index:999999!important}
+</style>
+<script id="dermed-final-interaction-fix">
+(function(){
+function E(id){return document.getElementById(id)}
+function hide(id){var x=E(id);if(x){x.innerHTML="";x.classList.remove("show");x.style.display="none"}}
+document.addEventListener("pointerdown",function(e){
+ var t=e.target&&e.target.closest?e.target.closest("#dermedItemResults [data-pid],#dermedItemResults [data-sid]"):null;
+ if(!t)return;
+ e.preventDefault();e.stopPropagation();
+ if(t.hasAttribute("data-pid")&&typeof window.addSaleProduct==="function")window.addSaleProduct("dermed",t.getAttribute("data-pid"));
+ if(t.hasAttribute("data-sid")&&typeof window.addDermedService==="function")window.addDermedService(t.getAttribute("data-sid"));
+ var i=E("dermedItemSearch");if(i)i.value="";hide("dermedItemResults");
+},true);
+document.addEventListener("pointerdown",function(e){
+ var t=e.target&&e.target.closest?e.target.closest("#dermedBuyerResults [data-bi]"):null;
+ if(!t)return;
+ e.preventDefault();e.stopPropagation();
+ if(typeof window.chooseBuyer==="function")window.chooseBuyer("dermed",t.getAttribute("data-bt"),t.getAttribute("data-bi"));
+ hide("dermedBuyerResults");
+},true);
+document.addEventListener("input",function(e){
+ if(e.target&&e.target.id==="dermedItemSearch"&&!e.target.value.trim())hide("dermedItemResults");
+ if(e.target&&e.target.id==="dermedBuyerSearch"&&!e.target.value.trim())hide("dermedBuyerResults");
+},true);
+})();
+</script>
 </body>
 </html>`;
 
@@ -6146,6 +6236,36 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
+<style id="dermed-final-position-fix">
+#dermedSale .sale-header-grid > div:first-child{position:relative!important}
+#dermedBuyerResults{z-index:999999!important}
+#dermedItemResults{z-index:999999!important}
+</style>
+<script id="dermed-final-interaction-fix">
+(function(){
+function E(id){return document.getElementById(id)}
+function hide(id){var x=E(id);if(x){x.innerHTML="";x.classList.remove("show");x.style.display="none"}}
+document.addEventListener("pointerdown",function(e){
+ var t=e.target&&e.target.closest?e.target.closest("#dermedItemResults [data-pid],#dermedItemResults [data-sid]"):null;
+ if(!t)return;
+ e.preventDefault();e.stopPropagation();
+ if(t.hasAttribute("data-pid")&&typeof window.addSaleProduct==="function")window.addSaleProduct("dermed",t.getAttribute("data-pid"));
+ if(t.hasAttribute("data-sid")&&typeof window.addDermedService==="function")window.addDermedService(t.getAttribute("data-sid"));
+ var i=E("dermedItemSearch");if(i)i.value="";hide("dermedItemResults");
+},true);
+document.addEventListener("pointerdown",function(e){
+ var t=e.target&&e.target.closest?e.target.closest("#dermedBuyerResults [data-bi]"):null;
+ if(!t)return;
+ e.preventDefault();e.stopPropagation();
+ if(typeof window.chooseBuyer==="function")window.chooseBuyer("dermed",t.getAttribute("data-bt"),t.getAttribute("data-bi"));
+ hide("dermedBuyerResults");
+},true);
+document.addEventListener("input",function(e){
+ if(e.target&&e.target.id==="dermedItemSearch"&&!e.target.value.trim())hide("dermedItemResults");
+ if(e.target&&e.target.id==="dermedBuyerSearch"&&!e.target.value.trim())hide("dermedBuyerResults");
+},true);
+})();
+</script>
 </body>
 </html>
 
