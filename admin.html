@@ -3585,7 +3585,15 @@ $("salesRefresh").onclick=loadSales;
 $("salesSearch").oninput=renderSales;
 $("salesPaymentFilter").onchange=renderSales;
 
-$("newSaleStudentBtn").onclick=()=>{$("saleStudentModal").classList.add("show");$("saleNewStudentName").focus()};
+$("newSaleStudentBtn").onclick=function(e){
+ e.preventDefault();
+ const modal=$("saleStudentModal");
+ if(!modal)return;
+ modal.classList.add("show");
+ modal.style.display="flex";
+ const name=$("saleNewStudentName");
+ if(name){name.value="";setTimeout(()=>name.focus(),50);}
+};
 $("closeSaleStudentModal").onclick=()=>{$("saleStudentModal").classList.remove("show");clearMsg($("saleNewStudentStatus"))};
 $("cancelSaleNewStudent").onclick=()=>{$("saleStudentModal").classList.remove("show");clearMsg($("saleNewStudentStatus"))};
 $("saleStudentModal").onclick=e=>{if(e.target.id==="saleStudentModal")$("saleStudentModal").classList.remove("show")};
@@ -4316,34 +4324,89 @@ function startSaleForStudent(studentId){
 
 $("saveSale").onclick=async()=>{
  clearMsg($("newSaleStatus"));
- selectSaleStudentByInput();
 
- const studentId=$("saleStudentId").value;
- const student=students.find(s=>String(s.id)===String(studentId));
- const calc=calculateSaleTotal();
- const isEdit=!!editingSaleId;
-
- const saleDateTime=isEdit ? String($("saleDate").value||"") : updateSaleDateTimeDisplay();
- const saleDate=saleDateForDb(saleDateTime);
- const saleTime=saleTimeForDb(saleDateTime);
- const reference=$("saleReference").value.trim()||nextSaleReference();
-
- if(!student){msg($("newSaleStatus"),"Please select a student/customer by name, Student ID or phone.",true);return}
- if(!saleDateTime){msg($("newSaleStatus"),"Please select the sale date and time.",true);return}
- if(!calc.items.length){msg($("newSaleStatus"),"Add at least one course or product.",true);return}
-
- const existingPaid=isEdit ? Math.max(0,editingSaleOriginalPaid) : 0;
- const amountPaid=isEdit ? Math.min(existingPaid,calc.initialTotal) : calc.paidNow;
- const status=isEdit ? saleStatus(calc.initialTotal,amountPaid) : $("salePaymentStatus").value;
-
- if(!isEdit){
-   if(status==="Paid"&&amountPaid+0.005<calc.initialTotal){msg($("newSaleStatus"),"Paid status requires the full Initial Total.",true);return}
-   if(status==="Due"&&amountPaid>0.005){msg($("newSaleStatus"),"Due status must have $0.00 paid.",true);return}
-   if(status==="Partial"&&(amountPaid<=0||amountPaid>=calc.initialTotal-0.005)){msg($("newSaleStatus"),"Partial Payment must be greater than $0 and less than the Initial Total.",true);return}
- }
-
- $("saveSale").disabled=true;
  try{
+   selectSaleStudentByInput();
+
+   const studentId=String($("saleStudentId")?.value||"").trim();
+   const student=students.find(s=>String(s.id)===studentId);
+   if(!student){
+     msg($("newSaleStatus"),"Please select a student by name, Student ID or phone.",true);
+     return;
+   }
+
+   const isEdit=!!editingSaleId;
+   const saleDateTime=isEdit
+     ? String($("saleDate")?.value||"")
+     : String(updateSaleDateTimeDisplay()||$("saleDate")?.value||"");
+
+   const saleDate=saleDateForDb(saleDateTime);
+   const saleTime=saleTimeForDb(saleDateTime);
+   const reference=String($("saleReference")?.value||"").trim()||nextSaleReference();
+
+   // Read the visible table directly so Save Sale does not depend on
+   // an earlier course-picker implementation.
+   const rows=[...document.querySelectorAll("#saleItems .sale-item")];
+   const items=rows.map(w=>{
+     const courseId=String(w.querySelector(".sale-course-id")?.value||"").trim();
+     const courseName=String(w.querySelector(".sale-course-name")?.textContent||"").trim();
+     const price=parseMoneyInput(w.querySelector(".sale-item-price")?.value);
+     const quantity=Math.max(1,parseInt(w.querySelector(".sale-item-qty")?.value,10)||1);
+     const type=w.querySelector(".sale-item-discount-type")?.value||"percent";
+     const value=parseMoneyInput(w.querySelector(".sale-item-discount-value")?.value);
+     const base=price*quantity;
+     const discount=type==="percent"
+       ? Math.min(base,base*value/100)
+       : Math.min(base,value);
+     return {
+       name:courseName,
+       course_id:courseId||null,
+       unit_price:price,
+       quantity,
+       discount_input:type==="percent"?`${value}%`:`$${value.toFixed(2)}`,
+       discount_amount:discount,
+       discount_type:type,
+       discount_value:value,
+       subtotal:Math.max(0,base-discount)
+     };
+   }).filter(x=>x.name);
+
+   if(!saleDateTime){
+     msg($("newSaleStatus"),"Sale Date & Time is required.",true);
+     return;
+   }
+   if(!items.length){
+     msg($("newSaleStatus"),"Please search and select at least one course.",true);
+     return;
+   }
+
+   const subInitialTotal=items.reduce((a,x)=>a+x.subtotal,0);
+   const discountType=$("saleOverallDiscountType")?.value||"percent";
+   const discountValue=parseMoneyInput($("saleOverallDiscountValue")?.value);
+   const overallAmount=discountType==="percent"
+     ? Math.min(subInitialTotal,subInitialTotal*discountValue/100)
+     : Math.min(subInitialTotal,discountValue);
+   const initialTotal=Math.max(0,subInitialTotal-overallAmount);
+
+   let amountPaid=isEdit
+     ? Math.min(Math.max(0,editingSaleOriginalPaid),initialTotal)
+     : Math.min(initialTotal,parseMoneyInput($("saleAmountPaidNow")?.value));
+
+   const status=isEdit
+     ? saleStatus(initialTotal,amountPaid)
+     : String($("salePaymentStatus")?.value||"Due");
+
+   if(!isEdit){
+     if(status==="Paid") amountPaid=initialTotal;
+     else if(status==="Due") amountPaid=0;
+     else if(status==="Partial"){
+       if(amountPaid<=0 || amountPaid>=initialTotal){
+         msg($("newSaleStatus"),"Partial Payment must be greater than $0 and less than the total.",true);
+         return;
+       }
+     }
+   }
+
    const payload={
      reference_no:reference,
      sale_date:saleDate,
@@ -4351,51 +4414,70 @@ $("saveSale").onclick=async()=>{
      student_id:String(student.id),
      student_name:student.full_name||"",
      student_phone:student.phone||"",
-     subtotal:calc.subInitialTotal,
-     discount:calc.overall.amount,
+     subtotal:subInitialTotal,
+     discount:overallAmount,
      shipping:0,
-     grand_total:calc.initialTotal,
+     grand_total:initialTotal,
      paid:amountPaid,
-     balance:Math.max(0,calc.initialTotal-amountPaid),
+     balance:Math.max(0,initialTotal-amountPaid),
      payment_status:status,
      sale_status:"Completed",
-     items:calc.items,
-     notes:$("saleNote").value.trim()
+     items,
+     notes:String($("saleNote")?.value||"").trim()
    };
 
+   const saveBtn=$("saveSale");
+   if(saveBtn)saveBtn.disabled=true;
+
+   let saved;
    if(isEdit){
-     const{error}=await sb.from("medifella_sales").update(payload).eq("id",editingSaleId);
-     if(error)throw error;
+     let r=await sb.from("medifella_sales").update(payload).eq("id",editingSaleId).select().single();
+     if(r.error && /sale_time|column .* does not exist/i.test(r.error.message||"")){
+       const p2={...payload};delete p2.sale_time;
+       r=await sb.from("medifella_sales").update(p2).eq("id",editingSaleId).select().single();
+     }
+     if(r.error)throw r.error;
+     saved=r.data;
      clearSaleEditMode();
-     msg($("newSaleStatus"),"Invoice updated successfully.");
    }else{
      const createPayload={...payload,created_by:adminUser.id};
-     let result=await sb.from("medifella_sales").insert(createPayload).select().single();
-     if(result.error&&/sale_time|column .* does not exist/i.test(result.error.message||"")){
-       delete createPayload.sale_time;
-       result=await sb.from("medifella_sales").insert(createPayload).select().single();
+     let r=await sb.from("medifella_sales").insert(createPayload).select().single();
+     if(r.error && /sale_time|column .* does not exist/i.test(r.error.message||"")){
+       const p2={...createPayload};delete p2.sale_time;
+       r=await sb.from("medifella_sales").insert(p2).select().single();
      }
-     if(result.error)throw result.error;
+     if(r.error)throw r.error;
+     saved=r.data;
 
      if(amountPaid>0){
-       const{error:pe}=await sb.from("medifella_sale_payments").insert({
-         sale_id:String(result.data.id),amount:amountPaid,
-         payment_method:$("salePaymentMethod").value,
+       const pr=await sb.from("medifella_sale_payments").insert({
+         sale_id:String(saved.id),
+         amount:amountPaid,
+         payment_method:String($("salePaymentMethod")?.value||"Cash"),
          payment_date:saleDate,
          note:status==="Partial"?"Partial Payment":"Paid in Full",
          created_by:adminUser.id
        });
-       if(pe)throw pe;
+       if(pr.error)throw pr.error;
      }
-     msg($("newSaleStatus"),"Sale saved successfully.");
    }
 
-   $("saleForm").classList.add("hidden");
+   msg($("newSaleStatus"),isEdit?"Invoice updated successfully.":"Sale saved successfully.");
+
    await loadSales();
+   setSaleFormCollapsed(true);
+
+   // Open the newly saved/updated invoice.
+   if(saved?.id && typeof showSaleInvoice==="function"){
+     showSaleInvoice(saved.id,"A4");
+   }
+
  }catch(e){
-   msg($("newSaleStatus"),e.message||"Could not save sale.",true);
+   console.error("Medi Fella Sale save error:",e);
+   msg($("newSaleStatus"),e?.message||"Could not save sale. Please check the required fields and try again.",true);
  }finally{
-   $("saveSale").disabled=false;
+   const saveBtn=$("saveSale");
+   if(saveBtn)saveBtn.disabled=false;
  }
 };
 
@@ -6965,5 +7047,22 @@ document.addEventListener("DOMContentLoaded",function(){
     wrapped.__v30Wrapped=true;
     window.loadCourses=wrapped;
   }
+})();
+</script>
+
+<script id="new-student-final-fix-v33">
+(function(){
+ document.addEventListener("click",function(e){
+   const btn=e.target.closest("#newSaleStudentBtn");
+   if(!btn)return;
+   e.preventDefault();
+   e.stopPropagation();
+   const modal=document.getElementById("saleStudentModal");
+   if(!modal)return;
+   modal.classList.add("show");
+   modal.style.display="flex";
+   const name=document.getElementById("saleNewStudentName");
+   if(name)setTimeout(function(){name.focus()},50);
+ });
 })();
 </script>
