@@ -2373,7 +2373,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <h1>MTS Sale</h1>
 <div class="card sale-form-shell">
 <div class="sale-header-grid">
-<div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="mtsBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="mtsNewCustomer" class="gold" type="button">+ Customer</button></div><div id="mtsBuyerResults" class="sale-course-picker-results"></div><input id="mtsBuyerType" <input id="mtsBuyerId" <div id="mtsBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
+<div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="mtsBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="mtsNewCustomer" class="gold" type="button">+ Customer</button></div><div id="mtsBuyerResults" class="sale-course-picker-results"></div><input id="mtsBuyerType" type="hidden"><input id="mtsBuyerId" type="hidden"><div id="mtsBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
 <div><label>Sale Staff *</label><select id="mtsSaleStaff"></select></div>
 <div><label>Sale Date & Time</label><input id="mtsSaleTime" readonly></div>
 </div>
@@ -2391,13 +2391,13 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div class="card sale-form-shell">
 <div class="sale-header-grid">
 <div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="dermedBuyerSearch" list="dermedBuyerDatalist" autocomplete="off" placeholder="Search Student or Customer">
-<datalist id="dermedBuyerDatalist"></datalist><button id="dermedNewCustomer" class="gold" type="button">+ Customer</button></div><div id="dermedBuyerResults" class="sale-course-picker-results"></div><input id="dermedBuyerType" <input id="dermedBuyerId" <div id="dermedBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
+<datalist id="dermedBuyerDatalist"></datalist><button id="dermedNewCustomer" class="gold" type="button">+ Customer</button></div><div id="dermedBuyerResults" class="sale-course-picker-results"></div><input id="dermedBuyerType" type="hidden"><input id="dermedBuyerId" type="hidden"><div id="dermedBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
 <div><label>Sale Staff *</label><select id="dermedSaleStaff"></select></div>
 <div><label>Reference No.</label><input id="dermedReferenceNo" readonly placeholder="Auto-generate"></div>
 <div><label>Sale Date & Time</label><input id="dermedSaleTime" readonly></div>
 </div>
-<label style="margin-top:18px">Search Product / Service</label><div style="position:relative"><input id="dermedItemSearch" autocomplete="off" placeholder="Search Product or Service name / ID"><div id="dermedItemResults" class="sale-course-picker-results"></div></div> <div class="table-wrap"><table class="table"><thead><tr><th>Product / Service</th><th>Type</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr></thead><tbody id="dermedItems"></tbody></table></div> <input id="dermedProductSearch"  <div id="dermedProductResults" style="display:none"></div>
-<input id="dermedServiceSearch" <div id="dermedServiceResults" style="display:none"></div>
+<label style="margin-top:18px">Search Product / Service</label><div style="position:relative"><input id="dermedItemSearch" autocomplete="off" placeholder="Search Product or Service name / ID"><div id="dermedItemResults" class="sale-course-picker-results"></div></div> <div class="table-wrap"><table class="table"><thead><tr><th>Product / Service</th><th>Type</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr></thead><tbody id="dermedItems"></tbody></table></div> <input id="dermedProductSearch" type="hidden"><div id="dermedProductResults" style="display:none"></div>
+<input id="dermedServiceSearch" type="hidden"><div id="dermedServiceResults" style="display:none"></div>
 <div class="sale-summary-row" style="margin-top:16px"><span>Products + Services Total</span><strong id="dermedTotal">$0.00</strong></div>
 <div class="actions" style="justify-content:flex-end;margin-top:14px"><button id="saveDermedSale" class="gold">Save Dermed Sale & Generate Invoice</button><button id="clearDermedSale" class="light">Clear</button></div>
 <div id="dermedStatus"></div>
