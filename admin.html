@@ -2093,11 +2093,11 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
 <section id="sales" class="section">
 <div class="sale-page-title">
-  <h1>Add Sale</h1>
-  <button id="toggleSaleForm" class="light" type="button" aria-expanded="true">Hide Add Sale ▲</button>
+  <h1>Medi Fella Sale</h1>
+  <button id="toggleSaleForm" class="gold" type="button" aria-expanded="false">+ Add Sale</button>
 </div>
 
-<div id="saleForm" class="card sale-form-shell">
+<div id="saleForm" class="card sale-form-shell hidden">
   <div class="sale-header-grid">
     <div>
       <label>Customer / Student *</label>
@@ -2128,11 +2128,6 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     </div>
   </div>
 
-  <div class="sale-section-title">
-    <h2>Course / Product</h2>
-    <button id="addSaleItem" class="light" type="button">+ Add Course / Product</button>
-  </div>
-
   <div class="sale-course-picker">
     <div class="sale-course-picker-wrap">
       <span class="sale-search-icon">⌕</span>
@@ -2141,7 +2136,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
       <div id="saleCourseSearchResults" class="sale-course-picker-results"></div>
     </div>
     <div class="muted sale-course-picker-help">
-      Search by course name or Course ID, then click the course to add it.
+      Search by course name or Course ID, then select a result to add it to the table.
     </div>
   </div>
 
@@ -2923,7 +2918,7 @@ document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{
  document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
  $(b.dataset.section).classList.add("active");
  if(b.dataset.section==="sales"){
-   setSaleFormCollapsed(false);
+   setSaleFormCollapsed(true);
    resetSaleForm();
    updateSaleDateTimeDisplay();
    $("saleReference").value=nextSaleReference();
@@ -3586,7 +3581,7 @@ function setSaleFormCollapsed(collapsed){
   if(!form || !toggleSaleFormBtn)return;
   form.classList.toggle("hidden",collapsed);
   toggleSaleFormBtn.setAttribute("aria-expanded",String(!collapsed));
-  toggleSaleFormBtn.textContent=collapsed ? "Show Add Sale ▼" : "Hide Add Sale ▲";
+  toggleSaleFormBtn.textContent=collapsed ? "+ Add Sale" : "Hide Sale Table";
 }
 toggleSaleFormBtn.onclick=()=>{
   const form=$("saleForm");
@@ -3912,7 +3907,7 @@ function showSaleInvoice(id,size="A4"){
    </div>
 
    <div class="invoice-actions" id="invoiceActions">
-  <button type="button" class="mf-action-btn" onclick="editSaleFromInvoice(window.currentInvoiceId)">✏️ Edit</button>
+  <button type="button" class="mf-action-btn" onclick="editSaleFromInvoiceRouter(window.currentInvoiceId)">✏️ Edit</button>
   <button type="button" class="mf-action-btn" onclick="printInvoice(window.currentInvoiceId,'A4')">🖨️ Print</button>
   <button type="button" class="mf-action-btn" onclick="downloadInvoicePDF(window.currentInvoiceId,'A4')">⬇️ Save PDF</button>
   <button type="button" class="mf-action-btn" onclick="closeInvoicePreview()">✕ Close</button>
@@ -5767,6 +5762,89 @@ function showDermedSaleInvoice(id,size="A4"){
  showSaleInvoice(id,size);
 }
 
+function editDermedSaleFromInvoice(id){
+ const s=salesRecords.find(x=>String(x.id)===String(id)&&String(x.sale_type||"").toUpperCase()==="DERMED");
+ if(!s){alert("Dermed sale not found.");return;}
+ closeInvoicePreview();
+
+ document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
+ document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
+ const nav=document.querySelector('.nav[data-section="dermedSale"]');
+ if(nav)nav.classList.add("active");
+ const section=$("dermedSale"); if(section)section.classList.add("active");
+
+ const form=$("dermedSaleFormCard");
+ if(form)form.style.display="";
+ const toggle=$("dermedAddSaleToggle");
+ if(toggle){toggle.textContent="− Hide Sale";toggle.setAttribute("aria-expanded","true");}
+
+ window.editingDermedSaleId=String(id);
+
+ const buyerType=s.customer_type || (s.student_id ? "student" : (s.customer_id ? "customer" : ""));
+ const buyerId=s.student_id || s.customer_id || "";
+ $("dermedBuyerType").value=buyerType;
+ $("dermedBuyerId").value=buyerId;
+ const buyer=buyerType==="student"
+   ? students.find(x=>String(x.id)===String(buyerId))
+   : customers.find(x=>String(x.id)===String(buyerId));
+ $("dermedBuyerSearch").value=buyer?.full_name || buyer?.name || s.student_name || "";
+ $("dermedBuyerHint").textContent=buyer
+   ? `Selected: ${buyer.full_name||buyer.name||"Customer"} · ${buyer.student_id||buyer.customer_code||""} · ${buyer.phone||s.student_phone||""}`
+   : `Selected: ${s.student_name||"Customer"} · ${s.student_phone||""}`;
+
+ $("dermedSaleStaff").value=s.sale_staff_id||"";
+ $("dermedReferenceNo").value=s.reference_no||"";
+
+ const d=String(s.sale_date||"");
+ const t=String(s.sale_time||"");
+ $("dermedSaleTime").value=(d && t) ? `${d} ${t}` : (d||"");
+
+ window.dermedSaleItems=(Array.isArray(s.items)?s.items:[]).map(x=>({
+   product_id:x.product_id,product_code:x.product_code,name:x.name,
+   price:Number(x.price??x.unit_price??0),quantity:Number(x.quantity??1),
+   discount_type:x.discount_type||"percent",discount_value:Number(x.discount_value??0)
+ }));
+ window.dermedServiceItems=(Array.isArray(s.service_items)?s.service_items:[]).map(x=>({
+   service_id:x.service_id,service_code:x.service_code,name:x.name,service_type:x.service_type,
+   price:Number(x.price??x.unit_price??0),quantity:Number(x.quantity??1),
+   discount_type:x.discount_type||"percent",discount_value:Number(x.discount_value??0)
+ }));
+
+ $("dermedOverallDiscountType").value="usd";
+ $("dermedOverallDiscountValue").value=Number(s.discount||0).toFixed(2);
+ $("dermedPaymentStatus").value=s.payment_status==="Partial"?"Partial":(s.payment_status||"Paid");
+ $("dermedAmountPaidNow").value=Number(s.paid||0).toFixed(2);
+ $("dermedPaymentMethod").value=s.payment_method||"Cash";
+ $("dermedSaleNote").value=s.notes||"";
+
+ const saveBtn=$("saveDermedSale");
+ if(saveBtn)saveBtn.textContent="Update Dermed Sale";
+
+ // Render the existing product/service rows using the dedicated Dermed renderer.
+ setTimeout(()=>{
+   const event=new Event("input");
+   if(typeof renderDermedCombinedItems==="function")renderDermedCombinedItems();
+   else {
+     const body=$("dermedItems");
+     if(body && typeof window.renderDermedItems==="function")window.renderDermedItems();
+   }
+   if(typeof updateTotals==="function")updateTotals();
+ },0);
+
+ section?.scrollIntoView({behavior:"smooth",block:"start"});
+}
+
+function editSaleFromInvoiceRouter(id){
+ const s=salesRecords.find(x=>String(x.id)===String(id));
+ if(!s)return;
+ if(String(s.sale_type||"").toUpperCase()==="DERMED"){
+   editDermedSaleFromInvoice(id);
+ }else{
+   editSaleFromInvoice(id);
+ }
+}
+window.editSaleFromInvoiceRouter=editSaleFromInvoiceRouter;
+
 $("stockProductSearch").oninput=renderProductSearchResults;
 $("productSearch").oninput=renderProductList;$("productRefresh").onclick=loadProducts;$("stockSearch").oninput=renderStockList;$("stockRefresh").onclick=loadStockMovements;
 $("stockReportType").onchange=renderStockReport;if($("stockReportDate"))$("stockReportDate").onchange=renderStockReport;$("stockReportRefresh").onclick=renderStockReport;
@@ -6188,6 +6266,8 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function reset(){
+    window.editingDermedSaleId=null;
+    const saveBtn=E("saveDermedSale"); if(saveBtn)saveBtn.textContent="Save Dermed Sale & Generate Invoice";
     window.dermedSaleItems=[];window.dermedServiceItems=[];
     if(E("dermedBuyerSearch"))E("dermedBuyerSearch").value="";
     if(E("dermedBuyerType"))E("dermedBuyerType").value="";
@@ -6210,6 +6290,8 @@ document.addEventListener("DOMContentLoaded",function(){
     renderItems();paymentDefaults();
   }
 
+  window.editingDermedSaleId = window.editingDermedSaleId || null;
+
   async function saveDermed(){
     const buyerType=E("dermedBuyerType")?.value,buyerId=E("dermedBuyerId")?.value,staffId=E("dermedSaleStaff")?.value;
     const c=calc(), items=pItems(), servicesArr=sItems();
@@ -6225,9 +6307,15 @@ document.addEventListener("DOMContentLoaded",function(){
     const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
     const now=phTime();
     const code="DERMED", prefix=code+"-"+new Date().getFullYear()+"-";
+    const editingId=window.editingDermedSaleId;
+    const editingRecord=editingId ? (Array.isArray(salesRecords)?salesRecords:[]).find(x=>String(x.id)===String(editingId)&&String(x.sale_type||"").toUpperCase()==="DERMED") : null;
     const existing=(Array.isArray(salesRecords)?salesRecords:[]).filter(x=>String(x.sale_type||"").toUpperCase()===code);
     let max=0;existing.forEach(x=>{const m=String(x.reference_no||"").match(new RegExp("^"+code+"-"+new Date().getFullYear()+"-(\\d+)$"));if(m)max=Math.max(max,Number(m[1]))});
-    const reference=prefix+String(max+1).padStart(4,"0");
+    const reference=editingRecord?.reference_no || prefix+String(max+1).padStart(4,"0");
+    const storedDate=editingRecord ? String(editingRecord.sale_date||"") : "";
+    const storedTime=editingRecord ? String(editingRecord.sale_time||"") : "";
+    const saleDate=(editingRecord && storedDate) ? storedDate : now.slice(0,10);
+    const saleTime=(editingRecord && storedTime) ? storedTime : now.slice(11);
     const itemPayload=items.map(x=>{
       const q=Math.max(1,num(x.quantity)),price=Math.max(0,num(x.price)),base=price*q,d=itemDiscount(base,x.discount_type||"percent",x.discount_value||0);
       return {...x,quantity:q,unit_price:price,discount_type:x.discount_type||"percent",discount_value:num(x.discount_value),discount_amount:d,subtotal:Math.max(0,base-d),discount_input:(x.discount_type||"percent")==="percent"?`${num(x.discount_value)}%`:`$${num(x.discount_value).toFixed(2)}`};
@@ -6237,7 +6325,7 @@ document.addEventListener("DOMContentLoaded",function(){
       return {...x,quantity:q,unit_price:price,discount_type:x.discount_type||"percent",discount_value:num(x.discount_value),discount_amount:d,subtotal:Math.max(0,base-d),discount_input:(x.discount_type||"percent")==="percent"?`${num(x.discount_value)}%`:`$${num(x.discount_value).toFixed(2)}`};
     });
     const payload={
-      reference_no:reference,sale_type:code,sale_date:now.slice(0,10),sale_time:now.slice(11),
+      reference_no:reference,sale_type:code,sale_date:saleDate,sale_time:saleTime,
       student_id:buyerType==="student"?buyerId:null,student_name:buyer?.full_name||buyer?.name||"",student_phone:buyer?.phone||"",
       customer_id:buyerType==="customer"?buyerId:null,customer_type:buyerType,sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",
       subtotal:c.sub,discount:c.odAmount,shipping:0,grand_total:c.initial,
@@ -6247,19 +6335,32 @@ document.addEventListener("DOMContentLoaded",function(){
     };
     const btn=E("saveDermedSale");if(btn)btn.disabled=true;
     try{
-      let r=await sb.from("medifella_sales").insert({...payload,created_by:adminUser.id}).select().single();
-      if(r.error && /sale_time|column .* does not exist/i.test(r.error.message||"")){
-        const p2={...payload};delete p2.sale_time;
-        r=await sb.from("medifella_sales").insert({...p2,created_by:adminUser.id}).select().single();
+      let r;
+      if(editingId){
+        let upd=await sb.from("medifella_sales").update(payload).eq("id",editingId).eq("sale_type","DERMED").select().single();
+        if(upd.error && /sale_time|column .* does not exist/i.test(upd.error.message||"")){
+          const p2={...payload};delete p2.sale_time;
+          upd=await sb.from("medifella_sales").update(p2).eq("id",editingId).eq("sale_type","DERMED").select().single();
+        }
+        if(upd.error)throw upd.error;
+        r=upd;
+      }else{
+        r=await sb.from("medifella_sales").insert({...payload,created_by:adminUser.id}).select().single();
+        if(r.error && /sale_time|column .* does not exist/i.test(r.error.message||"")){
+          const p2={...payload};delete p2.sale_time;
+          r=await sb.from("medifella_sales").insert({...p2,created_by:adminUser.id}).select().single();
+        }
+        if(r.error)throw r.error;
+        if(paid>0){
+          const pr=await sb.from("medifella_sale_payments").insert({sale_id:String(r.data.id),amount:paid,payment_method:E("dermedPaymentMethod").value,payment_date:now.slice(0,10),note:status==="Partial"?"Partial Payment":"Paid in Full",created_by:adminUser.id});
+          if(pr.error)throw pr.error;
+          }
+        const movements=items.map(x=>({product_id:x.product_id,movement_type:"sale",quantity:Math.max(1,num(x.quantity)),staff_id:staffId,staff_name:staff?.name_en||"",stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));
+        if(movements.length){const mr=await sb.from("medifella_inventory_movements").insert(movements);if(mr.error)throw mr.error}
       }
-      if(r.error)throw r.error;
-      if(paid>0){
-        const pr=await sb.from("medifella_sale_payments").insert({sale_id:String(r.data.id),amount:paid,payment_method:E("dermedPaymentMethod").value,payment_date:now.slice(0,10),note:status==="Partial"?"Partial Payment":"Paid in Full",created_by:adminUser.id});
-        if(pr.error)throw pr.error;
-      }
-      const movements=items.map(x=>({product_id:x.product_id,movement_type:"sale",quantity:Math.max(1,num(x.quantity)),staff_id:staffId,staff_name:staff?.name_en||"",stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));
-      if(movements.length){const mr=await sb.from("medifella_inventory_movements").insert(movements);if(mr.error)throw mr.error}
-      msg(E("dermedStatus"),`Dermed sale saved. Invoice ${reference}.`);
+      const wasEditing=!!editingId;
+      window.editingDermedSaleId=null;
+      msg(E("dermedStatus"),`${wasEditing?"Dermed sale updated":"Dermed sale saved"}. Invoice ${reference}.`);
       reset();
       if(typeof loadSales==="function")await loadSales();
       if(typeof renderDermedSales==="function")renderDermedSales();
