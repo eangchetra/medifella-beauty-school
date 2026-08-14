@@ -3623,6 +3623,9 @@ function formatSaleItems(v){
 function renderSales(){
  const q=$("salesSearch").value.trim().toLowerCase(),f=$("salesPaymentFilter").value;
  const rows=salesRecords.filter(s=>{
+   // List Sale is for the regular sales list only.
+   // Dermed sales are shown separately under Dermed Sale.
+   if(String(s.sale_type||"").toUpperCase()==="DERMED") return false;
    const total=saleTotal(s),paid=salePaid(s),status=saleStatus(total,paid);
    const hay=[saleRef(s),saleCustomer(s),saleField(s,["student_phone","phone"],""),formatSaleItems(saleItemsValue(s))].join(" ").toLowerCase();
    return(f==="all"||status===f)&&hay.includes(q);
@@ -3636,11 +3639,14 @@ function renderSales(){
 }
 
 function updateSalesMetrics(){
- const total=salesRecords.reduce((a,s)=>a+saleTotal(s),0),paid=salesRecords.reduce((a,s)=>a+salePaid(s),0);
- $("mSales").textContent=salesRecords.length;
+ // Keep List Sale totals consistent with the table: exclude Dermed sales.
+ const listSaleRecords=salesRecords.filter(s=>String(s.sale_type||"").toUpperCase()!=="DERMED");
+ const total=listSaleRecords.reduce((a,s)=>a+saleTotal(s),0);
+ const paid=listSaleRecords.reduce((a,s)=>a+salePaid(s),0);
+ $("mSales").textContent=listSaleRecords.length;
  $("mSalesPaid").textContent=money(paid);
  $("mSalesBalance").textContent=money(Math.max(0,total-paid));
- $("mSalesDue").textContent=salesRecords.filter(s=>saleStatus(saleTotal(s),salePaid(s))!=="Paid").length;
+ $("mSalesDue").textContent=listSaleRecords.filter(s=>saleStatus(saleTotal(s),salePaid(s))!=="Paid").length;
 }
 
 async function recordSalePayment(id){
