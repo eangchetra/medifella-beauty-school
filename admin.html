@@ -3333,8 +3333,7 @@ function setupSaleCoursePicker(){
    }
    const source=Array.isArray(courses)?courses:[];
    const matches=source
-     .filter(c=>courseType(c)==="sales")
-     .filter(c=>[c.name,c.id].join(" ").toLowerCase().includes(q))
+     .filter(c=>[c.name,c.id,c.course_id].join(" ").toLowerCase().includes(q))
      .slice(0,12);
 
    results.innerHTML=matches.length
@@ -6882,6 +6881,11 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!search||!results)return;
 
     function getCourses(){
+      // "courses" is declared as a top-level JS variable, not window.courses.
+      // Read the real course list first, then fall back to window.courses.
+      try{
+        if(typeof courses!=="undefined" && Array.isArray(courses)) return courses;
+      }catch(_){}
       return Array.isArray(window.courses)?window.courses:[];
     }
 
@@ -6895,7 +6899,6 @@ document.addEventListener("DOMContentLoaded",function(){
       }
 
       var matches=getCourses().filter(function(c){
-        if(!isSalesCourse(c))return false;
         var hay=norm((c.name||"")+" "+(c.id||"")+" "+(c.course_id||""));
         return hay.indexOf(q)>=0;
       }).slice(0,12);
