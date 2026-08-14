@@ -1871,6 +1871,12 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 #mtsBuyerResults,#dermedBuyerResults{display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 25px #075e6618;max-height:240px;overflow:auto}
 #mtsBuyerResults.show,#dermedBuyerResults.show{display:block}
 </style>
+<style id="dermed-final-layout">
+#dermedBuyerResults,#dermedItemResults{position:absolute!important;left:0!important;right:0!important;top:calc(100% + 3px)!important;z-index:99999!important;max-height:240px!important;overflow-y:auto!important}
+#dermedBuyerResults button,#dermedItemResults button{display:block!important;width:100%!important;text-align:left!important;padding:11px 13px!important;background:#fff!important;border:0!important;border-bottom:1px solid #e4eeee!important;cursor:pointer!important}
+#dermedBuyerResults button:hover,#dermedItemResults button:hover{background:#eef9fa!important}
+#dermedBuyerResults:empty,#dermedItemResults:empty{display:none!important}
+</style>
 </head>
 <body>
 
@@ -2386,13 +2392,15 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div class="sale-header-grid">
 <div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="dermedBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="dermedNewCustomer" class="gold" type="button">+ Customer</button></div><div id="dermedBuyerResults" class="sale-course-picker-results"></div><input id="dermedBuyerType" type="hidden"><input id="dermedBuyerId" type="hidden"><div id="dermedBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
 <div><label>Sale Staff *</label><select id="dermedSaleStaff"></select></div>
+<div><label>Reference No.</label><input id="dermedReferenceNo" readonly placeholder="Auto-generate"></div>
 <div><label>Sale Date & Time</label><input id="dermedSaleTime" readonly></div>
 </div>
-<label style="margin-top:18px">Search Product</label><div style="position:relative"><input id="dermedProductSearch" autocomplete="off" placeholder="Search Product ID or Product Name"><div id="dermedProductResults" class="sale-course-picker-results"></div></div>
+<label style="margin-top:18px">Search Product / Service</label><div style="position:relative"><input id="dermedItemSearch" autocomplete="off" placeholder="Search Product or Service name / ID"><div id="dermedItemResults" class="sale-course-picker-results"></div></div>
 <div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr></thead><tbody id="dermedItems"></tbody></table></div>
 <h2 style="margin-top:22px">Services Fee</h2>
-<label>Search Service</label><div style="position:relative"><input id="dermedServiceSearch" autocomplete="off" placeholder="Search Service ID or Service Name"><div id="dermedServiceResults" class="sale-course-picker-results"></div></div>
 <div class="table-wrap"><table class="table"><thead><tr><th>Service</th><th>Type</th><th>Price</th><th></th></tr></thead><tbody id="dermedServices"></tbody></table></div>
+<input id="dermedProductSearch" type="hidden"><div id="dermedProductResults" style="display:none"></div>
+<input id="dermedServiceSearch" type="hidden"><div id="dermedServiceResults" style="display:none"></div>
 <div class="sale-summary-row" style="margin-top:16px"><span>Products + Services Total</span><strong id="dermedTotal">$0.00</strong></div>
 <div class="actions" style="justify-content:flex-end;margin-top:14px"><button id="saveDermedSale" class="gold">Save Dermed Sale & Generate Invoice</button><button id="clearDermedSale" class="light">Clear</button></div>
 <div id="dermedStatus"></div>
@@ -5448,6 +5456,48 @@ const _oldUpdateMetrics=updateMetrics; updateMetrics=function(){_oldUpdateMetric
 boot();
 
 
+</script>
+<script id="dermed-final-search-only">
+(function(){
+  function el(id){return document.getElementById(id)}
+  function norm(v){return String(v==null?"":v).trim().toLowerCase()}
+  function escL(v){return typeof esc==="function"?esc(v):String(v==null?"":v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+  function moneyL(v){return typeof money==="function"?money(v):"$"+Number(v||0).toFixed(2)}
+  function hide(box){if(box){box.innerHTML="";box.classList.remove("show");box.style.display="none"}}
+  function show(box){if(box){box.style.display="block";box.classList.add("show")}}
+  function buyer(){
+    var i=el("dermedBuyerSearch"),b=el("dermedBuyerResults");if(!i||!b)return;
+    var q=norm(i.value);if(!q){hide(b);if(el("dermedBuyerType"))el("dermedBuyerType").value="";if(el("dermedBuyerId"))el("dermedBuyerId").value="";return}
+    var rows=[];
+    (window.students||[]).filter(function(x){return norm((x.student_id||"")+" "+(x.full_name||"")+" "+(x.full_name_km||"")+" "+(x.phone||"")).indexOf(q)>=0}).slice(0,10).forEach(function(x){rows.push({t:"student",id:x.id,code:x.student_id,name:x.full_name||x.full_name_km||"Student",phone:x.phone||""})});
+    (window.customers||[]).filter(function(x){return norm((x.customer_code||"")+" "+(x.name||"")+" "+(x.phone||"")).indexOf(q)>=0}).slice(0,10).forEach(function(x){rows.push({t:"customer",id:x.id,code:x.customer_code,name:x.name||"Customer",phone:x.phone||""})});
+    b.innerHTML=rows.length?rows.map(function(x){return '<button type="button" data-bt="'+escL(x.t)+'" data-bi="'+escL(x.id)+'"><strong>'+escL(x.name)+'</strong><div class="muted">'+escL(x.t)+' · '+escL(x.code||"")+' · '+escL(x.phone||"")+'</div></button>'}).join(""):'<div class="muted" style="padding:10px">No student/customer found.</div>';
+    show(b);
+  }
+  function item(){
+    var i=el("dermedItemSearch"),b=el("dermedItemResults");if(!i||!b)return;
+    var q=norm(i.value);if(!q){hide(b);return}
+    var ps=(window.products||[]).filter(function(x){return norm((x.product_code||"")+" "+(x.name||"")).indexOf(q)>=0}).slice(0,10);
+    var ss=(window.services||[]).filter(function(x){return norm((x.service_code||"")+" "+(x.name||"")+" "+(x.service_type||"")).indexOf(q)>=0}).slice(0,10);
+    var h="";
+    if(ps.length){h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">PRODUCTS</div>';h+=ps.map(function(x){return '<button type="button" data-pid="'+escL(x.id)+'"><strong>'+escL(x.name)+'</strong><div class="muted">Product · '+escL(x.product_code||"")+' · '+moneyL(x.price)+' · Stock: '+(typeof productStock==="function"?productStock(x.id):"")+'</div></button>'}).join("")}
+    if(ss.length){h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">SERVICES</div>';h+=ss.map(function(x){return '<button type="button" data-sid="'+escL(x.id)+'"><strong>'+escL(x.name)+'</strong><div class="muted">Service · '+escL(x.service_code||"")+' · '+escL(x.service_type||"")+' · '+moneyL(x.price)+'</div></button>'}).join("")}
+    b.innerHTML=h||'<div class="muted" style="padding:10px">No product or service found.</div>';show(b);
+  }
+  function bind(){
+    var bi=el("dermedBuyerSearch"),br=el("dermedBuyerResults"),ii=el("dermedItemSearch"),ir=el("dermedItemResults");
+    if(bi&&!bi.dataset.fsb){bi.dataset.fsb="1";bi.addEventListener("input",buyer);bi.addEventListener("keyup",buyer);bi.addEventListener("keydown",function(e){if(e.key==="Escape")hide(br)});br&&br.addEventListener("mousedown",function(e){var x=e.target.closest("[data-bi]");if(!x)return;e.preventDefault();if(typeof chooseBuyer==="function")chooseBuyer("dermed",x.dataset.bt,x.dataset.bi);hide(br)})}
+    if(ii&&!ii.dataset.fsb){ii.dataset.fsb="1";ii.addEventListener("input",item);ii.addEventListener("keyup",item);ii.addEventListener("keydown",function(e){if(e.key==="Escape")hide(ir)});ir&&ir.addEventListener("mousedown",function(e){var p=e.target.closest("[data-pid]"),v=e.target.closest("[data-sid]");if(!p&&!v)return;e.preventDefault();if(p&&typeof addSaleProduct==="function")addSaleProduct("dermed",p.dataset.pid);if(v&&typeof addDermedService==="function")addDermedService(v.dataset.sid);ii.value="";hide(ir)})}
+  }
+  document.addEventListener("DOMContentLoaded",function(){bind();setTimeout(bind,500);setTimeout(bind,1500)});
+})();
+</script>
+<script id="dermed-reference-display">
+document.addEventListener("DOMContentLoaded",function(){
+ var x=document.getElementById("dermedReferenceNo");if(!x)return;
+ var max=0;(window.salesRecords||[]).forEach(function(r){var m=String(r.reference_no||"").match(/^DERMED-(\d{4})-(\d+)$/);if(m)max=Math.max(max,Number(m[2]))});
+ x.value="DERMED-"+new Date().getFullYear()+"-"+String(max+1).padStart(4,"0");
+});
 </script>
 </body>
 </html>
