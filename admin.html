@@ -1877,6 +1877,115 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 #dermedBuyerResults button:hover,#dermedItemResults button:hover{background:#eef9fa!important}
 #dermedBuyerResults:empty,#dermedItemResults:empty{display:none!important}
 </style>
+
+<style id="dermed-final-fix-20260814">
+#dermedBuyerResults,#dermedItemResults{position:absolute!important;left:0!important;right:0!important;top:calc(100% + 4px)!important;z-index:999999!important;background:#fff!important;border:1px solid #d6e5e5!important;border-radius:10px!important;box-shadow:0 10px 25px rgba(0,0,0,.12)!important;max-height:300px!important;overflow-y:auto!important}
+#dermedBuyerSearch,#dermedItemSearch{position:relative!important}
+#dermedBuyerResults button,#dermedItemResults button{display:block!important;width:100%!important;text-align:left!important;padding:11px 13px!important;background:#fff!important;border:0!important;border-bottom:1px solid #e4eeee!important;cursor:pointer!important}
+#dermedBuyerResults button:hover,#dermedItemResults button:hover{background:#eef9fa!important}
+.dermed-search-heading{padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc;border-bottom:1px solid #e4eeee}
+</style>
+
+<script id="dermed-final-fix-20260814-script">
+(function(){
+  function $id(id){return document.getElementById(id)}
+  function norm(v){return String(v==null?'':v).trim().toLowerCase()}
+  function escx(v){return typeof esc==='function'?esc(v):String(v==null?'':v).replace(/[&<>"']/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c]))}
+  function moneyx(v){return typeof money==='function'?money(v):'$'+Number(v||0).toFixed(2)}
+  function show(box){if(!box)return;box.style.display='block';box.classList.add('show')}
+  function hide(box){if(!box)return;box.innerHTML='';box.classList.remove('show');box.style.display='none'}
+
+  function renderCustomerResults(){
+    const input=$id('dermedBuyerSearch'), box=$id('dermedBuyerResults');
+    if(!input||!box)return;
+    const q=norm(input.value);
+    if(!q){hide(box);return}
+    const rows=[];
+    (Array.isArray(window.students)?window.students:[]).filter(x=>norm([x.student_id,x.full_name,x.full_name_km,x.phone].join(' ')).includes(q)).slice(0,10)
+      .forEach(x=>rows.push({type:'student',id:x.id,code:x.student_id||'',name:x.full_name||x.full_name_km||'Student',phone:x.phone||''}));
+    (Array.isArray(window.customers)?window.customers:[]).filter(x=>norm([x.customer_code,x.name,x.phone].join(' ')).includes(q)).slice(0,10)
+      .forEach(x=>rows.push({type:'customer',id:x.id,code:x.customer_code||'',name:x.name||'Customer',phone:x.phone||''}));
+    box.innerHTML=rows.map(x=>`<button type="button" class="dermed-buyer-result" data-buyer-type="${escx(x.type)}" data-buyer-id="${escx(x.id)}"><strong>${escx(x.name)}</strong><div class="muted">${escx(x.type)} · ${escx(x.code)} · ${escx(x.phone)}</div></button>`).join('');
+    if(rows.length)show(box);else hide(box);
+  }
+
+  function chooseCustomerFromResult(btn){
+    if(!btn)return;
+    const type=btn.dataset.buyerType,id=btn.dataset.buyerId;
+    if(typeof chooseBuyer==='function') chooseBuyer('dermed',type,id);
+    else {
+      const arr=type==='student'?window.students:window.customers;
+      const x=(arr||[]).find(v=>String(v.id)===String(id));
+      if(x){$id('dermedBuyerType').value=type;$id('dermedBuyerId').value=id;$id('dermedBuyerSearch').value=type==='student'?x.full_name:x.name;$id('dermedBuyerHint').textContent=`Selected: ${type==='student'?x.full_name:x.name} · ${type==='student'?(x.student_id||''):(x.customer_code||'')} · ${x.phone||''}`;}
+    }
+    hide($id('dermedBuyerResults'));
+  }
+
+  function renderItemResults(){
+    const input=$id('dermedItemSearch'),box=$id('dermedItemResults');
+    if(!input||!box)return;
+    const q=norm(input.value);
+    if(!q){hide(box);return}
+    const ps=(Array.isArray(window.products)?window.products:[]).filter(x=>norm([x.product_code,x.name].join(' ')).includes(q)).slice(0,15);
+    const ss=(Array.isArray(window.services)?window.services:[]).filter(x=>norm([x.service_code,x.name,x.service_type].join(' ')).includes(q)).slice(0,15);
+    let html='';
+    if(ps.length){html+='<div class="dermed-search-heading">PRODUCTS</div>';html+=ps.map(x=>`<button type="button" class="dermed-item-result" data-kind="product" data-id="${escx(x.id)}"><strong>${escx(x.name)}</strong><div class="muted">Product · ${escx(x.product_code||'')} · ${moneyx(x.price)} · Stock: ${typeof productStock==='function'?productStock(x.id):''}</div></button>`).join('')}
+    if(ss.length){html+='<div class="dermed-search-heading">SERVICES</div>';html+=ss.map(x=>`<button type="button" class="dermed-item-result" data-kind="service" data-id="${escx(x.id)}"><strong>${escx(x.name)}</strong><div class="muted">Service · ${escx(x.service_code||'')} · ${escx(x.service_type||'')} · ${moneyx(x.price)}</div></button>`).join('')}
+    box.innerHTML=html;
+    if(html)show(box);else hide(box);
+  }
+
+  function addItem(btn){
+    if(!btn)return;
+    const kind=btn.dataset.kind,id=btn.dataset.id;
+    if(kind==='product' && typeof window.addSaleProduct==='function') window.addSaleProduct('dermed',id);
+    if(kind==='service' && typeof window.addDermedService==='function') window.addDermedService(id);
+    const input=$id('dermedItemSearch');if(input)input.value='';hide($id('dermedItemResults'));
+  }
+
+  function updateTime(){
+    const el=$id('dermedSaleTime');
+    if(!el)return;
+    try{
+      if(typeof phTime==='function') el.value=String(phTime()).replace('T',' ');
+      else el.value=new Date().toLocaleString('sv-SE',{hour12:false}).replace(' ',' ');
+    }catch(e){el.value=new Date().toLocaleString('sv-SE',{hour12:false})}
+  }
+
+  function bind(){
+    const bi=$id('dermedBuyerSearch'),br=$id('dermedBuyerResults');
+    const ii=$id('dermedItemSearch'),ir=$id('dermedItemResults');
+    if(bi&&!bi.dataset.fixedSearch){
+      bi.dataset.fixedSearch='1';
+      bi.addEventListener('input',renderCustomerResults,true);
+      bi.addEventListener('keyup',renderCustomerResults,true);
+      bi.addEventListener('focus',function(){if(this.value.trim())renderCustomerResults()});
+      bi.addEventListener('keydown',e=>{if(e.key==='Escape')hide(br)});
+    }
+    if(br&&!br.dataset.fixedClicks){
+      br.dataset.fixedClicks='1';
+      br.addEventListener('pointerdown',e=>{const b=e.target.closest('.dermed-buyer-result');if(b){e.preventDefault();e.stopPropagation();chooseCustomerFromResult(b)}},true);
+    }
+    if(ii&&!ii.dataset.fixedSearch){
+      ii.dataset.fixedSearch='1';
+      ii.addEventListener('input',renderItemResults,true);
+      ii.addEventListener('keyup',renderItemResults,true);
+      ii.addEventListener('focus',function(){if(this.value.trim())renderItemResults()});
+      ii.addEventListener('keydown',e=>{if(e.key==='Escape')hide(ir)});
+    }
+    if(ir&&!ir.dataset.fixedClicks){
+      ir.dataset.fixedClicks='1';
+      ir.addEventListener('pointerdown',e=>{const b=e.target.closest('.dermed-item-result');if(b){e.preventDefault();e.stopPropagation();addItem(b)}},true);
+    }
+    updateTime();
+    if(!window.__dermedTimeTimer) window.__dermedTimeTimer=setInterval(updateTime,1000);
+  }
+
+  function start(){bind();setTimeout(bind,300);setTimeout(bind,1000);setTimeout(bind,2000);updateTime()}
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',start);else start();
+})();
+
+</script>
 </head>
 <body>
 
