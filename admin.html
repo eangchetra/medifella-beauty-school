@@ -5153,7 +5153,9 @@ function renderServiceList(){
  if(!$("serviceList"))return;
  const q=($("serviceSearch")?.value||"").trim().toLowerCase();
  const rows=services.filter(x=>(`${x.service_code||""} ${x.name||""}`).toLowerCase().includes(q));
- $("serviceList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Service ID</th><th>Name of Service</th><th>Type</th><th>Price</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.service_code)}</td><td>${esc(x.name)}</td><td>${esc(x.service_type)}</td><td>${money(x.price)}</td><td><div class="actions"><button class="light" onclick="editService('${attr(x.id)}')">Edit</button><button class="danger" onclick="deleteService('${attr(x.id)}')">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No services found.</p>';
+ $("serviceList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Service ID</th><th>Name of Service</th><th>Type</th><th>Price</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.service_code)}</td><td>${esc(x.name)}</td><td>${esc(x.service_type)}</td><td>${money(x.price)}</td><td><div class="actions"><button type="button" class="light service-edit-btn" data-id="${attr(x.id)}">Edit</button><button type="button" class="danger service-delete-btn" data-id="${attr(x.id)}">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No services found.</p>';
+ document.querySelectorAll(".service-edit-btn").forEach(btn=>btn.addEventListener("click",()=>editService(btn.dataset.id)));
+ document.querySelectorAll(".service-delete-btn").forEach(btn=>btn.addEventListener("click",()=>deleteService(btn.dataset.id)));
 }
 function renderInventoryControls(){
  if($("stockStaff"))$("stockStaff").innerHTML='<option value="">Select staff</option>'+staffInfoRecords.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
@@ -5339,8 +5341,34 @@ $("clearCustomer").onclick=clearCustomerForm;
 
 $("saveService").onclick=async()=>{clearMsg($("serviceStatus"));const id=$("serviceEditId").value,name=$("serviceName").value.trim(),service_type=$("serviceType").value,rawPrice=$("servicePrice").value.trim(),price=Number(rawPrice);if(!name||rawPrice===""||!Number.isFinite(price)||price<0){msg($("serviceStatus"),"Service Name and Price are required.",true);return}try{const payload={name,service_type,price};let r=id?await sb.from("medifella_services").update(payload).eq("id",id):await sb.from("medifella_services").insert({...payload,service_code:genId("SV",services,"service_code")});if(r.error)throw r.error;msg($("serviceStatus"),id?"Service updated.":"Service added.");clearServiceForm();await loadServices()}catch(e){msg($("serviceStatus"),e.message,true)}};
 function clearServiceForm(){$("serviceEditId").value="";$("serviceName").value="";$("serviceType").value="Service With Product";$("servicePrice").value=""}
-function editService(id){const x=services.find(x=>String(x.id)===String(id));if(!x)return;$("serviceEditId").value=x.id;$("serviceName").value=x.name||"";$("serviceType").value=x.service_type||"Only Service";$("servicePrice").value=x.price??""}
-async function deleteService(id){if(!confirm("Delete this service?"))return;const r=await sb.from("medifella_services").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadServices()}
+function editService(id){
+ const x=services.find(x=>String(x.id)===String(id));
+ if(!x){alert("Service record not found. Please refresh the Service List.");return}
+ $("serviceEditId").value=x.id;
+ $("serviceName").value=x.name||"";
+ $("serviceType").value=x.service_type||"Only Service";
+ $("servicePrice").value=(x.price ?? "").toString();
+ const form=document.getElementById("services");
+ const nameInput=document.getElementById("serviceName");
+ if(nameInput){nameInput.focus();nameInput.scrollIntoView({behavior:"smooth",block:"center"});}
+ const status=document.getElementById("serviceStatus");
+ if(status)msg(status,"Editing "+(x.service_code||"service")+" — change the fields and click Save Service.");
+}
+async function deleteService(id){
+ const x=services.find(x=>String(x.id)===String(id));
+ if(!x){alert("Service record not found. Please refresh the Service List.");return}
+ if(!confirm("Delete service "+(x.service_code||"")+" — "+(x.name||"")+"?"))return;
+ try{
+   const r=await sb.from("medifella_services").delete().eq("id",id).select("id");
+   if(r.error)throw r.error;
+   clearServiceForm();
+   await loadServices();
+   if($("serviceStatus"))msg($("serviceStatus"),"Service deleted successfully.");
+ }catch(e){
+   if($("serviceStatus"))msg($("serviceStatus"),"Delete failed: "+(e.message||e),true);
+   else alert("Delete failed: "+(e.message||e));
+ }
+}
 function addDermedService(id){const x=services.find(x=>String(x.id)===String(id));if(!x)return;const arr=window.dermedServiceItems||(window.dermedServiceItems=[]);if(arr.some(y=>String(y.service_id)===String(id)))return;arr.push({service_id:x.id,service_code:x.service_code,name:x.name,service_type:x.service_type,price:Number(x.price||0)});renderDermedServices();$("dermedServiceSearch").value="";$("dermedServiceResults").classList.remove("show")}
 function renderDermedServices(){const arr=window.dermedServiceItems||[];$("dermedServices").innerHTML=arr.map((x,i)=>`<tr><td>${esc(x.name)}<div class="muted">${esc(x.service_code)}</div></td><td>${esc(x.service_type)}</td><td>${money(x.price)}</td><td><button class="danger" onclick="removeDermedService(${i})">×</button></td></tr>`).join("");const p=(window.dermedSaleItems||[]).reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),sv=arr.reduce((n,x)=>n+Number(x.price),0);$("dermedTotal").textContent=money(p+sv)}
 function removeDermedService(i){(window.dermedServiceItems||[]).splice(i,1);renderDermedServices()}
