@@ -3784,7 +3784,7 @@ function showSaleInvoice(id,size="A4"){
 
  $("invoicePrint").innerHTML=`<div class="mf-invoice">
    <div class="mf-invoice-top">
-     <div><img class="mf-invoice-logo" style="width:160px;height:160px;max-width:none;max-height:none;object-fit:contain;display:block" src="${logoData}" alt="Dermed Beauty Center Logo"></div>
+     <div><img class="mf-invoice-logo" style="width:320px;height:310px;max-width:none;max-height:none;object-fit:contain;display:block" src="${logoData}" alt="Dermed Beauty Center Logo"></div>
      <div class="mf-school-head">
        <div class="mf-school-kh" style="color:#C9901E !important">មជ្ឈមណ្ឌលថែរក្សាសម្ផស្សដឺមេដ</div>
        <div class="mf-school-en" style="color:#C9901E !important">Dermed Beauty Center</div>
@@ -6355,3 +6355,49 @@ document.addEventListener("DOMContentLoaded",function(){
   setTimeout(initDermedAddSaleToggle,1500);
 })();
 </script>
+
+
+<style id="dermed-logo-320x310-final">
+/* FINAL: Dermed Beauty Center invoice logo requested size */
+#invoicePrint .mf-invoice-logo,
+#invoiceOverlay .mf-invoice-logo,
+#invoiceExportContent .mf-invoice-logo{
+  width:320px!important;
+  height:310px!important;
+  max-width:none!important;
+  max-height:none!important;
+  object-fit:contain!important;
+  display:block!important;
+}
+#invoicePrint .mf-invoice-top,
+#invoiceOverlay .mf-invoice-top,
+#invoiceExportContent .mf-invoice-top{
+  grid-template-columns:330px minmax(0,1fr)!important;
+  align-items:start!important;
+}
+#invoicePrint .mf-school-kh,
+#invoicePrint .mf-school-en,
+#invoicePrint .mf-invoice-label .kh,
+#invoicePrint .mf-invoice-label .en,
+#invoiceOverlay .mf-school-kh,
+#invoiceOverlay .mf-school-en,
+#invoiceOverlay .mf-invoice-label .kh,
+#invoiceOverlay .mf-invoice-label .en,
+#invoiceExportContent .mf-school-kh,
+#invoiceExportContent .mf-school-en,
+#invoiceExportContent .mf-invoice-label .kh,
+#invoiceExportContent .mf-invoice-label .en{
+  color:#C9901E!important;
+}
+@media print{
+  #invoicePrint .mf-invoice-logo{
+    width:320px!important;
+    height:310px!important;
+    max-width:none!important;
+    max-height:none!important;
+  }
+  #invoicePrint .mf-invoice-top{
+    grid-template-columns:330px minmax(0,1fr)!important;
+  }
+}
+</style>
