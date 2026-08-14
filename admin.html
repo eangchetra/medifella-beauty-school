@@ -6479,3 +6479,31 @@ document.addEventListener("DOMContentLoaded",function(){
   color:#C9901E !important;
 }
 </style>
+
+
+<style id="dermed-logo-suitable-final">
+/* Suitable professional invoice logo size */
+#invoicePrint.invoice-preview-a4 .mf-invoice-logo,
+#invoicePrint.invoice-print-a4 .mf-invoice-logo,
+#invoicePrint.invoice-preview-a5 .mf-invoice-logo,
+#invoicePrint.invoice-print-a5 .mf-invoice-logo,
+#invoiceExportContent .mf-invoice-logo{
+  width:120px !important;
+  height:120px !important;
+  min-width:120px !important;
+  min-height:120px !important;
+  max-width:120px !important;
+  max-height:120px !important;
+  object-fit:contain !important;
+  display:block !important;
+}
+#invoicePrint.invoice-preview-a4 .mf-invoice-top,
+#invoicePrint.invoice-print-a4 .mf-invoice-top,
+#invoicePrint.invoice-preview-a5 .mf-invoice-top,
+#invoicePrint.invoice-print-a5 .mf-invoice-top,
+#invoiceExportContent .mf-invoice-top{
+  grid-template-columns:135px minmax(0,1fr) !important;
+  gap:10px !important;
+  align-items:start !important;
+}
+</style>
