@@ -3713,7 +3713,35 @@ function setSaleFormCollapsed(collapsed){
 }
 toggleSaleFormBtn.onclick=()=>{
   const form=$("saleForm");
-  setSaleFormCollapsed(!form.classList.contains("hidden"));
+  if(!form)return;
+
+  const isHidden=form.classList.contains("hidden");
+
+  if(isHidden){
+    // "+ Add Sale" always starts a NEW sale.
+    // If the user was editing an invoice, leave edit mode and clear the
+    // previous invoice data before showing the blank sale form.
+    if(typeof resetSaleForm==="function"){
+      resetSaleForm();
+    }else{
+      clearSaleEditMode();
+      $("saleItems").innerHTML="";
+      $("saleOverallDiscountType").value="percent";
+      $("saleOverallDiscountValue").value="0";
+      $("salePaymentStatus").value="Due";
+      $("saleAmountPaidNow").value="0.00";
+    }
+
+    setSaleFormCollapsed(false);
+    setSaleEditMode(false);
+    if($("saleReference"))$("saleReference").value=nextSaleReference();
+    if(typeof updateSaleDateTimeDisplay==="function")updateSaleDateTimeDisplay();
+    if(typeof setPaymentStatusDefaults==="function")setPaymentStatusDefaults();
+    if(typeof updateSaleTotals==="function")updateSaleTotals();
+  }else{
+    // Hide the form only; do not save or modify the current record.
+    setSaleFormCollapsed(true);
+  }
 };
 
 $("addSaleItem").onclick=()=>addSaleItemRow();
@@ -4587,21 +4615,40 @@ async function saveMediFellaSale(){
    // does not have. This prevents one optional column from blocking the sale.
    async function writeSale(basePayload,mode,id){
      let dataPayload={...basePayload};
-     if(!isEdit)dataPayload.created_by=adminUser.id;
 
-     for(let attempt=0;attempt<10;attempt++){
+     // created_by is optional. Do not make a successful sale depend on the
+     // current admin object having an id.
+     if(!isEdit && adminUser?.id)dataPayload.created_by=adminUser.id;
+
+     for(let attempt=0;attempt<12;attempt++){
        let response;
+
        if(mode==="update"){
-         response=await sb.from("medifella_sales").update(dataPayload).eq("id",id).select().single();
+         // IMPORTANT: do not call .select().single() here. UPDATE can succeed
+         // under RLS while SELECT is denied.
+         response=await sb.from("medifella_sales")
+           .update(dataPayload)
+           .eq("id",id);
+
        }else{
-         response=await sb.from("medifella_sales").insert(dataPayload).select().single();
+         // IMPORTANT: do not call .select().single() here. INSERT can succeed
+         // even when the table does not allow the same row to be selected back.
+         response=await sb.from("medifella_sales")
+           .insert(dataPayload);
        }
 
-       if(!response.error)return response.data;
+       if(!response.error){
+         return {id:id||null,reference_no:basePayload.reference_no};
+       }
 
-       const errorText=String(response.error.message||"");
-       const columnMatch=errorText.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']? (?:of relation .* )?does not exist/i)
-         ||errorText.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i);
+       const errorText=String(response.error.message||response.error.details||"");
+
+       // Retry automatically when this installation does not have an optional
+       // column included by the frontend.
+       const columnMatch=
+         errorText.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']? (?:of relation .* )?does not exist/i) ||
+         errorText.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i) ||
+         errorText.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
 
        if(columnMatch && Object.prototype.hasOwnProperty.call(dataPayload,columnMatch[1])){
          delete dataPayload[columnMatch[1]];
@@ -4610,24 +4657,41 @@ async function saveMediFellaSale(){
 
        throw response.error;
      }
-     throw new Error("Could not save the sale because the database columns could not be matched.");
+
+     throw new Error("Could not save the sale after checking the available database columns.");
    }
 
    const saved=await writeSale(payload,isEdit?"update":"insert",editingSaleId);
 
-   // Payment records are supplemental. The sale itself must remain saved even
-   // if the optional payment-history table is unavailable.
+   // Reload the authoritative sale list after the database write. This also
+   // gives us the real row ID when INSERT RETURNING is unavailable under RLS.
+   await loadSales();
+
+   let savedRow=null;
+   if(isEdit){
+     savedRow=salesRecords.find(x=>String(x.id)===String(editingSaleId))||null;
+   }else{
+     savedRow=salesRecords.find(x=>String(saleRef(x))===String(reference))||null;
+   }
+
+   if(!savedRow){
+     throw new Error("The sale was written but could not be found after saving. Please check the Medi Fella Sale List.");
+   }
+
+   // Payment history is supplemental. Do not make the sale itself fail because
+   // payment-history INSERT is blocked by RLS or a missing optional column.
    if(!isEdit && paid>0){
      const paymentPayload={
-       sale_id:String(saved.id),
+       sale_id:String(savedRow.id),
        amount:paid,
        payment_method:String($("salePaymentMethod")?.value||"Cash"),
        payment_date:saleDate,
-       note:paymentStatus==="Partial"?"Partial Payment":"Paid in Full",
-       created_by:adminUser.id
+       note:paymentStatus==="Partial"?"Partial Payment":"Paid in Full"
      };
+     if(adminUser?.id)paymentPayload.created_by=adminUser.id;
+
      try{
-       const pr=await sb.from("medifella_sale_payments").insert(paymentPayload);
+       let pr=await sb.from("medifella_sale_payments").insert(paymentPayload);
        if(pr.error)console.warn("Payment history was not saved:",pr.error.message);
      }catch(paymentError){
        console.warn("Payment history was not saved:",paymentError);
@@ -4638,16 +4702,18 @@ async function saveMediFellaSale(){
 
    msg($("newSaleStatus"),isEdit?"Invoice updated successfully.":"Sale saved successfully.");
 
-   await loadSales();
    setSaleFormCollapsed(true);
 
-   if(saved?.id && typeof showSaleInvoice==="function"){
-     showSaleInvoice(saved.id,"A4");
+   if(savedRow?.id && typeof showSaleInvoice==="function"){
+     showSaleInvoice(savedRow.id,"A4");
    }
 
  }catch(error){
    console.error("Medi Fella Sale save error:",error);
-   msg($("newSaleStatus"),"Save Sale failed: "+(error?.message||"Unknown database error"),true);
+   const errorText=error?.message||error?.details||"Unknown database error";
+   msg($("newSaleStatus"),"Save Sale failed: "+errorText,true);
+   const statusBox=$("newSaleStatus");
+   if(statusBox)statusBox.scrollIntoView({behavior:"smooth",block:"center"});
  }finally{
    if(saveBtn)saveBtn.disabled=false;
  }
@@ -7251,17 +7317,9 @@ document.addEventListener("DOMContentLoaded",function(){
     const toggle=E("toggleSaleForm");
     const form=E("saleForm");
     if(toggle && form){
-      toggle.onclick=function(e){
-        e.preventDefault();
-        const hidden=form.classList.contains("hidden");
-        if(typeof setSaleFormCollapsed==="function"){
-          setSaleFormCollapsed(!hidden);
-        }else{
-          form.classList.toggle("hidden",!hidden);
-          toggle.textContent=!hidden ? "+ Add Sale" : "Hide Sale Table";
-          toggle.setAttribute("aria-expanded",String(hidden));
-        }
-      };
+      // The primary Medi Fella Sale toggle handler above controls Add/Hide.
+      // Do not replace it here; only ensure the button is a normal button.
+      toggle.type="button";
     }
 
     const newStudent=E("newSaleStudentBtn");
@@ -7399,5 +7457,37 @@ document.addEventListener("DOMContentLoaded",function(){
    wrapped.__v39Wrapped=true;
    window.showSaleInvoice=wrapped;
  }
+})();
+</script>
+
+<script id="medifella-add-sale-exit-edit-v41">
+(function(){
+ document.addEventListener("click",function(e){
+   const btn=e.target.closest("#toggleSaleForm");
+   if(!btn)return;
+   const form=document.getElementById("saleForm");
+   if(!form || !form.classList.contains("hidden"))return;
+
+   e.preventDefault();
+   e.stopImmediatePropagation();
+
+   try{
+     if(typeof resetSaleForm==="function")resetSaleForm();
+     if(typeof setSaleEditMode==="function")setSaleEditMode(false);
+     if(typeof clearSaleEditMode==="function")clearSaleEditMode();
+     form.classList.remove("hidden");
+     btn.setAttribute("aria-expanded","true");
+     btn.textContent="Hide Sale Table";
+     if(typeof nextSaleReference==="function"){
+       const ref=document.getElementById("saleReference");
+       if(ref)ref.value=nextSaleReference();
+     }
+     if(typeof updateSaleDateTimeDisplay==="function")updateSaleDateTimeDisplay();
+     if(typeof setPaymentStatusDefaults==="function")setPaymentStatusDefaults();
+     if(typeof updateSaleTotals==="function")updateSaleTotals();
+   }catch(err){
+     console.error("Medi Fella + Add Sale reset error:",err);
+   }
+ },true);
 })();
 </script>
