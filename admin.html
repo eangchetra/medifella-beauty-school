@@ -2396,11 +2396,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div><label>Reference No.</label><input id="dermedReferenceNo" readonly placeholder="Auto-generate"></div>
 <div><label>Sale Date & Time</label><input id="dermedSaleTime" readonly></div>
 </div>
-<label style="margin-top:18px">Search Product / Service</label><div style="position:relative"><input id="dermedItemSearch" autocomplete="off" placeholder="Search Product or Service name / ID"><div id="dermedItemResults" class="sale-course-picker-results"></div></div>
-<div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr></thead><tbody id="dermedItems"></tbody></table></div>
-<h2 style="margin-top:22px">Services Fee</h2>
-<div class="table-wrap"><table class="table"><thead><tr><th>Service</th><th>Type</th><th>Price</th><th></th></tr></thead><tbody id="dermedServices"></tbody></table></div>
-<input id="dermedProductSearch" type="hidden"><div id="dermedProductResults" style="display:none"></div>
+<label style="margin-top:18px">Search Product / Service</label><div style="position:relative"><input id="dermedItemSearch" autocomplete="off" placeholder="Search Product or Service name / ID"><div id="dermedItemResults" class="sale-course-picker-results"></div></div> <div class="table-wrap"><table class="table"><thead><tr><th>Product / Service</th><th>Type</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr></thead><tbody id="dermedItems"></tbody></table></div> <input id="dermedProductSearch" type="hidden"> type="hidden"><div id="dermedProductResults" style="display:none"></div>
 <input id="dermedServiceSearch" type="hidden"><div id="dermedServiceResults" style="display:none"></div>
 <div class="sale-summary-row" style="margin-top:16px"><span>Products + Services Total</span><strong id="dermedTotal">$0.00</strong></div>
 <div class="actions" style="justify-content:flex-end;margin-top:14px"><button id="saveDermedSale" class="gold">Save Dermed Sale & Generate Invoice</button><button id="clearDermedSale" class="light">Clear</button></div>
@@ -5203,6 +5199,7 @@ function addSaleProduct(type,pid){
  renderSaleProductRows(type); $(type+"ProductSearch").value="";$(type+"ProductResults").classList.remove("show");
 }
 function renderSaleProductRows(type){
+ if(type==="dermed"){ renderDermedCombinedItems(); return; }
  const arr=window[type+"SaleItems"]||[], body=$(type+"Items"); if(!body)return;
  body.innerHTML=arr.map((x,i)=>`<tr><td><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code)}</div></td><td><input type="number" min="1" max="${Math.max(0,productStock(x.product_id)+(Number(x.quantity)||0))}" value="${x.quantity}" onchange="${type}Qty(${i},this.value)"></td><td>${money(x.price)}</td><td>${money(Number(x.price)*Number(x.quantity))}</td><td><button class="danger" onclick="removeSaleProduct('${type}',${i})">×</button></td></tr>`).join("");
  const total=arr.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0); if($(type+"Total"))$(type+"Total").textContent=money(total);
@@ -5388,16 +5385,50 @@ async function deleteService(id){
    else alert("Delete failed: "+(e.message||e));
  }
 }
-function addDermedService(id){const x=services.find(x=>String(x.id)===String(id));if(!x)return;const arr=window.dermedServiceItems||(window.dermedServiceItems=[]);if(arr.some(y=>String(y.service_id)===String(id)))return;arr.push({service_id:x.id,service_code:x.service_code,name:x.name,service_type:x.service_type,price:Number(x.price||0)});renderDermedServices();$("dermedServiceSearch").value="";$("dermedServiceResults").classList.remove("show")}
-function renderDermedServices(){const arr=window.dermedServiceItems||[];$("dermedServices").innerHTML=arr.map((x,i)=>`<tr><td>${esc(x.name)}<div class="muted">${esc(x.service_code)}</div></td><td>${esc(x.service_type)}</td><td>${money(x.price)}</td><td><button class="danger" onclick="removeDermedService(${i})">×</button></td></tr>`).join("");const p=(window.dermedSaleItems||[]).reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),sv=arr.reduce((n,x)=>n+Number(x.price),0);$("dermedTotal").textContent=money(p+sv)}
-function removeDermedService(i){(window.dermedServiceItems||[]).splice(i,1);renderDermedServices()}
-
+function addDermedService(id){
+ const x=services.find(x=>String(x.id)===String(id));if(!x)return;
+ const arr=window.dermedServiceItems||(window.dermedServiceItems=[]);
+ if(arr.some(y=>String(y.service_id)===String(id)))return;
+ arr.push({service_id:x.id,service_code:x.service_code,name:x.name,service_type:x.service_type,price:Number(x.price||0),quantity:1});
+ renderDermedCombinedItems();
+ $("dermedServiceSearch").value="";$("dermedServiceResults").classList.remove("show");
+}
+function renderDermedCombinedItems(){
+ const body=$("dermedItems");if(!body)return;
+ const products=window.dermedSaleItems||[], servicesArr=window.dermedServiceItems||[];
+ const productRows=products.map((x,i)=>`<tr>
+   <td><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code||"")}</div></td>
+   <td>Product</td>
+   <td><input type="number" min="1" max="${Math.max(0,productStock(x.product_id)+(Number(x.quantity)||0))}" value="${x.quantity}" onchange="dermedQty(${i},this.value)"></td>
+   <td>${money(x.price)}</td>
+   <td>${money(Number(x.price)*Number(x.quantity))}</td>
+   <td><button class="danger" onclick="removeSaleProduct('dermed',${i})">×</button></td>
+ </tr>`).join("");
+ const serviceRows=servicesArr.map((x,i)=>`<tr>
+   <td><strong>${esc(x.name)}</strong><div class="muted">${esc(x.service_code||"")}</div></td>
+   <td>${esc(x.service_type||"Service")}</td>
+   <td><input type="number" min="1" value="${Number(x.quantity||1)}" onchange="setDermedServiceQty(${i},this.value)"></td>
+   <td>${money(x.price)}</td>
+   <td>${money(Number(x.price)*Number(x.quantity||1))}</td>
+   <td><button class="danger" onclick="removeDermedService(${i})">×</button></td>
+ </tr>`).join("");
+ body.innerHTML=productRows+serviceRows||'<tr><td colspan="6" class="muted">No products or services added.</td></tr>';
+ const p=products.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0);
+ const sv=servicesArr.reduce((n,x)=>n+Number(x.price)*Number(x.quantity||1),0);
+ $("dermedTotal").textContent=money(p+sv);
+}
+function renderDermedServices(){renderDermedCombinedItems()}
+function setDermedServiceQty(i,v){
+ const arr=window.dermedServiceItems||[];if(!arr[i])return;
+ arr[i].quantity=Math.max(1,Number(v)||1);renderDermedCombinedItems();
+}
+function removeDermedService(i){(window.dermedServiceItems||[]).splice(i,1);renderDermedCombinedItems()}
 function resetNewInventorySale(type){
  window[type+"SaleItems"]=[];if(type==="dermed")window.dermedServiceItems=[];
  [type+"BuyerType",type+"BuyerId"].forEach(id=>$(id).value="");
  $(type+"BuyerSearch").value="";$(type+"BuyerHint").textContent="Choose a student or customer. You can add a new customer.";
  $(type+"SaleStaff").value="";setAutoTime(type+"SaleTime");
- renderSaleProductRows(type);if(type==="dermed")renderDermedServices();
+ renderSaleProductRows(type);if(type==="dermed")renderDermedCombinedItems();
 }
 async function saveInventorySale(type){
  const buyerType=$(type+"BuyerType").value,buyerId=$(type+"BuyerId").value,staffId=$(type+"SaleStaff").value,items=window[type+"SaleItems"]||[];
@@ -5408,7 +5439,7 @@ async function saveInventorySale(type){
  for(const it of items){if(Number(it.quantity)>productStock(it.product_id)){msg($(type+"Status"),`Not enough stock for ${it.name}. Available: ${productStock(it.product_id)}.`,true);return}}
  const buyer=buyerType==="student"?students.find(x=>String(x.id)===String(buyerId)):customers.find(x=>String(x.id)===String(buyerId));
  const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
- const productTotal=items.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),serviceTotal=serviceItems.reduce((n,x)=>n+Number(x.price),0),total=productTotal+serviceTotal;
+ const productTotal=items.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),serviceTotal=serviceItems.reduce((n,x)=>n+Number(x.price)*Number(x.quantity||1),0),total=productTotal+serviceTotal;
  try{
   const code=type==="mts"?"MTS":"DERMED";
   const prefix=code+"-"+new Date().getFullYear()+"-";
@@ -5421,7 +5452,7 @@ async function saveInventorySale(type){
     student_id:buyerType==="student"?buyerId:null,student_name:buyer?.full_name||buyer?.name||"",
     student_phone:buyer?.phone||"",customer_id:buyerType==="customer"?buyerId:null,customer_type:buyerType,
     sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",subtotal:total,discount:0,shipping:0,grand_total:total,paid:total,balance:0,payment_status:"Paid",sale_status:"Completed",
-    items:items.map(x=>({...x,quantity:Number(x.quantity)})),service_items:serviceItems,service_total:serviceTotal,notes:""
+    items:items.map(x=>({...x,quantity:Number(x.quantity)})),service_items:serviceItems.map(x=>({...x,quantity:Number(x.quantity||1)})),service_total:serviceTotal,notes:""
   };
   const r=await sb.from("medifella_sales").insert({...payload,created_by:adminUser.id}).select().single();if(r.error)throw r.error;
   const movements=items.map(x=>({product_id:x.product_id,movement_type:"sale",quantity:Number(x.quantity),staff_id:staffId,staff_name:staff?.name_en||"",stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));
