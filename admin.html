@@ -1871,6 +1871,121 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 #mtsBuyerResults,#dermedBuyerResults{display:none;position:absolute;left:0;right:0;top:100%;z-index:30;background:#fff;border:1px solid var(--line);border-radius:10px;box-shadow:0 10px 25px #075e6618;max-height:240px;overflow:auto}
 #mtsBuyerResults.show,#dermedBuyerResults.show{display:block}
 </style>
+
+<style id="dermed-fixed-picker-style">
+#dermedListBuyerResults,
+#dermedListProductResults,
+#dermedListServiceResults{
+  max-height:230px!important;
+  overflow-y:auto!important;
+  z-index:100!important;
+}
+#dermedListBuyerResults button,
+#dermedListProductResults button,
+#dermedListServiceResults button{
+  display:block!important;
+  width:100%!important;
+  padding:11px 13px!important;
+  text-align:left!important;
+  border:0!important;
+  border-bottom:1px solid #e6eff0!important;
+  background:#fff!important;
+  cursor:pointer!important;
+}
+#dermedListBuyerResults button:hover,
+#dermedListProductResults button:hover,
+#dermedListServiceResults button:hover{
+  background:#eef9fa!important;
+}
+#dermedListDateDisplay,
+#dermedListReference{
+  font-size:17px!important;
+  font-weight:700!important;
+  color:#168e9f!important;
+  background:#f7fcfd!important;
+}
+</style>
+
+
+<style id="dermed-buyer-search-final-fix">
+#dermedListBuyerResults{
+  position:absolute!important;
+  left:0!important;
+  right:0!important;
+  top:calc(100% + 4px)!important;
+  max-height:260px!important;
+  overflow-y:auto!important;
+  z-index:9999!important;
+}
+#dermedListBuyerSearch{position:relative!important;z-index:10000!important}
+.sale-course-picker-wrap{position:relative!important}
+#dermedListBuyerResults button{
+  display:block!important;
+  width:100%!important;
+  min-height:48px!important;
+  text-align:left!important;
+  padding:9px 12px!important;
+  background:#fff!important;
+  color:#222!important;
+  border:0!important;
+  border-bottom:1px solid #e5eeee!important;
+  cursor:pointer!important;
+}
+#dermedListBuyerResults button:hover{background:#eef9fa!important}
+</style>
+
+
+<style id="dermed-product-search-final-fix">
+#dermedListProductResults{
+  position:absolute!important;
+  left:0!important;
+  right:0!important;
+  top:calc(100% + 4px)!important;
+  max-height:260px!important;
+  overflow-y:auto!important;
+  z-index:9999!important;
+}
+#dermedListProductResults button{
+  display:block!important;
+  width:100%!important;
+  min-height:48px!important;
+  text-align:left!important;
+  padding:9px 12px!important;
+  background:#fff!important;
+  color:#222!important;
+  border:0!important;
+  border-bottom:1px solid #e5eeee!important;
+  cursor:pointer!important;
+}
+#dermedListProductResults button:hover{background:#eef9fa!important}
+</style>
+
+
+<style id="dermed-service-search-final-fix">
+#dermedListServiceResults{
+  position:absolute!important;
+  left:0!important;
+  right:0!important;
+  top:calc(100% + 4px)!important;
+  max-height:260px!important;
+  overflow-y:auto!important;
+  z-index:9999!important;
+}
+#dermedListServiceResults button{
+  display:block!important;
+  width:100%!important;
+  min-height:48px!important;
+  text-align:left!important;
+  padding:9px 12px!important;
+  background:#fff!important;
+  color:#222!important;
+  border:0!important;
+  border-bottom:1px solid #e5eeee!important;
+  cursor:pointer!important;
+}
+#dermedListServiceResults button:hover{background:#eef9fa!important}
+</style>
+
 </head>
 <body>
 
@@ -5622,7 +5737,7 @@ setupDermedListPickers();resetDermedSaleListToggle();resetDermedListSale();
 $("dermedListOverallDiscountType").onchange=updateDermedListTotals;$("dermedListOverallDiscountValue").oninput=updateDermedListTotals;$("dermedListPaymentStatus").onchange=updateDermedListTotals;$("dermedListAmountPaidNow").oninput=updateDermedListTotals;
 $("saveDermedListSale").onclick=saveDermedListSale;$("cancelDermedListSale").onclick=resetDermedListSale;
 $("dermedListSearch").oninput=renderDermedSales;$("dermedListPaymentFilter").onchange=renderDermedSales;$("dermedListRefresh").onclick=loadSales;
-$("stockTimeDisplay").value=phTime().replace("T"," ");$("stockTime").value=phTime();$("stockReportDate").value=new Date().toISOString().slice(0,10);setAutoTime("mtsSaleTime");
+$("stockTimeDisplay").value=phTime().replace("T"," ");$("stockTime").value=phTime();if($("stockReportDate"))$("stockReportDate").value=new Date().toISOString().slice(0,10);setAutoTime("mtsSaleTime");
 
 setupSaleCoursePicker();
 
@@ -5630,6 +5745,546 @@ function updateMetrics(){$("mStudents").textContent=students.length;$("mPending"
 const _oldUpdateMetrics=updateMetrics; updateMetrics=function(){_oldUpdateMetrics();renderMtsSales();renderDermedSales();renderProductList();renderStockList();renderStaffInfoList();renderCustomerList();renderServiceList();renderStockReport();};
 boot();
 
+/* ===== FIXED DERMED SALE INTEGRATION ===== */
+(function(){
+  function el(id){ return document.getElementById(id); }
+  function showResults(box){ if(box) box.classList.add("show"); }
+  function hideResults(box){ if(box) box.classList.remove("show"); }
+
+  function renderBuyer(){
+    const input=el("dermedListBuyerSearch"), box=el("dermedListBuyerResults");
+    if(!input||!box) return;
+    const q=(input.value||"").trim().toLowerCase();
+    let rows=[];
+    const st=(students||[]).filter(x=>
+      (`${x.student_id||""} ${x.full_name||""} ${x.full_name_km||""} ${x.phone||""} ${x.email||""}`)
+      .toLowerCase().includes(q)
+    ).slice(0,10);
+    st.forEach(x=>rows.push({type:"student",id:x.id,name:x.full_name||x.full_name_km||"Student",code:x.student_id||"",phone:x.phone||""}));
+
+    const cu=(customers||[]).filter(x=>
+      (`${x.customer_code||""} ${x.name||""} ${x.phone||""}`)
+      .toLowerCase().includes(q)
+    ).slice(0,10);
+    cu.forEach(x=>rows.push({type:"customer",id:x.id,name:x.name||"Customer",code:x.customer_code||"",phone:x.phone||""}));
+
+    if(!q && !rows.length){
+      // If data has not loaded yet, keep the dropdown ready and small.
+      box.innerHTML='<div class="muted" style="padding:12px">Loading students and customers...</div>';
+    }else{
+      box.innerHTML=rows.length ? rows.map(x=>
+        `<button type="button" class="dermed-picker-option" data-buyer-type="${attr(x.type)}" data-buyer-id="${attr(x.id)}">
+          <strong>${esc(x.name)}</strong>
+          <div class="muted">${esc(x.type==="student"?"Student":"Customer")} · ${esc(x.code)}${x.phone?` · ${esc(x.phone)}`:""}</div>
+        </button>`
+      ).join("") : '<div class="muted" style="padding:12px">No matching student/customer found.</div>';
+    }
+    showResults(box);
+  }
+
+  function chooseBuyer(type,id){
+    const x=type==="student"
+      ? (students||[]).find(v=>String(v.id)===String(id))
+      : (customers||[]).find(v=>String(v.id)===String(id));
+    if(!x) return;
+    el("dermedListBuyerType").value=type;
+    el("dermedListBuyerId").value=String(id);
+    el("dermedListBuyerSearch").value=type==="student" ? (x.full_name||x.full_name_km||"") : (x.name||"");
+    el("dermedListBuyerHint").textContent=
+      `Selected: ${type==="student"?(x.full_name||x.full_name_km||"Student"):(x.name||"Customer")} · ${type==="student"?(x.student_id||""):(x.customer_code||"")} · ${x.phone||""}`;
+    hideResults(el("dermedListBuyerResults"));
+  }
+
+  function renderProducts(){
+    const input=el("dermedListProductSearch"), box=el("dermedListProductResults");
+    if(!input||!box) return;
+    const q=(input.value||"").trim().toLowerCase();
+    const rows=(products||[]).filter(p=>
+      (`${p.product_code||""} ${p.name||""}`).toLowerCase().includes(q)
+    ).slice(0,15);
+    box.innerHTML=rows.length ? rows.map(p=>
+      `<button type="button" class="dermed-picker-option" data-product-id="${attr(p.id)}">
+        <strong>${esc(p.name||"Product")}</strong>
+        <div class="muted">Product ID: ${esc(p.product_code||"")} · ${money(p.price)} · Stock: ${productStock(p.id)}</div>
+      </button>`
+    ).join("") : '<div class="muted" style="padding:12px">No matching product found.</div>';
+    showResults(box);
+  }
+
+  function renderServices(){
+    const input=el("dermedListServiceSearch"), box=el("dermedListServiceResults");
+    if(!input||!box) return;
+    const q=(input.value||"").trim().toLowerCase();
+    const rows=(services||[]).filter(x=>
+      (`${x.service_code||""} ${x.name||""}`).toLowerCase().includes(q)
+    ).slice(0,15);
+    box.innerHTML=rows.length ? rows.map(x=>
+      `<button type="button" class="dermed-picker-option" data-service-id="${attr(x.id)}">
+        <strong>${esc(x.name||"Service")}</strong>
+        <div class="muted">Service ID: ${esc(x.service_code||"")} · ${esc(x.service_type||"")} · ${money(x.price)}</div>
+      </button>`
+    ).join("") : '<div class="muted" style="padding:12px">No matching service found.</div>';
+    showResults(box);
+  }
+
+  function setDermedDateAndReference(){
+    if(typeof dermedListSetDate==="function") dermedListSetDate();
+    else{
+      const now=new Date();
+      const parts=new Intl.DateTimeFormat("en-CA",{
+        timeZone:"Asia/Phnom_Penh",year:"numeric",month:"2-digit",day:"2-digit",
+        hour:"2-digit",minute:"2-digit",second:"2-digit",hourCycle:"h23"
+      }).formatToParts(now);
+      const get=t=>parts.find(x=>x.type===t)?.value||"00";
+      const dt=`${get("year")}-${get("month")}-${get("day")}T${get("hour")}:${get("minute")}:${get("second")}`;
+      if(el("dermedListDate")) el("dermedListDate").value=dt;
+      if(el("dermedListDateDisplay")) el("dermedListDateDisplay").value=dt.replace("T"," ");
+    }
+    if(el("dermedListReference") && !el("dermedListReference").value && typeof dermedListReference==="function"){
+      el("dermedListReference").value=dermedListReference();
+    }
+  }
+
+  function bind(){
+    const buyer=el("dermedListBuyerSearch");
+    const buyerBox=el("dermedListBuyerResults");
+    if(buyer && !buyer.dataset.fixedBound){
+      buyer.dataset.fixedBound="1";
+      buyer.addEventListener("input",renderBuyer);
+      buyer.addEventListener("focus",renderBuyer);
+      buyerBox?.addEventListener("mousedown",e=>{
+        const b=e.target.closest("[data-buyer-id]");
+        if(!b) return;
+        e.preventDefault();
+        chooseBuyer(b.dataset.buyerType,b.dataset.buyerId);
+      });
+      buyer.addEventListener("blur",()=>setTimeout(()=>hideResults(buyerBox),220));
+    }
+
+    const product=el("dermedListProductSearch");
+    const productBox=el("dermedListProductResults");
+    if(product && !product.dataset.fixedBound){
+      product.dataset.fixedBound="1";
+      product.addEventListener("input",renderProducts);
+      product.addEventListener("focus",renderProducts);
+      productBox?.addEventListener("mousedown",e=>{
+        const b=e.target.closest("[data-product-id]");
+        if(!b) return;
+        e.preventDefault();
+        if(typeof addDermedListProduct==="function") addDermedListProduct(b.dataset.productId);
+      });
+      product.addEventListener("blur",()=>setTimeout(()=>hideResults(productBox),220));
+    }
+
+    const service=el("dermedListServiceSearch");
+    const serviceBox=el("dermedListServiceResults");
+    if(service && !service.dataset.fixedBound){
+      service.dataset.fixedBound="1";
+      service.addEventListener("input",renderServices);
+      service.addEventListener("focus",renderServices);
+      serviceBox?.addEventListener("mousedown",e=>{
+        const b=e.target.closest("[data-service-id]");
+        if(!b) return;
+        e.preventDefault();
+        if(typeof addDermedListService==="function") addDermedListService(b.dataset.serviceId);
+      });
+      service.addEventListener("blur",()=>setTimeout(()=>hideResults(serviceBox),220));
+    }
+
+    const newCustomer=el("dermedListNewCustomerBtn");
+    if(newCustomer && !newCustomer.dataset.fixedBound){
+      newCustomer.dataset.fixedBound="1";
+      newCustomer.addEventListener("click",()=>{
+        if(typeof addDermedListCustomer==="function") addDermedListCustomer();
+      });
+    }
+
+    setDermedDateAndReference();
+    if(typeof renderDermedListProducts==="function") renderDermedListProducts();
+    if(typeof renderDermedListServices==="function") renderDermedListServices();
+    if(typeof updateDermedListTotals==="function") updateDermedListTotals();
+  }
+
+  // Bind now and again after async Supabase loading, because students/customers/products/services
+  // are populated by refreshAll().
+  bind();
+  setTimeout(bind,500);
+  setTimeout(bind,1500);
+  setTimeout(bind,3000);
+
+  // Keep the displayed Cambodia date/time current. Reference is refreshed only while the
+  // field is still empty, so it won't change after a sale has been started.
+  setInterval(()=>{
+    const date=el("dermedListDateDisplay");
+    if(date && document.getElementById("dermedSale")?.classList.contains("active")){
+      setDermedDateAndReference();
+    }
+  },1000);
+
+  // Expose a manual refresh for the page if needed.
+  window.refreshDermedSalePickers=()=>{
+    bind();
+    renderBuyer();
+    renderProducts();
+    renderServices();
+  };
+})();
+
+
+
+/* ===== DERMED BUYER SEARCH: name / phone / ID -> select into box ===== */
+(function(){
+  const $d=id=>document.getElementById(id);
+  const norm=v=>String(v??"").trim().toLowerCase();
+  const digits=v=>String(v??"").replace(/\D/g,"");
+
+  function buyerMatches(q){
+    const raw=norm(q), num=digits(q);
+    if(!raw)return [];
+    const out=[];
+    (window.students||[]).forEach(x=>{
+      const vals=[x.student_id,x.full_name,x.full_name_km,x.phone,x.email].map(norm);
+      const phone=digits(x.phone);
+      if(vals.some(v=>v.includes(raw)) || (num && phone.includes(num))){
+        out.push({type:"student",id:x.id,name:x.full_name||x.full_name_km||"Student",
+          code:x.student_id||"",phone:x.phone||"",raw:x});
+      }
+    });
+    (window.customers||[]).forEach(x=>{
+      const vals=[x.customer_code,x.name,x.phone,x.email].map(norm);
+      const phone=digits(x.phone);
+      if(vals.some(v=>v.includes(raw)) || (num && phone.includes(num))){
+        out.push({type:"customer",id:x.id,name:x.name||"Customer",
+          code:x.customer_code||"",phone:x.phone||"",raw:x});
+      }
+    });
+    return out;
+  }
+
+  function choose(type,id){
+    const x=type==="student"
+      ? (window.students||[]).find(v=>String(v.id)===String(id))
+      : (window.customers||[]).find(v=>String(v.id)===String(id));
+    if(!x)return false;
+    const name=type==="student"?(x.full_name||x.full_name_km||"Student"):(x.name||"Customer");
+    const code=type==="student"?(x.student_id||""):(x.customer_code||"");
+    $d("dermedListBuyerType").value=type;
+    $d("dermedListBuyerId").value=String(id);
+    $d("dermedListBuyerSearch").value=name;
+    $d("dermedListBuyerHint").textContent=`Selected: ${name}${code?` · ${code}`:""}${x.phone?` · ${x.phone}`:""}`;
+    $d("dermedListBuyerResults").classList.remove("show");
+    return true;
+  }
+
+  function render(){
+    const input=$d("dermedListBuyerSearch"), box=$d("dermedListBuyerResults");
+    if(!input||!box)return;
+    const q=input.value.trim();
+    if(!q){
+      box.innerHTML="";
+      box.classList.remove("show");
+      $d("dermedListBuyerType").value="";
+      $d("dermedListBuyerId").value="";
+      return;
+    }
+
+    const matches=buyerMatches(q);
+
+    // Exact match or one unique result: automatically put it into the box.
+    const raw=norm(q), num=digits(q);
+    const exact=matches.find(m=>{
+      const x=m.raw;
+      const vals=m.type==="student"
+        ? [x.student_id,x.full_name,x.full_name_km,x.phone,x.email]
+        : [x.customer_code,x.name,x.phone,x.email];
+      return vals.some(v=>norm(v)===raw) || (num && digits(x.phone)===num);
+    });
+
+    if(exact){
+      choose(exact.type,exact.id);
+      return;
+    }
+
+    // If only one person matches the typed value, select automatically.
+    if(matches.length===1){
+      choose(matches[0].type,matches[0].id);
+      return;
+    }
+
+    box.innerHTML=matches.length
+      ? matches.slice(0,20).map(m=>
+        `<button type="button" data-buyer-type="${attr(m.type)}" data-buyer-id="${attr(m.id)}">
+          <strong>${esc(m.name)}</strong>
+          <div class="muted">${esc(m.type==="student"?"Student":"Customer")} · ${esc(m.code||"")}${m.phone?` · ${esc(m.phone)}`:""}</div>
+        </button>`).join("")
+      : `<div class="muted" style="padding:12px">No student/customer found.</div>`;
+    box.classList.add("show");
+  }
+
+  function bind(){
+    const input=$d("dermedListBuyerSearch"),box=$d("dermedListBuyerResults");
+    if(!input||!box||input.dataset.buyerFinalFix==="1")return;
+    input.dataset.buyerFinalFix="1";
+
+    input.addEventListener("input",render);
+    input.addEventListener("focus",()=>{if(input.value.trim())render();});
+    input.addEventListener("keydown",e=>{
+      if(e.key==="Enter"){
+        e.preventDefault();
+        const matches=buyerMatches(input.value);
+        if(matches.length) choose(matches[0].type,matches[0].id);
+      }
+      if(e.key==="Escape")box.classList.remove("show");
+    });
+
+    box.addEventListener("mousedown",e=>{
+      const b=e.target.closest("[data-buyer-id]");
+      if(!b)return;
+      e.preventDefault();
+      choose(b.dataset.buyerType,b.dataset.buyerId);
+    });
+
+    input.addEventListener("blur",()=>setTimeout(()=>box.classList.remove("show"),300));
+  }
+
+  bind();
+  setTimeout(bind,500);
+  setTimeout(bind,1500);
+  setTimeout(bind,3000);
+  setTimeout(bind,5000);
+
+  window.refreshDermedBuyerSearch=render;
+})();
+
+
+/* ===== DERMED PRODUCT SEARCH: type name or ID, then select/add ===== */
+(function(){
+  const $d=id=>document.getElementById(id);
+  const norm=v=>String(v??"").trim().toLowerCase();
+
+  function matches(q){
+    const raw=norm(q);
+    if(!raw)return [];
+    return (window.products||[]).filter(p =>
+      norm(p.name).includes(raw) ||
+      norm(p.product_code).includes(raw) ||
+      norm(p.product_id).includes(raw)
+    );
+  }
+
+  function add(id){
+    if(typeof window.addDermedListProduct==="function"){
+      window.addDermedListProduct(id);
+      return true;
+    }
+    if(typeof window.addSaleProduct==="function"){
+      window.addSaleProduct("dermed",id);
+      return true;
+    }
+    return false;
+  }
+
+  function render(){
+    const input=$d("dermedListProductSearch");
+    const box=$d("dermedListProductResults");
+    if(!input||!box)return;
+
+    const q=input.value.trim();
+    if(!q){
+      box.innerHTML="";
+      box.classList.remove("show");
+      return;
+    }
+
+    const rows=matches(q);
+
+    // Exact product name or ID -> add immediately.
+    const exact=rows.find(p =>
+      norm(p.name)===norm(q) ||
+      norm(p.product_code)===norm(q) ||
+      norm(p.product_id)===norm(q)
+    );
+
+    if(exact){
+      add(exact.id);
+      input.value="";
+      box.classList.remove("show");
+      return;
+    }
+
+    // One unique result -> add automatically.
+    if(rows.length===1){
+      add(rows[0].id);
+      input.value="";
+      box.classList.remove("show");
+      return;
+    }
+
+    box.innerHTML=rows.length
+      ? rows.slice(0,20).map(p =>
+        `<button type="button" data-product-id="${attr(p.id)}">
+          <strong>${esc(p.name||"Product")}</strong>
+          <div class="muted">Product ID: ${esc(p.product_code||p.product_id||"")} · ${money(p.price)} · Stock: ${productStock(p.id)}</div>
+        </button>`
+      ).join("")
+      : `<div class="muted" style="padding:12px">No matching product found.</div>`;
+
+    box.classList.add("show");
+  }
+
+  function bind(){
+    const input=$d("dermedListProductSearch");
+    const box=$d("dermedListProductResults");
+    if(!input||!box||input.dataset.productFinalFix==="1")return;
+
+    input.dataset.productFinalFix="1";
+    input.addEventListener("input",render);
+    input.addEventListener("focus",()=>{if(input.value.trim())render();});
+    input.addEventListener("keydown",e=>{
+      if(e.key==="Enter"){
+        e.preventDefault();
+        const rows=matches(input.value);
+        if(rows.length) {
+          add(rows[0].id);
+          input.value="";
+          box.classList.remove("show");
+        }
+      }
+      if(e.key==="Escape")box.classList.remove("show");
+    });
+
+    box.addEventListener("mousedown",e=>{
+      const b=e.target.closest("[data-product-id]");
+      if(!b)return;
+      e.preventDefault();
+      add(b.dataset.productId);
+      input.value="";
+      box.classList.remove("show");
+    });
+
+    input.addEventListener("blur",()=>setTimeout(()=>box.classList.remove("show"),300));
+  }
+
+  bind();
+  setTimeout(bind,500);
+  setTimeout(bind,1500);
+  setTimeout(bind,3000);
+  setTimeout(bind,5000);
+})();
+
+
+/* ===== DERMED SERVICE SEARCH: type service name or ID, then select/add ===== */
+(function(){
+  const $d=id=>document.getElementById(id);
+  const norm=v=>String(v??"").trim().toLowerCase();
+
+  function matches(q){
+    const raw=norm(q);
+    if(!raw)return [];
+    return (window.services||[]).filter(x =>
+      norm(x.name).includes(raw) ||
+      norm(x.service_code).includes(raw) ||
+      norm(x.service_id).includes(raw)
+    );
+  }
+
+  function add(id){
+    if(typeof window.addDermedListService==="function"){
+      window.addDermedListService(id);
+      return true;
+    }
+    if(typeof window.addDermedService==="function"){
+      window.addDermedService(id);
+      return true;
+    }
+    return false;
+  }
+
+  function render(){
+    const input=$d("dermedListServiceSearch");
+    const box=$d("dermedListServiceResults");
+    if(!input||!box)return;
+
+    const q=input.value.trim();
+    if(!q){
+      box.innerHTML="";
+      box.classList.remove("show");
+      return;
+    }
+
+    const rows=matches(q);
+
+    const exact=rows.find(x =>
+      norm(x.name)===norm(q) ||
+      norm(x.service_code)===norm(q) ||
+      norm(x.service_id)===norm(q)
+    );
+
+    if(exact){
+      add(exact.id);
+      input.value="";
+      box.classList.remove("show");
+      return;
+    }
+
+    if(rows.length===1){
+      add(rows[0].id);
+      input.value="";
+      box.classList.remove("show");
+      return;
+    }
+
+    box.innerHTML=rows.length
+      ? rows.slice(0,20).map(x =>
+        `<button type="button" data-service-id="${attr(x.id)}">
+          <strong>${esc(x.name||"Service")}</strong>
+          <div class="muted">Service ID: ${esc(x.service_code||x.service_id||"")} · ${esc(x.service_type||"")} · ${money(x.price)}</div>
+        </button>`
+      ).join("")
+      : `<div class="muted" style="padding:12px">No matching service found.</div>`;
+
+    box.classList.add("show");
+  }
+
+  function bind(){
+    const input=$d("dermedListServiceSearch");
+    const box=$d("dermedListServiceResults");
+    if(!input||!box||input.dataset.serviceFinalFix==="1")return;
+
+    input.dataset.serviceFinalFix="1";
+    input.addEventListener("input",render);
+    input.addEventListener("focus",()=>{if(input.value.trim())render();});
+    input.addEventListener("keydown",e=>{
+      if(e.key==="Enter"){
+        e.preventDefault();
+        const rows=matches(input.value);
+        if(rows.length){
+          add(rows[0].id);
+          input.value="";
+          box.classList.remove("show");
+        }
+      }
+      if(e.key==="Escape")box.classList.remove("show");
+    });
+
+    box.addEventListener("mousedown",e=>{
+      const b=e.target.closest("[data-service-id]");
+      if(!b)return;
+      e.preventDefault();
+      add(b.dataset.serviceId);
+      input.value="";
+      box.classList.remove("show");
+    });
+
+    input.addEventListener("blur",()=>setTimeout(()=>box.classList.remove("show"),300));
+  }
+
+  bind();
+  setTimeout(bind,500);
+  setTimeout(bind,1500);
+  setTimeout(bind,3000);
+  setTimeout(bind,5000);
+})();
 
 </script>
 </body>
