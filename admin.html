@@ -3985,136 +3985,6 @@ function openPrintFromCanvas(canvas,paper,sale){
      setTimeout(()=>window.print(),300);
    };
  <\/script>
-
-<script id="dermed-search-only-fix">
-(function(){
-  function E(id){return document.getElementById(id)}
-  function A(name){return Array.isArray(window[name])?window[name]:[]}
-  function T(v){return String(v==null?"":v)}
-  function escS(v){return T(v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
-  function moneyS(v){return "$"+(Number(v)||0).toFixed(2)}
-  function closeS(id){var b=E(id);if(b){b.innerHTML="";b.classList.remove("show");b.style.display="none"}}
-
-  function buyerRows(q){
-    q=T(q).trim().toLowerCase(); if(!q)return [];
-    return A("students").map(function(x){return Object.assign({_kind:"student"},x)})
-      .concat(A("customers").map(function(x){return Object.assign({_kind:"customer"},x)}))
-      .filter(function(x){
-        return [x.name,x.phone,x.student_id,x.customer_id,x.code,x.id].map(T).join(" ").toLowerCase().indexOf(q)>=0;
-      }).slice(0,20);
-  }
-
-  function showBuyers(q){
-    var b=E("dermedBuyerResults");if(!b)return;
-    var rows=buyerRows(q);
-    if(!T(q).trim()||!rows.length){closeS("dermedBuyerResults");return}
-    b.innerHTML=rows.map(function(x){
-      return '<button type="button" data-dermed-buyer-type="'+escS(x._kind)+'" data-dermed-buyer-id="'+escS(x.id)+'">'+
-        '<strong>'+escS(x.name||"")+'</strong>'+
-        '<div class="muted">'+escS(x._kind==="student"?"Student":"Customer")+
-        ' · '+escS(x.student_id||x.customer_id||x.code||x.id||"")+
-        (x.phone?' · '+escS(x.phone):"")+'</div></button>';
-    }).join("");
-    b.classList.add("show");b.style.display="block";
-  }
-
-  function chooseBuyerNow(el){
-    var type=el.getAttribute("data-dermed-buyer-type"),id=el.getAttribute("data-dermed-buyer-id");
-    var source=(type==="student"?A("students"):A("customers")).find(function(x){return String(x.id)===String(id)});
-    if(!source)return;
-    if(E("dermedBuyerType"))E("dermedBuyerType").value=type;
-    if(E("dermedBuyerId"))E("dermedBuyerId").value=id;
-    if(E("dermedBuyerSearch"))E("dermedBuyerSearch").value=source.name||"";
-    if(E("dermedBuyerHint"))E("dermedBuyerHint").textContent=(type==="student"?"Student: ":"Customer: ")+(source.name||"")+(source.phone?" | "+source.phone:"");
-    closeS("dermedBuyerResults");
-  }
-
-  function itemRows(q){
-    q=T(q).trim().toLowerCase();if(!q)return [];
-    var ps=A("products").filter(function(x){
-      return [x.name,x.product_code,x.code,x.id].map(T).join(" ").toLowerCase().indexOf(q)>=0;
-    }).slice(0,20).map(function(x){return Object.assign({_kind:"product"},x)});
-    var ss=A("services").filter(function(x){
-      return [x.name,x.service_code,x.code,x.service_type,x.id].map(T).join(" ").toLowerCase().indexOf(q)>=0;
-    }).slice(0,20).map(function(x){return Object.assign({_kind:"service"},x)});
-    return ps.concat(ss);
-  }
-
-  function showItems(q){
-    var b=E("dermedItemResults");if(!b)return;
-    var rows=itemRows(q);
-    if(!T(q).trim()||!rows.length){closeS("dermedItemResults");return}
-    b.innerHTML=rows.map(function(x){
-      return '<button type="button" data-dermed-item-kind="'+escS(x._kind)+'" data-dermed-item-id="'+escS(x.id)+'">'+
-        '<div class="course-picker-name">'+escS(x.name||"")+'</div>'+
-        '<div class="course-picker-meta">'+escS(x._kind==="product"?"Product":"Service")+
-        ' · '+escS(x.product_code||x.service_code||x.code||x.id||"")+
-        ' · '+moneyS(x.price)+'</div></button>';
-    }).join("");
-    b.classList.add("show");b.style.display="block";
-  }
-
-  function addProductNow(id){
-    var p=A("products").find(function(x){return String(x.id)===String(id)});if(!p)return;
-    window.dermedSaleItems=window.dermedSaleItems||[];
-    if(!window.dermedSaleItems.some(function(x){return String(x.product_id)===String(id)})){
-      window.dermedSaleItems.push({product_id:p.id,product_code:p.product_code||p.code||"",name:p.name||"Product",price:Number(p.price)||0,quantity:1,discount_type:"percent",discount_value:0});
-    }
-    if(typeof renderItems==="function")renderItems();
-    if(typeof calc==="function")calc();
-  }
-
-  function addServiceNow(id){
-    var x=A("services").find(function(x){return String(x.id)===String(id)});if(!x)return;
-    window.dermedServiceItems=window.dermedServiceItems||[];
-    if(!window.dermedServiceItems.some(function(y){return String(y.service_id)===String(id)})){
-      window.dermedServiceItems.push({service_id:x.id,service_code:x.service_code||x.code||"",name:x.name||"Service",service_type:x.service_type||"Service",price:Number(x.price)||0,quantity:1,discount_type:"percent",discount_value:0});
-    }
-    if(typeof renderItems==="function")renderItems();
-    if(typeof calc==="function")calc();
-  }
-
-  function bindDermedSearchOnly(){
-    var b=E("dermedBuyerSearch"),br=E("dermedBuyerResults"),p=E("dermedItemSearch"),pr=E("dermedItemResults");
-    if(b&&br&&!b.dataset.searchOnlyFixed){
-      b.dataset.searchOnlyFixed="1";
-      b.addEventListener("input",function(){showBuyers(b.value)});
-      br.addEventListener("pointerdown",function(e){
-        var el=e.target.closest("[data-dermed-buyer-id]");if(!el)return;
-        e.preventDefault();e.stopPropagation();chooseBuyerNow(el);
-      },true);
-      br.addEventListener("click",function(e){
-        var el=e.target.closest("[data-dermed-buyer-id]");if(!el)return;
-        e.preventDefault();e.stopPropagation();chooseBuyerNow(el);
-      },true);
-    }
-    if(p&&pr&&!p.dataset.searchOnlyFixed){
-      p.dataset.searchOnlyFixed="1";
-      p.addEventListener("input",function(){showItems(p.value)});
-      pr.addEventListener("pointerdown",function(e){
-        var el=e.target.closest("[data-dermed-item-id]");if(!el)return;
-        e.preventDefault();e.stopPropagation();
-        if(el.getAttribute("data-dermed-item-kind")==="product")addProductNow(el.getAttribute("data-dermed-item-id"));
-        else addServiceNow(el.getAttribute("data-dermed-item-id"));
-        p.value="";closeS("dermedItemResults");
-      },true);
-      pr.addEventListener("click",function(e){
-        var el=e.target.closest("[data-dermed-item-id]");if(!el)return;
-        e.preventDefault();e.stopPropagation();
-        if(el.getAttribute("data-dermed-item-kind")==="product")addProductNow(el.getAttribute("data-dermed-item-id"));
-        else addServiceNow(el.getAttribute("data-dermed-item-id"));
-        p.value="";closeS("dermedItemResults");
-      },true);
-    }
-  }
-
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bindDermedSearchOnly);
-  else bindDermedSearchOnly();
-  setTimeout(bindDermedSearchOnly,300);
-  setTimeout(bindDermedSearchOnly,1000);
-})();
-</script>
-
 </body>
 </html>`;
 
@@ -6217,6 +6087,81 @@ document.addEventListener("DOMContentLoaded",function(){
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",function(){bind();setTimeout(bind,300);setTimeout(bind,1000)});else{bind();setTimeout(bind,300);setTimeout(bind,1000)}
 })();
 </script>
+<script id="dermed-search-only-fix">
+(function(){
+  function E(id){return document.getElementById(id)}
+  function A(n){return Array.isArray(window[n])?window[n]:[]}
+  function T(v){return String(v==null?"":v)}
+  function X(v){return T(v).replace(/[&<>"']/g,function(c){return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]})}
+  function M(v){return "$"+(Number(v)||0).toFixed(2)}
+  function closeBox(id){var b=E(id);if(b){b.innerHTML="";b.classList.remove("show");b.style.display="none"}}
+
+  function buyerSearch(q){
+    q=T(q).trim().toLowerCase();if(!q){closeBox("dermedBuyerResults");return}
+    var rows=A("students").map(function(x){return Object.assign({_k:"student"},x)})
+      .concat(A("customers").map(function(x){return Object.assign({_k:"customer"},x)}))
+      .filter(function(x){return [x.name,x.phone,x.student_id,x.customer_id,x.code,x.id].map(T).join(" ").toLowerCase().indexOf(q)>=0}).slice(0,20);
+    var b=E("dermedBuyerResults");if(!b)return;
+    b.innerHTML=rows.map(function(x){
+      return '<button type="button" data-dbuyer="'+X(x.id)+'" data-dtype="'+X(x._k)+'"><strong>'+X(x.name||"")+'</strong><div class="muted">'+X(x._k==="student"?"Student":"Customer")+' · '+X(x.student_id||x.customer_id||x.code||x.id||"")+(x.phone?" · "+X(x.phone):"")+'</div></button>';
+    }).join("");
+    if(rows.length){b.classList.add("show");b.style.display="block"}else closeBox("dermedBuyerResults");
+  }
+
+  function itemSearch(q){
+    q=T(q).trim().toLowerCase();if(!q){closeBox("dermedItemResults");return}
+    var ps=A("products").filter(function(x){return [x.name,x.product_code,x.code,x.id].map(T).join(" ").toLowerCase().indexOf(q)>=0}).slice(0,20);
+    var ss=A("services").filter(function(x){return [x.name,x.service_code,x.code,x.service_type,x.id].map(T).join(" ").toLowerCase().indexOf(q)>=0}).slice(0,20);
+    var b=E("dermedItemResults");if(!b)return;
+    var html=[];
+    ps.forEach(function(x){html.push('<button type="button" data-ditem="product" data-did="'+X(x.id)+'"><strong>'+X(x.name||"Product")+'</strong><div class="muted">Product · '+X(x.product_code||x.code||x.id||"")+' · '+M(x.price)+'</div></button>')});
+    ss.forEach(function(x){html.push('<button type="button" data-ditem="service" data-did="'+X(x.id)+'"><strong>'+X(x.name||"Service")+'</strong><div class="muted">Service · '+X(x.service_code||x.code||x.id||"")+' · '+M(x.price)+'</div></button>')});
+    b.innerHTML=html.join("");
+    if(html.length){b.classList.add("show");b.style.display="block"}else closeBox("dermedItemResults");
+  }
+
+  function chooseBuyer(el){
+    var type=el.getAttribute("data-dtype"),id=el.getAttribute("data-dbuyer");
+    var list=type==="student"?A("students"):A("customers");
+    var x=list.find(function(v){return String(v.id)===String(id)});if(!x)return;
+    if(E("dermedBuyerType"))E("dermedBuyerType").value=type;
+    if(E("dermedBuyerId"))E("dermedBuyerId").value=id;
+    if(E("dermedBuyerSearch"))E("dermedBuyerSearch").value=x.name||"";
+    if(E("dermedBuyerHint"))E("dermedBuyerHint").textContent=(type==="student"?"Student: ":"Customer: ")+(x.name||"")+(x.phone?" | "+x.phone:"");
+    closeBox("dermedBuyerResults");
+  }
+
+  function addItem(kind,id){
+    if(kind==="product"){
+      var p=A("products").find(function(x){return String(x.id)===String(id)});if(!p)return;
+      window.dermedSaleItems=window.dermedSaleItems||[];
+      if(!window.dermedSaleItems.some(function(x){return String(x.product_id)===String(id)}))
+        window.dermedSaleItems.push({product_id:p.id,product_code:p.product_code||p.code||"",name:p.name||"Product",price:Number(p.price)||0,quantity:1,discount_type:"percent",discount_value:0});
+    }else{
+      var v=A("services").find(function(x){return String(x.id)===String(id)});if(!v)return;
+      window.dermedServiceItems=window.dermedServiceItems||[];
+      if(!window.dermedServiceItems.some(function(x){return String(x.service_id)===String(id)}))
+        window.dermedServiceItems.push({service_id:v.id,service_code:v.service_code||v.code||"",name:v.name||"Service",service_type:v.service_type||"Service",price:Number(v.price)||0,quantity:1,discount_type:"percent",discount_value:0});
+    }
+    if(typeof renderItems==="function")renderItems();
+    closeBox("dermedItemResults");
+    var p=E("dermedItemSearch");if(p)p.value="";
+  }
+
+  function bind(){
+    var b=E("dermedBuyerSearch"),br=E("dermedBuyerResults"),p=E("dermedItemSearch"),ir=E("dermedItemResults");
+    if(b&&br&&!b.dataset.dfix){b.dataset.dfix="1";b.addEventListener("input",function(){buyerSearch(b.value)});
+      br.addEventListener("pointerdown",function(e){var el=e.target.closest("[data-dbuyer]");if(el){e.preventDefault();e.stopPropagation();chooseBuyer(el)}},true);
+      br.addEventListener("click",function(e){var el=e.target.closest("[data-dbuyer]");if(el){e.preventDefault();e.stopPropagation();chooseBuyer(el)}},true);}
+    if(p&&ir&&!p.dataset.dfix){p.dataset.dfix="1";p.addEventListener("input",function(){itemSearch(p.value)});
+      ir.addEventListener("pointerdown",function(e){var el=e.target.closest("[data-ditem]");if(el){e.preventDefault();e.stopPropagation();addItem(el.getAttribute("data-ditem"),el.getAttribute("data-did"))}},true);
+      ir.addEventListener("click",function(e){var el=e.target.closest("[data-ditem]");if(el){e.preventDefault();e.stopPropagation();addItem(el.getAttribute("data-ditem"),el.getAttribute("data-did"))}},true);}
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind);else bind();
+  setTimeout(bind,300);setTimeout(bind,1000);
+})();
+</script>
 </body>
 </html>
+
 
