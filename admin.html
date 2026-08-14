@@ -2521,7 +2521,12 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
 <div class="card" style="margin-top:18px">
 <h2>Dermed Sales</h2>
-<div class="toolbar"><input id="dermedSaleSearch" placeholder="Search invoice, buyer or product"><button id="dermedSalesRefresh" class="light">Refresh</button></div>
+<div class="toolbar"><input id="dermedSaleSearch" placeholder="Search invoice, buyer or product"><select id="dermedPaymentFilter" style="margin-left:8px;">
+<option value="all">All Payment Status</option>
+<option value="Paid">Paid</option>
+<option value="Partial">Partial Payment</option>
+<option value="Due">Due</option>
+</select><button id="dermedSalesRefresh" class="light">Refresh</button></div>
 <div id="dermedSalesList">Loading...</div>
 </div>
 </section>
@@ -5678,7 +5683,73 @@ async function saveInventorySale(type){
  }catch(e){msg($(type+"Status"),e.message||"Could not save sale.",true)}
 }
 function renderMtsSales(){const box=$("mtsSalesList");if(!box)return;const q=($("mtsSaleSearch")?.value||"").toLowerCase();const rows=salesRecords.filter(x=>String(x.sale_type||"").toUpperCase()==="MTS"&&(`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])}`).toLowerCase().includes(q));box.innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Invoice</th><th>Buyer</th><th>Products</th><th>Total</th><th>Date</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.reference_no)}</td><td>${esc(x.student_name)}</td><td>${esc((x.items||[]).map(i=>i.name).join(", "))}</td><td>${money(x.grand_total)}</td><td>${esc(x.sale_date||"")}</td><td><button class="light" onclick="showSaleInvoice('${attr(x.id)}')">View Invoice</button></td></tr>`).join("")}</table></div>`:'<p class="muted">No MTS sales found.</p>'}
-function renderDermedSales(){const box=$("dermedSalesList");if(!box)return;const q=($("dermedSaleSearch")?.value||"").toLowerCase();const rows=salesRecords.filter(x=>String(x.sale_type||"").toUpperCase()==="DERMED"&&(`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])} ${JSON.stringify(x.service_items||[])}`).toLowerCase().includes(q));box.innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Invoice</th><th>Buyer</th><th>Products / Services</th><th>Total</th><th>Date</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.reference_no)}</td><td>${esc(x.student_name)}</td><td>${esc([...(x.items||[]).map(i=>i.name),...(x.service_items||[]).map(i=>i.name)].join(", "))}</td><td>${money(x.grand_total)}</td><td>${esc(x.sale_date||"")}</td><td><button class="light" onclick="showSaleInvoice('${attr(x.id)}')">View Invoice</button></td></tr>`).join("")}</table></div>`:'<p class="muted">No Dermed sales found.</p>'}
+function renderDermedSales(){
+ const box=$("dermedSalesList");if(!box)return;
+ const q=($("dermedSaleSearch")?.value||"").toLowerCase();
+ const f=($("dermedPaymentFilter")?.value||"all");
+ const rows=salesRecords.filter(x=>{
+   if(String(x.sale_type||"").toUpperCase()!=="DERMED") return false;
+   const status=saleStatus(saleTotal(x),salePaid(x));
+   const hay=`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])} ${JSON.stringify(x.service_items||[])}`.toLowerCase();
+   return (f==="all"||status===f) && hay.includes(q);
+ });
+ box.innerHTML=rows.length?`<div class="table-wrap"><table class="table">
+ <tr><th>Date / Time</th><th>Reference</th><th>Buyer</th><th>Products / Services</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>
+ ${rows.map(x=>{
+   const total=saleTotal(x),paid=salePaid(x),bal=Math.max(0,total-paid),status=saleStatus(total,paid);
+   const badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
+   const dt=saleDateValue(x),time=saleField(x,["sale_time","time"],"");
+   const items=[...(x.items||[]).map(i=>i.name),...(x.service_items||[]).map(i=>i.name)].join(", ");
+   return `<tr>
+     <td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td>
+     <td><strong>${esc(x.reference_no||"—")}</strong></td>
+     <td>${esc(x.student_name||"—")}<div class="muted">${esc(x.student_phone||"")}</div></td>
+     <td>${esc(items||"—")}</td>
+     <td>${money(total)}</td>
+     <td>${money(paid)}</td>
+     <td>${money(bal)}</td>
+     <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
+     <td><div class="actions">
+       <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       ${bal>0.005?`<button class="gold" type="button" onclick="recordDermedSalePayment('${attr(x.id)}')">Payment</button>`:""}
+     </div></td>
+   </tr>`;
+ }).join("")}</table></div>`:'<p class="muted">No Dermed sales found.</p>';
+}
+
+async function recordDermedSalePayment(id){
+ const s=salesRecords.find(x=>String(x.id)===String(id)&&String(x.sale_type||"").toUpperCase()==="DERMED");
+ if(!s){alert("Dermed sale not found.");return;}
+ const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
+ if(balance<=0.005){return;}
+ const raw=prompt(`Due for ${saleRef(s)} is ${money(balance)}.\nEnter additional payment amount:`,String(balance));
+ if(raw===null)return;
+ const amount=parseMoneyInput(raw);
+ if(amount<=0||amount>balance+0.005){alert("Enter a valid payment amount not greater than the Due amount.");return;}
+ const method=prompt("Payment method (Cash / ABA / Bank Transfer / Card / Other):","Cash")||"Cash";
+ try{
+   const paymentDate=new Date();
+   const{error:pe}=await sb.from("medifella_sale_payments").insert({
+     sale_id:String(id),amount,payment_method:method,
+     payment_date:paymentDate.toISOString().slice(0,10),
+     note:"Additional Dermed Sale payment",created_by:adminUser.id
+   });
+   if(pe)throw pe;
+   const newPaid=paid+amount;
+   const{error:se}=await sb.from("medifella_sales").update({
+     paid:newPaid,balance:Math.max(0,total-newPaid),payment_status:saleStatus(total,newPaid)
+   }).eq("id",id).eq("sale_type","DERMED");
+   if(se)throw se;
+   await loadSales();
+ }catch(e){alert(e.message||"Could not record Dermed Sale payment.");}
+}
+
+function showDermedSaleInvoice(id,size="A4"){
+ const s=salesRecords.find(x=>String(x.id)===String(id)&&String(x.sale_type||"").toUpperCase()==="DERMED");
+ if(!s){alert("Dermed sale invoice not found.");return;}
+ window.currentInvoiceId=id;
+ showSaleInvoice(id,size);
+}
 
 $("stockProductSearch").oninput=renderProductSearchResults;
 $("productSearch").oninput=renderProductList;$("productRefresh").onclick=loadProducts;$("stockSearch").oninput=renderStockList;$("stockRefresh").onclick=loadStockMovements;
@@ -5691,7 +5762,10 @@ if($("saveMtsSale"))$("saveMtsSale").onclick=()=>saveInventorySale("mts");
 if($("clearMtsSale"))$("clearMtsSale").onclick=()=>resetNewInventorySale("mts");
 // Dermed Sale is handled by the dedicated List-Sale-style controller below.
 
-$("mtsSaleSearch").oninput=renderMtsSales;$("dermedSaleSearch").oninput=renderDermedSales;$("mtsSalesRefresh").onclick=loadSales;$("dermedSalesRefresh").onclick=loadSales;
+$("mtsSaleSearch").oninput=renderMtsSales;
+$("dermedSaleSearch").oninput=renderDermedSales;
+if($("dermedPaymentFilter"))$("dermedPaymentFilter").onchange=renderDermedSales;
+$("mtsSalesRefresh").onclick=loadSales;$("dermedSalesRefresh").onclick=loadSales;
 $("stockTimeDisplay").value=phTime().replace("T"," ");$("stockTime").value=phTime();if($("stockReportDate"))$("stockReportDate").value=new Date().toISOString().slice(0,10);setAutoTime("mtsSaleTime");setAutoTime("dermedSaleTime");
 
 let saleCustomerTargetType="dermed";
