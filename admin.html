@@ -4163,6 +4163,57 @@ async function printInvoice(id,size="A4"){
   color:var(--muted);
 }
 </style>
+<style id="dermed-invoice-branding-v10">
+/* V10: FINAL OVERRIDE — must come after all previous invoice CSS */
+#invoiceOverlay .mf-invoice .mf-invoice-logo,
+#invoicePrint .mf-invoice-logo,
+#invoiceExportContent .mf-invoice-logo{
+  width:160px !important;
+  height:160px !important;
+  max-width:none !important;
+  max-height:none !important;
+  object-fit:contain !important;
+  display:block !important;
+}
+#invoiceOverlay .mf-invoice .mf-invoice-top,
+#invoicePrint .mf-invoice-top,
+#invoiceExportContent .mf-invoice-top{
+  grid-template-columns:170px minmax(0,1fr) !important;
+  gap:10px !important;
+}
+#invoiceOverlay .mf-invoice .mf-school-kh,
+#invoiceOverlay .mf-invoice .mf-school-en,
+#invoiceOverlay .mf-invoice .mf-invoice-label .kh,
+#invoiceOverlay .mf-invoice .mf-invoice-label .en,
+#invoicePrint .mf-school-kh,
+#invoicePrint .mf-school-en,
+#invoicePrint .mf-invoice-label .kh,
+#invoicePrint .mf-invoice-label .en,
+#invoiceExportContent .mf-school-kh,
+#invoiceExportContent .mf-school-en,
+#invoiceExportContent .mf-invoice-label .kh,
+#invoiceExportContent .mf-invoice-label .en{
+  color:#C9901E !important;
+}
+#invoiceOverlay .mf-invoice .mf-invoice-label,
+#invoicePrint .mf-invoice-label,
+#invoiceExportContent .mf-invoice-label{
+  border-top-color:#C9901E !important;
+}
+/* Keep the larger logo proportional on A5 */
+#invoiceOverlay.preview-a5 .mf-invoice .mf-invoice-logo,
+#invoicePrint.invoice-print-a5 .mf-invoice-logo,
+#invoiceExportContent .invoice-export-a5 .mf-invoice-logo{
+  width:120px !important;
+  height:120px !important;
+}
+#invoiceOverlay.preview-a5 .mf-invoice .mf-invoice-top,
+#invoicePrint.invoice-print-a5 .mf-invoice-top,
+#invoiceExportContent .invoice-export-a5 .mf-invoice-top{
+  grid-template-columns:130px minmax(0,1fr) !important;
+  gap:8px !important;
+}
+</style>
 </head>
 <body>
 <div id="paper"><img src="${img}" alt="Invoice"></div>
