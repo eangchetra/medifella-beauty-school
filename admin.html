@@ -5463,10 +5463,6 @@ async function saveSaleCustomer(){
     return;
   }
 
-  if(!confirm("Save this customer to Customer List?\n\nName: " + name + "\nPhone: " + phone)){
-    return;
-  }
-
   const btn = $("saleCustomerSave");
   btn.disabled = true;
   status.textContent = "Saving customer...";
