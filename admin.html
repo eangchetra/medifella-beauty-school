@@ -1886,6 +1886,48 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="dermed-one-search-layout-fix">
+#dermedItemResults{
+  position:absolute!important;
+  left:0!important;
+  right:0!important;
+  top:calc(100% - 1px)!important;
+  z-index:9999!important;
+  max-height:260px!important;
+  overflow-y:auto!important;
+}
+#dermedItemResults button{
+  display:block!important;
+  width:100%!important;
+  text-align:left!important;
+  background:#fff!important;
+  border:0!important;
+  border-bottom:1px solid #e4eff0!important;
+  padding:12px 15px!important;
+  cursor:pointer!important;
+}
+#dermedItemResults button:hover{background:#edf9fa!important}
+#dermedSale .sale-header-grid>div:first-child{position:relative!important}
+#dermedSale .sale-header-grid>div:first-child #dermedBuyerResults{
+  top:52px!important;
+  left:0!important;
+  right:8px!important;
+  z-index:9999!important;
+  max-height:230px!important;
+  overflow-y:auto!important;
+}
+#dermedSale .sale-header-grid>div:first-child #dermedBuyerResults button{
+  display:block!important;
+  width:100%!important;
+  text-align:left!important;
+  background:#fff!important;
+  border:0!important;
+  border-bottom:1px solid #e4eff0!important;
+  padding:11px 14px!important;
+}
+</style>
+
 </head>
 <body>
 
@@ -2404,11 +2446,19 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div><label>Reference No.</label><input id="dermedReferenceNo" readonly placeholder="Auto-generate"></div>
 <div><label>Sale Date & Time</label><input id="dermedSaleTime" readonly></div>
 </div>
-<label style="margin-top:18px">Search Product</label><div style="position:relative"><input id="dermedProductSearch" autocomplete="off" placeholder="Search Product ID or Product Name"><div id="dermedProductResults" class="sale-course-picker-results"></div></div>
+<label style="margin-top:18px">Search Product / Service</label>
+<div style="position:relative">
+<input id="dermedItemSearch" autocomplete="off" placeholder="Search Product or Service name / ID">
+<div id="dermedItemResults" class="sale-course-picker-results"></div>
+</div>
 <div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr></thead><tbody id="dermedItems"></tbody></table></div>
 <h2 style="margin-top:22px">Services Fee</h2>
-<label>Search Service</label><div style="position:relative"><input id="dermedServiceSearch" autocomplete="off" placeholder="Search Service ID or Service Name"><div id="dermedServiceResults" class="sale-course-picker-results"></div></div>
 <div class="table-wrap"><table class="table"><thead><tr><th>Service</th><th>Type</th><th>Price</th><th></th></tr></thead><tbody id="dermedServices"></tbody></table></div>
+<!-- Hidden compatibility fields used by the existing sale functions -->
+<input id="dermedProductSearch" type="hidden">
+<div id="dermedProductResults" style="display:none"></div>
+<input id="dermedServiceSearch" type="hidden">
+<div id="dermedServiceResults" style="display:none"></div>
 <div class="sale-summary-row" style="margin-top:16px"><span>Products + Services Total</span><strong id="dermedTotal">$0.00</strong></div>
 <div class="actions" style="justify-content:flex-end;margin-top:14px"><button id="saveDermedSale" class="gold">Save Dermed Sale & Generate Invoice</button><button id="clearDermedSale" class="light">Clear</button></div>
 <div id="dermedStatus"></div>
@@ -3912,6 +3962,25 @@ function openPrintFromCanvas(canvas,paper,sale){
      setTimeout(()=>window.print(),300);
    };
  <\/script>
+
+<script>
+document.addEventListener("DOMContentLoaded",function(){
+ const i=document.getElementById("dermedItemSearch"),r=document.getElementById("dermedItemResults");
+ if(i){
+   i.addEventListener("input",renderDermedItemSearch);
+   i.addEventListener("focus",function(){if(i.value.trim())renderDermedItemSearch()});
+   i.addEventListener("keydown",function(e){
+     if(e.key==="Enter"){
+       e.preventDefault();
+       renderDermedItemSearch();
+     }
+     if(e.key==="Escape")r.classList.remove("show");
+   });
+   i.addEventListener("blur",function(){setTimeout(()=>r.classList.remove("show"),250)});
+ }
+});
+</script>
+
 </body>
 </html>`;
 
@@ -5179,13 +5248,16 @@ function renderInventoryControls(){
 }
 function renderBuyerControls(){
  ["mts","dermed"].forEach(type=>{
-   const input=$(type+"BuyerSearch"), results=$(type+"BuyerResults"); if(!input||!results)return;
+   const input=$(type+"BuyerSearch"),results=$(type+"BuyerResults"); if(!input||!results)return;
    const q=(input.value||"").toLowerCase().trim();
+   if(!q){results.innerHTML="";results.classList.remove("show");return}
    const arr=[];
-   students.filter(x=>(`${x.student_id||""} ${x.full_name||""} ${x.phone||""}`).toLowerCase().includes(q)).slice(0,10).forEach(x=>arr.push({type:"student",id:x.id,code:x.student_id,name:x.full_name,phone:x.phone}));
-   customers.filter(x=>(`${x.customer_code||""} ${x.name||""} ${x.phone||""}`).toLowerCase().includes(q)).slice(0,10).forEach(x=>arr.push({type:"customer",id:x.id,code:x.customer_code,name:x.name,phone:x.phone}));
+   students.filter(x=>(`${x.student_id||""} ${x.full_name||""} ${x.full_name_km||""} ${x.phone||""}`).toLowerCase().includes(q)).slice(0,10)
+     .forEach(x=>arr.push({type:"student",id:x.id,code:x.student_id,name:x.full_name||x.full_name_km,phone:x.phone}));
+   customers.filter(x=>(`${x.customer_code||""} ${x.name||""} ${x.phone||""}`).toLowerCase().includes(q)).slice(0,10)
+     .forEach(x=>arr.push({type:"customer",id:x.id,code:x.customer_code,name:x.name,phone:x.phone}));
    results.innerHTML=arr.map(x=>`<button type="button" onclick="chooseBuyer('${type}','${attr(x.type)}','${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.type)} · ${esc(x.code||"")} · ${esc(x.phone||"")}</div></button>`).join("")||'<div class="muted" style="padding:10px">No student/customer found.</div>';
-   results.classList.toggle("show",!!q);
+   results.classList.add("show");
  });
 }
 function renderServiceControls(){
@@ -5475,6 +5547,43 @@ function updateMetrics(){$("mStudents").textContent=students.length;$("mPending"
 const _oldUpdateMetrics=updateMetrics; updateMetrics=function(){_oldUpdateMetrics();renderMtsSales();renderDermedSales();renderProductList();renderStockList();renderStaffInfoList();renderCustomerList();renderServiceList();renderStockReport();};
 boot();
 
+
+
+/* ===== Dermed ONE Search: Product + Service ===== */
+function renderDermedItemSearch(){
+ const input=$("dermedItemSearch"),res=$("dermedItemResults"); if(!input||!res)return;
+ const q=(input.value||"").toLowerCase().trim();
+ if(!q){res.innerHTML="";res.classList.remove("show");return}
+ const pRows=products.filter(x=>(`${x.product_code||""} ${x.name||""}`).toLowerCase().includes(q)).slice(0,10);
+ const sRows=services.filter(x=>(`${x.service_code||""} ${x.name||""} ${x.service_type||""}`).toLowerCase().includes(q)).slice(0,10);
+ const exactP=pRows.find(x=>String(x.name||"").toLowerCase()===q||String(x.product_code||"").toLowerCase()===q);
+ const exactS=sRows.find(x=>String(x.name||"").toLowerCase()===q||String(x.service_code||"").toLowerCase()===q);
+ if(exactP && !exactS){addSaleProduct("dermed",exactP.id);input.value="";res.classList.remove("show");return}
+ if(exactS && !exactP){addDermedService(exactS.id);input.value="";res.classList.remove("show");return}
+ if(pRows.length===1 && sRows.length===0){addSaleProduct("dermed",pRows[0].id);input.value="";res.classList.remove("show");return}
+ if(sRows.length===1 && pRows.length===0){addDermedService(sRows[0].id);input.value="";res.classList.remove("show");return}
+ let html="";
+ if(pRows.length){
+   html+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">PRODUCTS</div>';
+   html+=pRows.map(x=>`<button type="button" onclick="addDermedCombinedProduct('${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">Product · ${esc(x.product_code||"")} · ${money(x.price)} · Stock: ${productStock(x.id)}</div></button>`).join("");
+ }
+ if(sRows.length){
+   html+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">SERVICES</div>';
+   html+=sRows.map(x=>`<button type="button" onclick="addDermedCombinedService('${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">Service · ${esc(x.service_code||"")} · ${esc(x.service_type||"")} · ${money(x.price)}</div></button>`).join("");
+ }
+ res.innerHTML=html||'<div class="muted" style="padding:10px">No product or service found.</div>';
+ res.classList.add("show");
+}
+function addDermedCombinedProduct(id){
+ addSaleProduct("dermed",id);
+ $("dermedItemSearch").value="";
+ $("dermedItemResults").classList.remove("show");
+}
+function addDermedCombinedService(id){
+ addDermedService(id);
+ $("dermedItemSearch").value="";
+ $("dermedItemResults").classList.remove("show");
+}
 
 </script>
 </body>
