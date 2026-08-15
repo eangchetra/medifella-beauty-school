@@ -10274,3 +10274,167 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 }
 </style>
+
+<style id="mts-invoice-actually-working-final">
+/*
+  MTS INVOICE ACTUAL FIX
+  The previous MTS CSS depended on [data-sale-type="MTS"], but the
+  generated invoice did not reliably receive that attribute. This rule
+  uses an attribute added by the script below, so the MTS styles actually
+  apply to the rendered invoice.
+*/
+#invoiceOverlay .mf-invoice.mts-invoice-final,
+#invoicePrint .mf-invoice.mts-invoice-final,
+#invoiceExportContent .mf-invoice.mts-invoice-final{
+  color:#000!important;
+}
+
+/* MTS KOREAN BEAUTY PRODUCT */
+#invoiceOverlay .mf-invoice.mts-invoice-final .mts-invoice-brand-name,
+#invoicePrint .mf-invoice.mts-invoice-final .mts-invoice-brand-name,
+#invoiceExportContent .mf-invoice.mts-invoice-final .mts-invoice-brand-name{
+  color:#000!important;
+}
+
+/* វិក្កយបត្រ + INVOICE */
+#invoiceOverlay .mf-invoice.mts-invoice-final .mf-invoice-label,
+#invoicePrint .mf-invoice.mts-invoice-final .mf-invoice-label,
+#invoiceExportContent .mf-invoice.mts-invoice-final .mf-invoice-label{
+  border-top-color:#000!important;
+  color:#000!important;
+}
+#invoiceOverlay .mf-invoice.mts-invoice-final .mf-invoice-label .kh,
+#invoicePrint .mf-invoice.mts-invoice-final .mf-invoice-label .kh,
+#invoiceExportContent .mf-invoice.mts-invoice-final .mf-invoice-label .kh{
+  color:#000!important;
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
+  font-weight:400!important;
+}
+#invoiceOverlay .mf-invoice.mts-invoice-final .mf-invoice-label .en,
+#invoicePrint .mf-invoice.mts-invoice-final .mf-invoice-label .en,
+#invoiceExportContent .mf-invoice.mts-invoice-final .mf-invoice-label .en{
+  color:#000!important;
+  font-family:Arial,"Noto Sans",sans-serif!important;
+  font-weight:900!important;
+}
+
+/* Payment is non-refundable, thank you! */
+#invoiceOverlay .mf-invoice.mts-invoice-final .mf-refund-box,
+#invoicePrint .mf-invoice.mts-invoice-final .mf-refund-box,
+#invoiceExportContent .mf-invoice.mts-invoice-final .mf-refund-box{
+  border:1px solid #000!important;
+  color:#000!important;
+}
+#invoiceOverlay .mf-invoice.mts-invoice-final .mf-refund-box *,
+#invoicePrint .mf-invoice.mts-invoice-final .mf-refund-box *,
+#invoiceExportContent .mf-invoice.mts-invoice-final .mf-refund-box *{
+  color:#000!important;
+}
+#invoiceOverlay .mf-invoice.mts-invoice-final .mf-refund-box .kh,
+#invoicePrint .mf-invoice.mts-invoice-final .mf-refund-box .kh,
+#invoiceExportContent .mf-invoice.mts-invoice-final .mf-refund-box .kh{
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
+}
+
+/* Make sure the old yellow MTS table/header styling does not affect these
+   requested invoice elements. */
+#invoiceOverlay .mf-invoice.mts-invoice-final .mf-mts-payment-title,
+#invoicePrint .mf-invoice.mts-invoice-final .mf-mts-payment-title,
+#invoiceExportContent .mf-invoice.mts-invoice-final .mf-mts-payment-title{
+  color:#000!important;
+}
+</style>
+
+<script id="mts-invoice-actually-working-final-js">
+(function(){
+  "use strict";
+
+  function isMtsSale(s){
+    const type=String(s?.sale_type||"").trim().toUpperCase();
+    const ref=String(s?.reference_no||"").trim().toUpperCase();
+    return type==="MTS" || ref.indexOf("MTS-")===0;
+  }
+
+  function markMtsInvoice(){
+    try{
+      const id=window.currentInvoiceId;
+      const sale=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
+      const overlay=document.getElementById("invoiceOverlay");
+      const invoice=document.querySelector("#invoiceOverlay .mf-invoice");
+      const printInvoice=document.querySelector("#invoicePrint .mf-invoice");
+
+      if(!invoice)return;
+
+      const mts=!!sale && isMtsSale(sale);
+      invoice.classList.toggle("mts-invoice-final",mts);
+      invoice.setAttribute("data-sale-type",mts?"MTS":String(sale?.sale_type||""));
+
+      if(printInvoice){
+        printInvoice.classList.toggle("mts-invoice-final",mts);
+        printInvoice.setAttribute("data-sale-type",mts?"MTS":String(sale?.sale_type||""));
+      }
+
+      /* If the invoice is MTS, directly override inline colors as a final
+         safeguard. */
+      if(mts){
+        invoice.querySelectorAll(".mts-invoice-brand-name").forEach(el=>{
+          el.style.setProperty("color","#000","important");
+        });
+        invoice.querySelectorAll(".mf-invoice-label,.mf-invoice-label .kh,.mf-invoice-label .en").forEach(el=>{
+          el.style.setProperty("color","#000","important");
+        });
+        invoice.querySelectorAll(".mf-refund-box,.mf-refund-box *").forEach(el=>{
+          el.style.setProperty("color","#000","important");
+          if(el.classList.contains("mf-refund-box"))
+            el.style.setProperty("border-color","#000","important");
+        });
+      }
+    }catch(e){
+      console.warn("MTS invoice style marker:",e);
+    }
+  }
+
+  /* Watch the invoice DOM because showSaleInvoice replaces its HTML. */
+  const observer=new MutationObserver(function(){
+    markMtsInvoice();
+  });
+  function start(){
+    const overlay=document.getElementById("invoiceOverlay");
+    if(overlay)observer.observe(overlay,{childList:true,subtree:true});
+    markMtsInvoice();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",start,{once:true});
+  }else start();
+
+  /* Re-apply after showSaleInvoice and before PDF/Print capture. */
+  [50,150,300,600,1000].forEach(ms=>setTimeout(markMtsInvoice,ms));
+
+  const oldShow=window.showSaleInvoice;
+  if(typeof oldShow==="function" && !oldShow.__mtsInvoiceWrapped){
+    function wrappedShowSaleInvoice(){
+      const result=oldShow.apply(this,arguments);
+      setTimeout(markMtsInvoice,0);
+      setTimeout(markMtsInvoice,100);
+      setTimeout(markMtsInvoice,400);
+      return result;
+    }
+    wrappedShowSaleInvoice.__mtsInvoiceWrapped=true;
+    window.showSaleInvoice=wrappedShowSaleInvoice;
+  }
+
+  const oldBuild=window.buildInvoicePaperCanvas;
+  if(typeof oldBuild==="function" && !oldBuild.__mtsInvoiceWrapped){
+    async function wrappedBuild(){
+      markMtsInvoice();
+      await new Promise(r=>requestAnimationFrame(r));
+      markMtsInvoice();
+      return oldBuild.apply(this,arguments);
+    }
+    wrappedBuild.__mtsInvoiceWrapped=true;
+    window.buildInvoicePaperCanvas=wrappedBuild;
+  }
+})();
+</script>
+
