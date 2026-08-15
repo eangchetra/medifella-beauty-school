@@ -2418,7 +2418,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div><label>Sale Date & Time</label><input id="mtsSaleTime" readonly></div>
 </div>
 <label style="margin-top:18px">Search Product</label><div style="position:relative"><input id="mtsProductSearch" autocomplete="off" placeholder="Search Product ID or Product Name"><div id="mtsProductResults" class="sale-course-picker-results"></div></div>
-<div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr></thead><tbody id="mtsItems"></tbody></table></div>
+<div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Discount</th><th>Total</th><th></th></tr></thead><tbody id="mtsItems"></tbody></table></div>
 <div class="sale-subtotal-line" style="margin-top:16px"><span>Sub Initial Total</span><strong id="mtsSubtotal">$0.00</strong></div>
 <div class="sale-controls-grid" style="margin-top:12px">
  <div>
@@ -2427,6 +2427,28 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
    <select id="mtsOverallDiscountType"><option value="percent">%</option><option value="usd">USD</option></select>
    <input id="mtsOverallDiscountValue" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
   </div>
+ </div>
+ <div>
+  <label>Payment Method *</label>
+  <select id="mtsPaymentMethod">
+   <option value="Cash">Cash</option>
+   <option value="ABA">ABA</option>
+   <option value="Bank Transfer">Bank Transfer</option>
+   <option value="Card">Card</option>
+   <option value="Other">Other</option>
+  </select>
+ </div>
+ <div>
+  <label>Payment Status *</label>
+  <select id="mtsPaymentStatus">
+   <option value="Paid">Paid</option>
+   <option value="Partial">Partial Payment</option>
+   <option value="Due">Due</option>
+  </select>
+ </div>
+ <div id="mtsPartialPaidWrap" class="hidden">
+  <label>Amount Paid (USD)</label>
+  <input id="mtsAmountPaidNow" type="text" inputmode="decimal" autocomplete="off" placeholder="0.00">
  </div>
 </div>
 <div class="sale-summary-card" style="margin-top:12px">
@@ -4311,6 +4333,66 @@ function openPrintFromCanvas(canvas,paper,sale){
  setTimeout(initMtsAddSaleToggle,500);
 })();
 <\/script>
+
+<script id="mts-payment-status-final-v2">
+(function(){
+  function E(id){return document.getElementById(id)}
+  function num(v){
+    const n=Number(String(v??"").replace(/[$,\s]/g,""));
+    return Number.isFinite(n)&&n>=0?n:0;
+  }
+  function calcTotal(){
+    const arr=window.mtsSaleItems||[];
+    let subtotal=0;
+    arr.forEach(function(x){
+      const qty=Math.max(1,Number(x.quantity)||1);
+      const price=Math.max(0,Number(x.price)||0);
+      const base=qty*price;
+      const dv=Math.max(0,Number(x.discount_value)||0);
+      const d=x.discount_type==="usd"
+        ? Math.min(base,dv)
+        : Math.min(base,base*dv/100);
+      subtotal+=Math.max(0,base-d);
+    });
+    const ov=num(E("mtsOverallDiscountValue")?.value||0);
+    const totalDisc=E("mtsOverallDiscountType")?.value==="usd"
+      ? Math.min(subtotal,ov)
+      : Math.min(subtotal,subtotal*ov/100);
+    return Math.max(0,subtotal-totalDisc);
+  }
+  function sync(){
+    const status=E("mtsPaymentStatus")?.value||"Paid";
+    const input=E("mtsAmountPaidNow");
+    const wrap=E("mtsPartialPaidWrap");
+    if(!input)return;
+    const total=calcTotal();
+
+    if(status==="Paid"){
+      input.value=total.toFixed(2);
+      input.readOnly=true;
+      if(wrap)wrap.classList.add("hidden");
+    }else if(status==="Due"){
+      input.value="0.00";
+      input.readOnly=true;
+      if(wrap)wrap.classList.add("hidden");
+    }else{
+      input.readOnly=false;
+      if(wrap)wrap.classList.remove("hidden");
+      input.value=Math.min(total,num(input.value)).toFixed(2);
+    }
+  }
+  function bind(){
+    E("mtsPaymentStatus")?.addEventListener("change",sync);
+    E("mtsOverallDiscountValue")?.addEventListener("input",sync);
+    E("mtsOverallDiscountType")?.addEventListener("change",sync);
+    sync();
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind,{once:true});
+  else bind();
+  setTimeout(bind,500);
+})();
+</script>
+
 </body>
 </html>`;
 
@@ -7184,6 +7266,374 @@ document.addEventListener("DOMContentLoaded",function(){
   setInterval(function(){
     bindMtsProductSelection();
   }, 1000);
+})();
+</script>
+
+
+<style id="mts-item-discount-payment-final">
+/* MTS ONLY — item discount + payment controls. */
+#mtsSale #mtsItems .mts-item-discount-wrap{
+  display:grid;
+  grid-template-columns:58px minmax(65px,1fr);
+  gap:5px;
+  min-width:125px;
+}
+#mtsSale #mtsItems .mts-item-discount-wrap select,
+#mtsSale #mtsItems .mts-item-discount-wrap input{
+  width:100%;
+  min-height:40px;
+  padding:8px;
+}
+#mtsSale #mtsItems .mts-item-subtotal{
+  font-weight:800;
+  color:#1aa8bb;
+  background:#f5fbfc;
+}
+#mtsSale #mtsPartialPaidWrap{
+  display:block;
+}
+#mtsSale #mtsPartialPaidWrap.hidden{
+  display:none!important;
+}
+@media(min-width:901px){
+  #mtsSale .sale-controls-grid{grid-template-columns:minmax(220px,1fr) minmax(180px,1fr) minmax(180px,1fr)}
+  #mtsSale #mtsPartialPaidWrap{grid-column:1 / -1;max-width:320px}
+}
+@media(max-width:900px){
+  #mtsSale .sale-controls-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+
+<script id="mts-item-discount-payment-final">
+(function(){
+  "use strict";
+  function E(id){return document.getElementById(id)}
+  function n(v){
+    const x=Number(String(v??"").replace(/[$,\s]/g,""));
+    return Number.isFinite(x)&&x>=0?x:0;
+  }
+  function itemDiscount(base,type,value){
+    const v=Math.max(0,n(value));
+    return type==="usd"
+      ? Math.min(base,v)
+      : Math.min(base,base*v/100);
+  }
+  function itemData(x){
+    const qty=Math.max(1,Number(x.quantity)||1);
+    const price=Math.max(0,Number(x.price)||0);
+    const base=price*qty;
+    const dtype=x.discount_type==="usd"?"usd":"percent";
+    const dvalue=Math.max(0,Number(x.discount_value)||0);
+    const damount=itemDiscount(base,dtype,dvalue);
+    return {qty,price,base,dtype,dvalue,damount,subtotal:Math.max(0,base-damount)};
+  }
+
+  /* MTS-only renderer. Dermed and Medi Fella Sale use their original renderers. */
+  window.renderMtsSaleRowsWithDiscount=function(){
+    const arr=window.mtsSaleItems||[];
+    const body=E("mtsItems");
+    if(!body)return;
+
+    body.innerHTML=arr.map(function(x,i){
+      if(x.discount_type!=="usd" && x.discount_type!=="percent")x.discount_type="percent";
+      if(x.discount_value==null)x.discount_value=0;
+
+      const d=itemData(x);
+      const max=Math.max(0,(typeof productStock==="function"?productStock(x.product_id):999999)+d.qty);
+
+      return `<tr>
+        <td><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code||"")}</div></td>
+        <td><input type="number" min="1" max="${max}" value="${d.qty}" data-mts-qty="${i}"></td>
+        <td>${money(d.price)}</td>
+        <td><div class="mts-item-discount-wrap">
+          <select data-mts-disc-type="${i}">
+            <option value="percent" ${d.dtype==="percent"?"selected":""}>%</option>
+            <option value="usd" ${d.dtype==="usd"?"selected":""}>USD</option>
+          </select>
+          <input type="text" inputmode="decimal" value="${d.dvalue?String(d.dvalue):""}" placeholder="0" data-mts-disc-value="${i}">
+        </div></td>
+        <td><input class="mts-item-subtotal" readonly value="${money(d.subtotal)}"></td>
+        <td><button class="danger sale-remove-btn" type="button" data-mts-remove="${i}">×</button></td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="6" class="muted">No products added.</td></tr>';
+
+    body.querySelectorAll("[data-mts-qty]").forEach(function(el){
+      el.addEventListener("input",function(){
+        const i=Number(el.dataset.mtsQty);
+        const x=(window.mtsSaleItems||[])[i];
+        if(!x)return;
+        const max=typeof productStock==="function"?productStock(x.product_id):999999;
+        x.quantity=Math.max(1,Math.min(Number(el.value)||1,max));
+        window.renderMtsSaleRowsWithDiscount();
+        updateMtsTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-disc-type]").forEach(function(el){
+      el.addEventListener("change",function(){
+        const i=Number(el.dataset.mtsDiscType);
+        const x=(window.mtsSaleItems||[])[i];
+        if(!x)return;
+        x.discount_type=el.value==="usd"?"usd":"percent";
+        updateMtsTotals();
+        window.renderMtsSaleRowsWithDiscount();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-disc-value]").forEach(function(el){
+      el.addEventListener("input",function(){
+        const i=Number(el.dataset.mtsDiscValue);
+        const x=(window.mtsSaleItems||[])[i];
+        if(!x)return;
+        x.discount_value=n(el.value);
+        updateMtsTotals();
+        const row=el.closest("tr");
+        const subtotal=row && row.querySelector(".mts-item-subtotal");
+        if(subtotal)subtotal.value=money(itemData(x).subtotal);
+      });
+    });
+
+    body.querySelectorAll("[data-mts-remove]").forEach(function(el){
+      el.addEventListener("click",function(){
+        const i=Number(el.dataset.mtsRemove);
+        (window.mtsSaleItems||[]).splice(i,1);
+        window.renderMtsSaleRowsWithDiscount();
+        updateMtsTotals();
+      });
+    });
+  };
+
+  function getMtsCalc(){
+    const arr=window.mtsSaleItems||[];
+    const itemSubtotal=arr.reduce(function(sum,x){return sum+itemData(x).subtotal},0);
+    const dtype=E("mtsOverallDiscountType")?.value==="usd"?"usd":"percent";
+    const dvalue=n(E("mtsOverallDiscountValue")?.value||"0");
+    const overall=dtype==="usd"
+      ? Math.min(itemSubtotal,dvalue)
+      : Math.min(itemSubtotal,itemSubtotal*dvalue/100);
+    const total=Math.max(0,itemSubtotal-overall);
+
+    const status=E("mtsPaymentStatus")?.value||"Paid";
+    let paid=status==="Paid"?total:(status==="Due"?0:n(E("mtsAmountPaidNow")?.value||"0"));
+    paid=Math.min(total,Math.max(0,paid));
+    return {itemSubtotal,overall,total,status,paid,due:Math.max(0,total-paid)};
+  }
+
+  function updateMtsTotals(){
+    const c=getMtsCalc();
+    if(E("mtsSubtotal"))E("mtsSubtotal").textContent=money(c.itemSubtotal);
+    if(E("mtsSummarySubtotal"))E("mtsSummarySubtotal").textContent=money(c.itemSubtotal);
+    if(E("mtsSummaryDiscount"))E("mtsSummaryDiscount").textContent=money(c.overall);
+    if(E("mtsTotal"))E("mtsTotal").textContent=money(c.total);
+
+    const wrap=E("mtsPartialPaidWrap");
+    const paid=E("mtsAmountPaidNow");
+    if(wrap)wrap.classList.toggle("hidden",c.status!=="Partial");
+    if(paid){
+      if(c.status==="Paid"){
+        paid.value=c.total.toFixed(2);
+        paid.readOnly=true;
+      }else if(c.status==="Due"){
+        paid.value="0.00";
+        paid.readOnly=true;
+      }else{
+        paid.readOnly=false;
+      }
+      paid.style.background=c.status==="Partial"?"#fff":"#f3f7f7";
+    }
+  }
+
+  /* Preserve the original MTS function for every non-MTS call. */
+  const originalRender=window.renderSaleProductRows;
+  window.renderSaleProductRows=function(type){
+    if(type==="mts"){
+      window.renderMtsSaleRowsWithDiscount();
+      updateMtsTotals();
+      return;
+    }
+    return originalRender.apply(this,arguments);
+  };
+
+  const originalAdd=window.addSaleProduct;
+  window.addSaleProduct=function(type,pid){
+    if(type!=="mts")return originalAdd.apply(this,arguments);
+    const p=(Array.isArray(window.products)?window.products:[]).find(x=>String(x.id)===String(pid));
+    if(!p)return;
+    const arr=window.mtsSaleItems||(window.mtsSaleItems=[]);
+    if(arr.some(x=>String(x.product_id)===String(pid)))return;
+    arr.push({
+      product_id:p.id,
+      product_code:p.product_code,
+      name:p.name,
+      price:Number(p.price||0),
+      quantity:1,
+      discount_type:"percent",
+      discount_value:0
+    });
+    window.renderMtsSaleRowsWithDiscount();
+    updateMtsTotals();
+    const input=E("mtsProductSearch"),results=E("mtsProductResults");
+    if(input)input.value="";
+    if(results){results.innerHTML="";results.classList.remove("show");results.style.display="none";}
+  };
+
+  /* MTS-only save: preserves existing save behavior elsewhere, while storing
+     item discounts and the selected payment method/status. */
+  const originalSave=window.saveInventorySale;
+  window.saveInventorySale=async function(type){
+    if(type!=="mts")return originalSave.apply(this,arguments);
+
+    const buyerType=E("mtsBuyerType")?.value;
+    const buyerId=E("mtsBuyerId")?.value;
+    const staffId=E("mtsSaleStaff")?.value;
+    const items=window.mtsSaleItems||[];
+
+    if(!buyerType||!buyerId){msg(E("mtsStatus"),"Please select a Student or Customer.",true);return}
+    if(!staffId){msg(E("mtsStatus"),"Please select Sale Staff.",true);return}
+    if(!items.length){msg(E("mtsStatus"),"Add at least one product.",true);return}
+
+    for(const it of items){
+      if(Number(it.quantity)>productStock(it.product_id)){
+        msg(E("mtsStatus"),`Not enough stock for ${it.name}. Available: ${productStock(it.product_id)}.`,true);
+        return;
+      }
+    }
+
+    const buyer=buyerType==="student"
+      ?students.find(x=>String(x.id)===String(buyerId))
+      :customers.find(x=>String(x.id)===String(buyerId));
+    const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
+    const calc=getMtsCalc();
+
+    const code="MTS";
+    const year=new Date().getFullYear();
+    const prefix=code+"-"+year+"-";
+    const existing=(salesRecords||[]).filter(x=>String(x.sale_type||"").toUpperCase()==="MTS");
+    let max=0;
+    existing.forEach(x=>{
+      const m=String(x.reference_no||"").match(new RegExp("^"+code+"-"+year+"-(\\\\d+)$"));
+      if(m)max=Math.max(max,Number(m[1]));
+    });
+    const reference=prefix+String(max+1).padStart(4,"0");
+    const now=phTime();
+
+    const normalizedItems=items.map(function(x){
+      const d=itemData(x);
+      return {
+        ...x,
+        quantity:d.qty,
+        price:d.price,
+        unit_price:d.price,
+        discount_type:d.dtype,
+        discount_value:d.dvalue,
+        discount_input:d.dtype==="percent"?`${d.dvalue}%`:`$${d.dvalue.toFixed(2)}`,
+        discount_amount:d.damount,
+        subtotal:d.subtotal
+      };
+    });
+
+    const payload={
+      reference_no:reference,
+      sale_type:code,
+      sale_date:now.slice(0,10),
+      sale_time:now.slice(11),
+      student_id:buyerType==="student"?buyerId:null,
+      student_name:buyer?.full_name||buyer?.name||"",
+      student_phone:buyer?.phone||"",
+      customer_id:buyerType==="customer"?buyerId:null,
+      customer_type:buyerType,
+      sale_staff_id:staffId,
+      sale_staff_name:staff?.name_en||"",
+      subtotal:calc.itemSubtotal,
+      discount:calc.overall,
+      shipping:0,
+      grand_total:calc.total,
+      paid:calc.paid,
+      balance:calc.due,
+      payment_status:calc.status,
+      payment_method:E("mtsPaymentMethod")?.value||"Cash",
+      sale_status:"Completed",
+      items:normalizedItems,
+      service_items:[],
+      service_total:0,
+      notes:""
+    };
+
+    try{
+      const r=await sb.from("medifella_sales").insert({...payload,created_by:adminUser.id}).select().single();
+      if(r.error)throw r.error;
+
+      const movements=items.map(x=>({
+        product_id:x.product_id,
+        movement_type:"sale",
+        quantity:Number(x.quantity),
+        staff_id:staffId,
+        staff_name:staff?.name_en||"",
+        stock_time:now,
+        created_by:adminUser.id,
+        sale_id:r.data.id,
+        notes:code
+      }));
+      if(movements.length){
+        const mr=await sb.from("medifella_inventory_movements").insert(movements);
+        if(mr.error)throw mr.error;
+      }
+
+      if(calc.paid>0){
+        const pr=await sb.from("medifella_sale_payments").insert({
+          sale_id:String(r.data.id),
+          amount:calc.paid,
+          payment_method:E("mtsPaymentMethod")?.value||"Cash",
+          payment_date:now.slice(0,10),
+          note:calc.status==="Partial"?"Partial Payment":"Paid in Full",
+          created_by:adminUser.id
+        });
+        if(pr.error)console.warn("MTS payment history was not saved:",pr.error.message);
+      }
+
+      msg(E("mtsStatus"),`MTS sale saved. Invoice ${reference}.`);
+      resetNewInventorySale("mts");
+      await loadSales();
+      await loadStockMovements();
+      showSaleInvoice(r.data.id);
+    }catch(e){
+      console.error("MTS Sale save error:",e);
+      msg(E("mtsStatus"),e.message||"Could not save MTS sale.",true);
+    }
+  };
+
+  /* MTS-only reset/payment listeners. */
+  const originalReset=window.resetNewInventorySale;
+  window.resetNewInventorySale=function(type){
+    if(type!=="mts")return originalReset.apply(this,arguments);
+    window.mtsSaleItems=[];
+    if(E("mtsBuyerType"))E("mtsBuyerType").value="";
+    if(E("mtsBuyerId"))E("mtsBuyerId").value="";
+    if(E("mtsBuyerSearch"))E("mtsBuyerSearch").value="";
+    if(E("mtsBuyerHint"))E("mtsBuyerHint").textContent="Choose a student or customer. You can add a new customer.";
+    if(E("mtsSaleStaff"))E("mtsSaleStaff").value="";
+    if(E("mtsOverallDiscountType"))E("mtsOverallDiscountType").value="percent";
+    if(E("mtsOverallDiscountValue"))E("mtsOverallDiscountValue").value="";
+    if(E("mtsPaymentMethod"))E("mtsPaymentMethod").value="Cash";
+    if(E("mtsPaymentStatus"))E("mtsPaymentStatus").value="Paid";
+    if(E("mtsAmountPaidNow"))E("mtsAmountPaidNow").value="0.00";
+    if(typeof setAutoTime==="function")setAutoTime("mtsSaleTime");
+    window.renderMtsSaleRowsWithDiscount();
+    updateMtsTotals();
+  };
+
+  function bind(){
+    E("mtsPaymentStatus")?.addEventListener("change",updateMtsTotals);
+    E("mtsAmountPaidNow")?.addEventListener("input",updateMtsTotals);
+    E("mtsOverallDiscountValue")?.addEventListener("input",updateMtsTotals);
+    E("mtsOverallDiscountType")?.addEventListener("change",updateMtsTotals);
+    window.renderMtsSaleRowsWithDiscount();
+    updateMtsTotals();
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind,{once:true});
+  else bind();
+  setTimeout(bind,300);
 })();
 </script>
 
