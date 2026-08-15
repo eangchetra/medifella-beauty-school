@@ -6860,6 +6860,55 @@ document.addEventListener("DOMContentLoaded",function(){
   setInterval(syncLiveData,1000);
 })();
 </script>
+
+<script id="mts-add-sale-toggle-page-fix">
+(function(){
+  function bindMtsAddSale(){
+    var btn=document.getElementById("mtsAddSaleToggle");
+    var form=document.getElementById("mtsSaleFormCard");
+    if(!btn || !form || btn.dataset.mtsBound==="1") return;
+    btn.dataset.mtsBound="1";
+
+    function openMts(){
+      form.style.display="";
+      btn.textContent="+ Hide Sale";
+      btn.setAttribute("aria-expanded","true");
+      if(typeof resetNewInventorySale==="function"){
+        try{ resetNewInventorySale("mts"); }catch(e){ console.warn("MTS reset:",e); }
+      }
+      var search=document.getElementById("mtsProductSearch");
+      if(search) setTimeout(function(){search.focus()},80);
+    }
+
+    function closeMts(){
+      form.style.display="none";
+      btn.textContent="+ Add Sale";
+      btn.setAttribute("aria-expanded","false");
+    }
+
+    // Start closed every time the page loads.
+    closeMts();
+
+    btn.onclick=function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      if(form.style.display==="none" || form.style.display===""){
+        openMts();
+      }else{
+        closeMts();
+      }
+    };
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",bindMtsAddSale,{once:true});
+  }else{
+    bindMtsAddSale();
+  }
+  setTimeout(bindMtsAddSale,300);
+  setTimeout(bindMtsAddSale,1000);
+})();
+</script>
 </body>
 </html>
 
