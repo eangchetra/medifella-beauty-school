@@ -8156,19 +8156,25 @@ document.addEventListener("DOMContentLoaded",function(){
     const status=E("mtsPaymentStatus");
     if(!input||!status)return;
     const c=calcMtsFinal();
+    const previous=status.dataset.mtsPaymentFinalLastStatus||"";
+    const current=status.value||"Paid";
 
-    if(status.value==="Paid"){
+    if(current==="Paid"){
       input.value=c.total.toFixed(2);
       input.readOnly=true;
-    }else if(status.value==="Due"){
+    }else if(current==="Due"){
       input.value="0.00";
       input.readOnly=true;
     }else{
+      if(previous!==current || input.value.trim()==="")input.value="0.00";
       input.readOnly=false;
       input.removeAttribute("readonly");
       input.removeAttribute("disabled");
       input.style.setProperty("pointer-events","auto","important");
+      input.style.setProperty("user-select","text","important");
     }
+
+    status.dataset.mtsPaymentFinalLastStatus=current;
   }
 
   async function saveMtsFinal(){
@@ -8200,6 +8206,20 @@ document.addEventListener("DOMContentLoaded",function(){
       :customers.find(x=>String(x.id)===String(buyerId));
     const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
     const c=calcMtsFinal();
+
+    if(c.status==="Partial" && (c.paid<=0 || c.paid>=c.total-0.005)){
+      msg(E("mtsStatus"),"For Partial Payment, enter an amount greater than $0 and less than the Grand Total.",true);
+      return;
+    }
+    if(c.status==="Paid" && c.paid<c.total-0.005){
+      msg(E("mtsStatus"),"Paid status requires the full Grand Total.",true);
+      return;
+    }
+    if(c.status==="Due" && c.paid>0.005){
+      msg(E("mtsStatus"),"Due status must have $0.00 paid.",true);
+      return;
+    }
+
     const now=phTime();
     const year=new Date().getFullYear();
     const existing=(salesRecords||[]).filter(x=>String(x.sale_type||"").toUpperCase()==="MTS");
@@ -8226,6 +8246,12 @@ document.addEventListener("DOMContentLoaded",function(){
 
     const paymentMethod=E("mtsPaymentMethod")?.value||"Cash";
 
+    /*
+     * IMPORTANT:
+     * medifella_sales in this installation does NOT expose payment_method.
+     * The selected method is saved in medifella_sale_payments instead, so
+     * payment_method must not be sent to medifella_sales.
+     */
     const payload={
       reference_no:reference,
       sale_type:"MTS",
@@ -8245,7 +8271,6 @@ document.addEventListener("DOMContentLoaded",function(){
       paid:c.paid,
       balance:c.due,
       payment_status:c.status,
-      payment_method:paymentMethod,
       sale_status:"Completed",
       items:normalized,
       service_items:[],
@@ -8257,10 +8282,48 @@ document.addEventListener("DOMContentLoaded",function(){
     if(btn){btn.disabled=true;btn.textContent="Saving MTS Sale..."}
 
     try{
-      const r=await sb.from("medifella_sales")
-        .insert({...payload,created_by:adminUser.id})
-        .select().single();
-      if(r.error)throw r.error;
+      /*
+       * Write the sale without .select().single().
+       * This avoids a SELECT/RLS problem after a successful INSERT.
+       * If Supabase reports another missing schema-cache column, remove only
+       * that field and retry; this keeps the MTS sale isolated from schema
+       * differences without changing Dermed or Medi Fella Sale.
+       */
+      let dataPayload={...payload};
+      if(adminUser?.id)dataPayload.created_by=adminUser.id;
+
+      let insertResult=null;
+      for(let attempt=0;attempt<12;attempt++){
+        insertResult=await sb.from("medifella_sales").insert(dataPayload);
+        if(!insertResult.error)break;
+
+        const errorText=String(
+          insertResult.error.message||insertResult.error.details||""
+        );
+        const columnMatch=
+          errorText.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']? (?:of relation .* )?does not exist/i) ||
+          errorText.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i) ||
+          errorText.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
+
+        if(columnMatch && Object.prototype.hasOwnProperty.call(dataPayload,columnMatch[1])){
+          delete dataPayload[columnMatch[1]];
+          continue;
+        }
+        throw insertResult.error;
+      }
+
+      if(insertResult?.error)throw insertResult.error;
+
+      await loadSales();
+
+      const savedRow=(salesRecords||[]).find(
+        x=>String(saleRef(x))===String(reference)
+      );
+      if(!savedRow){
+        throw new Error("MTS sale was saved but could not be loaded into the MTS Sales list.");
+      }
+
+      const saleId=String(savedRow.id);
 
       const movements=items.map(x=>({
         product_id:x.product_id,
@@ -8269,8 +8332,8 @@ document.addEventListener("DOMContentLoaded",function(){
         staff_id:staffId,
         staff_name:staff?.name_en||"",
         stock_time:now,
-        created_by:adminUser.id,
-        sale_id:r.data.id,
+        created_by:adminUser?.id||null,
+        sale_id:saleId,
         notes:"MTS"
       }));
       if(movements.length){
@@ -8279,22 +8342,28 @@ document.addEventListener("DOMContentLoaded",function(){
       }
 
       if(c.paid>0){
-        const pr=await sb.from("medifella_sale_payments").insert({
-          sale_id:String(r.data.id),
+        const paymentPayload={
+          sale_id:saleId,
           amount:c.paid,
           payment_method:paymentMethod,
           payment_date:now.slice(0,10),
-          note:c.status==="Partial"?"Partial Payment":"Paid in Full",
-          created_by:adminUser.id
-        });
-        if(pr.error)console.warn("MTS payment history:",pr.error.message);
+          note:c.status==="Partial"?"Partial Payment":"Paid in Full"
+        };
+        if(adminUser?.id)paymentPayload.created_by=adminUser.id;
+
+        try{
+          const pr=await sb.from("medifella_sale_payments").insert(paymentPayload);
+          if(pr.error)console.warn("MTS payment history:",pr.error.message);
+        }catch(paymentError){
+          console.warn("MTS payment history was not saved:",paymentError);
+        }
       }
 
       msg(E("mtsStatus"),`MTS sale saved. Invoice ${reference}.`);
       if(typeof resetNewInventorySale==="function")resetNewInventorySale("mts");
       await loadSales();
       await loadStockMovements();
-      showSaleInvoice(r.data.id);
+      showSaleInvoice(saleId);
     }catch(e){
       console.error("MTS save error:",e);
       msg(E("mtsStatus"),e.message||"Could not save MTS sale.",true);
@@ -9641,22 +9710,35 @@ document.addEventListener("DOMContentLoaded",function(){
       wrap.style.setProperty("visibility","visible","important");
     }
 
-    if(status.value==="Paid"){
+    const previousStatus=status.dataset.mtsLastPaymentStatus||"";
+    const currentStatus=status.value||"Paid";
+
+    if(currentStatus==="Paid"){
       input.value=grandTotal().toFixed(2);
       input.readOnly=true;
       input.removeAttribute("disabled");
-    }else if(status.value==="Due"){
+    }else if(currentStatus==="Due"){
       input.value="0.00";
       input.readOnly=true;
       input.removeAttribute("disabled");
     }else{
-      /* Partial Payment: never change the user's text while typing. */
+      /*
+       * When Partial Payment is selected, start with exactly 0.00.
+       * After that, never rewrite the field while the user is typing.
+       */
+      if(previousStatus!==currentStatus){
+        input.value="0.00";
+      }else if(input.value.trim()===""){
+        input.value="0.00";
+      }
       input.readOnly=false;
       input.removeAttribute("readonly");
       input.removeAttribute("disabled");
       input.style.setProperty("pointer-events","auto","important");
       input.style.setProperty("user-select","text","important");
     }
+
+    status.dataset.mtsLastPaymentStatus=currentStatus;
   }
 
   function bindFinal(){
