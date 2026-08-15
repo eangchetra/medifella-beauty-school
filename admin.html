@@ -7035,6 +7035,286 @@ document.addEventListener("DOMContentLoaded",function(){
 
 
 
+
+<style id="mts-product-table-final-fix">
+/* MTS ONLY — product rows and item discount. */
+#mtsSale #mtsItems input,
+#mtsSale #mtsItems select{
+  box-sizing:border-box;
+}
+#mtsSale #mtsItems .mts-item-discount{
+  display:grid;
+  grid-template-columns:55px minmax(65px,1fr);
+  gap:5px;
+  min-width:125px;
+}
+#mtsSale #mtsItems .mts-item-discount input,
+#mtsSale #mtsItems .mts-item-discount select{
+  width:100%;
+  min-height:38px;
+}
+</style>
+
+<script id="mts-product-table-final-fix">
+(function(){
+  "use strict";
+
+  function E(id){return document.getElementById(id)}
+  function num(v){
+    const n=Number(String(v??"").replace(/[$,\s]/g,""));
+    return Number.isFinite(n)&&n>=0?n:0;
+  }
+  function escv(v){
+    return typeof esc==="function"?esc(v):String(v??"").replace(/[&<>"']/g,function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function moneyv(v){
+    return typeof money==="function"?money(v):"$"+Number(v||0).toFixed(2);
+  }
+  function discountAmount(base,type,value){
+    const v=Math.max(0,num(value));
+    return type==="usd"?Math.min(base,v):Math.min(base,base*v/100);
+  }
+
+  /*
+   * MTS ONLY.
+   * The existing final Dermed handler intentionally ignores non-Dermed
+   * products. We restore only the MTS branch while leaving Dermed behavior
+   * untouched.
+   */
+  window.addSaleProduct=function(type,pid){
+    if(type!=="mts"){
+      /* Dermed's existing handler remains the active implementation. */
+      const p=Array.isArray(window.products)
+        ? window.products.find(x=>String(x.id)===String(pid))
+        : null;
+      if(type==="dermed" && typeof window.__mtsOriginalDermedAdd==="function"){
+        return window.__mtsOriginalDermedAdd(type,pid);
+      }
+      return;
+    }
+
+    const productsArr=Array.isArray(window.products)?window.products:[];
+    const p=productsArr.find(x=>String(x.id)===String(pid));
+    if(!p)return;
+
+    const arr=window.mtsSaleItems||(window.mtsSaleItems=[]);
+    if(arr.some(x=>String(x.product_id)===String(pid))){
+      const s=E("mtsProductSearch"),r=E("mtsProductResults");
+      if(s)s.value="";
+      if(r){r.innerHTML="";r.classList.remove("show");r.style.display="none";}
+      return;
+    }
+
+    arr.push({
+      product_id:p.id,
+      product_code:p.product_code||"",
+      name:p.name||"",
+      price:Number(p.price||0),
+      quantity:1,
+      discount_type:"percent",
+      discount_value:0
+    });
+
+    renderMtsItems();
+
+    const s=E("mtsProductSearch"),r=E("mtsProductResults");
+    if(s)s.value="";
+    if(r){r.innerHTML="";r.classList.remove("show");r.style.display="none";}
+  };
+
+  function renderMtsItems(){
+    const body=E("mtsItems");
+    const arr=window.mtsSaleItems||(window.mtsSaleItems=[]);
+    if(!body)return;
+
+    body.innerHTML=arr.map(function(x,i){
+      const qty=Math.max(1,Number(x.quantity)||1);
+      const price=Math.max(0,Number(x.price)||0);
+      const base=qty*price;
+      const dtype=x.discount_type==="usd"?"usd":"percent";
+      const dvalue=Math.max(0,Number(x.discount_value)||0);
+      const d=discountAmount(base,dtype,dvalue);
+      const total=Math.max(0,base-d);
+      const stock=typeof productStock==="function"?productStock(x.product_id):999999;
+      const max=Math.max(1,stock+qty);
+
+      return `<tr>
+        <td><strong>${escv(x.name)}</strong><div class="muted">${escv(x.product_code||"")}</div></td>
+        <td><input type="number" min="1" max="${max}" value="${qty}" data-mts-qty="${i}"></td>
+        <td>${moneyv(price)}</td>
+        <td>
+          <div class="mts-item-discount">
+            <select data-mts-disc-type="${i}">
+              <option value="percent" ${dtype==="percent"?"selected":""}>%</option>
+              <option value="usd" ${dtype==="usd"?"selected":""}>USD</option>
+            </select>
+            <input type="text" inputmode="decimal" value="${dvalue||""}" placeholder="0" data-mts-disc-value="${i}">
+          </div>
+        </td>
+        <td><strong>${moneyv(total)}</strong></td>
+        <td><button type="button" class="danger" data-mts-remove="${i}">×</button></td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="6" class="muted">No products added.</td></tr>';
+
+    body.querySelectorAll("[data-mts-qty]").forEach(function(el){
+      el.addEventListener("change",function(){
+        const i=Number(el.dataset.mtsQty);
+        const x=arr[i];
+        if(!x)return;
+        const max=typeof productStock==="function"?productStock(x.product_id):999999;
+        x.quantity=Math.max(1,Math.min(Number(el.value)||1,max));
+        renderMtsItems();
+        updateMtsTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-disc-type]").forEach(function(el){
+      el.addEventListener("change",function(){
+        const i=Number(el.dataset.mtsDiscType);
+        if(!arr[i])return;
+        arr[i].discount_type=el.value==="usd"?"usd":"percent";
+        renderMtsItems();
+        updateMtsTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-disc-value]").forEach(function(el){
+      el.addEventListener("input",function(){
+        const i=Number(el.dataset.mtsDiscValue);
+        if(!arr[i])return;
+        arr[i].discount_value=num(el.value);
+        updateMtsTotals();
+        const row=el.closest("tr");
+        if(row){
+          const x=arr[i];
+          const qty=Math.max(1,Number(x.quantity)||1);
+          const price=Math.max(0,Number(x.price)||0);
+          const base=qty*price;
+          const d=discountAmount(base,x.discount_type,x.discount_value);
+          const total=row.querySelector("td:nth-child(5)");
+          if(total)total.innerHTML="<strong>"+moneyv(Math.max(0,base-d))+"</strong>";
+        }
+      });
+    });
+
+    body.querySelectorAll("[data-mts-remove]").forEach(function(el){
+      el.addEventListener("click",function(){
+        arr.splice(Number(el.dataset.mtsRemove),1);
+        renderMtsItems();
+        updateMtsTotals();
+      });
+    });
+
+    updateMtsTotals();
+  }
+
+  function updateMtsTotals(){
+    const arr=window.mtsSaleItems||[];
+    let subtotal=0;
+    arr.forEach(function(x){
+      const qty=Math.max(1,Number(x.quantity)||1);
+      const price=Math.max(0,Number(x.price)||0);
+      const base=qty*price;
+      subtotal+=Math.max(0,base-discountAmount(base,x.discount_type,x.discount_value));
+    });
+
+    const type=E("mtsOverallDiscountType")?.value==="usd"?"usd":"percent";
+    const raw=num(E("mtsOverallDiscountValue")?.value||0);
+    const overall=type==="usd"?Math.min(subtotal,raw):Math.min(subtotal,subtotal*raw/100);
+    const total=Math.max(0,subtotal-overall);
+
+    if(E("mtsSubtotal"))E("mtsSubtotal").textContent=moneyv(subtotal);
+    if(E("mtsSummarySubtotal"))E("mtsSummarySubtotal").textContent=moneyv(subtotal);
+    if(E("mtsSummaryDiscount"))E("mtsSummaryDiscount").textContent=moneyv(overall);
+    if(E("mtsTotal"))E("mtsTotal").textContent=moneyv(total);
+
+    const status=E("mtsPaymentStatus")?.value||"Paid";
+    const paid=E("mtsAmountPaidNow");
+    const wrap=E("mtsPartialPaidWrap");
+    if(status==="Paid"){
+      if(paid){paid.value=total.toFixed(2);paid.readOnly=true;}
+      if(wrap)wrap.classList.add("hidden");
+    }else if(status==="Due"){
+      if(paid){paid.value="0.00";paid.readOnly=true;}
+      if(wrap)wrap.classList.add("hidden");
+    }else{
+      if(paid){paid.readOnly=false;paid.value=Math.min(total,num(paid.value)).toFixed(2);}
+      if(wrap)wrap.classList.remove("hidden");
+    }
+  }
+
+  /* Keep the original Dermed function available before replacing the global. */
+  if(typeof window.__mtsOriginalDermedAdd!=="function"){
+    const candidates=[];
+    /* Capture the currently installed handler only if it is the Dermed-only one. */
+    if(typeof window.addSaleProduct==="function"){
+      const current=window.addSaleProduct;
+      window.__mtsOriginalDermedAdd=function(type,pid){
+        return current.apply(this,arguments);
+      };
+    }
+  }
+
+  /* Reinstall the MTS branch after all previous page scripts have loaded. */
+  const existingDermed=window.__mtsOriginalDermedAdd;
+  const mtsHandler=function(type,pid){
+    if(type==="mts"){
+      const productsArr=Array.isArray(window.products)?window.products:[];
+      const p=productsArr.find(x=>String(x.id)===String(pid));
+      if(!p)return;
+      const arr=window.mtsSaleItems||(window.mtsSaleItems=[]);
+      if(arr.some(x=>String(x.product_id)===String(pid)))return;
+      arr.push({
+        product_id:p.id,
+        product_code:p.product_code||"",
+        name:p.name||"",
+        price:Number(p.price||0),
+        quantity:1,
+        discount_type:"percent",
+        discount_value:0
+      });
+      renderMtsItems();
+      const s=E("mtsProductSearch"),r=E("mtsProductResults");
+      if(s)s.value="";
+      if(r){r.innerHTML="";r.classList.remove("show");r.style.display="none";}
+      return;
+    }
+    if(existingDermed)return existingDermed.apply(this,arguments);
+  };
+  window.addSaleProduct=mtsHandler;
+
+  /* Product-result buttons use this delegated handler in the existing page.
+     Ensure it always calls the MTS branch above. */
+  function bind(){
+    const search=E("mtsProductSearch"), box=E("mtsProductResults");
+    if(search && search.dataset.mtsFinalBound!=="1"){
+      search.dataset.mtsFinalBound="1";
+      search.addEventListener("input",function(){
+        if(typeof productPicker==="function")productPicker("mts");
+      });
+    }
+
+    E("mtsOverallDiscountValue")?.addEventListener("input",updateMtsTotals);
+    E("mtsOverallDiscountType")?.addEventListener("change",updateMtsTotals);
+    E("mtsPaymentStatus")?.addEventListener("change",updateMtsTotals);
+    E("mtsAmountPaidNow")?.addEventListener("input",updateMtsTotals);
+
+    renderMtsItems();
+    updateMtsTotals();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",bind,{once:true});
+  }else{
+    bind();
+  }
+  setTimeout(bind,300);
+  setTimeout(bind,1000);
+})();
+</script>
+
 </body>
 </html>
 
