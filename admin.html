@@ -2419,11 +2419,28 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </div>
 <label style="margin-top:18px">Search Product</label><div style="position:relative"><input id="mtsProductSearch" autocomplete="off" placeholder="Search Product ID or Product Name"><div id="mtsProductResults" class="sale-course-picker-results"></div></div>
 <div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Total</th><th></th></tr></thead><tbody id="mtsItems"></tbody></table></div>
-<div class="sale-summary-row" style="margin-top:16px"><span>Total Price</span><strong id="mtsTotal">$0.00</strong></div>
+<div class="sale-subtotal-line" style="margin-top:16px"><span>Sub Initial Total</span><strong id="mtsSubtotal">$0.00</strong></div>
+<div class="sale-controls-grid" style="margin-top:12px">
+ <div>
+  <label>Overall Discount</label>
+  <div class="discount-control">
+   <select id="mtsOverallDiscountType"><option value="percent">%</option><option value="usd">USD</option></select>
+   <input id="mtsOverallDiscountValue" type="text" inputmode="decimal" autocomplete="off" placeholder="0">
+  </div>
+ </div>
+</div>
+<div class="sale-summary-card" style="margin-top:12px">
+ <div class="sale-summary-col">
+  <div class="sale-summary-row"><span>Sub Initial Total</span><strong id="mtsSummarySubtotal">$0.00</strong></div>
+  <div class="sale-summary-row"><span>Overall Discount</span><strong id="mtsSummaryDiscount" class="discount-number">$0.00</strong></div>
+  <div class="sale-summary-divider"></div>
+  <div class="sale-summary-row sale-grand-row"><span>Grand Total</span><strong id="mtsTotal">$0.00</strong></div>
+ </div>
+</div>
 <div class="actions" style="justify-content:flex-end;margin-top:14px"><button id="saveMtsSale" class="gold">Save MTS Sale & Generate Invoice</button><button id="clearMtsSale" class="light">Clear</button></div>
 <div id="mtsStatus"></div>
 </div>
-<div class="card" style="margin-top:18px"><h2>MTS Sales</h2><div class="toolbar"><input id="mtsSaleSearch" placeholder="Search invoice, buyer or product"><button id="mtsSalesRefresh" class="light">Refresh</button></div><div id="mtsSalesList">Loading...</div></div>
+<div class="card" style="margin-top:18px"><h2>MTS Sales</h2><div class="toolbar"><input id="mtsSaleSearch" placeholder="Search invoice, buyer or product"><select id="mtsPaymentFilter"><option value="all">All Payment Status</option><option value="Paid">Paid</option><option value="Partial">Partial Payment</option><option value="Due">Due</option></select><button id="mtsSalesRefresh" class="light">Refresh</button></div><div id="mtsSalesList">Loading...</div></div>
 </section>
 
 <section id="dermedSale" class="section">
@@ -4466,6 +4483,24 @@ async function printInvoice(id,size="A4"){
   gap:8px !important;
 }
 </style>
+
+<style id="mts-buyer-results-position-only">
+/* MTS ONLY: keep customer results directly under the search box.
+   Do not alter Dermed, Medi Fella Sale, or other dashboard sections. */
+#mtsSale .sale-header-grid > div:first-child{position:relative!important}
+#mtsSale #mtsBuyerResults{
+  position:absolute!important;
+  left:0!important;
+  right:auto!important;
+  top:52px!important;
+  width:calc(100% - 108px)!important;
+  max-width:520px!important;
+  z-index:200000!important;
+  max-height:240px!important;
+  overflow-y:auto!important;
+}
+#mtsSale #mtsBuyerResults.show{display:block!important}
+</style>
 </head>
 <body>
 <div id="paper"><img src="${img}" alt="Invoice"></div>
@@ -5767,7 +5802,7 @@ function productPicker(type){
  const input=$(type+"ProductSearch"),res=$(type+"ProductResults"); if(!input||!res)return;
  const q=(input.value||"").toLowerCase().trim();
  const rows=products.filter(x=>(`${x.product_code||""} ${x.name||""}`).toLowerCase().includes(q)).slice(0,15);
- res.innerHTML=rows.map(x=>`<button type="button" onclick="addSaleProduct('${type}','${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code)} · ${money(x.price)} · Stock: ${productStock(x.id)}</div></button>`).join("")||'<div class="muted" style="padding:10px">No product found.</div>';
+ res.innerHTML=rows.map(x=>`<button type="button" data-product-id="${attr(x.id)}" onclick="addSaleProduct('${type}','${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code)} · ${money(x.price)} · Stock: ${productStock(x.id)}</div></button>`).join("")||'<div class="muted" style="padding:10px">No product found.</div>';
  res.classList.toggle("show",!!q);
 }
 function addSaleProduct(type,pid){
@@ -5781,7 +5816,18 @@ function renderSaleProductRows(type){
  if(type==="dermed"){ renderDermedCombinedItems(); return; }
  const arr=window[type+"SaleItems"]||[], body=$(type+"Items"); if(!body)return;
  body.innerHTML=arr.map((x,i)=>`<tr><td><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code)}</div></td><td><input type="number" min="1" max="${Math.max(0,productStock(x.product_id)+(Number(x.quantity)||0))}" value="${x.quantity}" onchange="${type}Qty(${i},this.value)"></td><td>${money(x.price)}</td><td>${money(Number(x.price)*Number(x.quantity))}</td><td><button class="danger" onclick="removeSaleProduct('${type}',${i})">×</button></td></tr>`).join("");
- const total=arr.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0); if($(type+"Total"))$(type+"Total").textContent=money(total);
+ const subtotal=arr.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0);
+ if(type==="mts"){
+   const raw=parseMoneyInput($("mtsOverallDiscountValue")?.value||"0");
+   const dtype=$("mtsOverallDiscountType")?.value||"percent";
+   const discount=dtype==="usd"?Math.min(subtotal,Math.max(0,raw)):Math.min(subtotal,subtotal*Math.max(0,raw)/100);
+   if($("mtsSubtotal"))$("mtsSubtotal").textContent=money(subtotal);
+   if($("mtsSummarySubtotal"))$("mtsSummarySubtotal").textContent=money(subtotal);
+   if($("mtsSummaryDiscount"))$("mtsSummaryDiscount").textContent=money(discount);
+   if($("mtsTotal"))$("mtsTotal").textContent=money(Math.max(0,subtotal-discount));
+ }else{
+   if($(type+"Total"))$(type+"Total").textContent=money(subtotal);
+ }
 }
 function setSaleQty(type,i,v){const arr=window[type+"SaleItems"]||[];const max=productStock(arr[i].product_id);arr[i].quantity=Math.max(1,Math.min(Number(v)||1,max));renderSaleProductRows(type)}
 window.mtsQty=(i,v)=>setSaleQty("mts",i,v);window.dermedQty=(i,v)=>setSaleQty("dermed",i,v);
@@ -6007,6 +6053,10 @@ function resetNewInventorySale(type){
  [type+"BuyerType",type+"BuyerId"].forEach(id=>$(id).value="");
  $(type+"BuyerSearch").value="";$(type+"BuyerHint").textContent="Choose a student or customer. You can add a new customer.";
  $(type+"SaleStaff").value="";setAutoTime(type+"SaleTime");
+ if(type==="mts"){
+   if($("mtsOverallDiscountType"))$("mtsOverallDiscountType").value="percent";
+   if($("mtsOverallDiscountValue"))$("mtsOverallDiscountValue").value="";
+ }
  renderSaleProductRows(type);if(type==="dermed")renderDermedCombinedItems();
 }
 async function saveInventorySale(type){
@@ -6018,7 +6068,11 @@ async function saveInventorySale(type){
  for(const it of items){if(Number(it.quantity)>productStock(it.product_id)){msg($(type+"Status"),`Not enough stock for ${it.name}. Available: ${productStock(it.product_id)}.`,true);return}}
  const buyer=buyerType==="student"?students.find(x=>String(x.id)===String(buyerId)):customers.find(x=>String(x.id)===String(buyerId));
  const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
- const productTotal=items.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),serviceTotal=serviceItems.reduce((n,x)=>n+Number(x.price)*Number(x.quantity||1),0),total=productTotal+serviceTotal;
+ const productTotal=items.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0),serviceTotal=serviceItems.reduce((n,x)=>n+Number(x.price)*Number(x.quantity||1),0),subtotal=productTotal+serviceTotal;
+ const mtsDiscountRaw=type==="mts"?parseMoneyInput($("mtsOverallDiscountValue")?.value||"0"):0;
+ const mtsDiscountType=type==="mts"?($("mtsOverallDiscountType")?.value||"percent"):"percent";
+ const overallDiscount=type==="mts"?Math.min(subtotal,Math.max(0,mtsDiscountType==="usd"?mtsDiscountRaw:subtotal*mtsDiscountRaw/100)):0;
+ const total=Math.max(0,subtotal-overallDiscount);
  try{
   const code=type==="mts"?"MTS":"DERMED";
   const prefix=code+"-"+new Date().getFullYear()+"-";
@@ -6030,7 +6084,7 @@ async function saveInventorySale(type){
     reference_no:reference,sale_type:code,sale_date:now.slice(0,10),sale_time:now.slice(11),
     student_id:buyerType==="student"?buyerId:null,student_name:buyer?.full_name||buyer?.name||"",
     student_phone:buyer?.phone||"",customer_id:buyerType==="customer"?buyerId:null,customer_type:buyerType,
-    sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",subtotal:total,discount:0,shipping:0,grand_total:total,paid:total,balance:0,payment_status:"Paid",sale_status:"Completed",
+    sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",subtotal:subtotal,discount:overallDiscount,shipping:0,grand_total:total,paid:total,balance:0,payment_status:"Paid",sale_status:"Completed",
     items:items.map(x=>({...x,quantity:Number(x.quantity)})),service_items:serviceItems.map(x=>({...x,quantity:Number(x.quantity||1)})),service_total:serviceTotal,notes:""
   };
   const r=await sb.from("medifella_sales").insert({...payload,created_by:adminUser.id}).select().single();if(r.error)throw r.error;
@@ -6040,7 +6094,44 @@ async function saveInventorySale(type){
   resetNewInventorySale(type);await loadSales();await loadStockMovements();showSaleInvoice(r.data.id);
  }catch(e){msg($(type+"Status"),e.message||"Could not save sale.",true)}
 }
-function renderMtsSales(){const box=$("mtsSalesList");if(!box)return;const q=($("mtsSaleSearch")?.value||"").toLowerCase();const rows=salesRecords.filter(x=>String(x.sale_type||"").toUpperCase()==="MTS"&&(`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])}`).toLowerCase().includes(q));box.innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Invoice</th><th>Buyer</th><th>Products</th><th>Total</th><th>Date</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.reference_no)}</td><td>${esc(x.student_name)}</td><td>${esc((x.items||[]).map(i=>i.name).join(", "))}</td><td>${money(x.grand_total)}</td><td>${esc(x.sale_date||"")}</td><td><button class="light" onclick="showSaleInvoice('${attr(x.id)}')">View Invoice</button></td></tr>`).join("")}</table></div>`:'<p class="muted">No MTS sales found.</p>'}
+function isMtsListRecord(x){
+ const t=String(x?.sale_type||"").trim().toUpperCase().replace(/[\s_-]+/g,"");
+ const ref=String(x?.reference_no||"").trim().toUpperCase();
+ return t==="MTS" || t==="MTSKOREANBEAUTYPRODUCT" || ref.startsWith("MTS-");
+}
+function renderMtsSales(){
+ const box=$("mtsSalesList");if(!box)return;
+ const q=($("mtsSaleSearch")?.value||"").toLowerCase();
+ const f=($("mtsPaymentFilter")?.value||"all");
+ const rows=salesRecords.filter(x=>{
+   if(!isMtsListRecord(x)) return false;
+   const total=saleTotal(x),paid=salePaid(x),status=saleStatus(total,paid);
+   const hay=`${saleRef(x)||""} ${saleCustomer(x)||""} ${saleField(x,["student_phone","phone"],"")} ${JSON.stringify(saleItemsValue(x))}`.toLowerCase();
+   return (f==="all"||status===f) && hay.includes(q);
+ });
+ box.innerHTML=rows.length?`<div class="table-wrap"><table class="table">
+ <tr><th>Date / Time</th><th>Reference</th><th>Buyer</th><th>Products</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>
+ ${rows.map(x=>{
+   const total=saleTotal(x),paid=salePaid(x),bal=Math.max(0,total-paid),status=saleStatus(total,paid);
+   const badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
+   const dt=saleDateValue(x),time=saleField(x,["sale_time","time"],"");
+   return `<tr>
+     <td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td>
+     <td><strong>${esc(saleRef(x)||"—")}</strong></td>
+     <td>${esc(saleCustomer(x)||"—")}<div class="muted">${esc(saleField(x,["student_phone","phone"],""))}</div></td>
+     <td>${esc(formatSaleItems(saleItemsValue(x)))}</td>
+     <td>${money(total)}</td>
+     <td>${money(paid)}</td>
+     <td>${money(bal)}</td>
+     <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
+     <td><div class="actions">
+       <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       ${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(x.id)}')">Payment</button>`:""}
+     </div></td>
+   </tr>`;
+ }).join("")}</table></div>`:'<p class="muted">No MTS sales found.</p>';
+}
+
 function renderDermedSales(){
  const box=$("dermedSalesList");if(!box)return;
  const q=($("dermedSaleSearch")?.value||"").toLowerCase();
@@ -6201,9 +6292,12 @@ if($("dermedBuyerSearch"))$("dermedBuyerSearch").oninput=renderBuyerControls;
 if($("mtsProductSearch"))$("mtsProductSearch").oninput=()=>productPicker("mts");
 if($("saveMtsSale"))$("saveMtsSale").onclick=()=>saveInventorySale("mts");
 if($("clearMtsSale"))$("clearMtsSale").onclick=()=>resetNewInventorySale("mts");
+if($("mtsOverallDiscountValue"))$("mtsOverallDiscountValue").oninput=()=>renderSaleProductRows("mts");
+if($("mtsOverallDiscountType"))$("mtsOverallDiscountType").onchange=()=>renderSaleProductRows("mts");
 // Dermed Sale is handled by the dedicated List-Sale-style controller below.
 
 $("mtsSaleSearch").oninput=renderMtsSales;
+if($("mtsPaymentFilter"))$("mtsPaymentFilter").onchange=renderMtsSales;
 $("dermedSaleSearch").oninput=renderDermedSales;
 if($("dermedPaymentFilter"))$("dermedPaymentFilter").onchange=renderDermedSales;
 $("mtsSalesRefresh").onclick=loadSales;$("dermedSalesRefresh").onclick=loadSales;
@@ -6892,7 +6986,7 @@ document.addEventListener("DOMContentLoaded",function(){
     btn.onclick=function(e){
       e.preventDefault();
       e.stopPropagation();
-      if(form.style.display==="none" || form.style.display===""){
+      if(form.style.display==="none"){
         openMts();
       }else{
         closeMts();
@@ -6907,6 +7001,37 @@ document.addEventListener("DOMContentLoaded",function(){
   }
   setTimeout(bindMtsAddSale,300);
   setTimeout(bindMtsAddSale,1000);
+})();
+</script>
+
+<script id="mts-product-result-click-fix">
+(function(){
+  function bindMtsProductResults(){
+    const box=document.getElementById("mtsProductResults");
+    if(!box || box.dataset.mtsProductClickBound==="1") return;
+    box.dataset.mtsProductClickBound="1";
+    box.addEventListener("click",function(e){
+      const btn=e.target.closest("button[data-product-id]");
+      if(!btn || !box.contains(btn)) return;
+      e.preventDefault();
+      e.stopPropagation();
+      const pid=btn.getAttribute("data-product-id");
+      if(typeof window.addSaleProduct==="function"){
+        window.addSaleProduct("mts",pid);
+      }
+      const input=document.getElementById("mtsProductSearch");
+      if(input) input.value="";
+      box.classList.remove("show");
+      box.innerHTML="";
+    });
+  }
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",bindMtsProductResults,{once:true});
+  }else{
+    bindMtsProductResults();
+  }
+  setTimeout(bindMtsProductResults,300);
+  setTimeout(bindMtsProductResults,1000);
 })();
 </script>
 </body>
