@@ -4343,6 +4343,198 @@ function openPrintFromCanvas(canvas,paper,sale){
 
 
 
+
+<script id="mts-invoice-edit-products-definitive-fix">
+(function(){
+  "use strict";
+
+  function E(id){ return document.getElementById(id); }
+  function n(v){
+    const x=Number(String(v ?? "").replace(/[$,\s]/g,""));
+    return Number.isFinite(x) && x>=0 ? x : 0;
+  }
+  function escv(v){
+    return typeof esc==="function" ? esc(v) :
+      String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function moneyv(v){
+    return typeof money==="function" ? money(v) : "$"+Number(v||0).toFixed(2);
+  }
+  function discountAmount(base,type,value){
+    const v=Math.max(0,n(value));
+    return type==="usd" ? Math.min(base,v) : Math.min(base,base*v/100);
+  }
+
+  /*
+   * This is the renderer used specifically after Invoice -> Edit.
+   * It does NOT depend on the private/local renderMtsItems() functions
+   * defined in earlier IIFEs, which is the reason V5 could still show
+   * "No products added" even though window.mtsSaleItems was populated.
+   */
+  window.renderMtsInvoiceEditProducts=function(){
+    const body=E("mtsItems");
+    const arr=Array.isArray(window.mtsSaleItems) ? window.mtsSaleItems : [];
+    if(!body)return;
+
+    body.innerHTML=arr.map((x,i)=>{
+      const qty=Math.max(1,n(x.quantity)||1);
+      const price=Math.max(0,n(x.price));
+      const base=qty*price;
+      const dtype=String(x.discount_type||"percent").toLowerCase()==="usd" ? "usd" : "percent";
+      const dvalue=Math.max(0,n(x.discount_value));
+      const line=Math.max(0,base-discountAmount(base,dtype,dvalue));
+      const stock=typeof productStock==="function" ? Number(productStock(x.product_id)) : 999999;
+      const max=Math.max(qty,Number.isFinite(stock)?stock:999999);
+
+      return `<tr>
+        <td><strong>${escv(x.name||"")}</strong><div class="muted">${escv(x.product_code||"")}</div></td>
+        <td><input type="number" min="1" max="${max}" value="${qty}" data-mts-edit-qty="${i}"></td>
+        <td>${moneyv(price)}</td>
+        <td>
+          <div class="mts-item-discount">
+            <select data-mts-edit-dtype="${i}">
+              <option value="percent" ${dtype==="percent"?"selected":""}>%</option>
+              <option value="usd" ${dtype==="usd"?"selected":""}>USD</option>
+            </select>
+            <input type="text" inputmode="decimal" autocomplete="off"
+                   placeholder="0" value="${dvalue?String(dvalue):""}"
+                   data-mts-edit-dvalue="${i}">
+          </div>
+        </td>
+        <td><strong>${moneyv(line)}</strong></td>
+        <td><button type="button" class="danger" data-mts-edit-remove="${i}">×</button></td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="6" class="muted">No products added.</td></tr>';
+
+    body.querySelectorAll("[data-mts-edit-qty]").forEach(el=>{
+      el.addEventListener("change",()=>{
+        const x=arr[Number(el.dataset.mtsEditQty)];
+        if(!x)return;
+        const stock=typeof productStock==="function" ? Number(productStock(x.product_id)) : 999999;
+        x.quantity=Math.max(1,Math.min(Number(el.value)||1,Math.max(1,Number.isFinite(stock)?stock:999999)));
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-edit-dtype]").forEach(el=>{
+      el.addEventListener("change",()=>{
+        const x=arr[Number(el.dataset.mtsEditDtype)];
+        if(!x)return;
+        x.discount_type=el.value==="usd"?"usd":"percent";
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-edit-dvalue]").forEach(el=>{
+      el.addEventListener("input",()=>{
+        const x=arr[Number(el.dataset.mtsEditDvalue)];
+        if(!x)return;
+        x.discount_value=n(el.value);
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-edit-remove]").forEach(el=>{
+      el.addEventListener("click",()=>{
+        arr.splice(Number(el.dataset.mtsEditRemove),1);
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    /* Always refresh the visible totals using the current MTS item array. */
+    let subtotal=0;
+    arr.forEach(x=>{
+      const q=Math.max(1,n(x.quantity)||1);
+      const p=Math.max(0,n(x.price));
+      const base=q*p;
+      subtotal += Math.max(0,base-discountAmount(base,String(x.discount_type||"percent")==="usd"?"usd":"percent",x.discount_value));
+    });
+    const odType=E("mtsOverallDiscountType")?.value==="usd"?"usd":"percent";
+    const odRaw=n(E("mtsOverallDiscountValue")?.value||0);
+    const overall=odType==="usd"?Math.min(subtotal,odRaw):Math.min(subtotal,subtotal*odRaw/100);
+    const total=Math.max(0,subtotal-overall);
+
+    if(E("mtsSubtotal"))E("mtsSubtotal").textContent=moneyv(subtotal);
+    if(E("mtsSummarySubtotal"))E("mtsSummarySubtotal").textContent=moneyv(subtotal);
+    if(E("mtsSummaryDiscount"))E("mtsSummaryDiscount").textContent=moneyv(overall);
+    if(E("mtsTotal"))E("mtsTotal").textContent=moneyv(total);
+  };
+
+  /*
+   * Definitive wrapper around the existing MTS Invoice Edit function.
+   * It first lets the original function fill customer/staff/payment/item data,
+   * then forces our public renderer to paint the already-loaded products.
+   *
+   * It also fetches the sale directly when possible so Invoice Edit is not
+   * dependent on an incomplete cached salesRecords row.
+   */
+  function install(){
+    const original=window.editMtsSaleFromInvoice;
+    if(typeof original!=="function" || original.__mtsProductsDefinitive)return;
+
+    const wrapped=async function(id){
+      let result;
+      try{
+        result=await original.apply(this,arguments);
+      }catch(e){
+        console.warn("MTS invoice edit:",e);
+      }
+
+      /* Prefer a fresh database row because the invoice may have been
+         rendered from a fresh row while salesRecords is older. */
+      try{
+        if(window.sb && id){
+          const r=await window.sb.from("medifella_sales").select("*").eq("id",String(id)).maybeSingle();
+          if(!r.error && r.data){
+            const s=r.data;
+            let raw=s.items??s.order_items??s.products??[];
+            if(typeof raw==="string"){
+              try{raw=JSON.parse(raw)}catch(_){raw=[]}
+            }
+            if(Array.isArray(raw) && raw.length){
+              const catalog=Array.isArray(window.products)?window.products:[];
+              window.mtsSaleItems=raw.map(x=>{
+                const pid=x.product_id||x.id||"";
+                const p=catalog.find(z=>String(z.id)===String(pid))||{};
+                return {
+                  product_id:pid,
+                  product_code:x.product_code||x.code||p.product_code||"",
+                  name:x.name||x.product_name||p.name||"",
+                  price:n(x.price??x.unit_price??p.price),
+                  quantity:Math.max(1,n(x.quantity??x.qty??1)),
+                  discount_type:String(x.discount_type||"percent").toLowerCase()==="usd"?"usd":"percent",
+                  discount_value:n(x.discount_value??x.discount_input??x.discount_percent)
+                };
+              });
+            }
+          }
+        }
+      }catch(e){
+        console.warn("MTS fresh item load:",e);
+      }
+
+      window.mtsEditingId=String(id);
+      window.renderMtsInvoiceEditProducts();
+      return result;
+    };
+
+    wrapped.__mtsProductsDefinitive=true;
+    window.editMtsSaleFromInvoice=wrapped;
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else{
+    install();
+  }
+  [100,500,1200,2500].forEach(ms=>setTimeout(install,ms));
+})();
+</script>
+
 </body>
 </html>`;
 
@@ -4368,7 +4560,199 @@ async function printInvoice(id,size="A4"){
  }
 
  printWin.document.open();
- printWin.document.write("<!doctype html><html><head><title>Preparing invoice...</title></head><body style='font-family:sans-serif;padding:30px'>Preparing invoice...</body></html>");
+ printWin.document.write("<!doctype html><html><head><title>Preparing invoice...</title></head><body style='font-family:sans-serif;padding:30px'>Preparing invoice...
+<script id="mts-invoice-edit-products-definitive-fix">
+(function(){
+  "use strict";
+
+  function E(id){ return document.getElementById(id); }
+  function n(v){
+    const x=Number(String(v ?? "").replace(/[$,\s]/g,""));
+    return Number.isFinite(x) && x>=0 ? x : 0;
+  }
+  function escv(v){
+    return typeof esc==="function" ? esc(v) :
+      String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function moneyv(v){
+    return typeof money==="function" ? money(v) : "$"+Number(v||0).toFixed(2);
+  }
+  function discountAmount(base,type,value){
+    const v=Math.max(0,n(value));
+    return type==="usd" ? Math.min(base,v) : Math.min(base,base*v/100);
+  }
+
+  /*
+   * This is the renderer used specifically after Invoice -> Edit.
+   * It does NOT depend on the private/local renderMtsItems() functions
+   * defined in earlier IIFEs, which is the reason V5 could still show
+   * "No products added" even though window.mtsSaleItems was populated.
+   */
+  window.renderMtsInvoiceEditProducts=function(){
+    const body=E("mtsItems");
+    const arr=Array.isArray(window.mtsSaleItems) ? window.mtsSaleItems : [];
+    if(!body)return;
+
+    body.innerHTML=arr.map((x,i)=>{
+      const qty=Math.max(1,n(x.quantity)||1);
+      const price=Math.max(0,n(x.price));
+      const base=qty*price;
+      const dtype=String(x.discount_type||"percent").toLowerCase()==="usd" ? "usd" : "percent";
+      const dvalue=Math.max(0,n(x.discount_value));
+      const line=Math.max(0,base-discountAmount(base,dtype,dvalue));
+      const stock=typeof productStock==="function" ? Number(productStock(x.product_id)) : 999999;
+      const max=Math.max(qty,Number.isFinite(stock)?stock:999999);
+
+      return `<tr>
+        <td><strong>${escv(x.name||"")}</strong><div class="muted">${escv(x.product_code||"")}</div></td>
+        <td><input type="number" min="1" max="${max}" value="${qty}" data-mts-edit-qty="${i}"></td>
+        <td>${moneyv(price)}</td>
+        <td>
+          <div class="mts-item-discount">
+            <select data-mts-edit-dtype="${i}">
+              <option value="percent" ${dtype==="percent"?"selected":""}>%</option>
+              <option value="usd" ${dtype==="usd"?"selected":""}>USD</option>
+            </select>
+            <input type="text" inputmode="decimal" autocomplete="off"
+                   placeholder="0" value="${dvalue?String(dvalue):""}"
+                   data-mts-edit-dvalue="${i}">
+          </div>
+        </td>
+        <td><strong>${moneyv(line)}</strong></td>
+        <td><button type="button" class="danger" data-mts-edit-remove="${i}">×</button></td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="6" class="muted">No products added.</td></tr>';
+
+    body.querySelectorAll("[data-mts-edit-qty]").forEach(el=>{
+      el.addEventListener("change",()=>{
+        const x=arr[Number(el.dataset.mtsEditQty)];
+        if(!x)return;
+        const stock=typeof productStock==="function" ? Number(productStock(x.product_id)) : 999999;
+        x.quantity=Math.max(1,Math.min(Number(el.value)||1,Math.max(1,Number.isFinite(stock)?stock:999999)));
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-edit-dtype]").forEach(el=>{
+      el.addEventListener("change",()=>{
+        const x=arr[Number(el.dataset.mtsEditDtype)];
+        if(!x)return;
+        x.discount_type=el.value==="usd"?"usd":"percent";
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-edit-dvalue]").forEach(el=>{
+      el.addEventListener("input",()=>{
+        const x=arr[Number(el.dataset.mtsEditDvalue)];
+        if(!x)return;
+        x.discount_value=n(el.value);
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-edit-remove]").forEach(el=>{
+      el.addEventListener("click",()=>{
+        arr.splice(Number(el.dataset.mtsEditRemove),1);
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    /* Always refresh the visible totals using the current MTS item array. */
+    let subtotal=0;
+    arr.forEach(x=>{
+      const q=Math.max(1,n(x.quantity)||1);
+      const p=Math.max(0,n(x.price));
+      const base=q*p;
+      subtotal += Math.max(0,base-discountAmount(base,String(x.discount_type||"percent")==="usd"?"usd":"percent",x.discount_value));
+    });
+    const odType=E("mtsOverallDiscountType")?.value==="usd"?"usd":"percent";
+    const odRaw=n(E("mtsOverallDiscountValue")?.value||0);
+    const overall=odType==="usd"?Math.min(subtotal,odRaw):Math.min(subtotal,subtotal*odRaw/100);
+    const total=Math.max(0,subtotal-overall);
+
+    if(E("mtsSubtotal"))E("mtsSubtotal").textContent=moneyv(subtotal);
+    if(E("mtsSummarySubtotal"))E("mtsSummarySubtotal").textContent=moneyv(subtotal);
+    if(E("mtsSummaryDiscount"))E("mtsSummaryDiscount").textContent=moneyv(overall);
+    if(E("mtsTotal"))E("mtsTotal").textContent=moneyv(total);
+  };
+
+  /*
+   * Definitive wrapper around the existing MTS Invoice Edit function.
+   * It first lets the original function fill customer/staff/payment/item data,
+   * then forces our public renderer to paint the already-loaded products.
+   *
+   * It also fetches the sale directly when possible so Invoice Edit is not
+   * dependent on an incomplete cached salesRecords row.
+   */
+  function install(){
+    const original=window.editMtsSaleFromInvoice;
+    if(typeof original!=="function" || original.__mtsProductsDefinitive)return;
+
+    const wrapped=async function(id){
+      let result;
+      try{
+        result=await original.apply(this,arguments);
+      }catch(e){
+        console.warn("MTS invoice edit:",e);
+      }
+
+      /* Prefer a fresh database row because the invoice may have been
+         rendered from a fresh row while salesRecords is older. */
+      try{
+        if(window.sb && id){
+          const r=await window.sb.from("medifella_sales").select("*").eq("id",String(id)).maybeSingle();
+          if(!r.error && r.data){
+            const s=r.data;
+            let raw=s.items??s.order_items??s.products??[];
+            if(typeof raw==="string"){
+              try{raw=JSON.parse(raw)}catch(_){raw=[]}
+            }
+            if(Array.isArray(raw) && raw.length){
+              const catalog=Array.isArray(window.products)?window.products:[];
+              window.mtsSaleItems=raw.map(x=>{
+                const pid=x.product_id||x.id||"";
+                const p=catalog.find(z=>String(z.id)===String(pid))||{};
+                return {
+                  product_id:pid,
+                  product_code:x.product_code||x.code||p.product_code||"",
+                  name:x.name||x.product_name||p.name||"",
+                  price:n(x.price??x.unit_price??p.price),
+                  quantity:Math.max(1,n(x.quantity??x.qty??1)),
+                  discount_type:String(x.discount_type||"percent").toLowerCase()==="usd"?"usd":"percent",
+                  discount_value:n(x.discount_value??x.discount_input??x.discount_percent)
+                };
+              });
+            }
+          }
+        }
+      }catch(e){
+        console.warn("MTS fresh item load:",e);
+      }
+
+      window.mtsEditingId=String(id);
+      window.renderMtsInvoiceEditProducts();
+      return result;
+    };
+
+    wrapped.__mtsProductsDefinitive=true;
+    window.editMtsSaleFromInvoice=wrapped;
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else{
+    install();
+  }
+  [100,500,1200,2500].forEach(ms=>setTimeout(install,ms));
+})();
+</script>
+
+</body></html>");
  printWin.document.close();
 
  try{
@@ -4539,6 +4923,198 @@ async function printInvoice(id,size="A4"){
 <scr`+`ipt>
 window.onload=function(){setTimeout(function(){window.print();},250);};
 <\/script>
+
+<script id="mts-invoice-edit-products-definitive-fix">
+(function(){
+  "use strict";
+
+  function E(id){ return document.getElementById(id); }
+  function n(v){
+    const x=Number(String(v ?? "").replace(/[$,\s]/g,""));
+    return Number.isFinite(x) && x>=0 ? x : 0;
+  }
+  function escv(v){
+    return typeof esc==="function" ? esc(v) :
+      String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function moneyv(v){
+    return typeof money==="function" ? money(v) : "$"+Number(v||0).toFixed(2);
+  }
+  function discountAmount(base,type,value){
+    const v=Math.max(0,n(value));
+    return type==="usd" ? Math.min(base,v) : Math.min(base,base*v/100);
+  }
+
+  /*
+   * This is the renderer used specifically after Invoice -> Edit.
+   * It does NOT depend on the private/local renderMtsItems() functions
+   * defined in earlier IIFEs, which is the reason V5 could still show
+   * "No products added" even though window.mtsSaleItems was populated.
+   */
+  window.renderMtsInvoiceEditProducts=function(){
+    const body=E("mtsItems");
+    const arr=Array.isArray(window.mtsSaleItems) ? window.mtsSaleItems : [];
+    if(!body)return;
+
+    body.innerHTML=arr.map((x,i)=>{
+      const qty=Math.max(1,n(x.quantity)||1);
+      const price=Math.max(0,n(x.price));
+      const base=qty*price;
+      const dtype=String(x.discount_type||"percent").toLowerCase()==="usd" ? "usd" : "percent";
+      const dvalue=Math.max(0,n(x.discount_value));
+      const line=Math.max(0,base-discountAmount(base,dtype,dvalue));
+      const stock=typeof productStock==="function" ? Number(productStock(x.product_id)) : 999999;
+      const max=Math.max(qty,Number.isFinite(stock)?stock:999999);
+
+      return `<tr>
+        <td><strong>${escv(x.name||"")}</strong><div class="muted">${escv(x.product_code||"")}</div></td>
+        <td><input type="number" min="1" max="${max}" value="${qty}" data-mts-edit-qty="${i}"></td>
+        <td>${moneyv(price)}</td>
+        <td>
+          <div class="mts-item-discount">
+            <select data-mts-edit-dtype="${i}">
+              <option value="percent" ${dtype==="percent"?"selected":""}>%</option>
+              <option value="usd" ${dtype==="usd"?"selected":""}>USD</option>
+            </select>
+            <input type="text" inputmode="decimal" autocomplete="off"
+                   placeholder="0" value="${dvalue?String(dvalue):""}"
+                   data-mts-edit-dvalue="${i}">
+          </div>
+        </td>
+        <td><strong>${moneyv(line)}</strong></td>
+        <td><button type="button" class="danger" data-mts-edit-remove="${i}">×</button></td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="6" class="muted">No products added.</td></tr>';
+
+    body.querySelectorAll("[data-mts-edit-qty]").forEach(el=>{
+      el.addEventListener("change",()=>{
+        const x=arr[Number(el.dataset.mtsEditQty)];
+        if(!x)return;
+        const stock=typeof productStock==="function" ? Number(productStock(x.product_id)) : 999999;
+        x.quantity=Math.max(1,Math.min(Number(el.value)||1,Math.max(1,Number.isFinite(stock)?stock:999999)));
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-edit-dtype]").forEach(el=>{
+      el.addEventListener("change",()=>{
+        const x=arr[Number(el.dataset.mtsEditDtype)];
+        if(!x)return;
+        x.discount_type=el.value==="usd"?"usd":"percent";
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-edit-dvalue]").forEach(el=>{
+      el.addEventListener("input",()=>{
+        const x=arr[Number(el.dataset.mtsEditDvalue)];
+        if(!x)return;
+        x.discount_value=n(el.value);
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-edit-remove]").forEach(el=>{
+      el.addEventListener("click",()=>{
+        arr.splice(Number(el.dataset.mtsEditRemove),1);
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    /* Always refresh the visible totals using the current MTS item array. */
+    let subtotal=0;
+    arr.forEach(x=>{
+      const q=Math.max(1,n(x.quantity)||1);
+      const p=Math.max(0,n(x.price));
+      const base=q*p;
+      subtotal += Math.max(0,base-discountAmount(base,String(x.discount_type||"percent")==="usd"?"usd":"percent",x.discount_value));
+    });
+    const odType=E("mtsOverallDiscountType")?.value==="usd"?"usd":"percent";
+    const odRaw=n(E("mtsOverallDiscountValue")?.value||0);
+    const overall=odType==="usd"?Math.min(subtotal,odRaw):Math.min(subtotal,subtotal*odRaw/100);
+    const total=Math.max(0,subtotal-overall);
+
+    if(E("mtsSubtotal"))E("mtsSubtotal").textContent=moneyv(subtotal);
+    if(E("mtsSummarySubtotal"))E("mtsSummarySubtotal").textContent=moneyv(subtotal);
+    if(E("mtsSummaryDiscount"))E("mtsSummaryDiscount").textContent=moneyv(overall);
+    if(E("mtsTotal"))E("mtsTotal").textContent=moneyv(total);
+  };
+
+  /*
+   * Definitive wrapper around the existing MTS Invoice Edit function.
+   * It first lets the original function fill customer/staff/payment/item data,
+   * then forces our public renderer to paint the already-loaded products.
+   *
+   * It also fetches the sale directly when possible so Invoice Edit is not
+   * dependent on an incomplete cached salesRecords row.
+   */
+  function install(){
+    const original=window.editMtsSaleFromInvoice;
+    if(typeof original!=="function" || original.__mtsProductsDefinitive)return;
+
+    const wrapped=async function(id){
+      let result;
+      try{
+        result=await original.apply(this,arguments);
+      }catch(e){
+        console.warn("MTS invoice edit:",e);
+      }
+
+      /* Prefer a fresh database row because the invoice may have been
+         rendered from a fresh row while salesRecords is older. */
+      try{
+        if(window.sb && id){
+          const r=await window.sb.from("medifella_sales").select("*").eq("id",String(id)).maybeSingle();
+          if(!r.error && r.data){
+            const s=r.data;
+            let raw=s.items??s.order_items??s.products??[];
+            if(typeof raw==="string"){
+              try{raw=JSON.parse(raw)}catch(_){raw=[]}
+            }
+            if(Array.isArray(raw) && raw.length){
+              const catalog=Array.isArray(window.products)?window.products:[];
+              window.mtsSaleItems=raw.map(x=>{
+                const pid=x.product_id||x.id||"";
+                const p=catalog.find(z=>String(z.id)===String(pid))||{};
+                return {
+                  product_id:pid,
+                  product_code:x.product_code||x.code||p.product_code||"",
+                  name:x.name||x.product_name||p.name||"",
+                  price:n(x.price??x.unit_price??p.price),
+                  quantity:Math.max(1,n(x.quantity??x.qty??1)),
+                  discount_type:String(x.discount_type||"percent").toLowerCase()==="usd"?"usd":"percent",
+                  discount_value:n(x.discount_value??x.discount_input??x.discount_percent)
+                };
+              });
+            }
+          }
+        }
+      }catch(e){
+        console.warn("MTS fresh item load:",e);
+      }
+
+      window.mtsEditingId=String(id);
+      window.renderMtsInvoiceEditProducts();
+      return result;
+    };
+
+    wrapped.__mtsProductsDefinitive=true;
+    window.editMtsSaleFromInvoice=wrapped;
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else{
+    install();
+  }
+  [100,500,1200,2500].forEach(ms=>setTimeout(install,ms));
+})();
+</script>
+
 </body>
 </html>`;
 
@@ -8809,6 +9385,198 @@ document.addEventListener("DOMContentLoaded",function(){
   else run();
 })();
 </script>
+
+<script id="mts-invoice-edit-products-definitive-fix">
+(function(){
+  "use strict";
+
+  function E(id){ return document.getElementById(id); }
+  function n(v){
+    const x=Number(String(v ?? "").replace(/[$,\s]/g,""));
+    return Number.isFinite(x) && x>=0 ? x : 0;
+  }
+  function escv(v){
+    return typeof esc==="function" ? esc(v) :
+      String(v ?? "").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function moneyv(v){
+    return typeof money==="function" ? money(v) : "$"+Number(v||0).toFixed(2);
+  }
+  function discountAmount(base,type,value){
+    const v=Math.max(0,n(value));
+    return type==="usd" ? Math.min(base,v) : Math.min(base,base*v/100);
+  }
+
+  /*
+   * This is the renderer used specifically after Invoice -> Edit.
+   * It does NOT depend on the private/local renderMtsItems() functions
+   * defined in earlier IIFEs, which is the reason V5 could still show
+   * "No products added" even though window.mtsSaleItems was populated.
+   */
+  window.renderMtsInvoiceEditProducts=function(){
+    const body=E("mtsItems");
+    const arr=Array.isArray(window.mtsSaleItems) ? window.mtsSaleItems : [];
+    if(!body)return;
+
+    body.innerHTML=arr.map((x,i)=>{
+      const qty=Math.max(1,n(x.quantity)||1);
+      const price=Math.max(0,n(x.price));
+      const base=qty*price;
+      const dtype=String(x.discount_type||"percent").toLowerCase()==="usd" ? "usd" : "percent";
+      const dvalue=Math.max(0,n(x.discount_value));
+      const line=Math.max(0,base-discountAmount(base,dtype,dvalue));
+      const stock=typeof productStock==="function" ? Number(productStock(x.product_id)) : 999999;
+      const max=Math.max(qty,Number.isFinite(stock)?stock:999999);
+
+      return `<tr>
+        <td><strong>${escv(x.name||"")}</strong><div class="muted">${escv(x.product_code||"")}</div></td>
+        <td><input type="number" min="1" max="${max}" value="${qty}" data-mts-edit-qty="${i}"></td>
+        <td>${moneyv(price)}</td>
+        <td>
+          <div class="mts-item-discount">
+            <select data-mts-edit-dtype="${i}">
+              <option value="percent" ${dtype==="percent"?"selected":""}>%</option>
+              <option value="usd" ${dtype==="usd"?"selected":""}>USD</option>
+            </select>
+            <input type="text" inputmode="decimal" autocomplete="off"
+                   placeholder="0" value="${dvalue?String(dvalue):""}"
+                   data-mts-edit-dvalue="${i}">
+          </div>
+        </td>
+        <td><strong>${moneyv(line)}</strong></td>
+        <td><button type="button" class="danger" data-mts-edit-remove="${i}">×</button></td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="6" class="muted">No products added.</td></tr>';
+
+    body.querySelectorAll("[data-mts-edit-qty]").forEach(el=>{
+      el.addEventListener("change",()=>{
+        const x=arr[Number(el.dataset.mtsEditQty)];
+        if(!x)return;
+        const stock=typeof productStock==="function" ? Number(productStock(x.product_id)) : 999999;
+        x.quantity=Math.max(1,Math.min(Number(el.value)||1,Math.max(1,Number.isFinite(stock)?stock:999999)));
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-edit-dtype]").forEach(el=>{
+      el.addEventListener("change",()=>{
+        const x=arr[Number(el.dataset.mtsEditDtype)];
+        if(!x)return;
+        x.discount_type=el.value==="usd"?"usd":"percent";
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-edit-dvalue]").forEach(el=>{
+      el.addEventListener("input",()=>{
+        const x=arr[Number(el.dataset.mtsEditDvalue)];
+        if(!x)return;
+        x.discount_value=n(el.value);
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-edit-remove]").forEach(el=>{
+      el.addEventListener("click",()=>{
+        arr.splice(Number(el.dataset.mtsEditRemove),1);
+        window.renderMtsInvoiceEditProducts();
+        if(typeof window.updateMtsStableTotals==="function")window.updateMtsStableTotals();
+      });
+    });
+
+    /* Always refresh the visible totals using the current MTS item array. */
+    let subtotal=0;
+    arr.forEach(x=>{
+      const q=Math.max(1,n(x.quantity)||1);
+      const p=Math.max(0,n(x.price));
+      const base=q*p;
+      subtotal += Math.max(0,base-discountAmount(base,String(x.discount_type||"percent")==="usd"?"usd":"percent",x.discount_value));
+    });
+    const odType=E("mtsOverallDiscountType")?.value==="usd"?"usd":"percent";
+    const odRaw=n(E("mtsOverallDiscountValue")?.value||0);
+    const overall=odType==="usd"?Math.min(subtotal,odRaw):Math.min(subtotal,subtotal*odRaw/100);
+    const total=Math.max(0,subtotal-overall);
+
+    if(E("mtsSubtotal"))E("mtsSubtotal").textContent=moneyv(subtotal);
+    if(E("mtsSummarySubtotal"))E("mtsSummarySubtotal").textContent=moneyv(subtotal);
+    if(E("mtsSummaryDiscount"))E("mtsSummaryDiscount").textContent=moneyv(overall);
+    if(E("mtsTotal"))E("mtsTotal").textContent=moneyv(total);
+  };
+
+  /*
+   * Definitive wrapper around the existing MTS Invoice Edit function.
+   * It first lets the original function fill customer/staff/payment/item data,
+   * then forces our public renderer to paint the already-loaded products.
+   *
+   * It also fetches the sale directly when possible so Invoice Edit is not
+   * dependent on an incomplete cached salesRecords row.
+   */
+  function install(){
+    const original=window.editMtsSaleFromInvoice;
+    if(typeof original!=="function" || original.__mtsProductsDefinitive)return;
+
+    const wrapped=async function(id){
+      let result;
+      try{
+        result=await original.apply(this,arguments);
+      }catch(e){
+        console.warn("MTS invoice edit:",e);
+      }
+
+      /* Prefer a fresh database row because the invoice may have been
+         rendered from a fresh row while salesRecords is older. */
+      try{
+        if(window.sb && id){
+          const r=await window.sb.from("medifella_sales").select("*").eq("id",String(id)).maybeSingle();
+          if(!r.error && r.data){
+            const s=r.data;
+            let raw=s.items??s.order_items??s.products??[];
+            if(typeof raw==="string"){
+              try{raw=JSON.parse(raw)}catch(_){raw=[]}
+            }
+            if(Array.isArray(raw) && raw.length){
+              const catalog=Array.isArray(window.products)?window.products:[];
+              window.mtsSaleItems=raw.map(x=>{
+                const pid=x.product_id||x.id||"";
+                const p=catalog.find(z=>String(z.id)===String(pid))||{};
+                return {
+                  product_id:pid,
+                  product_code:x.product_code||x.code||p.product_code||"",
+                  name:x.name||x.product_name||p.name||"",
+                  price:n(x.price??x.unit_price??p.price),
+                  quantity:Math.max(1,n(x.quantity??x.qty??1)),
+                  discount_type:String(x.discount_type||"percent").toLowerCase()==="usd"?"usd":"percent",
+                  discount_value:n(x.discount_value??x.discount_input??x.discount_percent)
+                };
+              });
+            }
+          }
+        }
+      }catch(e){
+        console.warn("MTS fresh item load:",e);
+      }
+
+      window.mtsEditingId=String(id);
+      window.renderMtsInvoiceEditProducts();
+      return result;
+    };
+
+    wrapped.__mtsProductsDefinitive=true;
+    window.editMtsSaleFromInvoice=wrapped;
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else{
+    install();
+  }
+  [100,500,1200,2500].forEach(ms=>setTimeout(install,ms));
+})();
+</script>
+
 </body>
 </html>
 
