@@ -3847,6 +3847,7 @@ function renderSales(){
    // Medi Fella Sale is for the regular sales list only.
    // Dermed sales are shown separately under Dermed Sale.
    if(String(s.sale_type||"").toUpperCase()==="DERMED") return false;
+   if(isMts(s)) return false;
    const total=saleTotal(s),paid=salePaid(s),status=saleStatus(total,paid);
    const hay=[saleRef(s),saleCustomer(s),saleField(s,["student_phone","phone"],""),formatSaleItems(saleItemsValue(s))].join(" ").toLowerCase();
    return(f==="all"||status===f)&&hay.includes(q);
@@ -3861,7 +3862,7 @@ function renderSales(){
 
 function updateSalesMetrics(){
  // Keep Medi Fella Sale totals consistent with the table: exclude Dermed sales.
- const listSaleRecords=salesRecords.filter(s=>String(s.sale_type||"").toUpperCase()!=="DERMED");
+ const listSaleRecords=salesRecords.filter(s=>String(s.sale_type||"").toUpperCase()!=="DERMED" && !isMts(s));
  const total=listSaleRecords.reduce((a,s)=>a+saleTotal(s),0);
  const paid=listSaleRecords.reduce((a,s)=>a+salePaid(s),0);
  $("mSales").textContent=listSaleRecords.length;
@@ -4054,7 +4055,7 @@ function showSaleInvoice(id,size="A4"){
      <div><img class="mf-invoice-logo" style="width:${isDermedSale?200:(isMtsSale?150:150)}px;height:${isDermedSale?200:(isMtsSale?150:150)}px;max-width:none;max-height:none;object-fit:contain;display:block" src="${logoData}" alt="${esc(invoiceBrand.en)} Logo"></div>
      <div class="mf-school-head">
        ${isMtsSale ? `
-       <div class="mf-school-en mts-invoice-brand-name">${esc(invoiceBrand.en)}</div>
+       <div class="mf-school-en mts-invoice-brand-name" style="color:#000 !important">${esc(invoiceBrand.en)}</div>
        <div class="mf-school-info mts-invoice-telegram">${esc(invoiceBrand.tel)}</div>
        ` : `
        <div class="mf-school-kh" style="color:${invoiceBrand.color} !important">${esc(invoiceBrand.kh)}</div>
@@ -4068,8 +4069,8 @@ function showSaleInvoice(id,size="A4"){
    </div>
 
    <div class="mf-invoice-label">
-     <div class="kh" style="color:${invoiceBrand.color} !important">វិក្កយបត្រ</div>
-     <div class="en" style="color:${invoiceBrand.color} !important">INVOICE</div>
+     <div class="kh" style="color:#000 !important;font-family:'KhmerOSMuolUploaded','Khmer OS MOUL Regular','Khmer OS Moul',serif !important">វិក្កយបត្រ</div>
+     <div class="en" style="color:#000 !important">INVOICE</div>
    </div>
 
    <div class="mf-info-grid">
@@ -4109,9 +4110,9 @@ function showSaleInvoice(id,size="A4"){
    <div class="mf-lower-grid">
      <div>
        
-       <div class="mf-refund-box">
-         <div class="kh">ទឹកប្រាក់ដែលបានបង់ហើយមិនអាចដកវិញបានទេ សូមអរគុណ</div>
-         <div class="en">Payment is non-refundable, thank you!</div>
+       <div class="mf-refund-box" style="border-color:#000 !important;color:#000 !important">
+         <div class="kh" style="color:#000 !important">ទឹកប្រាក់ដែលបានបង់ហើយមិនអាចដកវិញបានទេ សូមអរគុណ</div>
+         <div class="en" style="color:#000 !important">Payment is non-refundable, thank you!</div>
        </div>
        ${isMtsSale ? `
        <div class="mf-mts-risk-notice">
@@ -6241,10 +6242,10 @@ function renderMtsSales(){
  const q=($("mtsSaleSearch")?.value||"").toLowerCase();
  const f=($("mtsPaymentFilter")?.value||"all");
  const rows=salesRecords.filter(x=>{
-   if(!isMtsListRecord(x)) return false;
+   if(!isMts(x))return false;
    const total=saleTotal(x),paid=salePaid(x),status=saleStatus(total,paid);
    const hay=`${saleRef(x)||""} ${saleCustomer(x)||""} ${saleField(x,["student_phone","phone"],"")} ${JSON.stringify(saleItemsValue(x))}`.toLowerCase();
-   return (f==="all"||status===f) && hay.includes(q);
+   return(f==="all"||status===f)&&hay.includes(q);
  });
  box.innerHTML=rows.length?`<div class="table-wrap"><table class="table">
  <tr><th>Date / Time</th><th>Reference</th><th>Buyer</th><th>Products</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>
@@ -6263,6 +6264,7 @@ function renderMtsSales(){
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
        <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       <button class="gold" type="button" onclick="window.editMtsSaleFromInvoice('${attr(x.id)}'); return false;">Edit</button>
        ${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -10434,6 +10436,43 @@ document.addEventListener("DOMContentLoaded",function(){
     }
     wrappedBuild.__mtsInvoiceWrapped=true;
     window.buildInvoicePaperCanvas=wrappedBuild;
+  }
+})();
+</script>
+
+<script id="mts-final-routing-safeguard">
+(function(){
+  "use strict";
+  function isMtsLocal(s){
+    const t=String(s?.sale_type||"").trim().toUpperCase();
+    const r=String(s?.reference_no||"").trim().toUpperCase();
+    return t==="MTS" || t==="MTSKOREANBEAUTYPRODUCT" || r.indexOf("MTS-")===0;
+  }
+
+  function routeMtsEdit(id){
+    const fn=window.editMtsSaleFromInvoice;
+    if(typeof fn==="function"){
+      fn(String(id));
+      return false;
+    }
+    if(typeof window.editMtsSale==="function"){
+      window.editMtsSale(String(id));
+      return false;
+    }
+    return false;
+  }
+  window.editMtsSaleFromInvoice=routeMtsEdit;
+
+  /* Protect the invoice Edit button from routing MTS into the generic sale. */
+  const oldRouter=window.editSaleFromInvoiceRouter;
+  if(typeof oldRouter==="function" && !oldRouter.__mtsFinal){
+    const wrapped=function(id){
+      const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
+      if(isMtsLocal(s))return routeMtsEdit(id);
+      return oldRouter.apply(this,arguments);
+    };
+    wrapped.__mtsFinal=true;
+    window.editSaleFromInvoiceRouter=wrapped;
   }
 })();
 </script>
