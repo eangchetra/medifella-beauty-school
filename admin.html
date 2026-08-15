@@ -6283,7 +6283,6 @@ function renderMtsSales(){
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
        <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
-       <button class="gold" type="button" onclick="window.editMtsSaleFromInvoice('${attr(x.id)}'); return false;">Edit</button>
        ${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -10459,40 +10458,55 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
-<script id="mts-final-routing-safeguard">
+<script id="mts-invoice-edit-routing-final">
 (function(){
   "use strict";
-  function isMtsLocal(s){
-    const t=String(s?.sale_type||"").trim().toUpperCase();
+
+  function isMtsRecord(s){
+    const t=String(s?.sale_type||"").trim().toUpperCase().replace(/[\s_-]+/g,"");
     const r=String(s?.reference_no||"").trim().toUpperCase();
-    return t==="MTS" || t==="MTSKOREANBEAUTYPRODUCT" || r.indexOf("MTS-")===0;
+    return t==="MTS" || t==="MTSKOREANBEAUTYPRODUCT" || r.startsWith("MTS-");
   }
 
-  function routeMtsEdit(id){
-    const fn=window.editMtsSaleFromInvoice;
-    if(typeof fn==="function"){
-      fn(String(id));
-      return false;
-    }
+  function routeMtsInvoiceEdit(id){
+    const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
+    if(!s || !isMtsRecord(s)) return false;
+
+    // Use the dedicated MTS editor already present in this admin file.
     if(typeof window.editMtsSale==="function"){
       window.editMtsSale(String(id));
       return false;
     }
+    if(typeof window.editMtsSaleFromInvoice==="function"){
+      window.editMtsSaleFromInvoice(String(id));
+      return false;
+    }
+
+    // Fallback: open the MTS Sale section without touching Medi Fella Sale.
+    const nav=document.querySelector('.nav[data-section="mtsSale"]');
+    if(nav) nav.click();
     return false;
   }
-  window.editMtsSaleFromInvoice=routeMtsEdit;
 
-  /* Protect the invoice Edit button from routing MTS into the generic sale. */
-  const oldRouter=window.editSaleFromInvoiceRouter;
-  if(typeof oldRouter==="function" && !oldRouter.__mtsFinal){
+  // The original invoice Edit control uses this router. MTS is intercepted;
+  // all non-MTS sales continue through the original router unchanged.
+  const install=function(){
+    const original=window.editSaleFromInvoiceRouter;
+    if(typeof original!=="function" || original.__mtsSafeRouter) return;
+
     const wrapped=function(id){
       const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
-      if(isMtsLocal(s))return routeMtsEdit(id);
-      return oldRouter.apply(this,arguments);
+      if(isMtsRecord(s)) return routeMtsInvoiceEdit(id);
+      return original.apply(this,arguments);
     };
-    wrapped.__mtsFinal=true;
+    wrapped.__mtsSafeRouter=true;
     window.editSaleFromInvoiceRouter=wrapped;
-  }
+  };
+
+  install();
+  setTimeout(install,100);
+  setTimeout(install,500);
+  setTimeout(install,1200);
 })();
 </script>
 
