@@ -3333,10 +3333,22 @@ async function loadSales(){
  salesRecords=sr.data||[];
  salePayments=pr.error?[]:(pr.data||[]);
  renderSaleStudentOptions();
- renderSales();
- if(typeof renderMtsSales==="function")renderMtsSales();
- if(typeof renderDermedSales==="function")renderDermedSales();
- updateSalesMetrics();
+ try{renderSales()}catch(e){
+   console.error("Medi Fella Sale render error:",e);
+   const box=$("salesList");
+   if(box)box.innerHTML=`<p class="error status">${esc(e?.message||"Could not load Medi Fella Sale list.")}</p>`;
+ }
+ try{if(typeof renderMtsSales==="function")renderMtsSales()}catch(e){
+   console.error("MTS Sale render error:",e);
+   const box=$("mtsSalesList");
+   if(box)box.innerHTML=`<p class="error status">${esc(e?.message||"Could not load MTS Sale list.")}</p>`;
+ }
+ try{if(typeof renderDermedSales==="function")renderDermedSales()}catch(e){
+   console.error("Dermed Sale render error:",e);
+   const box=$("dermedSalesList");
+   if(box)box.innerHTML=`<p class="error status">${esc(e?.message||"Could not load Dermed Sale list.")}</p>`;
+ }
+ try{updateSalesMetrics()}catch(e){console.error("Sales metrics error:",e)}
 }
 
 function renderSaleStudentOptions(){
@@ -3847,7 +3859,9 @@ function renderSales(){
    // Medi Fella Sale is for the regular sales list only.
    // Dermed sales are shown separately under Dermed Sale.
    if(String(s.sale_type||"").toUpperCase()==="DERMED") return false;
-   if(isMts(s)) return false;
+   const mtsType=String(s.sale_type||"").trim().toUpperCase().replace(/[\s_-]+/g,"");
+   const mtsRef=String(s.reference_no||"").trim().toUpperCase();
+   if(mtsType==="MTS" || mtsType==="MTSKOREANBEAUTYPRODUCT" || mtsRef.startsWith("MTS-")) return false;
    const total=saleTotal(s),paid=salePaid(s),status=saleStatus(total,paid);
    const hay=[saleRef(s),saleCustomer(s),saleField(s,["student_phone","phone"],""),formatSaleItems(saleItemsValue(s))].join(" ").toLowerCase();
    return(f==="all"||status===f)&&hay.includes(q);
@@ -3862,7 +3876,12 @@ function renderSales(){
 
 function updateSalesMetrics(){
  // Keep Medi Fella Sale totals consistent with the table: exclude Dermed sales.
- const listSaleRecords=salesRecords.filter(s=>String(s.sale_type||"").toUpperCase()!=="DERMED" && !isMts(s));
+ const listSaleRecords=salesRecords.filter(s=>{
+   if(String(s.sale_type||"").toUpperCase()==="DERMED") return false;
+   const mtsType=String(s.sale_type||"").trim().toUpperCase().replace(/[\s_-]+/g,"");
+   const mtsRef=String(s.reference_no||"").trim().toUpperCase();
+   return !(mtsType==="MTS" || mtsType==="MTSKOREANBEAUTYPRODUCT" || mtsRef.startsWith("MTS-"));
+ });
  const total=listSaleRecords.reduce((a,s)=>a+saleTotal(s),0);
  const paid=listSaleRecords.reduce((a,s)=>a+salePaid(s),0);
  $("mSales").textContent=listSaleRecords.length;
@@ -6242,7 +6261,7 @@ function renderMtsSales(){
  const q=($("mtsSaleSearch")?.value||"").toLowerCase();
  const f=($("mtsPaymentFilter")?.value||"all");
  const rows=salesRecords.filter(x=>{
-   if(!isMts(x))return false;
+   if(!isMtsListRecord(x))return false;
    const total=saleTotal(x),paid=salePaid(x),status=saleStatus(total,paid);
    const hay=`${saleRef(x)||""} ${saleCustomer(x)||""} ${saleField(x,["student_phone","phone"],"")} ${JSON.stringify(saleItemsValue(x))}`.toLowerCase();
    return(f==="all"||status===f)&&hay.includes(q);
@@ -8519,7 +8538,7 @@ document.addEventListener("DOMContentLoaded",function(){
       try{
         if(Array.isArray(window.salesRecords)){
           const originalRecords=window.salesRecords;
-          const filtered=originalRecords.filter(s=>!isMts(s));
+          const filtered=originalRecords.filter(s=>!isMtsListRecord(s));
           if(filtered.length!==originalRecords.length){
             window.salesRecords=filtered;
             try{return original.apply(this,arguments)}finally{window.salesRecords=originalRecords}
@@ -8540,7 +8559,7 @@ document.addEventListener("DOMContentLoaded",function(){
       try{
         if(Array.isArray(window.salesRecords)){
           const originalRecords=window.salesRecords;
-          const filtered=originalRecords.filter(s=>!isMts(s));
+          const filtered=originalRecords.filter(s=>!isMtsListRecord(s));
           window.salesRecords=filtered;
           try{return original.apply(this,arguments)}finally{window.salesRecords=originalRecords}
         }
@@ -8554,7 +8573,7 @@ document.addEventListener("DOMContentLoaded",function(){
   /* MTS edit: open the MTS Sale form, not Medi Fella Sale. */
   async function editMtsSaleFromInvoice(id){
     const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
-    if(!s || !isMts(s)){alert("MTS Sale invoice not found.");return;}
+    if(!s || !isMtsListRecord(s)){alert("MTS Sale invoice not found.");return;}
 
     if(typeof closeInvoicePreview==="function")closeInvoicePreview();
 
@@ -8627,7 +8646,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const original=window.editSaleFromInvoiceRouter;
     const wrapped=function(id){
       const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
-      if(isMts(s))return editMtsSaleFromInvoice(id);
+      if(isMtsListRecord(s))return editMtsSaleFromInvoice(id);
       return original.apply(this,arguments);
     };
     wrapped.__mtsRouter=true;
