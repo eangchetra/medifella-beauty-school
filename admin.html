@@ -7020,7 +7020,7 @@ function chooseBuyer(x){
  if(!x)return;E("mtsBuyerType").value=x.t;E("mtsBuyerId").value=x.id;E("mtsBuyerSearch").value=x.n;E("mtsBuyerHint").textContent=`Selected: ${x.n} · ${x.p||""}`;E("mtsBuyerResults").classList.remove("show");
 }
 function nextRef(){
- const year=new Date().getFullYear(),max=(salesRecords||[]).filter(x=>LOW(x.sale_type)==="mts").reduce((m,x)=>{const z=String(x.reference_no||"").match(/^MTS-\d{4}-(\d+)$/);return z?Math.max(m,+z[1]):m},0);
+ const year=new Date().getFullYear(),max=(salesRecords||[]).filter(isMtsRecord).reduce((m,x)=>{const z=String(x.reference_no||"").match(/^MTS-\d{4}-(\d+)$/);return z?Math.max(m,+z[1]):m},0);
  return `MTS-${year}-${String(max+1).padStart(4,"0")}`;
 }
 function reset(){
@@ -7054,7 +7054,7 @@ async function save(){
   let r=await sb.from("medifella_sales").insert(write);
   if(r.error)throw r.error;
   await loadSales();
-  const saved=salesRecords.find(x=>String(x.reference_no)===String(ref));
+  const saved=salesRecords.find(x=>String(x.reference_no)===String(ref) && isMtsRecord(x));
   if(!saved)throw new Error("MTS Sale was saved but could not be found in MTS Sales.");
   const movements=items.map(x=>({product_id:x.product_id,movement_type:"sale",quantity:N(x.quantity),staff_id:staffId,staff_name:staff?.name_en||"",stock_time:now,created_by:adminUser?.id||null,sale_id:saved.id,notes:"MTS"}));
   if(movements.length){
@@ -7068,9 +7068,14 @@ async function save(){
  }catch(e){say(e.message||"Could not save MTS sale.",true)}
  finally{if(btn)btn.disabled=false}
 }
+function isMtsRecord(x){
+ const t=LOW(x?.sale_type);
+ const r=String(x?.reference_no||"").trim().toUpperCase();
+ return t==="mts" || t==="mts sale" || t==="mts_sale" || t==="mts korean beauty product" || r.startsWith("MTS-");
+}
 function renderList(){
  const b=E("mtsSalesList"),q=LOW(E("mtsSaleSearch")?.value),f=E("mtsPaymentFilter")?.value||"all";if(!b)return;
- const rows=(salesRecords||[]).filter(x=>LOW(x.sale_type)==="mts").filter(x=>{
+ const rows=(salesRecords||[]).filter(isMtsRecord).filter(x=>{
   const st=x.payment_status||"Due",names=(x.items||[]).map(i=>i.name||i.product_name||"").join(" ");
   return(f==="all"||st===f)&&`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${names} ${st}`.toLowerCase().includes(q)
  });
