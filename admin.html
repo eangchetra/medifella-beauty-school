@@ -8073,6 +8073,290 @@ document.addEventListener("DOMContentLoaded",function(){
 }
 </style>
 
+
+<style id="mts-final-payment-save-working">
+#mtsSale #mtsAmountPaidNow{
+  pointer-events:auto!important;
+  user-select:text!important;
+  cursor:text!important;
+}
+#mtsSale #saveMtsSale{
+  pointer-events:auto!important;
+  cursor:pointer!important;
+}
+</style>
+
+<script id="mts-final-payment-save-working-js">
+(function(){
+  "use strict";
+
+  function E(id){return document.getElementById(id)}
+  function num(v){
+    const n=Number(String(v??"").replace(/[$,\s]/g,""));
+    return Number.isFinite(n)&&n>=0?n:0;
+  }
+  function moneyF(v){
+    return typeof money==="function" ? money(v) : "$"+Number(v||0).toFixed(2);
+  }
+  function itemCalc(x){
+    const q=Math.max(1,Number(x.quantity)||1);
+    const p=Math.max(0,Number(x.price)||0);
+    const base=q*p;
+    const type=x.discount_type==="usd"?"usd":"percent";
+    const dv=num(x.discount_value);
+    const d=type==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);
+    return {q,p,base,dv,d,total:Math.max(0,base-d)};
+  }
+  function calcMtsFinal(){
+    const items=window.mtsSaleItems||[];
+    let subtotal=0;
+    items.forEach(x=>subtotal+=itemCalc(x).total);
+    const ov=num(E("mtsOverallDiscountValue")?.value||0);
+    const ot=E("mtsOverallDiscountType")?.value==="usd"?"usd":"percent";
+    const od=ot==="usd"?Math.min(subtotal,ov):Math.min(subtotal,subtotal*ov/100);
+    const total=Math.max(0,subtotal-od);
+    const st=E("mtsPaymentStatus")?.value||"Paid";
+    const paid=st==="Paid"?total:st==="Due"?0:Math.min(total,num(E("mtsAmountPaidNow")?.value||0));
+    return {subtotal,od,total,status:st,paid,due:Math.max(0,total-paid)};
+  }
+
+  function forcePaymentField(){
+    const old=E("mtsAmountPaidNow");
+    if(!old)return null;
+
+    /* Remove all old event listeners that were fighting the Partial Payment input. */
+    if(!old.dataset.mtsFinalCloned){
+      const input=document.createElement("input");
+      input.id="mtsAmountPaidNow";
+      input.type="text";
+      input.inputMode="decimal";
+      input.autocomplete="off";
+      input.placeholder="0.00";
+      input.className=old.className;
+      input.style.cssText=old.style.cssText;
+      input.dataset.mtsFinalCloned="1";
+      old.replaceWith(input);
+    }
+
+    const input=E("mtsAmountPaidNow");
+    input.style.setProperty("pointer-events","auto","important");
+    input.style.setProperty("user-select","text","important");
+
+    const wrap=E("mtsPartialPaidWrap");
+    if(wrap){
+      wrap.classList.remove("hidden","mts-show");
+      wrap.style.setProperty("display","block","important");
+      wrap.style.setProperty("visibility","visible","important");
+    }
+    return input;
+  }
+
+  function syncPaymentFinal(){
+    const input=forcePaymentField();
+    const status=E("mtsPaymentStatus");
+    if(!input||!status)return;
+    const c=calcMtsFinal();
+
+    if(status.value==="Paid"){
+      input.value=c.total.toFixed(2);
+      input.readOnly=true;
+    }else if(status.value==="Due"){
+      input.value="0.00";
+      input.readOnly=true;
+    }else{
+      input.readOnly=false;
+      input.removeAttribute("readonly");
+      input.removeAttribute("disabled");
+      input.style.setProperty("pointer-events","auto","important");
+    }
+  }
+
+  async function saveMtsFinal(){
+    const buyerType=E("mtsBuyerType")?.value;
+    const buyerId=E("mtsBuyerId")?.value;
+    const staffId=E("mtsSaleStaff")?.value;
+    const items=window.mtsSaleItems||[];
+
+    if(!buyerType||!buyerId){
+      msg(E("mtsStatus"),"Please select a Student or Customer.",true); return;
+    }
+    if(!staffId){
+      msg(E("mtsStatus"),"Please select Sale Staff.",true); return;
+    }
+    if(!items.length){
+      msg(E("mtsStatus"),"Add at least one product.",true); return;
+    }
+
+    for(const it of items){
+      const available=typeof productStock==="function"?productStock(it.product_id):999999;
+      if(Number(it.quantity)>Number(available)){
+        msg(E("mtsStatus"),`Not enough stock for ${it.name}. Available: ${available}.`,true);
+        return;
+      }
+    }
+
+    const buyer=buyerType==="student"
+      ?students.find(x=>String(x.id)===String(buyerId))
+      :customers.find(x=>String(x.id)===String(buyerId));
+    const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
+    const c=calcMtsFinal();
+    const now=phTime();
+    const year=new Date().getFullYear();
+    const existing=(salesRecords||[]).filter(x=>String(x.sale_type||"").toUpperCase()==="MTS");
+    let max=0;
+    existing.forEach(x=>{
+      const m=String(x.reference_no||"").match(new RegExp("^MTS-"+year+"-(\\d+)$"));
+      if(m)max=Math.max(max,Number(m[1]));
+    });
+    const reference="MTS-"+year+"-"+String(max+1).padStart(4,"0");
+
+    const normalized=items.map(x=>{
+      const d=itemCalc(x);
+      return {
+        ...x,
+        quantity:d.q,
+        price:d.p,
+        unit_price:d.p,
+        discount_type:x.discount_type==="usd"?"usd":"percent",
+        discount_value:d.dv,
+        discount_amount:d.d,
+        subtotal:d.total
+      };
+    });
+
+    const paymentMethod=E("mtsPaymentMethod")?.value||"Cash";
+
+    const payload={
+      reference_no:reference,
+      sale_type:"MTS",
+      sale_date:now.slice(0,10),
+      sale_time:now.slice(11),
+      student_id:buyerType==="student"?buyerId:null,
+      student_name:buyer?.full_name||buyer?.name||"",
+      student_phone:buyer?.phone||"",
+      customer_id:buyerType==="customer"?buyerId:null,
+      customer_type:buyerType,
+      sale_staff_id:staffId,
+      sale_staff_name:staff?.name_en||"",
+      subtotal:c.subtotal,
+      discount:c.od,
+      shipping:0,
+      grand_total:c.total,
+      paid:c.paid,
+      balance:c.due,
+      payment_status:c.status,
+      payment_method:paymentMethod,
+      sale_status:"Completed",
+      items:normalized,
+      service_items:[],
+      service_total:0,
+      notes:""
+    };
+
+    const btn=E("saveMtsSale");
+    if(btn){btn.disabled=true;btn.textContent="Saving MTS Sale..."}
+
+    try{
+      const r=await sb.from("medifella_sales")
+        .insert({...payload,created_by:adminUser.id})
+        .select().single();
+      if(r.error)throw r.error;
+
+      const movements=items.map(x=>({
+        product_id:x.product_id,
+        movement_type:"sale",
+        quantity:Number(x.quantity),
+        staff_id:staffId,
+        staff_name:staff?.name_en||"",
+        stock_time:now,
+        created_by:adminUser.id,
+        sale_id:r.data.id,
+        notes:"MTS"
+      }));
+      if(movements.length){
+        const mr=await sb.from("medifella_inventory_movements").insert(movements);
+        if(mr.error)throw mr.error;
+      }
+
+      if(c.paid>0){
+        const pr=await sb.from("medifella_sale_payments").insert({
+          sale_id:String(r.data.id),
+          amount:c.paid,
+          payment_method:paymentMethod,
+          payment_date:now.slice(0,10),
+          note:c.status==="Partial"?"Partial Payment":"Paid in Full",
+          created_by:adminUser.id
+        });
+        if(pr.error)console.warn("MTS payment history:",pr.error.message);
+      }
+
+      msg(E("mtsStatus"),`MTS sale saved. Invoice ${reference}.`);
+      if(typeof resetNewInventorySale==="function")resetNewInventorySale("mts");
+      await loadSales();
+      await loadStockMovements();
+      showSaleInvoice(r.data.id);
+    }catch(e){
+      console.error("MTS save error:",e);
+      msg(E("mtsStatus"),e.message||"Could not save MTS sale.",true);
+    }finally{
+      const b=E("saveMtsSale");
+      if(b){b.disabled=false;b.textContent="Save MTS Sale & Generate Invoice"}
+    }
+  }
+
+  function bindFinal(){
+    const status=E("mtsPaymentStatus");
+    if(status && status.dataset.mtsFinalStatusBound!=="1"){
+      status.dataset.mtsFinalStatusBound="1";
+      status.addEventListener("change",function(){
+        syncPaymentFinal();
+      },true);
+    }
+
+    /* Clone once to remove every previous input handler/readonly fight. */
+    forcePaymentField();
+    const input=E("mtsAmountPaidNow");
+    if(input && input.dataset.mtsFinalInputBound!=="1"){
+      input.dataset.mtsFinalInputBound="1";
+      input.addEventListener("input",function(){
+        if(E("mtsPaymentStatus")?.value==="Partial"){
+          this.readOnly=false;
+          this.removeAttribute("readonly");
+          this.removeAttribute("disabled");
+        }
+      });
+    }
+
+    const save=E("saveMtsSale");
+    if(save && save.dataset.mtsFinalSaveBound!=="1"){
+      /* Clone button to remove all earlier onclick listeners. */
+      const clone=save.cloneNode(true);
+      clone.dataset.mtsFinalSaveBound="1";
+      clone.type="button";
+      save.replaceWith(clone);
+      clone.addEventListener("click",function(e){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        saveMtsFinal();
+      },true);
+    }
+
+    syncPaymentFinal();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",bindFinal,{once:true});
+  }else bindFinal();
+
+  setTimeout(bindFinal,300);
+  setTimeout(bindFinal,1000);
+  setInterval(function(){
+    const status=E("mtsPaymentStatus"),input=E("mtsAmountPaidNow");
+    if(status&&input&&status.value!=="Partial" && !input.matches(":focus"))syncPaymentFinal();
+  },500);
+})();
+</script>
+
 </body>
 </html>
 
@@ -9278,73 +9562,95 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
-<style id="mts-payment-save-final-css">
-#mtsSale #mtsPartialPaidWrap,
-#mtsSale #mtsPartialPaidWrap.hidden{
-  display:block!important;
-  visibility:visible!important;
-}
+<style id="mts-partial-input-final-fix-css">
 #mtsSale #mtsAmountPaidNow{
   pointer-events:auto!important;
   user-select:text!important;
+  -webkit-user-select:text!important;
   cursor:text!important;
+  opacity:1!important;
 }
 </style>
-
-<script id="mts-payment-save-final-js">
+<script id="mts-partial-input-final-fix-js">
 (function(){
   "use strict";
-  const E=id=>document.getElementById(id);
-  const num=v=>{
+
+  function E(id){return document.getElementById(id)}
+  function N(v){
     const n=Number(String(v??"").replace(/[$,\s]/g,""));
     return Number.isFinite(n)&&n>=0?n:0;
-  };
+  }
 
-  function mtsCalc(){
+  /*
+   * The old MTS code attaches an input listener that reformats the value
+   * after EVERY keystroke (for example 1 -> 1.00). That makes it impossible
+   * to type 15.3 naturally. Replace the input element once, at the very end,
+   * so none of those old listeners remain.
+   */
+  function replaceMtsAmountInput(){
+    const old=E("mtsAmountPaidNow");
+    if(!old)return null;
+
+    if(old.dataset.mtsCleanInput==="1")return old;
+
+    const fresh=document.createElement("input");
+    fresh.id="mtsAmountPaidNow";
+    fresh.type="text";
+    fresh.inputMode="decimal";
+    fresh.autocomplete="off";
+    fresh.placeholder="0.00";
+    fresh.value=old.value||"";
+    fresh.className=old.className;
+    fresh.name=old.name||"";
+    fresh.setAttribute("aria-label","Amount Paid (USD)");
+    fresh.dataset.mtsCleanInput="1";
+
+    old.replaceWith(fresh);
+    return fresh;
+  }
+
+  function grandTotal(){
     const items=window.mtsSaleItems||[];
-    let subtotal=0;
-    items.forEach(x=>{
+    let sub=0;
+    items.forEach(function(x){
       const q=Math.max(1,Number(x.quantity)||1);
       const p=Math.max(0,Number(x.price)||0);
       const base=q*p;
-      const dv=num(x.discount_value);
+      const dv=N(x.discount_value);
       const d=x.discount_type==="usd"
         ?Math.min(base,dv)
         :Math.min(base,base*dv/100);
-      subtotal+=Math.max(0,base-d);
+      sub+=Math.max(0,base-d);
     });
 
-    const ov=num(E("mtsOverallDiscountValue")?.value||0);
+    const ov=N(E("mtsOverallDiscountValue")?.value||0);
     const odType=E("mtsOverallDiscountType")?.value==="usd"?"usd":"percent";
-    const overall=odType==="usd"
-      ?Math.min(subtotal,ov)
-      :Math.min(subtotal,subtotal*ov/100);
-    const total=Math.max(0,subtotal-overall);
-    const status=E("mtsPaymentStatus")?.value||"Paid";
-
-    let paid=status==="Paid"
-      ?total
-      :status==="Due"
-        ?0
-        :num(E("mtsAmountPaidNow")?.value||0);
-
-    paid=Math.min(total,Math.max(0,paid));
-
-    return {items,subtotal,overall,total,status,paid,due:Math.max(0,total-paid)};
+    const od=odType==="usd"?Math.min(sub,ov):Math.min(sub,sub*ov/100);
+    return Math.max(0,sub-od);
   }
 
-  function forcePartialEditable(){
+  function showAmount(){
+    const input=replaceMtsAmountInput();
     const status=E("mtsPaymentStatus");
-    const input=E("mtsAmountPaidNow");
     const wrap=E("mtsPartialPaidWrap");
-    if(!status||!input)return;
+    if(!input||!status)return;
 
     if(wrap){
-      wrap.classList.remove("hidden");
+      wrap.classList.remove("hidden","mts-show");
       wrap.style.setProperty("display","block","important");
+      wrap.style.setProperty("visibility","visible","important");
     }
 
-    if(status.value==="Partial"){
+    if(status.value==="Paid"){
+      input.value=grandTotal().toFixed(2);
+      input.readOnly=true;
+      input.removeAttribute("disabled");
+    }else if(status.value==="Due"){
+      input.value="0.00";
+      input.readOnly=true;
+      input.removeAttribute("disabled");
+    }else{
+      /* Partial Payment: never change the user's text while typing. */
       input.readOnly=false;
       input.removeAttribute("readonly");
       input.removeAttribute("disabled");
@@ -9353,249 +9659,52 @@ document.addEventListener("DOMContentLoaded",function(){
     }
   }
 
-  function syncPayment(){
-    const c=mtsCalc();
-    const status=E("mtsPaymentStatus");
-    const input=E("mtsAmountPaidNow");
-    const wrap=E("mtsPartialPaidWrap");
-    if(!status||!input)return;
-
-    if(wrap){
-      wrap.classList.remove("hidden");
-      wrap.style.setProperty("display","block","important");
-    }
-
-    if(status.value==="Paid"){
-      input.value=c.total.toFixed(2);
-      input.readOnly=true;
-    }else if(status.value==="Due"){
-      input.value="0.00";
-      input.readOnly=true;
-    }else{
-      forcePartialEditable();
-      const current=num(input.value);
-      if(current>c.total)input.value=c.total.toFixed(2);
-    }
-  }
-
-  function updateTotals(){
-    const c=mtsCalc();
-    if(E("mtsSubtotal"))E("mtsSubtotal").textContent=money(c.subtotal);
-    if(E("mtsSummarySubtotal"))E("mtsSummarySubtotal").textContent=money(c.subtotal);
-    if(E("mtsSummaryDiscount"))E("mtsSummaryDiscount").textContent=money(c.overall);
-    if(E("mtsTotal"))E("mtsTotal").textContent=money(c.total);
-    syncPayment();
-  }
-
-  async function saveMtsFinal(event){
-    if(event){
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }
-
-    const buyerType=E("mtsBuyerType")?.value;
-    const buyerId=E("mtsBuyerId")?.value;
-    const staffId=E("mtsSaleStaff")?.value;
-    const items=window.mtsSaleItems||[];
-
-    if(!buyerType||!buyerId){
-      msg(E("mtsStatus"),"Please select a Student or Customer.",true);
-      return false;
-    }
-    if(!staffId){
-      msg(E("mtsStatus"),"Please select Sale Staff.",true);
-      return false;
-    }
-    if(!items.length){
-      msg(E("mtsStatus"),"Add at least one product.",true);
-      return false;
-    }
-
-    for(const it of items){
-      if(Number(it.quantity)>productStock(it.product_id)){
-        msg(E("mtsStatus"),
-          `Not enough stock for ${it.name}. Available: ${productStock(it.product_id)}.`,
-          true);
-        return false;
-      }
-    }
-
-    const c=mtsCalc();
-
-    if(c.status==="Partial" && c.paid<=0){
-      msg(E("mtsStatus"),"Please enter the Partial Payment amount.",true);
-      forcePartialEditable();
-      E("mtsAmountPaidNow")?.focus();
-      return false;
-    }
-
-    const buyer=buyerType==="student"
-      ?students.find(x=>String(x.id)===String(buyerId))
-      :customers.find(x=>String(x.id)===String(buyerId));
-    const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
-
-    const code="MTS";
-    const year=new Date().getFullYear();
-    const prefix=`${code}-${year}-`;
-    const existing=(salesRecords||[]).filter(
-      x=>String(x.sale_type||"").toUpperCase()==="MTS"
-    );
-
-    let max=0;
-    existing.forEach(x=>{
-      const m=String(x.reference_no||"").match(
-        new RegExp("^"+code+"-"+year+"-(\\d+)$")
-      );
-      if(m)max=Math.max(max,Number(m[1]));
-    });
-
-    const reference=prefix+String(max+1).padStart(4,"0");
-    const now=phTime();
-
-    const normalized=c.items.map(x=>{
-      const q=Math.max(1,Number(x.quantity)||1);
-      const p=Math.max(0,Number(x.price)||0);
-      const base=q*p;
-      const dv=num(x.discount_value);
-      const d=x.discount_type==="usd"
-        ?Math.min(base,dv)
-        :Math.min(base,base*dv/100);
-
-      return {
-        ...x,
-        quantity:q,
-        price:p,
-        unit_price:p,
-        discount_type:x.discount_type==="usd"?"usd":"percent",
-        discount_value:dv,
-        discount_amount:d,
-        subtotal:Math.max(0,base-d)
-      };
-    });
-
-    const payload={
-      reference_no:reference,
-      sale_type:code,
-      sale_date:now.slice(0,10),
-      sale_time:now.slice(11),
-      student_id:buyerType==="student"?buyerId:null,
-      student_name:buyer?.full_name||buyer?.name||"",
-      student_phone:buyer?.phone||"",
-      customer_id:buyerType==="customer"?buyerId:null,
-      customer_type:buyerType,
-      sale_staff_id:staffId,
-      sale_staff_name:staff?.name_en||"",
-      subtotal:c.subtotal,
-      discount:c.overall,
-      shipping:0,
-      grand_total:c.total,
-      paid:c.paid,
-      balance:c.due,
-      payment_status:c.status,
-      payment_method:E("mtsPaymentMethod")?.value||"Cash",
-      sale_status:"Completed",
-      items:normalized,
-      service_items:[],
-      service_total:0,
-      notes:""
-    };
-
-    try{
-      const r=await sb.from("medifella_sales")
-        .insert({...payload,created_by:adminUser.id})
-        .select()
-        .single();
-
-      if(r.error)throw r.error;
-
-      const movements=c.items.map(x=>({
-        product_id:x.product_id,
-        movement_type:"sale",
-        quantity:Number(x.quantity),
-        staff_id:staffId,
-        staff_name:staff?.name_en||"",
-        stock_time:now,
-        created_by:adminUser.id,
-        sale_id:r.data.id,
-        notes:code
-      }));
-
-      if(movements.length){
-        const mr=await sb.from("medifella_inventory_movements").insert(movements);
-        if(mr.error)throw mr.error;
-      }
-
-      if(c.paid>0){
-        const pr=await sb.from("medifella_sale_payments").insert({
-          sale_id:String(r.data.id),
-          amount:c.paid,
-          payment_method:E("mtsPaymentMethod")?.value||"Cash",
-          payment_date:now.slice(0,10),
-          note:c.status==="Partial"?"Partial Payment":"Paid in Full",
-          created_by:adminUser.id
-        });
-        if(pr.error)console.warn("MTS payment history:",pr.error.message);
-      }
-
-      msg(E("mtsStatus"),`MTS sale saved. Invoice ${reference}.`);
-
-      if(typeof resetNewInventorySale==="function")
-        resetNewInventorySale("mts");
-
-      await loadSales();
-      await loadStockMovements();
-      showSaleInvoice(r.data.id);
-    }catch(err){
-      console.error("MTS save error:",err);
-      msg(E("mtsStatus"),err.message||"Could not save MTS sale.",true);
-    }
-
-    return false;
-  }
-
   function bindFinal(){
-    const input=E("mtsAmountPaidNow");
+    const input=replaceMtsAmountInput();
     const status=E("mtsPaymentStatus");
-    const save=E("saveMtsSale");
+    if(!input||!status)return;
 
-    if(input && input.dataset.mtsPaymentFinal!=="1"){
-      input.dataset.mtsPaymentFinal="1";
+    showAmount();
 
-      ["focus","click","keydown","beforeinput","input","keyup"].forEach(ev=>{
-        input.addEventListener(ev,function(){
-          if(E("mtsPaymentStatus")?.value==="Partial"){
-            forcePartialEditable();
-          }
-        },true);
-      });
-    }
-
-    if(status && status.dataset.mtsPaymentFinal!=="1"){
-      status.dataset.mtsPaymentFinal="1";
+    if(status.dataset.mtsCleanStatus!=="1"){
+      status.dataset.mtsCleanStatus="1";
       status.addEventListener("change",function(){
-        setTimeout(syncPayment,0);
-        setTimeout(syncPayment,50);
+        showAmount();
       },true);
     }
 
-    if(save && save.dataset.mtsPaymentFinal!=="1"){
-      save.dataset.mtsPaymentFinal="1";
-      save.type="button";
+    if(input.dataset.mtsCleanEvents!=="1"){
+      input.dataset.mtsCleanEvents="1";
 
-      /* Capture phase + stopImmediatePropagation prevents the old broken
-         saveMts/saveInventorySale handler from taking over this button. */
-      save.addEventListener("click",saveMtsFinal,true);
+      /* Do NOT use an input listener that rewrites the value. */
+      input.addEventListener("focus",function(){
+        if(status.value==="Partial"){
+          input.readOnly=false;
+          input.removeAttribute("readonly");
+          input.removeAttribute("disabled");
+        }
+      },true);
+
+      /* Validate/limit only after the user finishes editing. */
+      input.addEventListener("blur",function(){
+        if(status.value==="Partial"){
+          const total=grandTotal();
+          const value=N(input.value);
+          if(value>total)input.value=total.toFixed(2);
+          else if(input.value.trim()!=="")input.value=value.toString();
+        }
+      },true);
     }
-
-    updateTotals();
   }
 
-  if(document.readyState==="loading")
+  if(document.readyState==="loading"){
     document.addEventListener("DOMContentLoaded",bindFinal,{once:true});
-  else
+  }else{
     bindFinal();
+  }
 
-  setTimeout(bindFinal,300);
+  setTimeout(bindFinal,100);
+  setTimeout(bindFinal,500);
   setTimeout(bindFinal,1000);
 })();
 </script>
