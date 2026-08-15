@@ -4165,7 +4165,7 @@ function showSaleInvoice(id,size="A4"){
    </div>
 
    <div class="invoice-actions" id="invoiceActions">
-  <button type="button" class="mf-action-btn" id="invoiceEditButton" onclick="editSaleFromInvoiceRouter(window.currentInvoiceId); return false;">✏️ Edit</button>
+  <button type="button" class="mf-action-btn" id="invoiceEditButton" onclick="window.mtsInvoiceEditClick(window.currentInvoiceId); return false;">✏️ Edit</button>
   <button type="button" class="mf-action-btn" onclick="printInvoice(window.currentInvoiceId,'A4')">🖨️ Print</button>
   <button type="button" class="mf-action-btn" onclick="downloadInvoicePDF(window.currentInvoiceId,'A4')">⬇️ Save PDF</button>
   <button type="button" class="mf-action-btn" onclick="closeInvoicePreview()">✕ Close</button>
@@ -10458,7 +10458,20 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
-<script id="mts-invoice-edit-routing-final">
+
+
+
+
+<style id="mts-telegram-larger-only">
+#mtsSale .mts-telegram-contact,
+#mtsSale [data-mts-telegram="true"]{
+  font-size:1.35em !important;
+  font-weight:800 !important;
+}
+</style>
+
+
+<script id="mts-invoice-edit-direct-final">
 (function(){
   "use strict";
 
@@ -10468,45 +10481,81 @@ document.addEventListener("DOMContentLoaded",function(){
     return t==="MTS" || t==="MTSKOREANBEAUTYPRODUCT" || r.startsWith("MTS-");
   }
 
-  function routeMtsInvoiceEdit(id){
+  function openMtsEditDirect(id){
     const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
     if(!s || !isMtsRecord(s)) return false;
 
-    // Use the dedicated MTS editor already present in this admin file.
+    // Prefer the dedicated MTS editor. Never call the generic
+    // Medi Fella Sale editor for an MTS record.
     if(typeof window.editMtsSale==="function"){
       window.editMtsSale(String(id));
       return false;
     }
+
+    // If the dedicated editor is named editMtsSaleFromInvoice, use it.
     if(typeof window.editMtsSaleFromInvoice==="function"){
       window.editMtsSaleFromInvoice(String(id));
       return false;
     }
 
-    // Fallback: open the MTS Sale section without touching Medi Fella Sale.
+    // Last-resort navigation: open MTS Sale only.
     const nav=document.querySelector('.nav[data-section="mtsSale"]');
     if(nav) nav.click();
     return false;
   }
 
-  // The original invoice Edit control uses this router. MTS is intercepted;
-  // all non-MTS sales continue through the original router unchanged.
-  const install=function(){
-    const original=window.editSaleFromInvoiceRouter;
-    if(typeof original!=="function" || original.__mtsSafeRouter) return;
+  // Override the router at the end of the file, after all existing
+  // declarations have loaded.
+  function install(){
+    const current=window.editSaleFromInvoiceRouter;
+    if(typeof current!=="function" || current.__mtsDirectFinal) return;
 
     const wrapped=function(id){
       const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
-      if(isMtsRecord(s)) return routeMtsInvoiceEdit(id);
-      return original.apply(this,arguments);
+      if(isMtsRecord(s)) return openMtsEditDirect(id);
+      return current.apply(this,arguments);
     };
-    wrapped.__mtsSafeRouter=true;
+    wrapped.__mtsDirectFinal=true;
     window.editSaleFromInvoiceRouter=wrapped;
-  };
+  }
 
-  install();
-  setTimeout(install,100);
-  setTimeout(install,500);
-  setTimeout(install,1200);
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else install();
+
+  [100,500,1200,2500].forEach(ms=>setTimeout(install,ms));
+})();
+</script>
+
+<script id="mts-invoice-edit-click-direct-final">
+(function(){
+  "use strict";
+  window.mtsInvoiceEditClick=function(id){
+    const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
+    const t=String(s?.sale_type||"").trim().toUpperCase().replace(/[\s_-]+/g,"");
+    const r=String(s?.reference_no||"").trim().toUpperCase();
+    const isMts=!!s && (t==="MTS" || t==="MTSKOREANBEAUTYPRODUCT" || r.startsWith("MTS-"));
+
+    if(isMts){
+      if(typeof window.editMtsSaleFromInvoice==="function"){
+        window.editMtsSaleFromInvoice(String(id));
+        return false;
+      }
+      if(typeof window.editMtsSale==="function"){
+        window.editMtsSale(String(id));
+        return false;
+      }
+      const nav=document.querySelector('.nav[data-section="mtsSale"]');
+      if(nav)nav.click();
+      return false;
+    }
+
+    // Preserve the original behavior for Medi Fella/Dermed invoices.
+    if(typeof window.editSaleFromInvoiceRouter==="function"){
+      window.editSaleFromInvoiceRouter(String(id));
+    }
+    return false;
+  };
 })();
 </script>
 
