@@ -7034,6 +7034,159 @@ document.addEventListener("DOMContentLoaded",function(){
   setTimeout(bindMtsProductResults,1000);
 })();
 </script>
+
+<style id="mts-final-customer-result-position">
+/* MTS ONLY — place Student / Customer results directly under its search input. */
+#mtsSale .sale-header-grid > div:first-child{
+  position:relative!important;
+}
+#mtsSale #mtsBuyerResults{
+  position:absolute!important;
+  right:auto!important;
+  z-index:200000!important;
+  max-height:240px!important;
+  overflow-y:auto!important;
+}
+</style>
+
+<script id="mts-final-customer-product-fix">
+(function(){
+  "use strict";
+
+  function E(id){ return document.getElementById(id); }
+
+  /* ------------------------------------------------------------
+     MTS ONLY: customer-result positioning.
+     The original search/render logic is preserved. We only
+     reposition the already-rendered results relative to the
+     actual input, so Dermed and other sale sections are untouched.
+     ------------------------------------------------------------ */
+  function positionMtsBuyerResults(){
+    const input = E("mtsBuyerSearch");
+    const results = E("mtsBuyerResults");
+    const parent = results && results.parentElement;
+    if(!input || !results || !parent) return;
+
+    const ir = input.getBoundingClientRect();
+    const pr = parent.getBoundingClientRect();
+
+    results.style.top = (ir.bottom - pr.top + 4) + "px";
+    results.style.left = (ir.left - pr.left) + "px";
+    results.style.width = ir.width + "px";
+    results.style.right = "auto";
+  }
+
+  function bindMtsBuyerPosition(){
+    const input = E("mtsBuyerSearch");
+    if(!input || input.dataset.mtsPositionBound === "1") return;
+
+    input.dataset.mtsPositionBound = "1";
+    input.addEventListener("input", function(){
+      requestAnimationFrame(positionMtsBuyerResults);
+    });
+    input.addEventListener("focus", function(){
+      requestAnimationFrame(positionMtsBuyerResults);
+    });
+
+    window.addEventListener("resize", positionMtsBuyerResults);
+    window.addEventListener("scroll", positionMtsBuyerResults, true);
+  }
+
+  /* ------------------------------------------------------------
+     MTS ONLY: product result selection.
+     The file already has a general addSaleProduct() function,
+     but a later Dermed-specific controller overwrites the global
+     window.addSaleProduct() and intentionally ignores MTS.
+     Wrap that final function and restore MTS selection only.
+     Dermed continues through the original function unchanged.
+     ------------------------------------------------------------ */
+  function bindMtsProductSelection(){
+    if(typeof window.addSaleProduct !== "function") return;
+    if(window.addSaleProduct.__mtsFinalWrapped === true) return;
+
+    const previousAddSaleProduct = window.addSaleProduct;
+
+    const mtsAddSaleProduct = function(type, pid){
+      if(type !== "mts"){
+        return previousAddSaleProduct.apply(this, arguments);
+      }
+
+      const product = Array.isArray(window.products)
+        ? window.products.find(function(x){
+            return String(x.id) === String(pid);
+          })
+        : null;
+
+      if(!product) return;
+
+      const arr = window.mtsSaleItems || (window.mtsSaleItems = []);
+
+      /* Do not add the same product twice. */
+      if(arr.some(function(x){
+        return String(x.product_id) === String(pid);
+      })){
+        const input = E("mtsProductSearch");
+        const results = E("mtsProductResults");
+        if(input) input.value = "";
+        if(results){
+          results.classList.remove("show");
+          results.style.display = "none";
+        }
+        return;
+      }
+
+      arr.push({
+        product_id: product.id,
+        product_code: product.product_code,
+        name: product.name,
+        price: Number(product.price || 0),
+        quantity: 1
+      });
+
+      if(typeof window.renderSaleProductRows === "function"){
+        window.renderSaleProductRows("mts");
+      }
+
+      const input = E("mtsProductSearch");
+      const results = E("mtsProductResults");
+      if(input) input.value = "";
+      if(results){
+        results.innerHTML = "";
+        results.classList.remove("show");
+        results.style.display = "none";
+      }
+    };
+
+    mtsAddSaleProduct.__mtsFinalWrapped = true;
+    window.addSaleProduct = mtsAddSaleProduct;
+  }
+
+  function init(){
+    bindMtsBuyerPosition();
+    bindMtsProductSelection();
+    positionMtsBuyerResults();
+  }
+
+  if(document.readyState === "loading"){
+    document.addEventListener("DOMContentLoaded", init, {once:true});
+  }else{
+    init();
+  }
+
+  /* The existing page has several delayed/final controllers.
+     Re-bind after them without changing their behavior. */
+  setTimeout(init, 100);
+  setTimeout(init, 500);
+  setTimeout(init, 1200);
+
+  /* If another final controller changes the global product handler,
+     restore the MTS-only wrapper without touching Dermed behavior. */
+  setInterval(function(){
+    bindMtsProductSelection();
+  }, 1000);
+})();
+</script>
+
 </body>
 </html>
 
