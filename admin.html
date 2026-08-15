@@ -2418,7 +2418,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div><label>Sale Date & Time</label><input id="mtsSaleTime" readonly></div>
 </div>
 <label style="margin-top:18px">Search Product</label><div style="position:relative"><input id="mtsProductSearch" autocomplete="off" placeholder="Search Product ID or Product Name"><div id="mtsProductResults" class="sale-course-picker-results"></div></div>
-<div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th>Qty</th><th>Unit Price</th><th>Discount</th><th>Total</th><th></th></tr></thead><tbody id="mtsItems"></tbody></table></div>
+<div class="table-wrap"><table class="table"><thead><tr><th>Product</th><th>Product ID</th><th>Qty</th><th>Unit Price</th><th>Discount</th><th>Total</th><th></th></tr></thead><tbody id="mtsItems"></tbody></table></div>
 <div class="sale-subtotal-line" style="margin-top:16px"><span>Sub Initial Total</span><strong id="mtsSubtotal">$0.00</strong></div>
 <div class="sale-controls-grid" style="margin-top:12px">
  <div>
@@ -7619,6 +7619,312 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
+
+<style id="mts-final-v4-css">
+/* MTS ONLY — final table/payment presentation */
+#mtsSale #mtsItems .mts-final-discount-box{
+  display:flex!important;
+  align-items:center!important;
+  gap:6px!important;
+  min-width:175px!important;
+}
+#mtsSale #mtsItems .mts-final-discount-box select{
+  width:58px!important;
+  min-width:58px!important;
+  height:40px!important;
+}
+#mtsSale #mtsItems .mts-final-discount-box input{
+  width:105px!important;
+  min-width:105px!important;
+  height:40px!important;
+}
+#mtsSale #mtsItems .mts-final-line-total{
+  width:105px!important;
+  min-width:105px!important;
+  height:40px!important;
+  box-sizing:border-box!important;
+  font-weight:800!important;
+}
+#mtsSale #mtsPartialPaidWrap,
+#mtsSale #mtsPartialPaidWrap.hidden{
+  display:block!important;
+  visibility:visible!important;
+}
+#mtsSale #mtsAmountPaidNow{
+  display:block!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+}
+</style>
+
+<script id="mts-final-v4-js">
+(function(){
+  "use strict";
+
+  const E=id=>document.getElementById(id);
+
+  function n(v){
+    const x=Number(String(v??"").replace(/[$,\s]/g,""));
+    return Number.isFinite(x)&&x>=0?x:0;
+  }
+  function m(v){
+    return typeof money==="function" ? money(v) : "$"+Number(v||0).toFixed(2);
+  }
+  function xesc(v){
+    return typeof esc==="function" ? esc(v) : String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  }
+  function dAmount(base,type,value){
+    const v=n(value);
+    return type==="usd" ? Math.min(base,v) : Math.min(base,base*v/100);
+  }
+
+  function mtsCalcFinal(){
+    const items=window.mtsSaleItems||[];
+    let sub=0;
+
+    items.forEach(it=>{
+      const q=Math.max(1,Number(it.quantity)||1);
+      const p=Math.max(0,Number(it.price)||0);
+      const base=q*p;
+      sub += Math.max(0,base-dAmount(base,it.discount_type==="usd"?"usd":"percent",it.discount_value));
+    });
+
+    const ov=n(E("mtsOverallDiscountValue")?.value||0);
+    const odType=E("mtsOverallDiscountType")?.value==="usd"?"usd":"percent";
+    const od=odType==="usd" ? Math.min(sub,ov) : Math.min(sub,sub*ov/100);
+    return {sub,od,total:Math.max(0,sub-od)};
+  }
+
+  /*
+   * Complete MTS table renderer.
+   * This is intentionally namespaced to MTS and does not touch Dermed.
+   */
+  function renderMtsFinalTable(){
+    const body=E("mtsItems");
+    const items=window.mtsSaleItems||[];
+    if(!body)return;
+
+    body.innerHTML=items.map((it,i)=>{
+      const q=Math.max(1,Number(it.quantity)||1);
+      const p=Math.max(0,Number(it.price)||0);
+      const type=it.discount_type==="usd"?"usd":"percent";
+      const value=n(it.discount_value);
+      const base=q*p;
+      const discount=dAmount(base,type,value);
+      const lineTotal=Math.max(0,base-discount);
+      const stock=typeof productStock==="function"?Number(productStock(it.product_id)):999999;
+      const max=Math.max(q,stock);
+
+      return `<tr>
+        <td>
+          <strong>${xesc(it.name||"")}</strong>
+          <div class="muted">${xesc(it.product_code||"")}</div>
+        </td>
+        <td>
+          <input type="number" min="1" max="${max}" value="${q}" data-mts-final-qty="${i}">
+        </td>
+        <td>
+          <strong>${m(p)}</strong>
+        </td>
+        <td>
+          <div class="mts-final-discount-box">
+            <select data-mts-final-dtype="${i}">
+              <option value="percent" ${type==="percent"?"selected":""}>%</option>
+              <option value="usd" ${type==="usd"?"selected":""}>USD</option>
+            </select>
+            <input type="text" inputmode="decimal" autocomplete="off"
+                   placeholder="0" value="${value?String(value):""}"
+                   data-mts-final-dvalue="${i}">
+          </div>
+        </td>
+        <td>
+          <input class="mts-final-line-total" readonly value="${m(lineTotal)}">
+        </td>
+        <td>
+          <button type="button" class="danger" data-mts-final-remove="${i}">×</button>
+        </td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="6" class="muted">No products added.</td></tr>';
+
+    body.querySelectorAll("[data-mts-final-qty]").forEach(el=>{
+      el.addEventListener("change",()=>{
+        const it=items[Number(el.dataset.mtsFinalQty)];
+        if(!it)return;
+        const stock=typeof productStock==="function"?Number(productStock(it.product_id)):999999;
+        it.quantity=Math.max(1,Math.min(Number(el.value)||1,stock));
+        renderMtsFinalTable();
+        updateMtsFinalPayment();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-final-dtype]").forEach(el=>{
+      el.addEventListener("change",()=>{
+        const it=items[Number(el.dataset.mtsFinalDtype)];
+        if(!it)return;
+        it.discount_type=el.value==="usd"?"usd":"percent";
+        updateMtsFinalPayment();
+        renderMtsFinalTable();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-final-dvalue]").forEach(el=>{
+      el.addEventListener("input",()=>{
+        const it=items[Number(el.dataset.mtsFinalDvalue)];
+        if(!it)return;
+        it.discount_value=n(el.value);
+
+        const q=Math.max(1,Number(it.quantity)||1);
+        const p=Math.max(0,Number(it.price)||0);
+        const total=Math.max(0,q*p-dAmount(q*p,it.discount_type,it.discount_value));
+        const row=el.closest("tr");
+        const totalBox=row?.querySelector(".mts-final-line-total");
+        if(totalBox)totalBox.value=m(total);
+
+        updateMtsFinalPayment();
+      });
+    });
+
+    body.querySelectorAll("[data-mts-final-remove]").forEach(el=>{
+      el.addEventListener("click",()=>{
+        items.splice(Number(el.dataset.mtsFinalRemove),1);
+        renderMtsFinalTable();
+        updateMtsFinalPayment();
+      });
+    });
+  }
+
+  function updateMtsFinalPayment(){
+    const c=mtsCalcFinal();
+
+    if(E("mtsSubtotal"))E("mtsSubtotal").textContent=m(c.sub);
+    if(E("mtsSummarySubtotal"))E("mtsSummarySubtotal").textContent=m(c.sub);
+    if(E("mtsSummaryDiscount"))E("mtsSummaryDiscount").textContent=m(c.od);
+    if(E("mtsTotal"))E("mtsTotal").textContent=m(c.total);
+
+    const status=E("mtsPaymentStatus");
+    const amount=E("mtsAmountPaidNow");
+    const wrap=E("mtsPartialPaidWrap");
+    if(!status||!amount)return;
+
+    if(wrap){
+      wrap.classList.remove("hidden");
+      wrap.style.setProperty("display","block","important");
+      wrap.style.visibility="visible";
+    }
+
+    if(status.value==="Paid"){
+      amount.value=c.total.toFixed(2);
+      amount.readOnly=true;
+      amount.removeAttribute("disabled");
+      amount.style.pointerEvents="auto";
+    }else if(status.value==="Due"){
+      amount.value="0.00";
+      amount.readOnly=true;
+      amount.removeAttribute("disabled");
+      amount.style.pointerEvents="auto";
+    }else{
+      /* Partial Payment: explicitly editable. */
+      amount.readOnly=false;
+      amount.removeAttribute("readonly");
+      amount.removeAttribute("disabled");
+      amount.style.setProperty("pointer-events","auto","important");
+      amount.style.setProperty("user-select","text","important");
+      const entered=n(amount.value);
+      if(entered>c.total)amount.value=c.total.toFixed(2);
+    }
+  }
+
+  /*
+   * MTS-only product add.
+   * Multiple different products are allowed.
+   * After choosing a product, clear the search text/results.
+   */
+  window.mtsAddProductFinalV4=function(pid){
+    const products=Array.isArray(window.products)?window.products:[];
+    const p=products.find(v=>String(v.id)===String(pid));
+    if(!p)return;
+
+    const items=window.mtsSaleItems||(window.mtsSaleItems=[]);
+    const existing=items.find(v=>String(v.product_id)===String(pid));
+
+    if(existing){
+      const stock=typeof productStock==="function"?Number(productStock(existing.product_id)):999999;
+      existing.quantity=Math.min((Number(existing.quantity)||1)+1,Math.max(1,stock));
+    }else{
+      items.push({
+        product_id:p.id,
+        product_code:p.product_code||"",
+        name:p.name||"",
+        price:Number(p.price||0),
+        quantity:1,
+        discount_type:"percent",
+        discount_value:0
+      });
+    }
+
+    renderMtsFinalTable();
+    updateMtsFinalPayment();
+
+    const search=E("mtsProductSearch");
+    const results=E("mtsProductResults");
+    if(search)search.value="";
+    if(results){
+      results.innerHTML="";
+      results.classList.remove("show");
+      results.style.display="none";
+    }
+  };
+
+  function bindFinalMts(){
+    const status=E("mtsPaymentStatus");
+    const amount=E("mtsAmountPaidNow");
+
+    if(status && status.dataset.mtsV4!=="1"){
+      status.dataset.mtsV4="1";
+      status.addEventListener("change",()=>{
+        updateMtsFinalPayment();
+        setTimeout(updateMtsFinalPayment,0);
+      },true);
+    }
+
+    if(amount && amount.dataset.mtsV4!=="1"){
+      amount.dataset.mtsV4="1";
+      amount.addEventListener("focus",()=>{
+        if(E("mtsPaymentStatus")?.value==="Partial"){
+          amount.readOnly=false;
+          amount.removeAttribute("readonly");
+          amount.removeAttribute("disabled");
+        }
+      },true);
+    }
+
+    /* Prevent an older MTS result click handler from leaving the search text. */
+    const results=E("mtsProductResults");
+    if(results && results.dataset.mtsV4Click!=="1"){
+      results.dataset.mtsV4Click="1";
+      results.addEventListener("click",e=>{
+        const btn=e.target.closest("button[data-product-id]");
+        if(!btn)return;
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        window.mtsAddProductFinalV4(btn.dataset.productId);
+      },true);
+    }
+
+    renderMtsFinalTable();
+    updateMtsFinalPayment();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",bindFinalMts,{once:true});
+  }else{
+    bindFinalMts();
+  }
+  setTimeout(bindFinalMts,300);
+  setTimeout(bindFinalMts,1000);
+})();
+</script>
+
 </body>
 </html>
 
@@ -8466,3 +8772,361 @@ document.addEventListener("DOMContentLoaded",function(){
  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',bind,{once:true});else bind();setTimeout(bind,700);
 })();
 </script>
+
+<style id="mts-final-absolute-fix-css">
+#mtsSale #mtsItems .mts-hard-discount{
+  display:flex!important;
+  align-items:center!important;
+  gap:6px!important;
+  min-width:180px!important;
+}
+#mtsSale #mtsItems .mts-hard-discount select{
+  width:58px!important;
+  min-width:58px!important;
+  height:40px!important;
+}
+#mtsSale #mtsItems .mts-hard-discount input{
+  width:105px!important;
+  min-width:105px!important;
+  height:40px!important;
+  box-sizing:border-box!important;
+}
+#mtsSale #mtsItems .mts-hard-line-total{
+  width:105px!important;
+  min-width:105px!important;
+  height:40px!important;
+  box-sizing:border-box!important;
+  font-weight:800!important;
+  color:#168fa1!important;
+  background:#f4fbfc!important;
+}
+#mtsSale #mtsPartialPaidWrap,
+#mtsSale #mtsPartialPaidWrap.hidden{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+}
+#mtsSale #mtsAmountPaidNow{
+  display:block!important;
+  visibility:visible!important;
+  opacity:1!important;
+  pointer-events:auto!important;
+  user-select:text!important;
+}
+</style>
+
+<script id="mts-final-absolute-fix-js">
+(function(){
+  "use strict";
+
+  function E(id){return document.getElementById(id)}
+  function num(v){
+    const n=Number(String(v??"").replace(/[$,\s]/g,""));
+    return Number.isFinite(n)&&n>=0?n:0;
+  }
+  function moneyF(v){
+    return typeof money==="function" ? money(v) : "$"+Number(v||0).toFixed(2);
+  }
+  function escF(v){
+    return typeof esc==="function" ? esc(v) : String(v??"").replace(/[&<>"']/g,function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+  function disc(base,type,value){
+    const v=num(value);
+    return type==="usd" ? Math.min(base,v) : Math.min(base,base*v/100);
+  }
+  function itemCalc(x){
+    const qty=Math.max(1,Number(x.quantity)||1);
+    const price=Math.max(0,Number(x.price)||0);
+    const base=qty*price;
+    const dtype=x.discount_type==="usd"?"usd":"percent";
+    const dvalue=num(x.discount_value);
+    const d=disc(base,dtype,dvalue);
+    return {qty,price,base,dtype,dvalue,d,total:Math.max(0,base-d)};
+  }
+
+  function mtsTotal(){
+    const items=window.mtsSaleItems||[];
+    let subtotal=0;
+    items.forEach(function(x){ subtotal += itemCalc(x).total; });
+
+    const ov=num(E("mtsOverallDiscountValue")?.value||0);
+    const type=E("mtsOverallDiscountType")?.value==="usd"?"usd":"percent";
+    const overall=disc(subtotal,type,ov);
+    return {subtotal,overall,total:Math.max(0,subtotal-overall)};
+  }
+
+  function renderHardTable(){
+    const body=E("mtsItems");
+    const items=window.mtsSaleItems||[];
+    if(!body)return;
+
+    body.innerHTML=items.map(function(x,i){
+      const c=itemCalc(x);
+      const stock=typeof productStock==="function"
+        ? Number(productStock(x.product_id)||0)
+        : 999999;
+      const max=Math.max(c.qty,stock);
+
+      return `<tr data-mts-hard-row="${i}">
+        <td><strong>${escF(x.name||"")}</strong></td>
+        <td><strong>${escF(x.product_code||"")}</strong></td>
+        <td>
+          <input type="number" min="1" max="${max}" value="${c.qty}" data-mts-hard-qty="${i}">
+        </td>
+        <td><strong>${moneyF(c.price)}</strong></td>
+        <td>
+          <div class="mts-hard-discount">
+            <select data-mts-hard-dtype="${i}">
+              <option value="percent" ${c.dtype==="percent"?"selected":""}>%</option>
+              <option value="usd" ${c.dtype==="usd"?"selected":""}>USD</option>
+            </select>
+            <input type="text" inputmode="decimal" autocomplete="off"
+              placeholder="0" value="${c.dvalue ? String(c.dvalue) : ""}"
+              data-mts-hard-dvalue="${i}">
+          </div>
+        </td>
+        <td>
+          <input class="mts-hard-line-total" readonly value="${moneyF(c.total)}">
+        </td>
+        <td>
+          <button type="button" class="danger" data-mts-hard-remove="${i}">×</button>
+        </td>
+      </tr>`;
+    }).join("") || '<tr><td colspan="7" class="muted">No products added.</td></tr>';
+
+    bindTableEvents();
+  }
+
+  function bindTableEvents(){
+    const body=E("mtsItems");
+    if(!body || body.dataset.mtsHardEvents==="1")return;
+    body.dataset.mtsHardEvents="1";
+
+    body.addEventListener("change",function(e){
+      const qty=e.target.closest("[data-mts-hard-qty]");
+      const dtype=e.target.closest("[data-mts-hard-dtype]");
+      const items=window.mtsSaleItems||[];
+
+      if(qty){
+        const i=Number(qty.dataset.mtsHardQty), x=items[i];
+        if(!x)return;
+        const stock=typeof productStock==="function"?Number(productStock(x.product_id)):999999;
+        x.quantity=Math.max(1,Math.min(Number(qty.value)||1,Math.max(1,stock)));
+        renderHardTable();
+        syncPayment();
+        return;
+      }
+
+      if(dtype){
+        const i=Number(dtype.dataset.mtsHardDtype), x=items[i];
+        if(!x)return;
+        x.discount_type=dtype.value==="usd"?"usd":"percent";
+        renderHardTable();
+        syncPayment();
+      }
+    });
+
+    body.addEventListener("input",function(e){
+      const dv=e.target.closest("[data-mts-hard-dvalue]");
+      if(!dv)return;
+      const items=window.mtsSaleItems||[];
+      const i=Number(dv.dataset.mtsHardDvalue), x=items[i];
+      if(!x)return;
+      x.discount_value=num(dv.value);
+
+      const c=itemCalc(x);
+      const row=dv.closest("tr");
+      const total=row?.querySelector(".mts-hard-line-total");
+      if(total)total.value=moneyF(c.total);
+      syncPayment();
+    });
+
+    body.addEventListener("click",function(e){
+      const rm=e.target.closest("[data-mts-hard-remove]");
+      if(!rm)return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const items=window.mtsSaleItems||[];
+      items.splice(Number(rm.dataset.mtsHardRemove),1);
+      renderHardTable();
+      syncPayment();
+    },true);
+  }
+
+  function syncPayment(){
+    const status=E("mtsPaymentStatus");
+    const amount=E("mtsAmountPaidNow");
+    const wrap=E("mtsPartialPaidWrap");
+    if(!status || !amount)return;
+
+    const c=mtsTotal();
+    const s=status.value||"Paid";
+
+    if(wrap){
+      wrap.classList.remove("hidden","mts-show");
+      wrap.style.setProperty("display","block","important");
+      wrap.style.setProperty("visibility","visible","important");
+    }
+
+    if(s==="Paid"){
+      amount.value=c.total.toFixed(2);
+      amount.readOnly=true;
+      amount.removeAttribute("readonly");
+      amount.removeAttribute("disabled");
+    }else if(s==="Due"){
+      amount.value="0.00";
+      amount.readOnly=true;
+      amount.removeAttribute("readonly");
+      amount.removeAttribute("disabled");
+    }else{
+      /* Partial Payment is deliberately editable. */
+      amount.readOnly=false;
+      amount.removeAttribute("readonly");
+      amount.removeAttribute("disabled");
+      amount.style.setProperty("pointer-events","auto","important");
+      amount.style.setProperty("user-select","text","important");
+      if(num(amount.value)>c.total)amount.value=c.total.toFixed(2);
+    }
+
+    if(E("mtsSubtotal"))E("mtsSubtotal").textContent=moneyF(c.subtotal);
+    if(E("mtsSummarySubtotal"))E("mtsSummarySubtotal").textContent=moneyF(c.subtotal);
+    if(E("mtsSummaryDiscount"))E("mtsSummaryDiscount").textContent=moneyF(c.overall);
+    if(E("mtsTotal"))E("mtsTotal").textContent=moneyF(c.total);
+  }
+
+  function clearProductSearch(){
+    const input=E("mtsProductSearch");
+    const results=E("mtsProductResults");
+    if(input)input.value="";
+    if(results){
+      results.innerHTML="";
+      results.classList.remove("show");
+      results.style.display="none";
+    }
+  }
+
+  function addMtsProduct(pid){
+    const products=Array.isArray(window.products)?window.products:[];
+    const p=products.find(function(v){return String(v.id)===String(pid)});
+    if(!p)return;
+
+    const items=window.mtsSaleItems||(window.mtsSaleItems=[]);
+    const existing=items.find(function(v){return String(v.product_id)===String(pid)});
+
+    if(existing){
+      const stock=typeof productStock==="function"?Number(productStock(existing.product_id)):999999;
+      existing.quantity=Math.min(
+        (Number(existing.quantity)||1)+1,
+        Math.max(1,stock)
+      );
+    }else{
+      items.push({
+        product_id:p.id,
+        product_code:p.product_code||"",
+        name:p.name||"",
+        price:Number(p.price||0),
+        quantity:1,
+        discount_type:"percent",
+        discount_value:0
+      });
+    }
+
+    clearProductSearch();
+    renderHardTable();
+    syncPayment();
+  }
+
+  function ensureProductSearch(){
+    const input=E("mtsProductSearch");
+    const results=E("mtsProductResults");
+    if(!input || !results || input.dataset.mtsHardSearch==="1")return;
+
+    input.dataset.mtsHardSearch="1";
+
+    input.addEventListener("input",async function(){
+      const q=input.value.trim().toLowerCase();
+      if(!q){
+        results.innerHTML="";
+        results.classList.remove("show");
+        results.style.display="none";
+        return;
+      }
+
+      let products=Array.isArray(window.products)?window.products:[];
+      if(!products.length && typeof sb!=="undefined"){
+        try{
+          const r=await sb.from("medifella_products").select("*").order("created_at",{ascending:false});
+          if(!r.error)products=window.products=r.data||[];
+        }catch(e){console.warn("MTS product search:",e)}
+      }
+
+      const matches=products.filter(function(p){
+        return (`${p.product_code||""} ${p.name||""}`).toLowerCase().includes(q);
+      }).slice(0,20);
+
+      results.innerHTML=matches.map(function(p){
+        return `<button type="button" data-mts-hard-product="${escF(p.id)}"
+          style="display:block;width:100%;text-align:left;cursor:pointer">
+          <strong>${escF(p.name||"")}</strong>
+          <div class="muted">${escF(p.product_code||"")} · ${moneyF(p.price)} · Stock: ${typeof productStock==="function"?productStock(p.id):0}</div>
+        </button>`;
+      }).join("") || '<div class="muted" style="padding:10px">No product found.</div>';
+
+      results.classList.add("show");
+      results.style.display="block";
+    });
+
+    results.addEventListener("click",function(e){
+      const b=e.target.closest("[data-mts-hard-product]");
+      if(!b)return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      addMtsProduct(b.getAttribute("data-mts-hard-product"));
+    },true);
+  }
+
+  function bindPayment(){
+    const status=E("mtsPaymentStatus");
+    const amount=E("mtsAmountPaidNow");
+    if(status && status.dataset.mtsHardPayment!=="1"){
+      status.dataset.mtsHardPayment="1";
+      status.addEventListener("change",function(){
+        syncPayment();
+        setTimeout(syncPayment,0);
+        setTimeout(syncPayment,100);
+      },true);
+    }
+    if(amount && amount.dataset.mtsHardAmount!=="1"){
+      amount.dataset.mtsHardAmount="1";
+      amount.addEventListener("focus",function(){
+        if(E("mtsPaymentStatus")?.value==="Partial"){
+          amount.readOnly=false;
+          amount.removeAttribute("readonly");
+          amount.removeAttribute("disabled");
+        }
+      },true);
+    }
+  }
+
+  function initHard(){
+    ensureProductSearch();
+    bindPayment();
+    renderHardTable();
+    syncPayment();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",initHard,{once:true});
+  }else{
+    initHard();
+  }
+
+  /* The existing MTS code may redraw the table later. Re-apply only when its
+     structure is missing; this does not touch Dermed or Medi Fella Sale. */
+  setTimeout(initHard,300);
+  setTimeout(initHard,1000);
+})();
+</script>
+
