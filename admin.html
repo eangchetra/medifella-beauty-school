@@ -3753,7 +3753,7 @@ toggleSaleFormBtn.onclick=()=>{
   }
 };
 
-$("addSaleItem").onclick=()=>addSaleItemRow();
+if($("addSaleItem"))$("addSaleItem").onclick=()=>addSaleItemRow();
 $("saleStudentSearch").addEventListener("input",renderSaleStudentOptions);
 $("saleStudentSearch").addEventListener("change",selectSaleStudentByInput);
 $("saleStudentSearch").addEventListener("blur",()=>setTimeout(selectSaleStudentByInput,150));
@@ -5994,7 +5994,7 @@ function renderDermedCombinedItems(){
  body.innerHTML=productRows+serviceRows||'<tr><td colspan="6" class="muted">No products or services added.</td></tr>';
  const p=products.reduce((n,x)=>n+Number(x.price)*Number(x.quantity),0);
  const sv=servicesArr.reduce((n,x)=>n+Number(x.price)*Number(x.quantity||1),0);
- $("dermedTotal").textContent=money(p+sv);
+ if($("dermedTotal"))$("dermedTotal").textContent=money(p+sv);
 }
 function renderDermedServices(){renderDermedCombinedItems()}
 function setDermedServiceQty(i,v){
