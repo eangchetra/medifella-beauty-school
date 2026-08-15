@@ -8443,6 +8443,311 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
+
+
+<!-- MTS INVOICE + MTS LIST SEPARATION FINAL PATCH -->
+<style id="mts-invoice-request-final">
+/* MTS ONLY: requested black invoice branding. Dermed/Medi Fella invoices are untouched. */
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mts-invoice-brand-name,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mts-invoice-brand-name,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mts-invoice-brand-name{
+  color:#000!important;
+}
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-invoice-label,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-invoice-label,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-invoice-label{
+  border-top-color:#000!important;
+}
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-invoice-label .kh,
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-invoice-label .en,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-invoice-label .kh,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-invoice-label .en,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-invoice-label .kh,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-invoice-label .en{
+  color:#000!important;
+}
+/* វិក្កយបត្រ = Khmer OS Moul; English INVOICE stays bold English. */
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-invoice-label .kh,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-invoice-label .kh,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-invoice-label .kh{
+  font-family:"KhmerOSMuolUploaded","Khmer OS MOUL Regular","Khmer OS Moul",serif!important;
+  font-weight:400!important;
+  color:#000!important;
+}
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-invoice-label .en,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-invoice-label .en,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-invoice-label .en{
+  color:#000!important;
+}
+/* Payment is non-refundable, thank you! box: black border + black text. */
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-refund-box,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-refund-box,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-refund-box{
+  border-color:#000!important;
+  color:#000!important;
+}
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-refund-box .kh,
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-refund-box .en,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-refund-box .kh,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-refund-box .en,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-refund-box .kh,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-refund-box .en{
+  color:#000!important;
+}
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-refund-box .kh,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-refund-box .kh,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-refund-box .kh{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
+}
+</style>
+
+<script id="mts-sale-separation-and-edit-final">
+(function(){
+  "use strict";
+  const E=id=>document.getElementById(id);
+  const upper=v=>String(v||"").trim().toUpperCase();
+  const isMts=s=>upper(s?.sale_type)==="MTS" || String(s?.reference_no||"").toUpperCase().startsWith("MTS-");
+  const escLocal=v=>typeof esc==="function"?esc(v):String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+
+  /* Never put MTS records in the regular Medi Fella Sale list. */
+  function patchMediFellaList(){
+    if(typeof window.renderSales!=="function" || window.renderSales.__mtsSeparated)return;
+    const original=window.renderSales;
+    const wrapped=function(){
+      try{
+        if(Array.isArray(window.salesRecords)){
+          const originalRecords=window.salesRecords;
+          const filtered=originalRecords.filter(s=>!isMts(s));
+          if(filtered.length!==originalRecords.length){
+            window.salesRecords=filtered;
+            try{return original.apply(this,arguments)}finally{window.salesRecords=originalRecords}
+          }
+        }
+      }catch(e){console.warn("MTS list separation:",e)}
+      return original.apply(this,arguments);
+    };
+    wrapped.__mtsSeparated=true;
+    window.renderSales=wrapped;
+  }
+
+  /* Also remove MTS from the Medi Fella Sale dashboard metrics. */
+  function patchMediFellaMetrics(){
+    if(typeof window.updateSalesMetrics!=="function" || window.updateSalesMetrics.__mtsSeparated)return;
+    const original=window.updateSalesMetrics;
+    const wrapped=function(){
+      try{
+        if(Array.isArray(window.salesRecords)){
+          const originalRecords=window.salesRecords;
+          const filtered=originalRecords.filter(s=>!isMts(s));
+          window.salesRecords=filtered;
+          try{return original.apply(this,arguments)}finally{window.salesRecords=originalRecords}
+        }
+      }catch(e){console.warn("MTS metrics separation:",e)}
+      return original.apply(this,arguments);
+    };
+    wrapped.__mtsSeparated=true;
+    window.updateSalesMetrics=wrapped;
+  }
+
+  /* MTS edit: open the MTS Sale form, not Medi Fella Sale. */
+  async function editMtsSaleFromInvoice(id){
+    const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
+    if(!s || !isMts(s)){alert("MTS Sale invoice not found.");return;}
+
+    if(typeof closeInvoicePreview==="function")closeInvoicePreview();
+
+    document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
+    const nav=document.querySelector('.nav[data-section="mtsSale"]');
+    if(nav)nav.classList.add("active");
+    const section=E("mtsSale");
+    if(section)section.classList.add("active");
+
+    const form=E("mtsSaleFormCard");
+    if(form)form.style.display="block";
+    const toggle=E("mtsAddSaleToggle");
+    if(toggle){toggle.setAttribute("aria-expanded","true");toggle.textContent="Hide Sale Table";}
+
+    window.mtsEditingId=String(id);
+
+    E("mtsBuyerType")&&(E("mtsBuyerType").value=String(s.customer_type||"")|| (s.student_id?"student":"customer"));
+    E("mtsBuyerId")&&(E("mtsBuyerId").value=String(s.student_id||s.customer_id||""));
+    E("mtsBuyerSearch")&&(E("mtsBuyerSearch").value=s.student_name||s.customer_name||"");
+    E("mtsBuyerHint")&&(E("mtsBuyerHint").textContent=`Selected: ${s.student_name||s.customer_name||"Customer"}${s.student_phone?" · "+s.student_phone:""}`);
+    E("mtsSaleStaff")&&(E("mtsSaleStaff").value=String(s.sale_staff_id||""));
+
+    const dt=String(s.sale_date||"").slice(0,10)+(s.sale_time?"T"+String(s.sale_time).slice(0,8):"");
+    if(E("mtsSaleTime"))E("mtsSaleTime").value=dt?dt.replace("T"," "):"";
+
+    let raw=s.items||[];
+    try{if(typeof raw==="string")raw=JSON.parse(raw)}catch(_){raw=[]}
+    if(!Array.isArray(raw))raw=[];
+    window.mtsSaleItems=raw.map(x=>({
+      product_id:x.product_id||x.id||"",
+      product_code:x.product_code||x.code||"",
+      name:x.name||x.product_name||"",
+      price:Number(x.price??x.unit_price??0),
+      quantity:Math.max(1,Number(x.quantity??x.qty??1)),
+      discount_type:String(x.discount_type||"percent").toLowerCase()==="usd"?"usd":"percent",
+      discount_value:Number(x.discount_value??x.discount_input??x.discount_percent??0)||0
+    }));
+
+    const overall=Number(s.discount||0);
+    if(E("mtsOverallDiscountType"))E("mtsOverallDiscountType").value="usd";
+    if(E("mtsOverallDiscountValue"))E("mtsOverallDiscountValue").value=overall?overall.toFixed(2):"0";
+
+    const total=typeof saleTotal==="function"?saleTotal(s):Number(s.grand_total||0);
+    const paid=typeof salePaid==="function"?salePaid(s):Number(s.paid||0);
+    const status=typeof saleStatus==="function"?saleStatus(total,paid):(s.payment_status||"Paid");
+    E("mtsPaymentStatus")&&(E("mtsPaymentStatus").value=status==="Partial"?"Partial":status==="Due"?"Due":"Paid");
+    E("mtsAmountPaidNow")&&(E("mtsAmountPaidNow").value=paid.toFixed(2));
+
+    /* Try to recover the current payment method from payment history. */
+    if(E("mtsPaymentMethod"))E("mtsPaymentMethod").value=s.payment_method||"Cash";
+    try{
+      const r=await sb.from("medifella_sale_payments").select("payment_method,payment_date,amount").eq("sale_id",String(id)).order("created_at",{ascending:false}).limit(1);
+      if(!r.error && r.data?.[0]?.payment_method && E("mtsPaymentMethod"))E("mtsPaymentMethod").value=r.data[0].payment_method;
+    }catch(_){ }
+
+    if(typeof window.renderMtsItems==="function")window.renderMtsItems();
+    if(typeof window.updateMtsTotals==="function")window.updateMtsTotals();
+    else if(typeof window.renderMtsFinalTable==="function")window.renderMtsFinalTable();
+    if(typeof window.mtsEditStatusSync==="function")window.mtsEditStatusSync();
+
+    if(section)section.scrollIntoView({behavior:"smooth",block:"start"});
+  }
+  window.editMtsSaleFromInvoice=editMtsSaleFromInvoice;
+
+  /* Route invoice Edit correctly: MTS -> MTS Sale, Dermed -> Dermed Sale,
+     everything else -> original Medi Fella Sale editor. */
+  function patchInvoiceEditRouter(){
+    if(typeof window.editSaleFromInvoiceRouter!=="function" || window.editSaleFromInvoiceRouter.__mtsRouter)return;
+    const original=window.editSaleFromInvoiceRouter;
+    const wrapped=function(id){
+      const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
+      if(isMts(s))return editMtsSaleFromInvoice(id);
+      return original.apply(this,arguments);
+    };
+    wrapped.__mtsRouter=true;
+    window.editSaleFromInvoiceRouter=wrapped;
+  }
+
+  /* Edit existing MTS record instead of inserting a second sale. */
+  async function saveMtsEdit(){
+    const id=window.mtsEditingId;
+    const old=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
+    if(!id || !old){alert("MTS sale to edit was not found.");return;}
+
+    const buyerType=E("mtsBuyerType")?.value||"";
+    const buyerId=E("mtsBuyerId")?.value||"";
+    const staffId=E("mtsSaleStaff")?.value||"";
+    const items=Array.isArray(window.mtsSaleItems)?window.mtsSaleItems:[];
+    if(!buyerType||!buyerId){msg(E("mtsStatus"),"Please select a Student or Customer.",true);return;}
+    if(!staffId){msg(E("mtsStatus"),"Please select Sale Staff.",true);return;}
+    if(!items.length){msg(E("mtsStatus"),"Add at least one product.",true);return;}
+
+    for(const it of items){
+      const available=typeof productStock==="function"?Number(productStock(it.product_id)):999999;
+      if(Number(it.quantity)>available){msg(E("mtsStatus"),`Not enough stock for ${it.name}. Available: ${available}.`,true);return;}
+    }
+
+    const buyer=buyerType==="student"
+      ?(window.students||[]).find(x=>String(x.id)===String(buyerId))
+      :(window.customers||[]).find(x=>String(x.id)===String(buyerId));
+    const staff=(window.staffInfoRecords||[]).find(x=>String(x.id)===String(staffId));
+
+    let subtotal=0;
+    const normalized=items.map(x=>{
+      const q=Math.max(1,Number(x.quantity)||1),p=Math.max(0,Number(x.price)||0),base=q*p;
+      const typ=x.discount_type==="usd"?"usd":"percent",dv=Math.max(0,Number(x.discount_value)||0);
+      const d=typ==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);
+      const line=Math.max(0,base-d);subtotal+=line;
+      return {...x,quantity:q,price:p,unit_price:p,discount_type:typ,discount_value:dv,discount_amount:d,subtotal:line};
+    });
+
+    const ovRaw=Math.max(0,Number(String(E("mtsOverallDiscountValue")?.value||0).replace(/[$,\s]/g,""))||0);
+    const ovType=E("mtsOverallDiscountType")?.value==="usd"?"usd":"percent";
+    const overallDiscount=ovType==="usd"?Math.min(subtotal,ovRaw):Math.min(subtotal,subtotal*ovRaw/100);
+    const total=Math.max(0,subtotal-overallDiscount);
+    const status=E("mtsPaymentStatus")?.value||"Paid";
+    const paid=status==="Paid"?total:status==="Due"?0:Math.min(total,Math.max(0,Number(String(E("mtsAmountPaidNow")?.value||0).replace(/[$,\s]/g,""))||0));
+    const due=Math.max(0,total-paid);
+    const now=new Date();
+
+    const payload={
+      student_id:buyerType==="student"?buyerId:null,
+      student_name:buyer?.full_name||buyer?.name||"",
+      student_phone:buyer?.phone||"",
+      customer_id:buyerType==="customer"?buyerId:null,
+      customer_type:buyerType,
+      sale_staff_id:staffId,
+      sale_staff_name:staff?.name_en||"",
+      subtotal:subtotal,
+      discount:overallDiscount,
+      shipping:0,
+      grand_total:total,
+      paid:paid,
+      balance:due,
+      payment_status:status,
+      sale_status:"Completed",
+      items:normalized,
+      service_items:[],
+      service_total:0,
+      notes:""
+    };
+
+    const btn=E("saveMtsSale");
+    if(btn){btn.disabled=true;btn.textContent="Updating MTS Sale..."}
+    try{
+      const r=await sb.from("medifella_sales").update(payload).eq("id",String(id));
+      if(r.error)throw r.error;
+      window.mtsEditingId=null;
+      if(typeof loadSales==="function")await loadSales();
+      if(typeof loadStockMovements==="function")await loadStockMovements();
+      if(typeof renderMtsSales==="function")renderMtsSales();
+      if(typeof window.resetNewInventorySale==="function")window.resetNewInventorySale("mts");
+      if(E("mtsSaleFormCard"))E("mtsSaleFormCard").style.display="none";
+      if(E("mtsAddSaleToggle")){E("mtsAddSaleToggle").setAttribute("aria-expanded","false");E("mtsAddSaleToggle").textContent="+ Add Sale";}
+      msg(E("mtsStatus"),"MTS sale updated successfully.");
+      if(typeof showSaleInvoice==="function")showSaleInvoice(String(id),"A4");
+    }catch(e){
+      console.error("MTS edit error:",e);
+      msg(E("mtsStatus"),e.message||"Could not update MTS sale.",true);
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent="Save MTS Sale & Generate Invoice"}
+    }
+  }
+  window.saveMtsEdit=saveMtsEdit;
+
+  /* Intercept ONLY edit-mode clicks before the existing MTS save handler.
+     Normal new-sale clicks continue through the original working MTS handler. */
+  function patchMtsSaveButton(){
+    if(document.documentElement.dataset.mtsEditClickRouter==="1")return;
+    document.documentElement.dataset.mtsEditClickRouter="1";
+    document.addEventListener("click",function(e){
+      const target=e.target.closest("#saveMtsSale");
+      if(!target || !window.mtsEditingId)return;
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      saveMtsEdit();
+    },true);
+  }
+
+  function run(){
+    patchMediFellaList();
+    patchMediFellaMetrics();
+    patchInvoiceEditRouter();
+    patchMtsSaveButton();
+    setTimeout(patchMediFellaList,300);
+    setTimeout(patchMediFellaMetrics,300);
+    setTimeout(patchInvoiceEditRouter,300);
+    setTimeout(patchMtsSaveButton,500);
+    setTimeout(patchMtsSaveButton,1200);
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",run,{once:true});
+  else run();
+})();
+</script>
 </body>
 </html>
 
