@@ -8535,12 +8535,12 @@ document.addEventListener("DOMContentLoaded",function(){
     const original=window.renderSales;
     const wrapped=function(){
       try{
-        if(Array.isArray(window.salesRecords)){
-          const originalRecords=window.salesRecords;
+        if(Array.isArray(salesRecords)){
+          const originalRecords=salesRecords;
           const filtered=originalRecords.filter(s=>!isMtsListRecord(s));
           if(filtered.length!==originalRecords.length){
-            window.salesRecords=filtered;
-            try{return original.apply(this,arguments)}finally{window.salesRecords=originalRecords}
+            salesRecords=filtered;
+            try{return original.apply(this,arguments)}finally{salesRecords=originalRecords}
           }
         }
       }catch(e){console.warn("MTS list separation:",e)}
@@ -8556,11 +8556,11 @@ document.addEventListener("DOMContentLoaded",function(){
     const original=window.updateSalesMetrics;
     const wrapped=function(){
       try{
-        if(Array.isArray(window.salesRecords)){
-          const originalRecords=window.salesRecords;
+        if(Array.isArray(salesRecords)){
+          const originalRecords=salesRecords;
           const filtered=originalRecords.filter(s=>!isMtsListRecord(s));
-          window.salesRecords=filtered;
-          try{return original.apply(this,arguments)}finally{window.salesRecords=originalRecords}
+          salesRecords=filtered;
+          try{return original.apply(this,arguments)}finally{salesRecords=originalRecords}
         }
       }catch(e){console.warn("MTS metrics separation:",e)}
       return original.apply(this,arguments);
@@ -8571,7 +8571,7 @@ document.addEventListener("DOMContentLoaded",function(){
 
   /* MTS edit: open the MTS Sale form, not Medi Fella Sale. */
   async function editMtsSaleFromInvoice(id){
-    const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
+    const s=(salesRecords||[]).find(x=>String(x.id)===String(id));
     if(!s || !isMtsListRecord(s)){alert("MTS Sale invoice not found.");return;}
 
     if(typeof closeInvoicePreview==="function")closeInvoicePreview();
@@ -8644,7 +8644,7 @@ document.addEventListener("DOMContentLoaded",function(){
     if(typeof window.editSaleFromInvoiceRouter!=="function" || window.editSaleFromInvoiceRouter.__mtsRouter)return;
     const original=window.editSaleFromInvoiceRouter;
     const wrapped=function(id){
-      const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
+      const s=(salesRecords||[]).find(x=>String(x.id)===String(id));
       if(isMtsListRecord(s))return editMtsSaleFromInvoice(id);
       return original.apply(this,arguments);
     };
@@ -8655,7 +8655,7 @@ document.addEventListener("DOMContentLoaded",function(){
   /* Edit existing MTS record instead of inserting a second sale. */
   async function saveMtsEdit(){
     const id=window.mtsEditingId;
-    const old=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
+    const old=(salesRecords||[]).find(x=>String(x.id)===String(id));
     if(!id || !old){alert("MTS sale to edit was not found.");return;}
 
     const buyerType=E("mtsBuyerType")?.value||"";
@@ -10378,7 +10378,7 @@ document.addEventListener("DOMContentLoaded",function(){
   function markMtsInvoice(){
     try{
       const id=window.currentInvoiceId;
-      const sale=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
+      const sale=(salesRecords||[]).find(x=>String(x.id)===String(id));
       const overlay=document.getElementById("invoiceOverlay");
       const invoice=document.querySelector("#invoiceOverlay .mf-invoice");
       const printInvoice=document.querySelector("#invoicePrint .mf-invoice");
@@ -10475,44 +10475,40 @@ document.addEventListener("DOMContentLoaded",function(){
 (function(){
   "use strict";
 
+  function allSales(){
+    try{
+      return Array.isArray(salesRecords) ? salesRecords : [];
+    }catch(_){
+      return Array.isArray(window.salesRecords) ? window.salesRecords : [];
+    }
+  }
+
   function isMtsRecord(s){
     const t=String(s?.sale_type||"").trim().toUpperCase().replace(/[\s_-]+/g,"");
     const r=String(s?.reference_no||"").trim().toUpperCase();
-    return t==="MTS" || t==="MTSKOREANBEAUTYPRODUCT" || r.startsWith("MTS-");
+    return !!s && (
+      t==="MTS" ||
+      t==="MTSKOREANBEAUTYPRODUCT" ||
+      r.startsWith("MTS-")
+    );
   }
 
-  function openMtsEditDirect(id){
-    const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
-    if(!s || !isMtsRecord(s)) return false;
-
-    // Prefer the dedicated MTS editor. Never call the generic
-    // Medi Fella Sale editor for an MTS record.
-    if(typeof window.editMtsSale==="function"){
-      window.editMtsSale(String(id));
-      return false;
-    }
-
-    // If the dedicated editor is named editMtsSaleFromInvoice, use it.
+  function openMts(id){
     if(typeof window.editMtsSaleFromInvoice==="function"){
       window.editMtsSaleFromInvoice(String(id));
       return false;
     }
-
-    // Last-resort navigation: open MTS Sale only.
-    const nav=document.querySelector('.nav[data-section="mtsSale"]');
-    if(nav) nav.click();
+    alert("MTS Sale editor is not available in this version.");
     return false;
   }
 
-  // Override the router at the end of the file, after all existing
-  // declarations have loaded.
   function install(){
     const current=window.editSaleFromInvoiceRouter;
-    if(typeof current!=="function" || current.__mtsDirectFinal) return;
+    if(typeof current!=="function" || current.__mtsDirectFinal)return;
 
     const wrapped=function(id){
-      const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
-      if(isMtsRecord(s)) return openMtsEditDirect(id);
+      const s=allSales().find(x=>String(x.id)===String(id));
+      if(isMtsRecord(s))return openMts(id);
       return current.apply(this,arguments);
     };
     wrapped.__mtsDirectFinal=true;
@@ -10530,27 +10526,44 @@ document.addEventListener("DOMContentLoaded",function(){
 <script id="mts-invoice-edit-click-direct-final">
 (function(){
   "use strict";
-  window.mtsInvoiceEditClick=function(id){
-    const s=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
+
+  function allSales(){
+    try{
+      return Array.isArray(salesRecords) ? salesRecords : [];
+    }catch(_){
+      return Array.isArray(window.salesRecords) ? window.salesRecords : [];
+    }
+  }
+
+  function isMtsRecord(s){
     const t=String(s?.sale_type||"").trim().toUpperCase().replace(/[\s_-]+/g,"");
     const r=String(s?.reference_no||"").trim().toUpperCase();
-    const isMts=!!s && (t==="MTS" || t==="MTSKOREANBEAUTYPRODUCT" || r.startsWith("MTS-"));
+    return !!s && (
+      t==="MTS" ||
+      t==="MTSKOREANBEAUTYPRODUCT" ||
+      r.startsWith("MTS-")
+    );
+  }
 
-    if(isMts){
+  /*
+   * IMPORTANT:
+   * MTS Invoice Edit is deliberately handled here first.
+   * It never calls the generic Medi Fella editor for an MTS record.
+   */
+  window.mtsInvoiceEditClick=function(id){
+    const list=allSales();
+    const s=list.find(x=>String(x.id)===String(id));
+
+    if(isMtsRecord(s)){
       if(typeof window.editMtsSaleFromInvoice==="function"){
         window.editMtsSaleFromInvoice(String(id));
         return false;
       }
-      if(typeof window.editMtsSale==="function"){
-        window.editMtsSale(String(id));
-        return false;
-      }
-      const nav=document.querySelector('.nav[data-section="mtsSale"]');
-      if(nav)nav.click();
+      alert("MTS Sale editor is not available in this version.");
       return false;
     }
 
-    // Preserve the original behavior for Medi Fella/Dermed invoices.
+    // Preserve original behavior for non-MTS invoices.
     if(typeof window.editSaleFromInvoiceRouter==="function"){
       window.editSaleFromInvoiceRouter(String(id));
     }
