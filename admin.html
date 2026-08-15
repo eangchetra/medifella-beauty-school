@@ -4304,94 +4304,7 @@ function openPrintFromCanvas(canvas,paper,sale){
    };
  <\/script>
 
-<script id="mts-add-sale-toggle-script">
-(function(){
- function initMtsAddSaleToggle(){
-   const btn=document.getElementById("mtsAddSaleToggle");
-   const form=document.getElementById("mtsSaleFormCard");
-   if(!btn||!form||btn.dataset.bound==="1")return;
-   btn.dataset.bound="1";
-   function setOpen(open){
-     form.style.display=open?"":"none";
-     btn.textContent=open?"− Hide Sale":"+ Add Sale";
-     btn.setAttribute("aria-expanded",open?"true":"false");
-   }
-   setOpen(false);
-   btn.addEventListener("click",function(e){
-     e.preventDefault();
-     e.stopPropagation();
-     setOpen(form.style.display==="none");
-     if(form.style.display!=="none"){
-       if(typeof resetNewInventorySale==="function")resetNewInventorySale("mts");
-       const search=document.getElementById("mtsProductSearch");
-       if(search)setTimeout(()=>search.focus(),50);
-     }
-   });
- }
- if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initMtsAddSaleToggle,{once:true});
- else initMtsAddSaleToggle();
- setTimeout(initMtsAddSaleToggle,500);
-})();
-<\/script>
 
-<script id="mts-payment-status-final-v2">
-(function(){
-  function E(id){return document.getElementById(id)}
-  function num(v){
-    const n=Number(String(v??"").replace(/[$,\s]/g,""));
-    return Number.isFinite(n)&&n>=0?n:0;
-  }
-  function calcTotal(){
-    const arr=window.mtsSaleItems||[];
-    let subtotal=0;
-    arr.forEach(function(x){
-      const qty=Math.max(1,Number(x.quantity)||1);
-      const price=Math.max(0,Number(x.price)||0);
-      const base=qty*price;
-      const dv=Math.max(0,Number(x.discount_value)||0);
-      const d=x.discount_type==="usd"
-        ? Math.min(base,dv)
-        : Math.min(base,base*dv/100);
-      subtotal+=Math.max(0,base-d);
-    });
-    const ov=num(E("mtsOverallDiscountValue")?.value||0);
-    const totalDisc=E("mtsOverallDiscountType")?.value==="usd"
-      ? Math.min(subtotal,ov)
-      : Math.min(subtotal,subtotal*ov/100);
-    return Math.max(0,subtotal-totalDisc);
-  }
-  function sync(){
-    const status=E("mtsPaymentStatus")?.value||"Paid";
-    const input=E("mtsAmountPaidNow");
-    const wrap=E("mtsPartialPaidWrap");
-    if(!input)return;
-    const total=calcTotal();
-
-    if(status==="Paid"){
-      input.value=total.toFixed(2);
-      input.readOnly=true;
-      if(wrap)wrap.classList.add("hidden");
-    }else if(status==="Due"){
-      input.value="0.00";
-      input.readOnly=true;
-      if(wrap)wrap.classList.add("hidden");
-    }else{
-      input.readOnly=false;
-      if(wrap)wrap.classList.remove("hidden");
-      input.value=Math.min(total,num(input.value)).toFixed(2);
-    }
-  }
-  function bind(){
-    E("mtsPaymentStatus")?.addEventListener("change",sync);
-    E("mtsOverallDiscountValue")?.addEventListener("input",sync);
-    E("mtsOverallDiscountType")?.addEventListener("change",sync);
-    sync();
-  }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind,{once:true});
-  else bind();
-  setTimeout(bind,500);
-})();
-</script>
 
 </body>
 </html>`;
@@ -7117,6 +7030,49 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
+
+
+
+
+
+<style id="mts-item-discount-payment-final">
+/* MTS ONLY — item discount + payment controls. */
+#mtsSale #mtsItems .mts-item-discount-wrap{
+  display:grid;
+  grid-template-columns:58px minmax(65px,1fr);
+  gap:5px;
+  min-width:125px;
+}
+#mtsSale #mtsItems .mts-item-discount-wrap select,
+#mtsSale #mtsItems .mts-item-discount-wrap input{
+  width:100%;
+  min-height:40px;
+  padding:8px;
+}
+#mtsSale #mtsItems .mts-item-subtotal{
+  font-weight:800;
+  color:#1aa8bb;
+  background:#f5fbfc;
+}
+#mtsSale #mtsPartialPaidWrap{
+  display:block;
+}
+#mtsSale #mtsPartialPaidWrap.hidden{
+  display:none!important;
+}
+@media(min-width:901px){
+  #mtsSale .sale-controls-grid{grid-template-columns:minmax(220px,1fr) minmax(180px,1fr) minmax(180px,1fr)}
+  #mtsSale #mtsPartialPaidWrap{grid-column:1 / -1;max-width:320px}
+}
+@media(max-width:900px){
+  #mtsSale .sale-controls-grid{grid-template-columns:1fr 1fr}
+}
+</style>
+
+
+
+
+
 <style id="mts-final-customer-result-position">
 /* MTS ONLY — place Student / Customer results directly under its search input. */
 #mtsSale .sale-header-grid > div:first-child{
@@ -7268,41 +7224,6 @@ document.addEventListener("DOMContentLoaded",function(){
   }, 1000);
 })();
 </script>
-
-
-<style id="mts-item-discount-payment-final">
-/* MTS ONLY — item discount + payment controls. */
-#mtsSale #mtsItems .mts-item-discount-wrap{
-  display:grid;
-  grid-template-columns:58px minmax(65px,1fr);
-  gap:5px;
-  min-width:125px;
-}
-#mtsSale #mtsItems .mts-item-discount-wrap select,
-#mtsSale #mtsItems .mts-item-discount-wrap input{
-  width:100%;
-  min-height:40px;
-  padding:8px;
-}
-#mtsSale #mtsItems .mts-item-subtotal{
-  font-weight:800;
-  color:#1aa8bb;
-  background:#f5fbfc;
-}
-#mtsSale #mtsPartialPaidWrap{
-  display:block;
-}
-#mtsSale #mtsPartialPaidWrap.hidden{
-  display:none!important;
-}
-@media(min-width:901px){
-  #mtsSale .sale-controls-grid{grid-template-columns:minmax(220px,1fr) minmax(180px,1fr) minmax(180px,1fr)}
-  #mtsSale #mtsPartialPaidWrap{grid-column:1 / -1;max-width:320px}
-}
-@media(max-width:900px){
-  #mtsSale .sale-controls-grid{grid-template-columns:1fr 1fr}
-}
-</style>
 
 <script id="mts-item-discount-payment-final">
 (function(){
@@ -7637,6 +7558,96 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
+<script id="mts-add-sale-toggle-script">
+(function(){
+ function initMtsAddSaleToggle(){
+   const btn=document.getElementById("mtsAddSaleToggle");
+   const form=document.getElementById("mtsSaleFormCard");
+   if(!btn||!form||btn.dataset.bound==="1")return;
+   btn.dataset.bound="1";
+   function setOpen(open){
+     form.style.display=open?"":"none";
+     btn.textContent=open?"− Hide Sale":"+ Add Sale";
+     btn.setAttribute("aria-expanded",open?"true":"false");
+   }
+   setOpen(false);
+   btn.addEventListener("click",function(e){
+     e.preventDefault();
+     e.stopPropagation();
+     setOpen(form.style.display==="none");
+     if(form.style.display!=="none"){
+       if(typeof resetNewInventorySale==="function")resetNewInventorySale("mts");
+       const search=document.getElementById("mtsProductSearch");
+       if(search)setTimeout(()=>search.focus(),50);
+     }
+   });
+ }
+ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initMtsAddSaleToggle,{once:true});
+ else initMtsAddSaleToggle();
+ setTimeout(initMtsAddSaleToggle,500);
+})();
+</script>
+
+
+
+<script id="mts-payment-status-final-v2">
+(function(){
+  function E(id){return document.getElementById(id)}
+  function num(v){
+    const n=Number(String(v??"").replace(/[$,\s]/g,""));
+    return Number.isFinite(n)&&n>=0?n:0;
+  }
+  function calcTotal(){
+    const arr=window.mtsSaleItems||[];
+    let subtotal=0;
+    arr.forEach(function(x){
+      const qty=Math.max(1,Number(x.quantity)||1);
+      const price=Math.max(0,Number(x.price)||0);
+      const base=qty*price;
+      const dv=Math.max(0,Number(x.discount_value)||0);
+      const d=x.discount_type==="usd"
+        ? Math.min(base,dv)
+        : Math.min(base,base*dv/100);
+      subtotal+=Math.max(0,base-d);
+    });
+    const ov=num(E("mtsOverallDiscountValue")?.value||0);
+    const totalDisc=E("mtsOverallDiscountType")?.value==="usd"
+      ? Math.min(subtotal,ov)
+      : Math.min(subtotal,subtotal*ov/100);
+    return Math.max(0,subtotal-totalDisc);
+  }
+  function sync(){
+    const status=E("mtsPaymentStatus")?.value||"Paid";
+    const input=E("mtsAmountPaidNow");
+    const wrap=E("mtsPartialPaidWrap");
+    if(!input)return;
+    const total=calcTotal();
+
+    if(status==="Paid"){
+      input.value=total.toFixed(2);
+      input.readOnly=true;
+      if(wrap)wrap.classList.add("hidden");
+    }else if(status==="Due"){
+      input.value="0.00";
+      input.readOnly=true;
+      if(wrap)wrap.classList.add("hidden");
+    }else{
+      input.readOnly=false;
+      if(wrap)wrap.classList.remove("hidden");
+      input.value=Math.min(total,num(input.value)).toFixed(2);
+    }
+  }
+  function bind(){
+    E("mtsPaymentStatus")?.addEventListener("change",sync);
+    E("mtsOverallDiscountValue")?.addEventListener("input",sync);
+    E("mtsOverallDiscountType")?.addEventListener("change",sync);
+    sync();
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind,{once:true});
+  else bind();
+  setTimeout(bind,500);
+})();
+</script>
 </body>
 </html>
 
