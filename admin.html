@@ -8599,18 +8599,59 @@ document.addEventListener("DOMContentLoaded",function(){
     const dt=String(s.sale_date||"").slice(0,10)+(s.sale_time?"T"+String(s.sale_time).slice(0,8):"");
     if(E("mtsSaleTime"))E("mtsSaleTime").value=dt?dt.replace("T"," "):"";
 
-    let raw=s.items||[];
+    /*
+     * IMPORTANT: MTS invoices may store the product array under `items`,
+     * `order_items`, or `products`.  The invoice renderer already uses
+     * saleItemsValue() to read all three forms.  Use the same source here,
+     * otherwise Edit can open the correct MTS form but show an empty table.
+     */
+    let raw=typeof saleItemsValue==="function"
+      ? saleItemsValue(s)
+      : (s.items??s.order_items??s.products??[]);
     try{if(typeof raw==="string")raw=JSON.parse(raw)}catch(_){raw=[]}
     if(!Array.isArray(raw))raw=[];
-    window.mtsSaleItems=raw.map(x=>({
-      product_id:x.product_id||x.id||"",
-      product_code:x.product_code||x.code||"",
-      name:x.name||x.product_name||"",
-      price:Number(x.price??x.unit_price??0),
-      quantity:Math.max(1,Number(x.quantity??x.qty??1)),
-      discount_type:String(x.discount_type||"percent").toLowerCase()==="usd"?"usd":"percent",
-      discount_value:Number(x.discount_value??x.discount_input??x.discount_percent??0)||0
-    }));
+
+    const productCatalog=Array.isArray(window.products)?window.products:[];
+    window.mtsSaleItems=raw.map(x=>{
+      const pid=x.product_id||x.id||"";
+      const p=productCatalog.find(z=>String(z.id)===String(pid));
+      return {
+        product_id:pid,
+        product_code:x.product_code||x.code||p?.product_code||"",
+        name:x.name||x.product_name||p?.name||"",
+        price:Number(x.price??x.unit_price??p?.price??0),
+        quantity:Math.max(1,Number(x.quantity??x.qty??1)),
+        discount_type:String(x.discount_type||"percent").toLowerCase()==="usd"?"usd":"percent",
+        discount_value:Number(x.discount_value??x.discount_input??x.discount_percent??0)||0
+      };
+    });
+
+    /*
+     * Defensive fallback for older MTS records whose `items` JSON is empty
+     * but whose inventory movements still identify the sold products.
+     */
+    if(!window.mtsSaleItems.length){
+      try{
+        const mr=await sb.from("medifella_inventory_movements")
+          .select("product_id,quantity,notes")
+          .eq("sale_id",String(id))
+          .eq("movement_type","sale");
+        if(!mr.error && Array.isArray(mr.data) && mr.data.length){
+          window.mtsSaleItems=mr.data.map(m=>{
+            const p=productCatalog.find(z=>String(z.id)===String(m.product_id))||{};
+            return {
+              product_id:m.product_id||"",
+              product_code:p.product_code||"",
+              name:p.name||"",
+              price:Number(p.price||0),
+              quantity:Math.max(1,Number(m.quantity)||1),
+              discount_type:"percent",
+              discount_value:0
+            };
+          });
+        }
+      }catch(_){}
+    }
 
     const overall=Number(s.discount||0);
     if(E("mtsOverallDiscountType"))E("mtsOverallDiscountType").value="usd";
