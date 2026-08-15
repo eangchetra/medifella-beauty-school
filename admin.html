@@ -3539,6 +3539,44 @@ function studentOutstanding(studentId){
  return salesRecords.filter(s=>saleStudentId(s)===String(studentId)).reduce((sum,s)=>sum+Math.max(0,saleTotal(s)-salePaid(s)),0);
 }
 
+/*
+ * Invoice-level outstanding balance for the exact buyer, kept SEPARATE
+ * by invoice type.
+ *
+ * MTS Grand Total Due = all outstanding MTS invoices for this buyer only.
+ * Dermed Grand Total Due = all outstanding Dermed invoices for this buyer only.
+ *
+ * MTS and Dermed NEVER contribute to each other's Grand Total Due.
+ * Fully-paid invoices contribute $0.
+ */
+function buyerOutstandingByInvoiceType(sale){
+ if(!sale)return 0;
+
+ const invoiceType=String(sale.sale_type||"").trim().toUpperCase();
+ if(invoiceType!=="MTS" && invoiceType!=="DERMED")return 0;
+
+ const studentId=String(saleStudentId(sale)||saleField(sale,["student_id"],"")||"").trim();
+ const customerId=String(saleField(sale,["customer_id"],"")||"").trim();
+
+ if(!studentId && !customerId)return 0;
+
+ return salesRecords.reduce((sum,s)=>{
+   const rowType=String(s?.sale_type||"").trim().toUpperCase();
+   if(rowType!==invoiceType)return sum;
+
+   const sStudent=String(saleStudentId(s)||saleField(s,["student_id"],"")||"").trim();
+   const sCustomer=String(saleField(s,["customer_id"],"")||"").trim();
+
+   const sameBuyer = studentId
+     ? sStudent===studentId
+     : customerId && sCustomer===customerId;
+
+   if(!sameBuyer)return sum;
+
+   return sum + Math.max(0, Number(saleTotal(s)||0)-Number(salePaid(s)||0));
+ },0);
+}
+
 function setPaymentStatusDefaults(){
  const status=$("salePaymentStatus").value;
  const total=Math.max(0,Number(calculateSaleTotal().initialTotal||0));
@@ -4000,7 +4038,16 @@ function showSaleInvoice(id,size="A4"){
  const student=saleCustomer(s)||"—";
  const subInitial=Number(saleField(s,["subtotal"],total))||0;
  const overallDiscount=Number(saleField(s,["discount"],0))||0;
- const studentGrandDue=Math.max(0,studentOutstanding(storedStudentId));
+ /*
+  * MTS and Dermed are separate account ledgers.
+  * An MTS invoice sees only outstanding MTS invoices.
+  * A Dermed invoice sees only outstanding Dermed invoices.
+  * They never connect to each other for Grand Total Due.
+  */
+ const invoiceSaleType=String(s.sale_type||"").trim().toUpperCase();
+ const studentGrandDue=(invoiceSaleType==="MTS" || invoiceSaleType==="DERMED")
+   ? Math.max(0,buyerOutstandingByInvoiceType(s))
+   : Math.max(0,studentOutstanding(storedStudentId));
  const khr=v=>Math.round(Number(v||0)*rate).toLocaleString("en-US")+" ៛";
  const usd=v=>money(v);
  const note=saleField(s,["notes","note"],"");
