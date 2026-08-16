@@ -9063,15 +9063,16 @@ document.addEventListener("DOMContentLoaded",function(){
       if(error)throw error;
       appointments=Array.isArray(data)?data:[];
 
-      // One-time migration of appointments created by the older localStorage version.
-      // This only runs when the database table is empty, so existing database records
-      // are never overwritten or duplicated.
+      // Migrate appointments from the previous browser-only version when the
+      // database is empty. Do not delete local data unless the database insert
+      // succeeds AND the database can be read back successfully.
       if(appointments.length===0){
         let legacy=[];
         try{
           const raw=localStorage.getItem(STORAGE_KEY);
           legacy=raw?JSON.parse(raw):[];
         }catch(_){legacy=[]}
+
         if(Array.isArray(legacy)&&legacy.length){
           const rows=legacy.map(a=>({
             id:String(a.id||("APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8))),
@@ -9089,22 +9090,46 @@ document.addEventListener("DOMContentLoaded",function(){
             cancelled_at:a.cancelled_at||null,
             met_at:a.met_at||null
           }));
-          const {data:inserted,error:insertError}=await sb.from("medifella_appointments").insert(rows).select("*");
-          if(!insertError && Array.isArray(inserted)){
-            appointments=inserted;
+
+          // Do not use .select() here: a restrictive SELECT RLS policy can
+          // make a successful INSERT look like a failed migration.
+          const {error:insertError}=await sb.from("medifella_appointments").insert(rows);
+          if(insertError)throw insertError;
+
+          const {data:afterMigration,error:readBackError}=await sb.from("medifella_appointments")
+            .select("*")
+            .order("date",{ascending:true})
+            .order("time",{ascending:true})
+            .order("created_at",{ascending:false});
+          if(readBackError)throw readBackError;
+
+          appointments=Array.isArray(afterMigration)?afterMigration:[];
+          if(appointments.length>=rows.length){
             localStorage.removeItem(STORAGE_KEY);
           }
         }
       }
+
+      return true;
     }catch(e){
       appointments=[];
+      const message=String(e?.message||e||"Unknown database error");
       console.error("Appointment database load error:",e);
+
       const box=A("appointmentList");
-      if(box)box.innerHTML=`<div class="status error">Appointment database could not be loaded: ${escA(e?.message||e)}</div>`;
+      if(box)box.innerHTML=
+        `<div class="status error"><strong>Appointment database error</strong><br>${escA(message)}<br><br>`+
+        `Please run the Appointment Management SQL setup in Supabase, then click Refresh.</div>`;
+
       const up=A("appointmentUpcoming");
-      if(up)up.innerHTML=`<div class="status error">Appointment database could not be loaded. Please run the Appointment Management SQL setup in Supabase.</div>`;
+      if(up)up.innerHTML=
+        `<div class="status error"><strong>Appointment database error</strong><br>${escA(message)}<br><br>`+
+        `Please run the Appointment Management SQL setup in Supabase, then click Refresh.</div>`;
+
+      return false;
     }
   }
+
   async function insertAppointment(row){
     const {data,error}=await sb.from("medifella_appointments").insert(row).select("*").single();
     if(error)throw error;
@@ -9495,7 +9520,7 @@ document.addEventListener("DOMContentLoaded",function(){
     installInvoiceReturnHook();
     setTimeout(installInvoiceReturnHook,300);
     setTimeout(installInvoiceReturnHook,1000);
-    readAppointments().then(()=>renderAll());
+    readAppointments().then(ok=>{if(ok)renderAll();});
     clearForm();
     A("appointmentMonth").value=localDate().slice(0,7);
     A("appointmentAddToggle").onclick=()=>{
@@ -9513,7 +9538,7 @@ document.addEventListener("DOMContentLoaded",function(){
       clearForm();
     };
     A("appointmentListSearch").oninput=renderList;
-    A("appointmentListRefresh").onclick=async()=>{await readAppointments();renderAll()};
+    A("appointmentListRefresh").onclick=async()=>{const ok=await readAppointments();if(ok)renderAll()};
     A("appointmentListTab").onclick=()=>{
       A("appointmentListPanel").classList.remove("hidden");
       A("appointmentUpcomingPanel").classList.add("hidden");
