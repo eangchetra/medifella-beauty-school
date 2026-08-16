@@ -4532,367 +4532,7 @@ function openPrintFromCanvas(canvas,paper,sale){
 
 
 
-<script id="appointment-management-script">
-(function(){
-  "use strict";
-  const STORAGE_KEY="medi_fella_appointments_v1";
-  let appointments=[];
-  let appointmentReturnSection="appointments";
 
-  function A(id){return document.getElementById(id)}
-  function escA(v){return typeof esc==="function"?esc(v):String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
-  function pad(n){return String(n).padStart(2,"0")}
-  function localDate(){
-    const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Phnom_Penh",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
-    const g=t=>p.find(x=>x.type===t)?.value||"00";
-    return `${g("year")}-${g("month")}-${g("day")}`;
-  }
-  function addDays(dateStr,n){
-    const d=new Date(dateStr+"T12:00:00");
-    d.setDate(d.getDate()+n);
-    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
-  }
-  function formatDate(dateStr){
-    if(!dateStr)return "—";
-    const d=new Date(dateStr+"T12:00:00");
-    return d.toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
-  }
-  function formatTime(t){
-    if(!t)return "—";
-    const [h,m]=String(t).split(":").map(Number);
-    if(Number.isNaN(h))return t;
-    const ap=h>=12?"PM":"AM", hh=(h%12)||12;
-    return `${hh}:${pad(m||0)} ${ap}`;
-  }
-  function readAppointments(){
-    try{
-      const raw=localStorage.getItem(STORAGE_KEY);
-      appointments=raw?JSON.parse(raw):[];
-      if(!Array.isArray(appointments))appointments=[];
-    }catch(e){appointments=[]}
-  }
-  function saveAppointments(){
-    localStorage.setItem(STORAGE_KEY,JSON.stringify(appointments));
-  }
-  function appointmentCustomer(c){
-    return {
-      id:String(c?.id||""),
-      name:String(c?.name||""),
-      phone:String(c?.phone||""),
-      code:String(c?.customer_code||"")
-    };
-  }
-  function getCustomer(id){
-    return (typeof customers!=="undefined" ? customers : []).find(c=>String(c.id)===String(id));
-  }
-  function sortAppointments(list){
-    return list.slice().sort((a,b)=>{
-      const aa=`${a.date||""} ${a.time||""}`,bb=`${b.date||""} ${b.time||""}`;
-      return aa.localeCompare(bb);
-    });
-  }
-  function isActive(a){return a.status!=="cancelled"}
-  function customerHay(a){
-    return `${a.customer_name||""} ${a.customer_phone||""} ${a.customer_code||""}`.toLowerCase();
-  }
-  function setFormCustomer(c){
-    if(!c)return;
-    A("appointmentCustomerId").value=String(c.id);
-    A("appointmentCustomerSearch").value=c.name||"";
-    A("appointmentCustomerHint").textContent=`Selected: ${c.name||"Customer"} · ${c.customer_code||"No ID"} · ${c.phone||"No phone"}`;
-    A("appointmentCustomerResults").classList.remove("show");
-  }
-  function renderCustomerPicker(){
-    const input=A("appointmentCustomerSearch"), box=A("appointmentCustomerResults");
-    if(!input||!box)return;
-    const q=(input.value||"").trim().toLowerCase();
-    const list=(typeof customers!=="undefined" ? customers : []).filter(c=>{
-      if(!q)return false;
-      return [c.name,c.phone,c.customer_code].join(" ").toLowerCase().includes(q);
-    }).slice(0,25);
-    box.innerHTML=list.length?list.map(c=>`<button type="button" data-appt-customer="${escA(c.id)}">
-      <strong>${escA(c.name||"Customer")}</strong>
-      <div class="muted">${escA(c.customer_code||"No ID")} · ${escA(c.phone||"No phone")}</div>
-    </button>`).join(""):`<div style="padding:12px" class="muted">${q?"No matching customer found.":"Type to search customers."}</div>`;
-    box.classList.add("show");
-  }
-  function clearForm(){
-    A("appointmentCustomerId").value="";
-    A("appointmentCustomerSearch").value="";
-    A("appointmentCustomerHint").textContent="Search and select a customer.";
-    A("appointmentDate").value=localDate();
-    A("appointmentTime").value="";
-    A("appointmentFormStatus").textContent="";
-    A("appointmentCustomerResults").classList.remove("show");
-  }
-  function showStatus(msg,error){
-    const el=A("appointmentFormStatus");
-    if(!el)return;
-    el.className=error?"status error":"status";
-    el.textContent=msg||"";
-  }
-  function addAppointment(){
-    const customerId=A("appointmentCustomerId").value;
-    const c=getCustomer(customerId);
-    const date=A("appointmentDate").value;
-    const time=A("appointmentTime").value;
-    if(!c){showStatus("Please search and select a customer.",true);return}
-    if(!date||!time){showStatus("Please select appointment date and time.",true);return}
-    const data=appointmentCustomer(c);
-    appointments.push({
-      id:"APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
-      customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,
-      date,time,status:"pending",created_at:new Date().toISOString(),confirmed_at:null
-    });
-    saveAppointments();
-    renderAll();
-    showStatus("Appointment saved successfully.",false);
-    setTimeout(clearForm,700);
-  }
-  function updateAppointment(id,changes){
-    const a=appointments.find(x=>String(x.id)===String(id));
-    if(!a)return null;
-    Object.assign(a,changes);
-    saveAppointments();
-    renderAll();
-    return a;
-  }
-  function deleteAppointment(id){
-    const a=appointments.find(x=>String(x.id)===String(id));
-    if(!a)return;
-    if(!confirm(`Delete appointment for ${a.customer_name||"customer"}?`))return;
-    appointments=appointments.filter(x=>String(x.id)!==String(id));
-    saveAppointments();renderAll();
-  }
-  function cancelAppointment(id){
-    const a=appointments.find(x=>String(x.id)===String(id));
-    if(!a)return;
-    if(!confirm(`Cancel appointment for ${a.customer_name||"customer"}?`))return;
-    updateAppointment(id,{status:"cancelled",cancelled_at:new Date().toISOString()});
-  }
-  function confirmAppointment(id){
-    const a=appointments.find(x=>String(x.id)===String(id));
-    if(!a)return;
-    const t=prompt("Confirm appointment time:",a.time||"");
-    if(t===null)return;
-    if(!/^\d{2}:\d{2}$/.test(t)){alert("Please enter time in HH:MM format.");return}
-    updateAppointment(id,{time:t,status:"confirmed",confirmed_at:new Date().toISOString(),cancelled_at:null});
-  }
-  function changeAppointmentDate(id){
-    const a=appointments.find(x=>String(x.id)===String(id));
-    if(!a)return;
-    const d=prompt("Select new appointment date (YYYY-MM-DD):",a.date||localDate());
-    if(d===null)return;
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){alert("Please enter date as YYYY-MM-DD.");return}
-    const t=prompt("Select new appointment time (HH:MM):",a.time||"");
-    if(t===null)return;
-    if(!/^\d{2}:\d{2}$/.test(t)){alert("Please enter time as HH:MM.");return}
-    updateAppointment(id,{date:d,time:t,status:"pending",confirmed_at:null,cancelled_at:null});
-  }
-  function invoiceRowsForCustomer(a){
-    const list=(typeof salesRecords!=="undefined" ? salesRecords : []).filter(s=>{
-      if(String(s.sale_type||"").toUpperCase()!=="DERMED")return false;
-      const sameId=a.customer_id && (String(s.customer_id||"")===String(a.customer_id));
-      const samePhone=a.customer_phone && String(s.student_phone||"")===String(a.customer_phone);
-      const sameName=a.customer_name && String(s.student_name||"").trim().toLowerCase()===String(a.customer_name||"").trim().toLowerCase();
-      return sameId||samePhone||sameName;
-    });
-    return list.sort((x,y)=>String(y.sale_date||"").localeCompare(String(x.sale_date||"")));
-  }
-  function showCustomerInvoices(id){
-    const a=appointments.find(x=>String(x.id)===String(id));
-    if(!a)return;
-    appointmentReturnSection="appointments";
-    const rows=invoiceRowsForCustomer(a);
-    A("appointmentInvoiceCustomer").textContent=`${a.customer_name||"Customer"} · ${a.customer_code||"No ID"} · ${a.customer_phone||"No phone"}`;
-    A("appointmentInvoiceBody").innerHTML=rows.length?`<div class="table-wrap"><table class="appointment-invoice-table">
-      <thead><tr><th>Date / Time</th><th>Invoice</th><th>Products / Services</th><th>Total</th><th>Paid</th><th>Due</th><th>Action</th></tr></thead>
-      <tbody>${rows.map(s=>{
-        const total=typeof saleTotal==="function"?saleTotal(s):Number(s.total||0);
-        const paid=typeof salePaid==="function"?salePaid(s):Number(s.paid||0);
-        const due=Math.max(0,total-paid);
-        const items=[...(s.items||[]).map(i=>i.name),...(s.service_items||[]).map(i=>i.name)].join(", ");
-        return `<tr>
-          <td>${escA(s.sale_date||"—")} ${escA(String(s.sale_time||"").slice(0,5))}</td>
-          <td><strong>${escA(s.reference_no||"—")}</strong></td>
-          <td>${escA(items||"—")}</td>
-          <td>${typeof money==="function"?money(total):"$"+total.toFixed(2)}</td>
-          <td>${typeof money==="function"?money(paid):"$"+paid.toFixed(2)}</td>
-          <td>${typeof money==="function"?money(due):"$"+due.toFixed(2)}</td>
-          <td><button type="button" class="light appointment-view-invoice" data-sale-id="${escA(s.id)}">View Invoice</button></td>
-        </tr>`;
-      }).join("")}</tbody></table></div>`:`<div class="appointment-empty">No Dermed invoices found for this customer.</div>`;
-    A("appointmentInvoiceModal").classList.add("show");
-  }
-  function closeInvoiceModal(){
-    A("appointmentInvoiceModal").classList.remove("show");
-    // Return to the page from which the customer invoice history was opened.
-    const nav=document.querySelector(`.nav[data-section="${appointmentReturnSection}"]`);
-    if(nav)nav.click();
-  }
-  function renderAlerts(){
-    const today=localDate(),tomorrow=addDays(today,1);
-    const make=(date,target,countTarget)=>{
-      const rows=sortAppointments(appointments.filter(a=>a.date===date&&isActive(a)));
-      A(countTarget).textContent=String(rows.length);
-      A(target).innerHTML=rows.length?rows.map(a=>`<div class="appointment-alert-item">
-        <strong>${escA(formatTime(a.time))}</strong> · ${escA(a.customer_name||"Customer")}
-        <div class="muted">${escA(a.customer_code||"No ID")} · ${escA(a.customer_phone||"No phone")}${a.status==="confirmed"?' · <span style="color:#176b49;font-weight:800">Confirmed</span>':''}</div>
-      </div>`).join(""):`<span class="muted">No appointments.</span>`;
-    };
-    make(today,"appointmentTodayAlert","appointmentTodayCount");
-    make(tomorrow,"appointmentTomorrowAlert","appointmentTomorrowCount");
-  }
-  function renderList(){
-    const q=(A("appointmentListSearch").value||"").trim().toLowerCase();
-    const rows=sortAppointments(appointments.filter(a=>!q||customerHay(a).includes(q)||String(a.date||"").includes(q)));
-    A("appointmentList").innerHTML=rows.length?`<div class="table-wrap"><table class="table">
-      <thead><tr><th>Customer Information</th><th>Appointment Date & Time</th><th>Status</th><th>Actions</th></tr></thead>
-      <tbody>${rows.map(a=>`<tr>
-        <td><strong>${escA(a.customer_code||"—")}</strong><div>${escA(a.customer_name||"—")}</div><div class="muted">${escA(a.customer_phone||"—")}</div></td>
-        <td>${escA(formatDate(a.date))}<div class="muted">${escA(formatTime(a.time))}</div></td>
-        <td>${a.status==="confirmed"?'<span class="badge verified">Confirmed</span>':a.status==="cancelled"?'<span class="badge rejected">Cancelled</span>':'<span class="badge pending">Pending</span>'}</td>
-        <td><div class="actions">
-          <button type="button" class="light appointment-invoices" data-appt-id="${escA(a.id)}">Go to See Invoice</button>
-          <button type="button" class="light appointment-edit" data-appt-id="${escA(a.id)}">Edit</button>
-          <button type="button" class="danger appointment-delete" data-appt-id="${escA(a.id)}">Delete</button>
-        </div></td>
-      </tr>`).join("")}</tbody></table></div>`:'<div class="appointment-empty">No appointments found.</div>';
-  }
-  function renderUpcoming(){
-    const month=A("appointmentMonth").value||localDate().slice(0,7);
-    const current=localDate();
-    let first=month+"-01";
-    const d=new Date(first+"T12:00:00");
-    const last=new Date(d.getFullYear(),d.getMonth()+1,0);
-    let start=first;
-    if(month===current.slice(0,7))start=current;
-    const days=[];
-    for(let x=new Date(start+"T12:00:00");x<=last;x.setDate(x.getDate()+1)){
-      days.push(`${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`);
-    }
-    const byDay=days.map(date=>({date,rows:sortAppointments(appointments.filter(a=>a.date===date&&isActive(a)))}));
-    A("appointmentUpcoming").innerHTML=byDay.length?byDay.map(day=>`<div class="appointment-day">
-      <div class="appointment-day-head"><strong>${escA(formatDate(day.date))}</strong><span class="muted">${day.rows.length} customer${day.rows.length===1?"":"s"}</span></div>
-      <div class="appointment-day-list">${day.rows.length?day.rows.map(a=>{
-        const confirmed=a.status==="confirmed";
-        return `<div class="appointment-ticket ${confirmed?"confirmed":""}">
-          <div class="appointment-time">${escA(formatTime(a.time))}</div>
-          <div><div class="appointment-customer-name">${escA(a.customer_name||"Customer")}${confirmed?'<span class="appointment-confirmed-badge">GREEN TICKET · CONFIRMED</span>':''}</div>
-            <div class="muted">${escA(a.customer_code||"No ID")} · ${escA(a.customer_phone||"No phone")}</div></div>
-          <div class="muted">${confirmed?"Confirmed appointment":"Waiting for confirmation"}</div>
-          <div class="appointment-actions">
-            ${!confirmed?`<button type="button" class="btn appointment-confirm" data-appt-id="${escA(a.id)}">Confirm</button>`:""}
-            <button type="button" class="light appointment-change" data-appt-id="${escA(a.id)}">Change Date</button>
-            <button type="button" class="gold appointment-cancel" data-appt-id="${escA(a.id)}">Cancel</button>
-            <button type="button" class="danger appointment-delete" data-appt-id="${escA(a.id)}">Delete</button>
-          </div>
-        </div>`;
-      }).join(""):'<div class="appointment-empty">No customers scheduled for this day.</div>'}</div></div>`).join(""):'<div class="appointment-empty">No days available.</div>';
-  }
-  function renderAll(){renderAlerts();renderList();renderUpcoming()}
-  function editAppointment(id){
-    const a=appointments.find(x=>String(x.id)===String(id));
-    if(!a)return;
-    const c=getCustomer(a.customer_id);
-    if(c)setFormCustomer(c);
-    else{
-      A("appointmentCustomerId").value=a.customer_id||"";
-      A("appointmentCustomerSearch").value=a.customer_name||"";
-      A("appointmentCustomerHint").textContent=`Selected: ${a.customer_name||"Customer"} · ${a.customer_code||"No ID"} · ${a.customer_phone||"No phone"}`;
-    }
-    A("appointmentDate").value=a.date||localDate();
-    A("appointmentTime").value=a.time||"";
-    A("appointmentAddCard").style.display="";
-    A("appointmentAddToggle").textContent="− Hide Appointment";
-    A("appointmentAddToggle").setAttribute("aria-expanded","true");
-    A("saveAppointment").textContent="Update Appointment";
-    A("saveAppointment").dataset.editId=String(a.id);
-    A("appointmentAddCard").scrollIntoView({behavior:"smooth",block:"start"});
-  }
-  function saveOrUpdate(){
-    const editId=A("saveAppointment").dataset.editId;
-    if(editId){
-      const a=appointments.find(x=>String(x.id)===String(editId));
-      if(!a)return;
-      const c=getCustomer(A("appointmentCustomerId").value);
-      if(!c){showStatus("Please select a customer.",true);return}
-      const date=A("appointmentDate").value,time=A("appointmentTime").value;
-      if(!date||!time){showStatus("Please select date and time.",true);return}
-      const data=appointmentCustomer(c);
-      updateAppointment(editId,{customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,date,time});
-      showStatus("Appointment updated successfully.",false);
-      A("saveAppointment").textContent="Save Appointment";
-      delete A("saveAppointment").dataset.editId;
-      setTimeout(clearForm,500);
-      return;
-    }
-    addAppointment();
-  }
-  function setMonth(v){
-    if(v)A("appointmentMonth").value=v;
-    renderUpcoming();
-  }
-  function init(){
-    readAppointments();
-    clearForm();
-    A("appointmentMonth").value=localDate().slice(0,7);
-    A("appointmentAddToggle").onclick=()=>{
-      const open=A("appointmentAddCard").style.display!=="none";
-      A("appointmentAddCard").style.display=open?"none":"";
-      A("appointmentAddToggle").textContent=open?"+ Add Appointment":"− Hide Appointment";
-      A("appointmentAddToggle").setAttribute("aria-expanded",open?"false":"true");
-    };
-    A("appointmentCustomerSearch").oninput=renderCustomerPicker;
-    A("appointmentCustomerSearch").onclick=renderCustomerPicker;
-    A("saveAppointment").onclick=saveOrUpdate;
-    A("clearAppointmentForm").onclick=()=>{
-      delete A("saveAppointment").dataset.editId;
-      A("saveAppointment").textContent="Save Appointment";
-      clearForm();
-    };
-    A("appointmentListSearch").oninput=renderList;
-    A("appointmentListRefresh").onclick=()=>{readAppointments();renderAll()};
-    A("appointmentMonth").onchange=renderUpcoming;
-    A("appointmentPrevMonth").onclick=()=>{
-      const v=A("appointmentMonth").value||localDate().slice(0,7),d=new Date(v+"-01T12:00:00");
-      d.setMonth(d.getMonth()-1);setMonth(`${d.getFullYear()}-${pad(d.getMonth()+1)}`);
-    };
-    A("appointmentNextMonth").onclick=()=>{
-      const v=A("appointmentMonth").value||localDate().slice(0,7),d=new Date(v+"-01T12:00:00");
-      d.setMonth(d.getMonth()+1);setMonth(`${d.getFullYear()}-${pad(d.getMonth()+1)}`);
-    };
-    document.addEventListener("click",function(e){
-      const cr=e.target.closest?.("[data-appt-customer]");
-      if(cr){e.preventDefault();setFormCustomer(getCustomer(cr.dataset.apptCustomer));return}
-      const inv=e.target.closest?.(".appointment-invoices");
-      if(inv){e.preventDefault();showCustomerInvoices(inv.dataset.apptId);return}
-      const ed=e.target.closest?.(".appointment-edit");
-      if(ed){e.preventDefault();editAppointment(ed.dataset.apptId);return}
-      const del=e.target.closest?.(".appointment-delete");
-      if(del){e.preventDefault();deleteAppointment(del.dataset.apptId);return}
-      const conf=e.target.closest?.(".appointment-confirm");
-      if(conf){e.preventDefault();confirmAppointment(conf.dataset.apptId);return}
-      const ch=e.target.closest?.(".appointment-change");
-      if(ch){e.preventDefault();changeAppointmentDate(ch.dataset.apptId);return}
-      const ca=e.target.closest?.(".appointment-cancel");
-      if(ca){e.preventDefault();cancelAppointment(ca.dataset.apptId);return}
-      const vi=e.target.closest?.(".appointment-view-invoice");
-      if(vi){
-        e.preventDefault();
-        const id=vi.dataset.saleId;
-        if(typeof window.showDermedSaleInvoice==="function")window.showDermedSaleInvoice(id,"A4");
-        return;
-      }
-      if(e.target.closest?.("#appointmentInvoiceClose,#appointmentInvoiceX")){e.preventDefault();closeInvoiceModal();return}
-      if(e.target===A("appointmentInvoiceModal"))closeInvoiceModal();
-    });
-    renderAll();
-  }
-  window.refreshAppointments=()=>{readAppointments();renderAll()};
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
-})();
-</script>
 </body>
 </html>`;
 
@@ -9357,6 +8997,367 @@ document.addEventListener("DOMContentLoaded",function(){
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",run,{once:true});
   else run();
+})();
+</script>
+<script id="appointment-management-script">
+(function(){
+  "use strict";
+  const STORAGE_KEY="medi_fella_appointments_v1";
+  let appointments=[];
+  let appointmentReturnSection="appointments";
+
+  function A(id){return document.getElementById(id)}
+  function escA(v){return typeof esc==="function"?esc(v):String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[m]))}
+  function pad(n){return String(n).padStart(2,"0")}
+  function localDate(){
+    const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Phnom_Penh",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+    const g=t=>p.find(x=>x.type===t)?.value||"00";
+    return `${g("year")}-${g("month")}-${g("day")}`;
+  }
+  function addDays(dateStr,n){
+    const d=new Date(dateStr+"T12:00:00");
+    d.setDate(d.getDate()+n);
+    return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
+  }
+  function formatDate(dateStr){
+    if(!dateStr)return "—";
+    const d=new Date(dateStr+"T12:00:00");
+    return d.toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+  }
+  function formatTime(t){
+    if(!t)return "—";
+    const [h,m]=String(t).split(":").map(Number);
+    if(Number.isNaN(h))return t;
+    const ap=h>=12?"PM":"AM", hh=(h%12)||12;
+    return `${hh}:${pad(m||0)} ${ap}`;
+  }
+  function readAppointments(){
+    try{
+      const raw=localStorage.getItem(STORAGE_KEY);
+      appointments=raw?JSON.parse(raw):[];
+      if(!Array.isArray(appointments))appointments=[];
+    }catch(e){appointments=[]}
+  }
+  function saveAppointments(){
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(appointments));
+  }
+  function appointmentCustomer(c){
+    return {
+      id:String(c?.id||""),
+      name:String(c?.name||""),
+      phone:String(c?.phone||""),
+      code:String(c?.customer_code||"")
+    };
+  }
+  function getCustomer(id){
+    return (typeof customers!=="undefined" ? customers : []).find(c=>String(c.id)===String(id));
+  }
+  function sortAppointments(list){
+    return list.slice().sort((a,b)=>{
+      const aa=`${a.date||""} ${a.time||""}`,bb=`${b.date||""} ${b.time||""}`;
+      return aa.localeCompare(bb);
+    });
+  }
+  function isActive(a){return a.status!=="cancelled"}
+  function customerHay(a){
+    return `${a.customer_name||""} ${a.customer_phone||""} ${a.customer_code||""}`.toLowerCase();
+  }
+  function setFormCustomer(c){
+    if(!c)return;
+    A("appointmentCustomerId").value=String(c.id);
+    A("appointmentCustomerSearch").value=c.name||"";
+    A("appointmentCustomerHint").textContent=`Selected: ${c.name||"Customer"} · ${c.customer_code||"No ID"} · ${c.phone||"No phone"}`;
+    A("appointmentCustomerResults").classList.remove("show");
+  }
+  function renderCustomerPicker(){
+    const input=A("appointmentCustomerSearch"), box=A("appointmentCustomerResults");
+    if(!input||!box)return;
+    const q=(input.value||"").trim().toLowerCase();
+    const list=(typeof customers!=="undefined" ? customers : []).filter(c=>{
+      if(!q)return false;
+      return [c.name,c.phone,c.customer_code].join(" ").toLowerCase().includes(q);
+    }).slice(0,25);
+    box.innerHTML=list.length?list.map(c=>`<button type="button" data-appt-customer="${escA(c.id)}">
+      <strong>${escA(c.name||"Customer")}</strong>
+      <div class="muted">${escA(c.customer_code||"No ID")} · ${escA(c.phone||"No phone")}</div>
+    </button>`).join(""):`<div style="padding:12px" class="muted">${q?"No matching customer found.":"Type to search customers."}</div>`;
+    box.classList.add("show");
+  }
+  function clearForm(){
+    A("appointmentCustomerId").value="";
+    A("appointmentCustomerSearch").value="";
+    A("appointmentCustomerHint").textContent="Search and select a customer.";
+    A("appointmentDate").value=localDate();
+    A("appointmentTime").value="";
+    A("appointmentFormStatus").textContent="";
+    A("appointmentCustomerResults").classList.remove("show");
+  }
+  function showStatus(msg,error){
+    const el=A("appointmentFormStatus");
+    if(!el)return;
+    el.className=error?"status error":"status";
+    el.textContent=msg||"";
+  }
+  function addAppointment(){
+    const customerId=A("appointmentCustomerId").value;
+    const c=getCustomer(customerId);
+    const date=A("appointmentDate").value;
+    const time=A("appointmentTime").value;
+    if(!c){showStatus("Please search and select a customer.",true);return}
+    if(!date||!time){showStatus("Please select appointment date and time.",true);return}
+    const data=appointmentCustomer(c);
+    appointments.push({
+      id:"APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
+      customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,
+      date,time,status:"pending",created_at:new Date().toISOString(),confirmed_at:null
+    });
+    saveAppointments();
+    renderAll();
+    showStatus("Appointment saved successfully.",false);
+    setTimeout(clearForm,700);
+  }
+  function updateAppointment(id,changes){
+    const a=appointments.find(x=>String(x.id)===String(id));
+    if(!a)return null;
+    Object.assign(a,changes);
+    saveAppointments();
+    renderAll();
+    return a;
+  }
+  function deleteAppointment(id){
+    const a=appointments.find(x=>String(x.id)===String(id));
+    if(!a)return;
+    if(!confirm(`Delete appointment for ${a.customer_name||"customer"}?`))return;
+    appointments=appointments.filter(x=>String(x.id)!==String(id));
+    saveAppointments();renderAll();
+  }
+  function cancelAppointment(id){
+    const a=appointments.find(x=>String(x.id)===String(id));
+    if(!a)return;
+    if(!confirm(`Cancel appointment for ${a.customer_name||"customer"}?`))return;
+    updateAppointment(id,{status:"cancelled",cancelled_at:new Date().toISOString()});
+  }
+  function confirmAppointment(id){
+    const a=appointments.find(x=>String(x.id)===String(id));
+    if(!a)return;
+    const t=prompt("Confirm appointment time:",a.time||"");
+    if(t===null)return;
+    if(!/^\d{2}:\d{2}$/.test(t)){alert("Please enter time in HH:MM format.");return}
+    updateAppointment(id,{time:t,status:"confirmed",confirmed_at:new Date().toISOString(),cancelled_at:null});
+  }
+  function changeAppointmentDate(id){
+    const a=appointments.find(x=>String(x.id)===String(id));
+    if(!a)return;
+    const d=prompt("Select new appointment date (YYYY-MM-DD):",a.date||localDate());
+    if(d===null)return;
+    if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){alert("Please enter date as YYYY-MM-DD.");return}
+    const t=prompt("Select new appointment time (HH:MM):",a.time||"");
+    if(t===null)return;
+    if(!/^\d{2}:\d{2}$/.test(t)){alert("Please enter time as HH:MM.");return}
+    updateAppointment(id,{date:d,time:t,status:"pending",confirmed_at:null,cancelled_at:null});
+  }
+  function invoiceRowsForCustomer(a){
+    const list=(typeof salesRecords!=="undefined" ? salesRecords : []).filter(s=>{
+      if(String(s.sale_type||"").toUpperCase()!=="DERMED")return false;
+      const sameId=a.customer_id && (String(s.customer_id||"")===String(a.customer_id));
+      const samePhone=a.customer_phone && String(s.student_phone||"")===String(a.customer_phone);
+      const sameName=a.customer_name && String(s.student_name||"").trim().toLowerCase()===String(a.customer_name||"").trim().toLowerCase();
+      return sameId||samePhone||sameName;
+    });
+    return list.sort((x,y)=>String(y.sale_date||"").localeCompare(String(x.sale_date||"")));
+  }
+  function showCustomerInvoices(id){
+    const a=appointments.find(x=>String(x.id)===String(id));
+    if(!a)return;
+    appointmentReturnSection="appointments";
+    const rows=invoiceRowsForCustomer(a);
+    A("appointmentInvoiceCustomer").textContent=`${a.customer_name||"Customer"} · ${a.customer_code||"No ID"} · ${a.customer_phone||"No phone"}`;
+    A("appointmentInvoiceBody").innerHTML=rows.length?`<div class="table-wrap"><table class="appointment-invoice-table">
+      <thead><tr><th>Date / Time</th><th>Invoice</th><th>Products / Services</th><th>Total</th><th>Paid</th><th>Due</th><th>Action</th></tr></thead>
+      <tbody>${rows.map(s=>{
+        const total=typeof saleTotal==="function"?saleTotal(s):Number(s.total||0);
+        const paid=typeof salePaid==="function"?salePaid(s):Number(s.paid||0);
+        const due=Math.max(0,total-paid);
+        const items=[...(s.items||[]).map(i=>i.name),...(s.service_items||[]).map(i=>i.name)].join(", ");
+        return `<tr>
+          <td>${escA(s.sale_date||"—")} ${escA(String(s.sale_time||"").slice(0,5))}</td>
+          <td><strong>${escA(s.reference_no||"—")}</strong></td>
+          <td>${escA(items||"—")}</td>
+          <td>${typeof money==="function"?money(total):"$"+total.toFixed(2)}</td>
+          <td>${typeof money==="function"?money(paid):"$"+paid.toFixed(2)}</td>
+          <td>${typeof money==="function"?money(due):"$"+due.toFixed(2)}</td>
+          <td><button type="button" class="light appointment-view-invoice" data-sale-id="${escA(s.id)}">View Invoice</button></td>
+        </tr>`;
+      }).join("")}</tbody></table></div>`:`<div class="appointment-empty">No Dermed invoices found for this customer.</div>`;
+    A("appointmentInvoiceModal").classList.add("show");
+  }
+  function closeInvoiceModal(){
+    A("appointmentInvoiceModal").classList.remove("show");
+    // Return to the page from which the customer invoice history was opened.
+    const nav=document.querySelector(`.nav[data-section="${appointmentReturnSection}"]`);
+    if(nav)nav.click();
+  }
+  function renderAlerts(){
+    const today=localDate(),tomorrow=addDays(today,1);
+    const make=(date,target,countTarget)=>{
+      const rows=sortAppointments(appointments.filter(a=>a.date===date&&isActive(a)));
+      A(countTarget).textContent=String(rows.length);
+      A(target).innerHTML=rows.length?rows.map(a=>`<div class="appointment-alert-item">
+        <strong>${escA(formatTime(a.time))}</strong> · ${escA(a.customer_name||"Customer")}
+        <div class="muted">${escA(a.customer_code||"No ID")} · ${escA(a.customer_phone||"No phone")}${a.status==="confirmed"?' · <span style="color:#176b49;font-weight:800">Confirmed</span>':''}</div>
+      </div>`).join(""):`<span class="muted">No appointments.</span>`;
+    };
+    make(today,"appointmentTodayAlert","appointmentTodayCount");
+    make(tomorrow,"appointmentTomorrowAlert","appointmentTomorrowCount");
+  }
+  function renderList(){
+    const q=(A("appointmentListSearch").value||"").trim().toLowerCase();
+    const rows=sortAppointments(appointments.filter(a=>!q||customerHay(a).includes(q)||String(a.date||"").includes(q)));
+    A("appointmentList").innerHTML=rows.length?`<div class="table-wrap"><table class="table">
+      <thead><tr><th>Customer Information</th><th>Appointment Date & Time</th><th>Status</th><th>Actions</th></tr></thead>
+      <tbody>${rows.map(a=>`<tr>
+        <td><strong>${escA(a.customer_code||"—")}</strong><div>${escA(a.customer_name||"—")}</div><div class="muted">${escA(a.customer_phone||"—")}</div></td>
+        <td>${escA(formatDate(a.date))}<div class="muted">${escA(formatTime(a.time))}</div></td>
+        <td>${a.status==="confirmed"?'<span class="badge verified">Confirmed</span>':a.status==="cancelled"?'<span class="badge rejected">Cancelled</span>':'<span class="badge pending">Pending</span>'}</td>
+        <td><div class="actions">
+          <button type="button" class="light appointment-invoices" data-appt-id="${escA(a.id)}">Go to See Invoice</button>
+          <button type="button" class="light appointment-edit" data-appt-id="${escA(a.id)}">Edit</button>
+          <button type="button" class="danger appointment-delete" data-appt-id="${escA(a.id)}">Delete</button>
+        </div></td>
+      </tr>`).join("")}</tbody></table></div>`:'<div class="appointment-empty">No appointments found.</div>';
+  }
+  function renderUpcoming(){
+    const month=A("appointmentMonth").value||localDate().slice(0,7);
+    const current=localDate();
+    let first=month+"-01";
+    const d=new Date(first+"T12:00:00");
+    const last=new Date(d.getFullYear(),d.getMonth()+1,0);
+    let start=first;
+    if(month===current.slice(0,7))start=current;
+    const days=[];
+    for(let x=new Date(start+"T12:00:00");x<=last;x.setDate(x.getDate()+1)){
+      days.push(`${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`);
+    }
+    const byDay=days.map(date=>({date,rows:sortAppointments(appointments.filter(a=>a.date===date&&isActive(a)))}));
+    A("appointmentUpcoming").innerHTML=byDay.length?byDay.map(day=>`<div class="appointment-day">
+      <div class="appointment-day-head"><strong>${escA(formatDate(day.date))}</strong><span class="muted">${day.rows.length} customer${day.rows.length===1?"":"s"}</span></div>
+      <div class="appointment-day-list">${day.rows.length?day.rows.map(a=>{
+        const confirmed=a.status==="confirmed";
+        return `<div class="appointment-ticket ${confirmed?"confirmed":""}">
+          <div class="appointment-time">${escA(formatTime(a.time))}</div>
+          <div><div class="appointment-customer-name">${escA(a.customer_name||"Customer")}${confirmed?'<span class="appointment-confirmed-badge">GREEN TICKET · CONFIRMED</span>':''}</div>
+            <div class="muted">${escA(a.customer_code||"No ID")} · ${escA(a.customer_phone||"No phone")}</div></div>
+          <div class="muted">${confirmed?"Confirmed appointment":"Waiting for confirmation"}</div>
+          <div class="appointment-actions">
+            ${!confirmed?`<button type="button" class="btn appointment-confirm" data-appt-id="${escA(a.id)}">Confirm</button>`:""}
+            <button type="button" class="light appointment-change" data-appt-id="${escA(a.id)}">Change Date</button>
+            <button type="button" class="gold appointment-cancel" data-appt-id="${escA(a.id)}">Cancel</button>
+            <button type="button" class="danger appointment-delete" data-appt-id="${escA(a.id)}">Delete</button>
+          </div>
+        </div>`;
+      }).join(""):'<div class="appointment-empty">No customers scheduled for this day.</div>'}</div></div>`).join(""):'<div class="appointment-empty">No days available.</div>';
+  }
+  function renderAll(){renderAlerts();renderList();renderUpcoming()}
+  function editAppointment(id){
+    const a=appointments.find(x=>String(x.id)===String(id));
+    if(!a)return;
+    const c=getCustomer(a.customer_id);
+    if(c)setFormCustomer(c);
+    else{
+      A("appointmentCustomerId").value=a.customer_id||"";
+      A("appointmentCustomerSearch").value=a.customer_name||"";
+      A("appointmentCustomerHint").textContent=`Selected: ${a.customer_name||"Customer"} · ${a.customer_code||"No ID"} · ${a.customer_phone||"No phone"}`;
+    }
+    A("appointmentDate").value=a.date||localDate();
+    A("appointmentTime").value=a.time||"";
+    A("appointmentAddCard").style.display="";
+    A("appointmentAddToggle").textContent="− Hide Appointment";
+    A("appointmentAddToggle").setAttribute("aria-expanded","true");
+    A("saveAppointment").textContent="Update Appointment";
+    A("saveAppointment").dataset.editId=String(a.id);
+    A("appointmentAddCard").scrollIntoView({behavior:"smooth",block:"start"});
+  }
+  function saveOrUpdate(){
+    const editId=A("saveAppointment").dataset.editId;
+    if(editId){
+      const a=appointments.find(x=>String(x.id)===String(editId));
+      if(!a)return;
+      const c=getCustomer(A("appointmentCustomerId").value);
+      if(!c){showStatus("Please select a customer.",true);return}
+      const date=A("appointmentDate").value,time=A("appointmentTime").value;
+      if(!date||!time){showStatus("Please select date and time.",true);return}
+      const data=appointmentCustomer(c);
+      updateAppointment(editId,{customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,date,time});
+      showStatus("Appointment updated successfully.",false);
+      A("saveAppointment").textContent="Save Appointment";
+      delete A("saveAppointment").dataset.editId;
+      setTimeout(clearForm,500);
+      return;
+    }
+    addAppointment();
+  }
+  function setMonth(v){
+    if(v)A("appointmentMonth").value=v;
+    renderUpcoming();
+  }
+  function init(){
+    readAppointments();
+    clearForm();
+    A("appointmentMonth").value=localDate().slice(0,7);
+    A("appointmentAddToggle").onclick=()=>{
+      const open=A("appointmentAddCard").style.display!=="none";
+      A("appointmentAddCard").style.display=open?"none":"";
+      A("appointmentAddToggle").textContent=open?"+ Add Appointment":"− Hide Appointment";
+      A("appointmentAddToggle").setAttribute("aria-expanded",open?"false":"true");
+    };
+    A("appointmentCustomerSearch").oninput=renderCustomerPicker;
+    A("appointmentCustomerSearch").onclick=renderCustomerPicker;
+    A("saveAppointment").onclick=saveOrUpdate;
+    A("clearAppointmentForm").onclick=()=>{
+      delete A("saveAppointment").dataset.editId;
+      A("saveAppointment").textContent="Save Appointment";
+      clearForm();
+    };
+    A("appointmentListSearch").oninput=renderList;
+    A("appointmentListRefresh").onclick=()=>{readAppointments();renderAll()};
+    A("appointmentMonth").onchange=renderUpcoming;
+    A("appointmentPrevMonth").onclick=()=>{
+      const v=A("appointmentMonth").value||localDate().slice(0,7),d=new Date(v+"-01T12:00:00");
+      d.setMonth(d.getMonth()-1);setMonth(`${d.getFullYear()}-${pad(d.getMonth()+1)}`);
+    };
+    A("appointmentNextMonth").onclick=()=>{
+      const v=A("appointmentMonth").value||localDate().slice(0,7),d=new Date(v+"-01T12:00:00");
+      d.setMonth(d.getMonth()+1);setMonth(`${d.getFullYear()}-${pad(d.getMonth()+1)}`);
+    };
+    document.addEventListener("click",function(e){
+      const cr=e.target.closest?.("[data-appt-customer]");
+      if(cr){e.preventDefault();setFormCustomer(getCustomer(cr.dataset.apptCustomer));return}
+      const inv=e.target.closest?.(".appointment-invoices");
+      if(inv){e.preventDefault();showCustomerInvoices(inv.dataset.apptId);return}
+      const ed=e.target.closest?.(".appointment-edit");
+      if(ed){e.preventDefault();editAppointment(ed.dataset.apptId);return}
+      const del=e.target.closest?.(".appointment-delete");
+      if(del){e.preventDefault();deleteAppointment(del.dataset.apptId);return}
+      const conf=e.target.closest?.(".appointment-confirm");
+      if(conf){e.preventDefault();confirmAppointment(conf.dataset.apptId);return}
+      const ch=e.target.closest?.(".appointment-change");
+      if(ch){e.preventDefault();changeAppointmentDate(ch.dataset.apptId);return}
+      const ca=e.target.closest?.(".appointment-cancel");
+      if(ca){e.preventDefault();cancelAppointment(ca.dataset.apptId);return}
+      const vi=e.target.closest?.(".appointment-view-invoice");
+      if(vi){
+        e.preventDefault();
+        const id=vi.dataset.saleId;
+        if(typeof window.showDermedSaleInvoice==="function")window.showDermedSaleInvoice(id,"A4");
+        return;
+      }
+      if(e.target.closest?.("#appointmentInvoiceClose,#appointmentInvoiceX")){e.preventDefault();closeInvoiceModal();return}
+      if(e.target===A("appointmentInvoiceModal"))closeInvoiceModal();
+    });
+    renderAll();
+  }
+  window.refreshAppointments=()=>{readAppointments();renderAll()};
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
 })();
 </script>
 </body>
