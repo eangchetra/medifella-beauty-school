@@ -2021,6 +2021,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <button class="nav" data-section="sales">🧾 Medi Fella Sale</button>
 <button class="nav" data-section="mtsSale">🧾 MTS Sale</button>
 <button class="nav" data-section="dermedSale">🧾 Dermed Sale</button>
+<button class="nav" data-section="saleCommission">💰 Sale Commission Management</button>
 <button class="nav" data-section="appointments">📅 Appointment Management</button>
 <button class="nav" data-section="products">📦 Product Management</button>
 <button class="nav" data-section="services">🧴 Services Management</button>
@@ -2352,6 +2353,92 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div id="invoiceOverlay" class="invoice-overlay"><div id="invoicePrint" class="invoice-box"></div></div>
 
 
+
+<section id="saleCommission" class="section">
+<h1>Sale Commission Management</h1>
+
+<div class="card">
+  <h2>+ Add Sale Commission</h2>
+  <div class="row">
+    <div>
+      <label>Staff Name</label>
+      <select id="commissionStaff"><option value="">Select Staff</option></select>
+    </div>
+    <div>
+      <label>Customer Name</label>
+      <div style="position:relative">
+        <input id="commissionCustomerSearch" placeholder="Search customer name / phone / ID" autocomplete="off">
+        <div id="commissionCustomerResults" class="search-results" style="position:absolute;left:0;right:0;top:100%;z-index:30"></div>
+      </div>
+      <input id="commissionCustomerId" type="hidden">
+    </div>
+  </div>
+
+  <div class="row">
+    <div>
+      <label>Customer Phone Number</label>
+      <input id="commissionCustomerPhone" readonly>
+    </div>
+    <div>
+      <label>Service Type</label>
+      <select id="commissionServiceType">
+        <option value="service">Only Service — 2%</option>
+        <option value="service_product">Service with Product — 3%</option>
+      </select>
+    </div>
+  </div>
+
+  <label>Service Detail</label>
+  <input id="commissionServiceDetail" placeholder="Service detail">
+
+  <div class="row">
+    <div><label>Unit</label><input id="commissionUnit" type="number" min="1" step="1" value="1"></div>
+    <div><label>Unit Price</label><input id="commissionUnitPrice" type="number" min="0" step="0.01" value="0"></div>
+    <div><label>Discount</label><input id="commissionDiscount" type="number" min="0" step="0.01" value="0"></div>
+  </div>
+
+  <div class="row">
+    <div><label>Subtotal</label><input id="commissionSubtotal" readonly value="0.00"></div>
+    <div><label>Commission</label><input id="commissionRate" readonly value="2%"></div>
+    <div><label>Subtotal Commission</label><input id="commissionAmount" readonly value="0.00"></div>
+  </div>
+
+  <div class="actions" style="margin-top:14px">
+    <button id="saveSaleCommission" class="gold" type="button">Save Sale Commission</button>
+    <button id="clearSaleCommission" class="light" type="button">Clear</button>
+  </div>
+  <div id="commissionStatus"></div>
+</div>
+
+<div class="card" style="margin-top:18px">
+  <div class="toolbar">
+    <div>
+      <label>Filter Staff Name</label>
+      <select id="commissionFilterStaff"><option value="">All Staff</option></select>
+    </div>
+    <div>
+      <label>From Date</label>
+      <input id="commissionFromDate" type="date">
+    </div>
+    <div>
+      <label>To Date</label>
+      <input id="commissionToDate" type="date">
+    </div>
+    <div style="align-self:end">
+      <button id="commissionRefresh" class="light" type="button">Search</button>
+    </div>
+  </div>
+
+  <div class="actions" style="margin-bottom:14px">
+    <button id="commissionPdf" class="light" type="button">Save PDF</button>
+    <button id="commissionExcel" class="light" type="button">Save Excel</button>
+  </div>
+
+  <h2>Commission List</h2>
+  <div id="commissionList"></div>
+  <div id="commissionGrandTotal" class="sale-total"></div>
+</div>
+</section>
 <section id="appointments" class="section">
   <div class="appointment-titlebar">
     <div>
@@ -2900,6 +2987,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <label style="font-weight:400"><input id="permSales" type="checkbox"> Medi Fella Sale</label>
 <label style="font-weight:400"><input id="permMtsSale" type="checkbox"> MTS Sale</label>
 <label style="font-weight:400"><input id="permDermedSale" type="checkbox"> Dermed Sale</label>
+<label style="font-weight:400"><input id="permSaleCommission" type="checkbox"> Sale Commission Management</label>
 <label style="font-weight:400"><input id="permAppointments" type="checkbox"> Appointment Management</label>
 <label style="font-weight:400"><input id="permProducts" type="checkbox"> Product Management</label>
 <label style="font-weight:400"><input id="permServices" type="checkbox"> Services Management</label>
@@ -5656,6 +5744,7 @@ function normalizeStaffPermissions(raw){
     sales:["sales","mediFellaSale","medifellaSale"],
     mtsSale:["mtsSale","mts","mtsSales"],
     dermedSale:["dermedSale","dermed","dermedSales"],
+    saleCommission:["saleCommission","saleCommissionManagement","commission","commissions"],
     appointments:["appointments","appointmentManagement","appointment"],
     products:["products","productManagement","product"],
     services:["services","servicesManagement","service"],
@@ -5676,7 +5765,7 @@ function normalizeStaffPermissions(raw){
 
 const STAFF_PERMISSION_KEYS = [
 ["dashboard","permDashboard"],["students","permStudents"],["sales","permSales"],
-["mtsSale","permMtsSale"],["dermedSale","permDermedSale"],["appointments","permAppointments"],
+["mtsSale","permMtsSale"],["dermedSale","permDermedSale"],["saleCommission","permSaleCommission"],["appointments","permAppointments"],
 ["products","permProducts"],["services","permServices"],["staffManagement","permStaffManagement"],
 ["customers","permCustomers"],["certificates","permCertificates"],["posts","permPosts"],
 ["courses","permCourses"],["staff","permStaffAccounts"],["admins","permAdmins"]
@@ -5710,7 +5799,7 @@ function renderStaff(){
     const permissions=normalizeStaffPermissions(p.permissions);
     const labels=[
       ["dashboard","Dashboard"],["students","Students"],["sales","Medi Fella Sale"],
-      ["mtsSale","MTS Sale"],["dermedSale","Dermed Sale"],["appointments","Appointment Management"],
+      ["mtsSale","MTS Sale"],["dermedSale","Dermed Sale"],["saleCommission","Sale Commission Management"],["appointments","Appointment Management"],
       ["products","Product Management"],["services","Services Management"],
       ["staffManagement","Staff Management"],["customers","Customer Management"],
       ["certificates","Certificate Verification"],["posts","News Feed"],
@@ -7245,6 +7334,29 @@ document.addEventListener("DOMContentLoaded",function(){
         const movements=items.map(x=>({product_id:x.product_id,movement_type:"sale",quantity:Math.max(1,num(x.quantity)),staff_id:staffId,staff_name:staff?.name_en||"",stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));
         if(movements.length){const mr=await sb.from("medifella_inventory_movements").insert(movements);if(mr.error)throw mr.error}
       }
+      // Commission belongs to the customer's FIRST Dermed invoice.
+      // For the first invoice, editing the invoice recalculates its commission
+      // from the edited services. Later invoices never create commission.
+      if(r?.data?.id){
+        try{
+          await recordFirstDermedSaleCommission({
+            sale:r.data,
+            buyer,
+            buyerType,
+            buyerId,
+            staffId,
+            staff,
+            servicesArr,
+            items,
+            hasProducts:items.length>0,
+            adminId:adminUser.id
+          });
+        }catch(commissionError){
+          console.error("Commission recording failed:",commissionError);
+          // Do not fail the already-saved sale because commission logging is auxiliary.
+        }
+      }
+
       const wasEditing=!!editingId;
       const savedReference=(r&&r.data&&r.data.reference_no)||reference;
       window.editingDermedSaleId=null;
@@ -9931,6 +10043,328 @@ document.addEventListener("DOMContentLoaded",function(){
 
 
 
+
+
+<script id="sale-commission-management">
+(function(){
+  "use strict";
+  const C=id=>document.getElementById(id);
+  const moneyC=v=>Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const escC=v=>typeof esc==="function"?esc(v):String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const todayC=()=>new Date().toISOString().slice(0,10);
+
+  window.commissionRecords=window.commissionRecords||[];
+  let commissionCustomerCache={ref:null,rows:[]};
+
+  function commissionRateFor(type){
+    return type==="service_product"?0.03:0.02;
+  }
+
+  function rebuildCommissionCustomerCache(){
+    const cs=Array.isArray(window.customers)?window.customers:[];
+    if(commissionCustomerCache.ref===cs)return;
+    commissionCustomerCache.rows=cs.map(x=>({
+      raw:x,
+      text:String((x.customer_code||"")+" "+(x.name||"")+" "+(x.phone||"")).toLowerCase()
+    }));
+    commissionCustomerCache.ref=cs;
+  }
+
+  function renderCommissionCustomerResults(){
+    const input=C("commissionCustomerSearch"),box=C("commissionCustomerResults");
+    if(!input||!box)return;
+    const q=String(input.value||"").toLowerCase().trim();
+    if(!q){box.innerHTML="";box.classList.remove("show");return}
+    rebuildCommissionCustomerCache();
+    const rows=commissionCustomerCache.rows.filter(x=>x.text.includes(q)).slice(0,10).map(x=>x.raw);
+    box.innerHTML=rows.map(x=>`<button type="button" data-commission-customer="${escC(x.id)}">
+      <strong>${escC(x.name||"Customer")}</strong>
+      <div class="muted">${escC(x.customer_code||"No ID")} · ${escC(x.phone||"No phone")}</div>
+    </button>`).join("")||'<div class="muted" style="padding:10px">No matching customer found.</div>';
+    box.classList.add("show");
+  }
+
+  function selectCommissionCustomer(id){
+    const c=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(id));
+    if(!c)return;
+    C("commissionCustomerId").value=String(c.id);
+    C("commissionCustomerSearch").value=c.name||"";
+    C("commissionCustomerPhone").value=c.phone||"";
+    C("commissionCustomerResults").innerHTML="";
+    C("commissionCustomerResults").classList.remove("show");
+  }
+
+  function calcCommissionForm(){
+    const unit=Math.max(0,Number(C("commissionUnit")?.value||0));
+    const price=Math.max(0,Number(C("commissionUnitPrice")?.value||0));
+    const discount=Math.max(0,Number(C("commissionDiscount")?.value||0));
+    const subtotal=Math.max(0,unit*price-discount);
+    const rate=commissionRateFor(C("commissionServiceType")?.value||"service");
+    C("commissionSubtotal").value=subtotal.toFixed(2);
+    C("commissionRate").value=(rate*100).toFixed(0)+"%";
+    C("commissionAmount").value=(subtotal*rate).toFixed(2);
+    return {unit,price,discount,subtotal,rate,amount:subtotal*rate};
+  }
+
+  function clearCommissionForm(){
+    ["commissionCustomerId","commissionCustomerPhone"].forEach(id=>{if(C(id))C(id).value=""});
+    if(C("commissionCustomerSearch"))C("commissionCustomerSearch").value="";
+    if(C("commissionServiceDetail"))C("commissionServiceDetail").value="";
+    if(C("commissionUnit"))C("commissionUnit").value="1";
+    if(C("commissionUnitPrice"))C("commissionUnitPrice").value="0";
+    if(C("commissionDiscount"))C("commissionDiscount").value="0";
+    if(C("commissionServiceType"))C("commissionServiceType").value="service";
+    calcCommissionForm();
+  }
+
+  function staffRows(){
+    return Array.isArray(window.staffInfoRecords)?window.staffInfoRecords:[];
+  }
+  function populateCommissionStaff(){
+    const rows=staffRows();
+    ["commissionStaff","commissionFilterStaff"].forEach(id=>{
+      const el=C(id);if(!el)return;
+      const selected=el.value;
+      const all=id==="commissionFilterStaff"?'<option value="">All Staff</option>':'<option value="">Select Staff</option>';
+      el.innerHTML=all+rows.map(s=>`<option value="${escC(s.id)}">${escC(s.name_en||s.name_km||s.name||"Staff")}</option>`).join("");
+      if(selected)el.value=selected;
+    });
+  }
+
+  async function loadCommissionRecords(){
+    if(typeof sb==="undefined")return;
+    const r=await sb.from("medifella_sale_commissions").select("*").order("commission_date",{ascending:false}).order("created_at",{ascending:false});
+    if(r.error){
+      console.warn("Commission table load:",r.error.message);
+      window.commissionRecords=[];
+      renderCommissionList();
+      return;
+    }
+    window.commissionRecords=r.data||[];
+    renderCommissionList();
+  }
+
+  function filteredCommissionRecords(){
+    const staff=C("commissionFilterStaff")?.value||"";
+    const from=C("commissionFromDate")?.value||"";
+    const to=C("commissionToDate")?.value||"";
+    return (window.commissionRecords||[]).filter(x=>{
+      const d=String(x.commission_date||x.created_at||"").slice(0,10);
+      return (!staff||String(x.staff_id)===String(staff))
+        &&(!from||d>=from)&&(!to||d<=to);
+    });
+  }
+
+  function renderCommissionList(){
+    const box=C("commissionList");if(!box)return;
+    const rows=filteredCommissionRecords();
+    const totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0);
+    const totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
+    box.innerHTML=rows.length?`<div class="table-wrap"><table class="table">
+      <tr><th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th><th>Service Type</th><th>Service Detail</th><th>Unit</th><th>Unit Price</th><th>Discount</th><th>Subtotal</th><th>Commission</th><th>Subtotal Commission</th></tr>
+      ${rows.map(x=>`<tr>
+        <td>${escC(String(x.commission_date||x.created_at||"").slice(0,10))}</td>
+        <td>${escC(x.staff_name||"")}</td>
+        <td>${escC(x.customer_name||"")}</td>
+        <td>${escC(x.customer_phone||"")}</td>
+        <td>${escC(x.service_type==="service_product"?"Service with Product":"Only Service")}</td>
+        <td>${escC(x.service_detail||"")}</td>
+        <td>${escC(x.unit??1)}</td>
+        <td>$${moneyC(x.unit_price)}</td>
+        <td>$${moneyC(x.discount)}</td>
+        <td>$${moneyC(x.subtotal)}</td>
+        <td>${Number(x.commission_rate||0)*100}%</td>
+        <td>$${moneyC(x.commission_amount)}</td>
+      </tr>`).join("")}
+    </table></div>`:'<p class="muted">No commission records found.</p>';
+    C("commissionGrandTotal").innerHTML=`
+      <div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div>
+      <div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>
+    `;
+  }
+
+  async function saveCommissionManual(){
+    const staffId=C("commissionStaff")?.value, customerId=C("commissionCustomerId")?.value;
+    const detail=C("commissionServiceDetail")?.value.trim();
+    if(!staffId||!customerId||!detail){
+      C("commissionStatus").innerHTML='<div class="status error">Please select Staff, Customer and enter Service Detail.</div>';return;
+    }
+    const c=calcCommissionForm();
+    if(c.subtotal<=0){C("commissionStatus").innerHTML='<div class="status error">Subtotal must be greater than $0.</div>';return}
+    const staff=staffRows().find(x=>String(x.id)===String(staffId));
+    const customer=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(customerId));
+    const type=C("commissionServiceType").value;
+    const payload={
+      commission_date:todayC(),staff_id:staffId,staff_name:staff?.name_en||staff?.name_km||"",
+      customer_id:customerId,customer_name:customer?.name||"",customer_phone:customer?.phone||"",
+      service_type:type,service_detail:detail,unit:c.unit,unit_price:c.price,discount:c.discount,
+      subtotal:c.subtotal,commission_rate:c.rate,commission_amount:c.amount,source:"manual"
+    };
+    const r=await sb.from("medifella_sale_commissions").insert(payload).select().single();
+    if(r.error){C("commissionStatus").innerHTML=`<div class="status error">${escC(r.error.message)}</div>`;return}
+    C("commissionStatus").innerHTML='<div class="status">Sale commission saved successfully.</div>';
+    clearCommissionForm();
+    await loadCommissionRecords();
+  }
+
+  window.recordFirstDermedSaleCommission=async function({sale,buyer,buyerType,buyerId,staffId,staff,servicesArr,items,hasProducts,adminId}){
+    if(!sale?.id||!staffId)return;
+
+    // Find ALL Dermed invoices for this customer from the database. The oldest
+    // created invoice is the only invoice that can receive commission.
+    let allq;
+    if(buyerType==="student"){
+      allq=await sb.from("medifella_sales")
+        .select("id,created_at,sale_date")
+        .eq("sale_type","DERMED")
+        .eq("student_id",buyerId)
+        .order("created_at",{ascending:true});
+    }else{
+      allq=await sb.from("medifella_sales")
+        .select("id,created_at,sale_date")
+        .eq("sale_type","DERMED")
+        .eq("customer_id",buyerId)
+        .order("created_at",{ascending:true});
+    }
+    if(allq.error)throw allq.error;
+
+    const matching=allq.data||[];
+    if(!matching.length || String(matching[0].id)!==String(sale.id)){
+      // This is NOT the customer's first Dermed invoice. Never add or change
+      // commission for later invoices.
+      return;
+    }
+
+    // This IS the customer's first Dermed invoice. Remove any previous
+    // automatic commission rows first, then rebuild them from the CURRENT
+    // invoice. This makes an edit to the first invoice recalculate commission.
+    const del=await sb.from("medifella_sale_commissions")
+      .delete()
+      .eq("source_sale_id",sale.id)
+      .eq("source","dermed_auto");
+    if(del.error)throw del.error;
+
+    // IMPORTANT:
+    // - Product selected from Product List only = NO commission.
+    // - Service selected from Service List only = 2%.
+    // - Service List + Product List = 3%.
+    //
+    // Therefore the presence of a Product List item alone never creates a
+    // commission record. A Service List item is required.
+    const hasServiceListItems=Array.isArray(servicesArr) && servicesArr.length>0;
+    const hasProductListItems=Array.isArray(items) && items.length>0;
+
+    if(!hasServiceListItems)return;
+
+    const rate=hasProductListItems?0.03:0.02;
+    const rows=servicesArr.map(x=>{
+      const unit=Math.max(1,num(x.quantity));
+      const price=Math.max(0,num(x.price));
+      const base=unit*price;
+      const discType=x.discount_type||"percent";
+      const discVal=Math.max(0,num(x.discount_value));
+      const discount=discType==="percent"
+        ? Math.min(base,base*discVal/100)
+        : Math.min(base,discVal);
+      const subtotal=Math.max(0,base-discount);
+
+      return {
+        commission_date:String(sale.sale_date||todayC()).slice(0,10),
+        staff_id:staffId,
+        staff_name:staff?.name_en||staff?.name_km||"",
+        customer_id:buyerType==="customer"?buyerId:null,
+        student_id:buyerType==="student"?buyerId:null,
+        customer_name:buyer?.name||buyer?.full_name||"",
+        customer_phone:buyer?.phone||"",
+        service_type:hasProducts?"service_product":"service",
+        service_detail:(x.name||"Service")+(x.service_type?` · ${x.service_type}`:""),
+        service_id:x.service_id||null,
+        unit,
+        unit_price:price,
+        discount,
+        subtotal,
+        commission_rate:rate,
+        commission_amount:subtotal*rate,
+        source:"dermed_auto",
+        source_sale_id:sale.id,
+        reference_no:sale.reference_no||"",
+        created_by:adminId
+      };
+    }).filter(x=>x.subtotal>0);
+
+    if(!rows.length)return;
+
+    const ins=await sb.from("medifella_sale_commissions").insert(rows);
+    if(ins.error)throw ins.error;
+  };
+
+  async function exportCommissionExcel(){
+    const rows=filteredCommissionRecords();
+    const data=rows.map(x=>({
+      Date:String(x.commission_date||x.created_at||"").slice(0,10),
+      "Staff Name":x.staff_name||"", "Customer Name":x.customer_name||"",
+      "Customer Phone":x.customer_phone||"",
+      "Service Type":x.service_type==="service_product"?"Service with Product":"Only Service",
+      "Service Detail":x.service_detail||"",Unit:x.unit??1,
+      "Unit Price":Number(x.unit_price||0),"Discount":Number(x.discount||0),
+      Subtotal:Number(x.subtotal||0),"Commission":Number(x.commission_rate||0),
+      "Subtotal Commission":Number(x.commission_amount||0)
+    }));
+    data.push({Date:"", "Staff Name":"","Customer Name":"","Customer Phone":"","Service Type":"","Service Detail":"",
+      Unit:"", "Unit Price":"",Discount:"",Subtotal:"",Commission:"Grand Total","Subtotal Commission":rows.reduce((n,x)=>n+Number(x.commission_amount||0),0)});
+    if(window.XLSX){
+      const ws=XLSX.utils.json_to_sheet(data),wb=XLSX.utils.book_new();
+      XLSX.utils.book_append_sheet(wb,ws,"Commission List");
+      XLSX.writeFile(wb,`Sale_Commission_${todayC()}.xlsx`);
+    }else{
+      const csv=[Object.keys(data[0]||{}).join(","),...data.map(r=>Object.values(r).map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(","))].join("\n");
+      const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`Sale_Commission_${todayC()}.csv`;a.click();
+    }
+  }
+
+  function exportCommissionPdf(){
+    const rows=filteredCommissionRecords(), total=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
+    const J=window.jspdf?.jsPDF;if(!J){window.print();return}
+    const doc=new J({orientation:"landscape",unit:"mm",format:"a4"});
+    doc.setFontSize(16);doc.text("Sale Commission Management",14,14);
+    doc.setFontSize(9);doc.text(`Generated: ${todayC()}`,14,20);
+    const body=rows.map(x=>[
+      String(x.commission_date||x.created_at||"").slice(0,10),x.staff_name||"",x.customer_name||"",
+      x.customer_phone||"",x.service_type==="service_product"?"Service + Product":"Only Service",
+      x.service_detail||"",String(x.unit??1),moneyC(x.unit_price),moneyC(x.discount),
+      moneyC(x.subtotal),`${Number(x.commission_rate||0)*100}%`,moneyC(x.commission_amount)
+    ]);
+    if(doc.autoTable)doc.autoTable({startY:25,head:[["Date","Staff","Customer","Phone","Type","Service Detail","Unit","Unit Price","Discount","Subtotal","Commission","Commission Amount"]],body,styles:{fontSize:6},headStyles:{fontSize:6}});
+    const y=(doc.lastAutoTable?.finalY||25)+8;doc.setFontSize(10);doc.text(`Grand Total Commission: $${moneyC(total)}`,14,y);
+    doc.save(`Sale_Commission_${todayC()}.pdf`);
+  }
+
+  function bindCommission(){
+    populateCommissionStaff();
+    if(C("commissionUnit"))C("commissionUnit").addEventListener("input",calcCommissionForm);
+    if(C("commissionUnitPrice"))C("commissionUnitPrice").addEventListener("input",calcCommissionForm);
+    if(C("commissionDiscount"))C("commissionDiscount").addEventListener("input",calcCommissionForm);
+    if(C("commissionServiceType"))C("commissionServiceType").addEventListener("change",calcCommissionForm);
+    if(C("commissionCustomerSearch"))C("commissionCustomerSearch").addEventListener("input",renderCommissionCustomerResults);
+    C("commissionCustomerResults")?.addEventListener("click",e=>{
+      const b=e.target.closest("[data-commission-customer]");if(b)selectCommissionCustomer(b.dataset.commissionCustomer);
+    });
+    C("saveSaleCommission")?.addEventListener("click",saveCommissionManual);
+    C("clearSaleCommission")?.addEventListener("click",clearCommissionForm);
+    C("commissionRefresh")?.addEventListener("click",renderCommissionList);
+    C("commissionFilterStaff")?.addEventListener("change",renderCommissionList);
+    C("commissionFromDate")?.addEventListener("change",renderCommissionList);
+    C("commissionToDate")?.addEventListener("change",renderCommissionList);
+    C("commissionPdf")?.addEventListener("click",exportCommissionPdf);
+    C("commissionExcel")?.addEventListener("click",exportCommissionExcel);
+    calcCommissionForm();
+    loadCommissionRecords();
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bindCommission,{once:true});
+  else bindCommission();
+})();
+</script>
 
 </body>
 </html>
