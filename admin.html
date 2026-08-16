@@ -2634,7 +2634,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <label>Phone Number *</label><input id="staffInfoPhone">
 <div class="row"><div><label>Date of Birth *</label><input id="staffInfoDob" type="date"></div><div><label>Enroll Date *</label><input id="staffInfoEnrollDate" type="date"></div></div>
 <div class="row"><div><label>Status *</label><select id="staffInfoStatus"><option>Internship</option><option>Training</option><option>Full</option></select></div><div></div></div>
-<label>Job Title *</label><select id="staffInfoJob"><option>Counter</option><option>Sale</option><option>Cashier</option><option>Marketing</option><option>Graphic Designer</option><option>Beauty Therapist</option><option>Beauty Trainer</option><option>Nurse</option><option>Other</option></select>
+<label>Job Title *</label><select id="staffInfoJob"><option>Counter</option><option>Sale</option><option>Cashier</option><option>Sale Counter Cashier</option><option>Marketing</option><option>Graphic Designer</option><option>Beauty Therapist</option><option>Beauty Trainer</option><option>Nurse</option><option>Other</option></select>
 <input id="staffInfoJobOther" class="hidden" placeholder="Fill other job title">
 <div class="actions" style="margin-top:14px"><button id="saveStaffInfo" class="gold">Save Staff</button><button id="clearStaffInfo" class="light">Clear</button></div>
 <div id="staffInfoStatus"></div>
@@ -6173,14 +6173,14 @@ function renderInventoryControls(){
  if($("stockStaff"))$("stockStaff").innerHTML='<option value="">Select staff</option>'+staffInfoRecords.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
  ["mtsSaleStaff","dermedSaleStaff"].forEach(id=>{
   if($(id)){
-    const saleCounterStaff=staffInfoRecords.filter(x=>String(x.job_title||"").trim().toLowerCase()==="sale counter");
-    $(id).innerHTML='<option value="">Select Sale Staff</option>'+saleCounterStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
+    const eligibleStaff=staffInfoRecords.filter(x=>String(x.job_title||"").trim().toLowerCase()==="sale counter cashier");
+    $(id).innerHTML='<option value="">Select Sale Staff</option>'+eligibleStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
   }
 });
 ["mtsCashier","dermedCashier"].forEach(id=>{
   if($(id)){
-    const cashierStaff=staffInfoRecords.filter(x=>String(x.job_title||"").trim().toLowerCase()==="cashier");
-    $(id).innerHTML='<option value="">Select Cashier</option>'+cashierStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
+    const eligibleStaff=staffInfoRecords.filter(x=>String(x.job_title||"").trim().toLowerCase()==="sale counter cashier");
+    $(id).innerHTML='<option value="">Select Cashier</option>'+eligibleStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
   }
 });
 }
@@ -9244,7 +9244,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const staffId=E("mtsSaleStaff")?.value||"";const cashierId=E("mtsCashier")?.value||"";
     const items=Array.isArray(window.mtsSaleItems)?window.mtsSaleItems:[];
     if(!buyerType||!buyerId){msg(E("mtsStatus"),"Please select a Student or Customer.",true);return;}
-    if(!staffId){msg(E("mtsStatus"),"Please select Sale Staff (Job Title: Sale Counter).",true);return;}if(!cashierId){msg(E("mtsStatus"),"Please select Cashier (Job Title: Cashier).",true);return;}
+    if(!staffId){msg(E("mtsStatus"),"Please select Sale Staff (Job Title: Sale Counter Cashier).",true);return;}if(!cashierId){msg(E("mtsStatus"),"Please select Cashier (Job Title: Sale Counter Cashier).",true);return;}
     if(!items.length){msg(E("mtsStatus"),"Add at least one product.",true);return;}
 
     for(const it of items){
