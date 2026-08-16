@@ -1941,6 +1941,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .appointment-list-head,.appointment-upcoming-head{display:flex;justify-content:space-between;align-items:end;gap:15px}
 .appointment-search-wrap{display:flex;gap:8px;min-width:min(650px,55%)}
 .appointment-search-wrap input{flex:1}
+.appointment-tabs button{min-width:180px}
 .appointment-upcoming-card{margin-top:18px}
 .appointment-month-tools{display:flex;gap:7px;align-items:center}
 .appointment-month-tools input{width:170px}
@@ -2364,9 +2365,19 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     <div class="appointment-form-grid">
       <div class="appointment-customer-picker">
         <label>Customer Phone Number / Name / ID *</label>
-        <input id="appointmentCustomerSearch" autocomplete="off" placeholder="Search customer...">
-        <input id="appointmentCustomerId" type="hidden">
-        <div id="appointmentCustomerResults" class="appointment-results"></div>
+        <div style="display:flex;gap:8px;align-items:flex-start">
+          <div style="flex:1;position:relative">
+            <input id="appointmentCustomerSearch" autocomplete="off" placeholder="Search customer...">
+            <input id="appointmentCustomerId" type="hidden">
+            <div id="appointmentCustomerResults" class="appointment-results"></div>
+          </div>
+          <div style="width:180px">
+            <select id="appointmentCustomerType" title="Customer type">
+              <option value="Old Customer">Old Customer</option>
+              <option value="New Customer">New Customer</option>
+            </select>
+          </div>
+        </div>
         <div id="appointmentCustomerHint" class="muted" style="margin-top:6px;">Search and select a customer.</div>
       </div>
       <div>
@@ -2397,32 +2408,39 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
   </div>
 
   <div class="card" style="margin-top:18px;">
-    <div class="appointment-list-head">
-      <div>
-        <h2 style="margin:0 0 5px;">Appointment List</h2>
-        <div class="muted">Search Customer Phone Number / Name / ID</div>
-      </div>
-      <div class="appointment-search-wrap">
-        <input id="appointmentListSearch" placeholder="Search appointments...">
-        <button id="appointmentListRefresh" class="light" type="button">Refresh</button>
-      </div>
+    <div class="appointment-tabs" style="display:flex;gap:8px;align-items:center;flex-wrap:wrap;border-bottom:1px solid var(--line);padding-bottom:12px;">
+      <button id="appointmentListTab" class="btn" type="button">Appointment List</button>
+      <button id="appointmentUpcomingTab" class="light" type="button">Up Coming Appointments</button>
     </div>
-    <div id="appointmentList" style="margin-top:14px;">Loading...</div>
-  </div>
 
-  <div class="card appointment-upcoming-card">
-    <div class="appointment-upcoming-head">
-      <div>
-        <h2 style="margin:0 0 5px;">Upcoming Appointments</h2>
-        <div class="muted">Today through the end of the month, or select any month.</div>
+    <div id="appointmentListPanel" style="margin-top:14px;">
+      <div class="appointment-list-head">
+        <div>
+          <h2 style="margin:0 0 5px;">Appointment List</h2>
+          <div class="muted">Search Customer Phone Number / Name / ID</div>
+        </div>
+        <div class="appointment-search-wrap">
+          <input id="appointmentListSearch" placeholder="Search appointments...">
+          <button id="appointmentListRefresh" class="light" type="button">Refresh</button>
+        </div>
       </div>
-      <div class="appointment-month-tools">
-        <button id="appointmentPrevMonth" class="light" type="button">‹</button>
-        <input id="appointmentMonth" type="month">
-        <button id="appointmentNextMonth" class="light" type="button">›</button>
-      </div>
+      <div id="appointmentList" style="margin-top:14px;">Loading...</div>
     </div>
-    <div id="appointmentUpcoming" style="margin-top:14px;">Loading...</div>
+
+    <div id="appointmentUpcomingPanel" class="hidden" style="margin-top:14px;">
+      <div class="appointment-upcoming-head">
+        <div>
+          <h2 style="margin:0 0 5px;">Up Coming Appointments</h2>
+          <div class="muted">Today through the end of the month, or select any month.</div>
+        </div>
+        <div class="appointment-month-tools">
+          <button id="appointmentPrevMonth" class="light" type="button">‹</button>
+          <input id="appointmentMonth" type="month">
+          <button id="appointmentNextMonth" class="light" type="button">›</button>
+        </div>
+      </div>
+      <div id="appointmentUpcoming" style="margin-top:14px;">Loading...</div>
+    </div>
   </div>
 </section>
 
@@ -2706,7 +2724,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <option value="Paid">Paid</option>
 <option value="Partial">Partial Payment</option>
 <option value="Due">Due</option>
-</select><button id="dermedSalesRefresh" class="light">Refresh</button></div>
+</select><button id="dermedSalesRefresh" class="light">Refresh</button><button id="appointmentReturnClose" class="gold" type="button" style="display:none">Close</button></div>
 <div id="dermedSalesList">Loading...</div>
 </div>
 </section>
@@ -9060,7 +9078,10 @@ document.addEventListener("DOMContentLoaded",function(){
   }
   function isActive(a){return a.status!=="cancelled"}
   function customerHay(a){
-    return `${a.customer_name||""} ${a.customer_phone||""} ${a.customer_code||""}`.toLowerCase();
+    return `${a.customer_name||""} ${a.customer_phone||""} ${a.customer_code||""} ${a.customer_type||""}`.toLowerCase();
+  }
+  function customerType(){
+    return String(A("appointmentCustomerType")?.value||"Old Customer");
   }
   function setFormCustomer(c){
     if(!c)return;
@@ -9087,6 +9108,7 @@ document.addEventListener("DOMContentLoaded",function(){
     A("appointmentCustomerId").value="";
     A("appointmentCustomerSearch").value="";
     A("appointmentCustomerHint").textContent="Search and select a customer.";
+    if(A("appointmentCustomerType"))A("appointmentCustomerType").value="Old Customer";
     A("appointmentDate").value=localDate();
     A("appointmentTime").value="";
     A("appointmentFormStatus").textContent="";
@@ -9108,7 +9130,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const data=appointmentCustomer(c);
     appointments.push({
       id:"APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
-      customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,
+      customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,customer_type:customerType(),
       date,time,status:"pending",created_at:new Date().toISOString(),confirmed_at:null
     });
     saveAppointments();
@@ -9156,44 +9178,29 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!/^\d{2}:\d{2}$/.test(t)){alert("Please enter time as HH:MM.");return}
     updateAppointment(id,{date:d,time:t,status:"pending",confirmed_at:null,cancelled_at:null});
   }
-  function invoiceRowsForCustomer(a){
-    const list=(typeof salesRecords!=="undefined" ? salesRecords : []).filter(s=>{
-      if(String(s.sale_type||"").toUpperCase()!=="DERMED")return false;
-      const sameId=a.customer_id && (String(s.customer_id||"")===String(a.customer_id));
-      const samePhone=a.customer_phone && String(s.student_phone||"")===String(a.customer_phone);
-      const sameName=a.customer_name && String(s.student_name||"").trim().toLowerCase()===String(a.customer_name||"").trim().toLowerCase();
-      return sameId||samePhone||sameName;
-    });
-    return list.sort((x,y)=>String(y.sale_date||"").localeCompare(String(x.sale_date||"")));
-  }
   function showCustomerInvoices(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
     appointmentReturnSection="appointments";
-    const rows=invoiceRowsForCustomer(a);
-    A("appointmentInvoiceCustomer").textContent=`${a.customer_name||"Customer"} · ${a.customer_code||"No ID"} · ${a.customer_phone||"No phone"}`;
-    A("appointmentInvoiceBody").innerHTML=rows.length?`<div class="table-wrap"><table class="appointment-invoice-table">
-      <thead><tr><th>Date / Time</th><th>Invoice</th><th>Products / Services</th><th>Total</th><th>Paid</th><th>Due</th><th>Action</th></tr></thead>
-      <tbody>${rows.map(s=>{
-        const total=typeof saleTotal==="function"?saleTotal(s):Number(s.total||0);
-        const paid=typeof salePaid==="function"?salePaid(s):Number(s.paid||0);
-        const due=Math.max(0,total-paid);
-        const items=[...(s.items||[]).map(i=>i.name),...(s.service_items||[]).map(i=>i.name)].join(", ");
-        return `<tr>
-          <td>${escA(s.sale_date||"—")} ${escA(String(s.sale_time||"").slice(0,5))}</td>
-          <td><strong>${escA(s.reference_no||"—")}</strong></td>
-          <td>${escA(items||"—")}</td>
-          <td>${typeof money==="function"?money(total):"$"+total.toFixed(2)}</td>
-          <td>${typeof money==="function"?money(paid):"$"+paid.toFixed(2)}</td>
-          <td>${typeof money==="function"?money(due):"$"+due.toFixed(2)}</td>
-          <td><button type="button" class="light appointment-view-invoice" data-sale-id="${escA(s.id)}">View Invoice</button></td>
-        </tr>`;
-      }).join("")}</tbody></table></div>`:`<div class="appointment-empty">No Dermed invoices found for this customer.</div>`;
-    A("appointmentInvoiceModal").classList.add("show");
+    // Go directly to the existing Dermed Sale list and filter it to this customer.
+    // Phone is the strongest customer-level match; fall back to name.
+    const query=String(a.customer_phone||a.customer_name||"").trim();
+    const nav=document.querySelector('.nav[data-section="dermedSale"]');
+    if(nav)nav.click();
+    const search=A("dermedSaleSearch");
+    if(search){
+      search.value=query;
+      if(typeof renderDermedSales==="function")renderDermedSales();
+    }
+    const close=A("appointmentReturnClose");
+    if(close)close.style.display="inline-block";
   }
   function closeInvoiceModal(){
-    A("appointmentInvoiceModal").classList.remove("show");
-    // Return to the page from which the customer invoice history was opened.
+    const close=A("appointmentReturnClose");
+    if(close)close.style.display="none";
+    const search=A("dermedSaleSearch");
+    if(search)search.value="";
+    if(typeof renderDermedSales==="function")renderDermedSales();
     const nav=document.querySelector(`.nav[data-section="${appointmentReturnSection}"]`);
     if(nav)nav.click();
   }
@@ -9216,7 +9223,7 @@ document.addEventListener("DOMContentLoaded",function(){
     A("appointmentList").innerHTML=rows.length?`<div class="table-wrap"><table class="table">
       <thead><tr><th>Customer Information</th><th>Appointment Date & Time</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>${rows.map(a=>`<tr>
-        <td><strong>${escA(a.customer_code||"—")}</strong><div>${escA(a.customer_name||"—")}</div><div class="muted">${escA(a.customer_phone||"—")}</div></td>
+        <td><strong>${escA(a.customer_code||"—")}</strong><div>${escA(a.customer_name||"—")}</div><div class="muted">${escA(a.customer_phone||"—")}</div><span class="badge ${a.customer_type==="New Customer"?"pending":"verified"}" style="margin-top:5px">${escA(a.customer_type||"Old Customer")}</span></td>
         <td>${escA(formatDate(a.date))}<div class="muted">${escA(formatTime(a.time))}</div></td>
         <td>${a.status==="confirmed"?'<span class="badge verified">Confirmed</span>':a.status==="cancelled"?'<span class="badge rejected">Cancelled</span>':'<span class="badge pending">Pending</span>'}</td>
         <td><div class="actions">
@@ -9246,7 +9253,7 @@ document.addEventListener("DOMContentLoaded",function(){
         return `<div class="appointment-ticket ${confirmed?"confirmed":""}">
           <div class="appointment-time">${escA(formatTime(a.time))}</div>
           <div><div class="appointment-customer-name">${escA(a.customer_name||"Customer")}${confirmed?'<span class="appointment-confirmed-badge">GREEN TICKET · CONFIRMED</span>':''}</div>
-            <div class="muted">${escA(a.customer_code||"No ID")} · ${escA(a.customer_phone||"No phone")}</div></div>
+            <div class="muted">${escA(a.customer_code||"No ID")} · ${escA(a.customer_phone||"No phone")} · <strong>${escA(a.customer_type||"Old Customer")}</strong></div></div>
           <div class="muted">${confirmed?"Confirmed appointment":"Waiting for confirmation"}</div>
           <div class="appointment-actions">
             ${!confirmed?`<button type="button" class="btn appointment-confirm" data-appt-id="${escA(a.id)}">Confirm</button>`:""}
@@ -9268,6 +9275,7 @@ document.addEventListener("DOMContentLoaded",function(){
       A("appointmentCustomerSearch").value=a.customer_name||"";
       A("appointmentCustomerHint").textContent=`Selected: ${a.customer_name||"Customer"} · ${a.customer_code||"No ID"} · ${a.customer_phone||"No phone"}`;
     }
+    if(A("appointmentCustomerType"))A("appointmentCustomerType").value=a.customer_type||"Old Customer";
     A("appointmentDate").value=a.date||localDate();
     A("appointmentTime").value=a.time||"";
     A("appointmentAddCard").style.display="";
@@ -9287,7 +9295,7 @@ document.addEventListener("DOMContentLoaded",function(){
       const date=A("appointmentDate").value,time=A("appointmentTime").value;
       if(!date||!time){showStatus("Please select date and time.",true);return}
       const data=appointmentCustomer(c);
-      updateAppointment(editId,{customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,date,time});
+      updateAppointment(editId,{customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,customer_type:customerType(),date,time});
       showStatus("Appointment updated successfully.",false);
       A("saveAppointment").textContent="Save Appointment";
       delete A("saveAppointment").dataset.editId;
@@ -9320,6 +9328,20 @@ document.addEventListener("DOMContentLoaded",function(){
     };
     A("appointmentListSearch").oninput=renderList;
     A("appointmentListRefresh").onclick=()=>{readAppointments();renderAll()};
+    A("appointmentListTab").onclick=()=>{
+      A("appointmentListPanel").classList.remove("hidden");
+      A("appointmentUpcomingPanel").classList.add("hidden");
+      A("appointmentListTab").className="btn";
+      A("appointmentUpcomingTab").className="light";
+    };
+    A("appointmentUpcomingTab").onclick=()=>{
+      A("appointmentListPanel").classList.add("hidden");
+      A("appointmentUpcomingPanel").classList.remove("hidden");
+      A("appointmentListTab").className="light";
+      A("appointmentUpcomingTab").className="btn";
+      renderUpcoming();
+    };
+    A("appointmentReturnClose").onclick=closeInvoiceModal;
     A("appointmentMonth").onchange=renderUpcoming;
     A("appointmentPrevMonth").onclick=()=>{
       const v=A("appointmentMonth").value||localDate().slice(0,7),d=new Date(v+"-01T12:00:00");
@@ -9330,6 +9352,11 @@ document.addEventListener("DOMContentLoaded",function(){
       d.setMonth(d.getMonth()+1);setMonth(`${d.getFullYear()}-${pad(d.getMonth()+1)}`);
     };
     document.addEventListener("click",function(e){
+      const nav=e.target.closest?.(".nav");
+      if(nav && nav.dataset.section!=="dermedSale"){
+        const close=A("appointmentReturnClose");
+        if(close)close.style.display="none";
+      }
       const cr=e.target.closest?.("[data-appt-customer]");
       if(cr){e.preventDefault();setFormCustomer(getCustomer(cr.dataset.apptCustomer));return}
       const inv=e.target.closest?.(".appointment-invoices");
@@ -9344,13 +9371,6 @@ document.addEventListener("DOMContentLoaded",function(){
       if(ch){e.preventDefault();changeAppointmentDate(ch.dataset.apptId);return}
       const ca=e.target.closest?.(".appointment-cancel");
       if(ca){e.preventDefault();cancelAppointment(ca.dataset.apptId);return}
-      const vi=e.target.closest?.(".appointment-view-invoice");
-      if(vi){
-        e.preventDefault();
-        const id=vi.dataset.saleId;
-        if(typeof window.showDermedSaleInvoice==="function")window.showDermedSaleInvoice(id,"A4");
-        return;
-      }
       if(e.target.closest?.("#appointmentInvoiceClose,#appointmentInvoiceX")){e.preventDefault();closeInvoiceModal();return}
       if(e.target===A("appointmentInvoiceModal"))closeInvoiceModal();
     });
