@@ -10331,14 +10331,24 @@ document.addEventListener("DOMContentLoaded",function(){
       return;
     }
 
-    // This IS the customer's first Dermed invoice. Remove any previous
-    // automatic commission rows first, then rebuild them from the CURRENT
-    // invoice. This makes an edit to the first invoice recalculate commission.
+    // This IS the customer's first Dermed invoice.
+    // Older installations may not yet have source_sale_id/source columns in
+    // medifella_sale_commissions. Those optional columns must never prevent
+    // the commission itself from being created.
+    let canUseSourceColumns=true;
     const del=await sb.from("medifella_sale_commissions")
       .delete()
       .eq("source_sale_id",sale.id)
       .eq("source","dermed_auto");
-    if(del.error)throw del.error;
+    if(del.error){
+      const e=String(del.error.message||del.error.details||"");
+      if(/source_sale_id|source.*column|column .* does not exist|schema cache/i.test(e)){
+        canUseSourceColumns=false;
+        console.warn("Optional commission source columns are not available; continuing without them.");
+      }else{
+        throw del.error;
+      }
+    }
 
     // IMPORTANT:
     // - Product selected from Product List only = NO commission.
@@ -10364,10 +10374,10 @@ document.addEventListener("DOMContentLoaded",function(){
         : Math.min(base,discVal);
       const subtotal=Math.max(0,base-discount);
 
-      return {
+      const row = {
         commission_date:String(sale.sale_date||todayC()).slice(0,10),
         staff_id:staffId,
-        staff_name:staff?.name_en||staff?.name_km||"",
+        staff_name:staff?.name_en||staff?.name_km||staff?.name||"",
         customer_id:buyerType==="customer"?buyerId:null,
         student_id:buyerType==="student"?buyerId:null,
         customer_name:buyer?.name||buyer?.full_name||"",
@@ -10380,12 +10390,15 @@ document.addEventListener("DOMContentLoaded",function(){
         discount,
         subtotal,
         commission_rate:rate,
-        commission_amount:subtotal*rate,
-        source:"dermed_auto",
-        source_sale_id:sale.id,
-        reference_no:sale.reference_no||"",
-        created_by:adminId
+        commission_amount:subtotal*rate
       };
+      if(canUseSourceColumns){
+        row.source="dermed_auto";
+        row.source_sale_id=sale.id;
+        row.reference_no=sale.reference_no||"";
+        row.created_by=adminId;
+      }
+      return row;
     }).filter(x=>x.subtotal>0);
 
     if(!rows.length)return;
@@ -10406,7 +10419,7 @@ document.addEventListener("DOMContentLoaded",function(){
         errText.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
 
       if(columnMatch && pending.length && Object.prototype.hasOwnProperty.call(pending[0],columnMatch[1])){
-        delete pending[0][columnMatch[1]];
+        pending.forEach(row=>{ delete row[columnMatch[1]]; });
         continue;
       }
       throw ins.error;
