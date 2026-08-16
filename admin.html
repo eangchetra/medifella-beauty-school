@@ -6115,17 +6115,17 @@ async function loadStockMovements(){
 async function loadStaffInfo(){
  const {data,error}=await sb.from("medifella_staff").select("*").order("created_at",{ascending:false});
  if(error){staffInfoRecords=[]; if($("staffInfoList"))$("staffInfoList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Staff Management SQL setup.</p>`;return}
- staffInfoRecords=Array.isArray(data)?data:[]; renderStaffInfoList(); renderInventoryControls(); if(typeof window.refreshSaleStaffCashierOptions==="function")window.refreshSaleStaffCashierOptions(); renderBuyerControls(); if(typeof window.refreshCommissionStaffOptions==="function")window.refreshCommissionStaffOptions();
+ staffInfoRecords=Array.isArray(data)?data:[]; window.staffInfoRecords=staffInfoRecords; renderStaffInfoList(); renderInventoryControls(); if(typeof window.refreshSaleStaffCashierOptions==="function")window.refreshSaleStaffCashierOptions(); renderBuyerControls(); if(typeof window.refreshCommissionStaffOptions==="function")window.refreshCommissionStaffOptions();
 }
 async function loadCustomers(){
  const {data,error}=await sb.from("medifella_customers").select("*").order("created_at",{ascending:false});
  if(error){customers=[]; if($("customerList"))$("customerList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Customer Management SQL setup.</p>`;return}
- customers=data||[]; renderCustomerList(); renderBuyerControls();
+ customers=data||[]; window.customers=customers; renderCustomerList(); renderBuyerControls();
 }
 async function loadServices(){
  const {data,error}=await sb.from("medifella_services").select("*").order("created_at",{ascending:false});
  if(error){services=[]; if($("serviceList"))$("serviceList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Services Management SQL setup.</p>`;return}
- services=data||[]; renderServiceList(); renderServiceControls(); if(typeof window.refreshCommissionServiceOptions==="function")window.refreshCommissionServiceOptions();
+ services=data||[]; window.services=services; renderServiceList(); renderServiceControls(); if(typeof window.refreshCommissionServiceOptions==="function")window.refreshCommissionServiceOptions();
 }
 
 function inDateRange(value, fromId, toId){
@@ -6178,9 +6178,8 @@ function isSaleCounterCashierStaff(x){
    x?.job_title ?? x?.jobTitle ?? x?.job ?? ""
  ).replace(/\s+/g," ").trim().toLowerCase();
  // Staff are taken directly from Staff Management (medifella_staff).
- // Eligible counter staff roles are Sale, Counter, Cashier, or the combined
- // "Sale Counter Cashier" title.
- return ["sale","counter","cashier","sale counter cashier"].includes(title);
+ // Only the exact Job Title "Sale Counter Cashier" is eligible.
+ return title==="sale counter cashier";
 }
 function renderInventoryControls(){
  if($("stockStaff")){
@@ -10100,7 +10099,8 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function rebuildCommissionCustomerCache(){
-    const cs=Array.isArray(window.customers)?window.customers:[];
+    const cs=Array.isArray(window.customers)?window.customers:
+      (typeof customers!=="undefined" && Array.isArray(customers)?customers:[]);
     if(commissionCustomerCache.ref===cs)return;
     commissionCustomerCache.rows=cs.map(x=>({
       raw:x,
@@ -10124,7 +10124,9 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function selectCommissionCustomer(id){
-    const c=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(id));
+    const customerRows=Array.isArray(window.customers)?window.customers:
+      (typeof customers!=="undefined" && Array.isArray(customers)?customers:[]);
+    const c=customerRows.find(x=>String(x.id)===String(id));
     if(!c)return;
     C("commissionCustomerId").value=String(c.id);
     C("commissionCustomerSearch").value=c.name||"";
@@ -10158,7 +10160,9 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function staffRows(){
-    return Array.isArray(window.staffInfoRecords)?window.staffInfoRecords:[];
+    if(Array.isArray(window.staffInfoRecords))return window.staffInfoRecords;
+    if(typeof staffInfoRecords!=="undefined" && Array.isArray(staffInfoRecords))return staffInfoRecords;
+    return [];
   }
   function populateCommissionStaff(){
     // Sale Commission Management uses ONLY Sale Staff.
@@ -10183,7 +10187,8 @@ document.addEventListener("DOMContentLoaded",function(){
   function populateCommissionServices(){
     const el=C("commissionServiceDetail");
     if(!el)return;
-    const rows=Array.isArray(window.services)?window.services:[];
+    const rows=Array.isArray(window.services)?window.services:
+      (typeof services!=="undefined" && Array.isArray(services)?services:[]);
     const selected=el.value;
     el.innerHTML='<option value="">Select service</option>'+
       rows.map(s=>{
@@ -10386,8 +10391,28 @@ document.addEventListener("DOMContentLoaded",function(){
 
     if(!rows.length)return;
 
-    const ins=await sb.from("medifella_sale_commissions").insert(rows);
-    if(ins.error)throw ins.error;
+    // Insert the commission. Some existing installations may have an older
+    // commission-table schema without the newer metadata columns. If Supabase
+    // reports a missing column, remove only that optional field and retry.
+    // The core commission fields remain unchanged.
+    let pending=rows.map(x=>({...x}));
+    for(let attempt=0;attempt<12;attempt++){
+      const ins=await sb.from("medifella_sale_commissions").insert(pending);
+      if(!ins.error)return;
+
+      const errText=String(ins.error.message||ins.error.details||"");
+      const columnMatch=
+        errText.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']? (?:of relation .* )?does not exist/i) ||
+        errText.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i) ||
+        errText.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
+
+      if(columnMatch && pending.length && Object.prototype.hasOwnProperty.call(pending[0],columnMatch[1])){
+        delete pending[0][columnMatch[1]];
+        continue;
+      }
+      throw ins.error;
+    }
+    throw new Error("Could not save the automatic Dermed commission.");
   };
 
   async function exportCommissionExcel(){
