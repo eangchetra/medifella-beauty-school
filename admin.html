@@ -2894,20 +2894,23 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <label id="staffConfirmLabel">Confirm Password</label>
 <input id="staffPasswordConfirm" type="password" autocomplete="new-password" placeholder="Repeat password">
 
-<div id="staffPermissionBox">
-<label style="margin-top:16px">Permissions</label>
-<div style="display:grid;gap:10px;margin-top:10px">
+<div id="staffPermissionBox"><label style="margin-top:16px">Permissions</label><div style="display:grid;gap:10px;margin-top:10px">
 <label style="font-weight:400"><input id="permDashboard" type="checkbox"> View Dashboard</label>
 <label style="font-weight:400"><input id="permStudents" type="checkbox"> Student Registration</label>
 <label style="font-weight:400"><input id="permSales" type="checkbox"> Medi Fella Sale</label>
+<label style="font-weight:400"><input id="permMtsSale" type="checkbox"> MTS Sale</label>
+<label style="font-weight:400"><input id="permDermedSale" type="checkbox"> Dermed Sale</label>
+<label style="font-weight:400"><input id="permAppointments" type="checkbox"> Appointment Management</label>
+<label style="font-weight:400"><input id="permProducts" type="checkbox"> Product Management</label>
+<label style="font-weight:400"><input id="permServices" type="checkbox"> Services Management</label>
+<label style="font-weight:400"><input id="permStaffManagement" type="checkbox"> Staff Management</label>
+<label style="font-weight:400"><input id="permCustomers" type="checkbox"> Customer Management</label>
 <label style="font-weight:400"><input id="permCertificates" type="checkbox"> Certificate Verification</label>
 <label style="font-weight:400"><input id="permPosts" type="checkbox"> News Feed</label>
 <label style="font-weight:400"><input id="permCourses" type="checkbox"> Course Management</label>
+<label style="font-weight:400"><input id="permStaffAccounts" type="checkbox"> Staff Accounts</label>
 <label style="font-weight:400"><input id="permAdmins" type="checkbox"> Admin / Users</label>
-</div>
-</div>
-
-<div class="row" style="margin-top:16px">
+</div></div><div class="row" style="margin-top:16px">
 <button id="staffSave" class="gold">Create Account</button>
 <button id="staffClear" class="light">Clear</button>
 </div>
@@ -2996,36 +2999,27 @@ async function getCurrentAccount(){
 }
 
 function applyAccountPermissions(){
- const role=String(currentProfile?.role||"").toLowerCase();
- const permissions=currentProfile?.permissions||{};
- const allowed = key => role==="admin" || permissions[key]===true;
-
- document.querySelectorAll(".nav").forEach(btn=>{
-   const key=btn.dataset.section;
-   const isStaffSection=(key==="staff"||key==="admins");
-   let show = role==="admin" ? true : (isStaffSection ? false : allowed(key));
-   btn.classList.toggle("hidden",!show);
- });
-
- // If the current section is not allowed, switch to the first allowed section.
- const active=document.querySelector(".nav.active");
- if(!active || active.classList.contains("hidden")){
-   const first=[...document.querySelectorAll(".nav")].find(x=>!x.classList.contains("hidden"));
-   document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
-   document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
-   if(first){first.classList.add("active");$(first.dataset.section).classList.add("active");}
- }
- $("currentAdmin").textContent=currentProfile.username || currentProfile.email || adminUser.email || adminUser.id;
- $("adminRole").innerHTML=role==="admin"
-   ? '<span class="badge verified">Administrator</span>'
-   : '<span class="badge pending">Staff</span>';
- if($("saleForm") && !$("saleForm").classList.contains("hidden")){
-   updateSaleDateTimeDisplay();
-   $("saleReference").value=nextSaleReference();
- }
-}
-
-async function getAccount(){
+  const role=String(currentProfile?.role||"").toLowerCase();
+  const permissions=currentProfile?.permissions||{};
+  const allowed=key=>role==="admin" || permissions[key]===true;
+  document.querySelectorAll(".nav").forEach(btn=>{
+    btn.classList.toggle("hidden",!allowed(btn.dataset.section));
+  });
+  const active=document.querySelector(".nav.active");
+  if(!active || active.classList.contains("hidden")){
+    const first=[...document.querySelectorAll(".nav")].find(x=>!x.classList.contains("hidden"));
+    document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
+    document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
+    if(first){first.classList.add("active");$(first.dataset.section).classList.add("active");}
+  }
+  $("currentAdmin").textContent=currentProfile.username || currentProfile.email || adminUser.email || adminUser.id;
+  $("adminRole").innerHTML=role==="admin"
+    ? '<span class="badge verified">Administrator</span>'
+    : '<span class="badge pending">Staff</span>';
+  if($("saleForm") && !$("saleForm").classList.contains("hidden")){
+    updateSaleDateTimeDisplay(); $("saleReference").value=nextSaleReference();
+  }
+}async function getAccount(){
  return await getCurrentAccount();
 }
 
@@ -5641,19 +5635,11 @@ $("certCreate").onclick=async()=>{
 
 
 const STAFF_PERMISSION_KEYS = [
-  ["dashboard","permDashboard"],
-  ["students","permStudents"],
-  ["sales","permSales"],
-  ["mtsSale","permMtsSale"],
-  ["dermedSale","permDermedSale"],
-  ["products","permProducts"],
-  ["services","permServices"],
-  ["staffManagement","permStaffManagement"],
-  ["customers","permCustomers"],
-  ["certificates","permCertificates"],
-  ["posts","permPosts"],
-  ["courses","permCourses"],
-  ["admins","permAdmins"]
+["dashboard","permDashboard"],["students","permStudents"],["sales","permSales"],
+["mtsSale","permMtsSale"],["dermedSale","permDermedSale"],["appointments","permAppointments"],
+["products","permProducts"],["services","permServices"],["staffManagement","permStaffManagement"],
+["customers","permCustomers"],["certificates","permCertificates"],["posts","permPosts"],
+["courses","permCourses"],["staff","permStaffAccounts"],["admins","permAdmins"]
 ];
 
 let editingAccountId=null;
@@ -5672,7 +5658,7 @@ function updateAccountForm(){
   $("staffPermissionBox").classList.toggle("hidden",isAdmin);
   $("staffPasswordLabel").textContent=editingAccountId ? "New Password (optional)" : "Password";
   $("staffPasswordConfirm").placeholder=editingAccountId ? "Repeat new password" : "Repeat password";
-  $("staffSave").textContent=editingAccountId ? "Update Account" : "Create Account";
+  $("staffSave").textContent=editingAccountId ? "Save Edit" : "Create Account";
 }
 $("accountRole").onchange=updateAccountForm;
 
@@ -5776,7 +5762,7 @@ $("staffSave").onclick=async()=>{
    msg($("staffStatus"),"Passwords do not match.",true);return;
  }
 
- $("staffSave").disabled=true;$("staffSave").textContent=editingAccountId?"Updating...":"Creating...";
+ $("staffSave").disabled=true;$("staffSave").textContent=editingAccountId?"Saving Edit...":"Creating...";
  try{
    let result;
     try{
