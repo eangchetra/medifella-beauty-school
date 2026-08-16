@@ -5778,14 +5778,32 @@ $("staffSave").onclick=async()=>{
 
  $("staffSave").disabled=true;$("staffSave").textContent=editingAccountId?"Updating...":"Creating...";
  try{
-   const result=await callStaffFunction({
-     action:editingAccountId?"update":"create",
-     id:editingAccountId||null,
-     username,role,
-     permissions,
-     password:password||null
-   });
-   msg($("staffStatus"),result.message||"Account saved successfully.");
+   let result;
+    try{
+      result=await callStaffFunction({
+        action:editingAccountId?"update":"create",
+        id:editingAccountId||null,
+        username,role,
+        permissions,
+        password:password||null
+      });
+    }catch(primaryError){
+      // Compatibility fallback for older manage-staff Edge Functions.
+      // For an edit without a password change, save the profile fields
+      // directly so Edit -> Save remains functional.
+      if(editingAccountId && !password){
+        const fallback=await sb.from("profiles")
+          .update({username,role,permissions})
+          .eq("id",editingAccountId)
+          .select("id,username,role,permissions")
+          .single();
+        if(fallback.error)throw primaryError;
+        result={message:"Account updated successfully."};
+      }else{
+        throw primaryError;
+      }
+    }
+    msg($("staffStatus"),result.message||"Account saved successfully.");
    clearAccountForm();
    await loadStaff();
  }catch(e){
