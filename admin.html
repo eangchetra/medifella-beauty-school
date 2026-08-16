@@ -2426,7 +2426,6 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
         <div class="appointment-search-wrap">
           <input id="appointmentListSearch" placeholder="Search appointments...">
           <button id="appointmentListRefresh" class="light" type="button">Refresh</button>
-          <button id="appointmentRecoverOld" class="gold" type="button">Sync / Recover Old Appointments</button><div class="muted" style="margin-top:6px">New appointments are stored in Supabase. Old browser appointments remain readable/editable and are kept as a backup.</div>
         </div>
       </div>
       <div id="appointmentList" style="margin-top:14px;">Loading...</div>
@@ -9027,7 +9026,6 @@ document.addEventListener("DOMContentLoaded",function(){
   "use strict";
   const STORAGE_KEY="medi_fella_appointments_v1";
   let appointments=[];
-  let legacyAppointments=[];
   let appointmentReturnSection="appointments";
 
   function A(id){return document.getElementById(id)}
@@ -9055,207 +9053,15 @@ document.addEventListener("DOMContentLoaded",function(){
     const ap=h>=12?"PM":"AM", hh=(h%12)||12;
     return `${hh}:${pad(m||0)} ${ap}`;
   }
-  function looksLikeAppointmentObject(a){
-    if(!a || typeof a!=="object" || Array.isArray(a))return false;
-    const hasDate=!!(a.date||a.appointment_date||a.appointmentDate);
-    const hasTime=!!(a.time||a.appointment_time||a.appointmentTime);
-    const hasCustomer=!!(a.customer_name||a.customerName||a.name||a.customer_phone||a.customerPhone||a.customer_id||a.customerId||a.customer_code||a.customerCode);
-    return hasDate && (hasTime || hasCustomer);
-  }
-  function findAppointmentArrays(value,found,seen){
-    if(value===null || typeof value!=="object" || seen.has(value))return;
-    seen.add(value);
-    if(Array.isArray(value)){
-      const matches=value.filter(looksLikeAppointmentObject);
-      if(matches.length)found.push(matches);
-      value.slice(0,1000).forEach(v=>findAppointmentArrays(v,found,seen));
-      return;
-    }
-    Object.keys(value).slice(0,2000).forEach(k=>findAppointmentArrays(value[k],found,seen));
-  }
-  function readLegacyAppointmentCandidates(){
-    const candidates=[];
-    const stores=[localStorage,sessionStorage];
-    stores.forEach(store=>{
-      const keys=[];
-      try{for(let i=0;i<store.length;i++){const k=store.key(i);if(k)keys.push(k)}}catch(_){ }
-      if(!keys.includes(STORAGE_KEY))keys.push(STORAGE_KEY);
-      keys.forEach(key=>{
-        try{
-          const raw=store.getItem(key);if(!raw)return;
-          const parsed=JSON.parse(raw);
-          if(key===STORAGE_KEY && Array.isArray(parsed))candidates.push(parsed);
-          else findAppointmentArrays(parsed,candidates,new Set());
-        }catch(_){ }
-      });
-    });
-    const flat=[],seen=new Set();
-    candidates.flat().forEach(a=>{
-      if(!looksLikeAppointmentObject(a))return;
-      const sig=JSON.stringify([a.id||a.appointment_id||"",a.date||a.appointment_date||a.appointmentDate||"",a.time||a.appointment_time||a.appointmentTime||"",a.customer_id||a.customerId||"",a.customer_phone||a.customerPhone||"",a.customer_name||a.customerName||a.name||""]);
-      if(seen.has(sig))return;seen.add(sig);flat.push(a);
-    });
-    return flat;
-  }
-  function normalizeLegacyAppointment(a,index){
-    const date=a.date||a.appointment_date||a.appointmentDate||localDate();
-    const time=a.time||a.appointment_time||a.appointmentTime||"00:00";
-    let status=String(a.status||"pending").toLowerCase();
-    if(status==="meet"||status==="meet already")status="met";
-    if(!["pending","confirmed","cancelled","met"].includes(status))status="pending";
-    return {
-      id:String(a.id||a.appointment_id||("APT-RECOVER-"+Date.now()+"-"+index+"-"+Math.random().toString(36).slice(2,7))),
-      customer_id:(a.customer_id||a.customerId)?String(a.customer_id||a.customerId):null,
-      customer_name:String(a.customer_name||a.customerName||a.name||""),
-      customer_phone:String(a.customer_phone||a.customerPhone||a.phone||""),
-      customer_code:String(a.customer_code||a.customerCode||a.code||""),
-      customer_type:String(a.customer_type||a.customerType||"Old Customer"),
-      date:String(date),time:String(time).slice(0,8),note:String(a.note||a.notes||""),status,
-      created_at:a.created_at||a.createdAt||new Date().toISOString(),
-      confirmed_at:a.confirmed_at||a.confirmedAt||null,cancelled_at:a.cancelled_at||a.cancelledAt||null,met_at:a.met_at||a.metAt||null
-    };
-  }
-  async function recoverOldAppointments(){
-    const btn=A("appointmentRecoverOld");
-    if(btn){btn.disabled=true;btn.textContent="Recovering...";}
+  function readAppointments(){
     try{
-      const legacy=readLegacyAppointmentCandidates();
-      if(!legacy.length){
-        showStatus("No old appointment data was found in this browser's local/session storage.",true);
-        alert("No old appointment data was found in this browser. If the old appointments were already deleted from browser storage, they cannot be recovered from this HTML file.");
-        return;
-      }
-      const {data:existing,error:readError}=await sb.from("medifella_appointments").select("id,customer_id,date,time,customer_phone,customer_name");
-      if(readError)throw readError;
-      const existingKeys=new Set((existing||[]).map(a=>JSON.stringify([String(a.id||""),String(a.date||""),String(a.time||""),String(a.customer_id||""),String(a.customer_phone||""),String(a.customer_name||"")])));
-      const rows=[];
-      legacy.forEach((a,i)=>{
-        const r=normalizeLegacyAppointment(a,i);
-        const key=JSON.stringify([r.id,r.date,r.time,String(r.customer_id||""),r.customer_phone,r.customer_name]);
-        if(!existingKeys.has(key)){existingKeys.add(key);rows.push(r);}
-      });
-      if(!rows.length){showStatus("Old appointment data was found, but all of it is already in Supabase.",false);await readAppointments();renderAll();return;}
-      const {error:insertError}=await sb.from("medifella_appointments").insert(rows);
-      if(insertError)throw insertError;
-      await readAppointments();renderAll();
-      showStatus(`Recovered ${rows.length} old appointment${rows.length===1?"":"s"} successfully.`,false);
-      alert(`Recovered ${rows.length} old appointment${rows.length===1?"":"s"} successfully.`);
-    }catch(e){
-      console.error("Appointment recovery error:",e);
-      showStatus("Recovery failed: "+(e?.message||e),true);
-      alert("Recovery failed.\n\n"+(e?.message||e));
-    }finally{
-      if(btn){btn.disabled=false;btn.textContent="Sync / Recover Old Appointments";}
-    }
+      const raw=localStorage.getItem(STORAGE_KEY);
+      appointments=raw?JSON.parse(raw):[];
+      if(!Array.isArray(appointments))appointments=[];
+    }catch(e){appointments=[]}
   }
-  async function readAppointments(){
-    try{
-      const {data,error}=await sb.from("medifella_appointments")
-        .select("*")
-        .order("date",{ascending:true})
-        .order("time",{ascending:true})
-        .order("created_at",{ascending:false});
-      if(error)throw error;
-
-      const dbRows=Array.isArray(data)?data:[];
-
-      // Always read the old browser-only appointment records too.
-      // We deliberately DO NOT remove the old local copy.
-      const legacyRaw=readLegacyAppointmentCandidates();
-      const normalizedLegacy=legacyRaw.map((a,i)=>normalizeLegacyAppointment(a,i));
-
-      const dbKeys=new Set(dbRows.map(a=>JSON.stringify([
-        String(a.id||""),String(a.date||""),String(a.time||""),
-        String(a.customer_id||""),String(a.customer_phone||""),
-        String(a.customer_name||"")
-      ])));
-
-      legacyAppointments=[];
-      normalizedLegacy.forEach(r=>{
-        const key=JSON.stringify([
-          String(r.id||""),String(r.date||""),String(r.time||""),
-          String(r.customer_id||""),String(r.customer_phone||""),
-          String(r.customer_name||"")
-        ]);
-        r.__legacy=true;
-
-        // If an old record is already in Supabase, use the Supabase version.
-        if(dbKeys.has(key))return;
-
-        legacyAppointments.push(r);
-      });
-
-      // Try to copy old records into Supabase, but keep the old local copy.
-      // This means old records become editable in the same system while
-      // protecting the original browser data from accidental deletion.
-      if(legacyAppointments.length){
-        try{
-          const rows=legacyAppointments.map(({__legacy,...r})=>r);
-          const {error:legacyInsertError}=await sb.from("medifella_appointments").insert(rows);
-          if(!legacyInsertError){
-            const {data:after,error:afterError}=await sb.from("medifella_appointments")
-              .select("*")
-              .order("date",{ascending:true})
-              .order("time",{ascending:true})
-              .order("created_at",{ascending:false});
-            if(!afterError && Array.isArray(after)){
-              // Rebuild from the database so the old records now have their
-              // normal Supabase identity while local storage remains untouched.
-              appointments=after.map(a=>({...a,__legacy:false}));
-              legacyAppointments=[];
-              return true;
-            }
-          }else{
-            console.warn("Could not copy old appointments to Supabase; showing them from old browser storage.",legacyInsertError);
-          }
-        }catch(copyErr){
-          console.warn("Legacy appointment copy failed; showing old records locally.",copyErr);
-        }
-      }
-
-      appointments=[
-        ...dbRows.map(a=>({...a,__legacy:false})),
-        ...legacyAppointments
-      ];
-
-      return true;
-    }catch(e){
-      appointments=[];
-      legacyAppointments=[];
-      const message=String(e?.message||e||"Unknown database error");
-      console.error("Appointment database load error:",e);
-
-      const box=A("appointmentList");
-      if(box)box.innerHTML=
-        `<div class="status error"><strong>Appointment database error</strong><br>${escA(message)}<br><br>`+
-        `Please run the Appointment Management SQL setup in Supabase, then click Refresh.</div>`;
-
-      const up=A("appointmentUpcoming");
-      if(up)up.innerHTML=
-        `<div class="status error"><strong>Appointment database error</strong><br>${escA(message)}<br><br>`+
-        `Please run the Appointment Management SQL setup in Supabase, then click Refresh.</div>`;
-
-      return false;
-    }
-  }
-
-  async function insertAppointment(row){
-    const {data,error}=await sb.from("medifella_appointments").insert(row).select("*").single();
-    if(error)throw error;
-    return data;
-  }
-  async function updateAppointmentDb(id,changes){
-    const {data,error}=await sb.from("medifella_appointments")
-      .update(changes)
-      .eq("id",String(id))
-      .select("*")
-      .single();
-    if(error)throw error;
-    return data;
-  }
-  async function deleteAppointmentDb(id){
-    const {error}=await sb.from("medifella_appointments").delete().eq("id",String(id));
-    if(error)throw error;
+  function saveAppointments(){
+    localStorage.setItem(STORAGE_KEY,JSON.stringify(appointments));
   }
   function appointmentCustomer(c){
     return {
@@ -9319,7 +9125,7 @@ document.addEventListener("DOMContentLoaded",function(){
     el.className=error?"status error":"status";
     el.textContent=msg||"";
   }
-  async function addAppointment(){
+  function addAppointment(){
     const customerId=A("appointmentCustomerId").value;
     const c=getCustomer(customerId);
     const date=A("appointmentDate").value;
@@ -9327,209 +9133,38 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!c){showStatus("Please search and select a customer.",true);return}
     if(!date||!time){showStatus("Please select appointment date and time.",true);return}
     const data=appointmentCustomer(c);
-    const row={
+    appointments.push({
       id:"APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
-      customer_id:data.id||null,
-      customer_name:data.name,
-      customer_phone:data.phone,
-      customer_code:data.code,
-      customer_type:customerType(),
-      date,time,
-      note:String(A("appointmentNote")?.value||"").trim(),
-      status:"pending",
-      created_at:new Date().toISOString(),
-      confirmed_at:null,
-      cancelled_at:null,
-      met_at:null
-    };
-    try{
-      const saved=await insertAppointment(row);
-      appointments.unshift(saved||row);
-      renderAll();
-      showStatus("Appointment saved successfully.",false);
-      setTimeout(clearForm,700);
-    }catch(e){
-      console.error("Save appointment error:",e);
-      showStatus("Could not save appointment: "+(e?.message||e),true);
-    }
-  }
-  function updateLegacyAppointmentLocal(id,changes){
-    const stores=[localStorage,sessionStorage];
-    let found=false;
-    stores.forEach(store=>{
-      try{
-        for(let i=0;i<store.length;i++){
-          const key=store.key(i);
-          if(!key)continue;
-          const raw=store.getItem(key);
-          if(!raw)continue;
-          let parsed;
-          try{parsed=JSON.parse(raw)}catch(_){continue}
-
-          const patchArray=(arr)=>{
-            if(!Array.isArray(arr))return false;
-            let changed=false;
-            arr.forEach((a)=>{
-              if(a && String(a.id||a.appointment_id||"")===String(id)){
-                Object.assign(a,changes);
-                // Preserve common legacy camelCase fields where present.
-                if("date" in changes)a.appointment_date=changes.date;
-                if("time" in changes)a.appointment_time=changes.time;
-                changed=true;
-              }
-            });
-            return changed;
-          };
-
-          let changed=patchArray(parsed);
-          if(!changed && parsed && typeof parsed==="object"){
-            const walk=(v)=>{
-              if(changed||!v||typeof v!=="object")return;
-              if(Array.isArray(v)){
-                if(patchArray(v))changed=true;
-                if(!changed)v.forEach(walk);
-              }else{
-                Object.values(v).forEach(walk);
-              }
-            };
-            walk(parsed);
-          }
-          if(changed){
-            store.setItem(key,JSON.stringify(parsed));
-            found=true;
-          }
-        }
-      }catch(_){}
+      customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,customer_type:customerType(),
+      date,time,note:String(A("appointmentNote")?.value||"").trim(),status:"pending",created_at:new Date().toISOString(),confirmed_at:null
     });
-    return found;
+    saveAppointments();
+    renderAll();
+    showStatus("Appointment saved successfully.",false);
+    setTimeout(clearForm,700);
   }
-
-  function deleteLegacyAppointmentLocal(id){
-    const stores=[localStorage,sessionStorage];
-    let found=false;
-    stores.forEach(store=>{
-      try{
-        for(let i=0;i<store.length;i++){
-          const key=store.key(i);
-          if(!key)continue;
-          const raw=store.getItem(key);
-          if(!raw)continue;
-          let parsed;
-          try{parsed=JSON.parse(raw)}catch(_){continue}
-
-          let changed=false;
-          const cleanArray=(arr)=>{
-            if(!Array.isArray(arr))return arr;
-            const before=arr.length;
-            const kept=arr.filter(a=>String(a?.id||a?.appointment_id||"")!==String(id));
-            if(kept.length!==before)changed=true;
-            kept.forEach(a=>{
-              if(a && typeof a==="object"){
-                for(const [k,v] of Object.entries(a)){
-                  if(v && typeof v==="object")a[k]=cleanNested(v);
-                }
-              }
-            });
-            return kept;
-          };
-          const cleanNested=(v)=>{
-            if(Array.isArray(v))return cleanArray(v);
-            if(v&&typeof v==="object"){
-              Object.keys(v).forEach(k=>v[k]=cleanNested(v[k]));
-            }
-            return v;
-          };
-
-          if(Array.isArray(parsed)){
-            parsed=cleanArray(parsed);
-          }else if(parsed&&typeof parsed==="object"){
-            const walk=(v)=>{
-              if(!v||typeof v!=="object")return v;
-              if(Array.isArray(v))return cleanArray(v);
-              Object.keys(v).forEach(k=>v[k]=walk(v[k]));
-              return v;
-            };
-            parsed=walk(parsed);
-          }
-
-          if(changed){
-            store.setItem(key,JSON.stringify(parsed));
-            found=true;
-          }
-        }
-      }catch(_){}
-    });
-    return found;
+  function updateAppointment(id,changes){
+    const a=appointments.find(x=>String(x.id)===String(id));
+    if(!a)return null;
+    Object.assign(a,changes);
+    saveAppointments();
+    renderAll();
+    return a;
   }
-
-  async function updateAppointment(id,changes){
-    const existing=appointments.find(x=>String(x.id)===String(id));
-    if(!existing)return null;
-
-    // Old browser appointment: keep it editable even if Supabase cannot
-    // accept the update. If it was already copied to Supabase, update there too.
-    if(existing.__legacy){
-      const localChanged=updateLegacyAppointmentLocal(id,changes);
-      try{
-        const updated=await updateAppointmentDb(id,changes);
-        const idx=appointments.findIndex(x=>String(x.id)===String(id));
-        if(idx>=0)appointments[idx]=updated||Object.assign(appointments[idx],changes,{__legacy:false});
-        renderAll();
-        return updated||appointments[idx]||null;
-      }catch(e){
-        if(localChanged){
-          const idx=appointments.findIndex(x=>String(x.id)===String(id));
-          if(idx>=0)appointments[idx]=Object.assign({},appointments[idx],changes,{__legacy:true});
-          renderAll();
-          showStatus("Old appointment updated in the original browser data. It could not be synced to Supabase yet.",true);
-          return appointments[idx]||null;
-        }
-        alert("Could not update old appointment.\n\n"+(e?.message||e));
-        return null;
-      }
-    }
-
-    try{
-      const updated=await updateAppointmentDb(id,changes);
-      const idx=appointments.findIndex(x=>String(x.id)===String(id));
-      if(idx>=0)appointments[idx]=updated||Object.assign(appointments[idx],changes);
-      renderAll();
-      return updated||appointments[idx]||null;
-    }catch(e){
-      console.error("Update appointment error:",e);
-      alert("Could not update appointment.\n\n"+(e?.message||e));
-      return null;
-    }
-  }
-  async function deleteAppointment(id){
+  function deleteAppointment(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
     if(!confirm(`Delete appointment for ${a.customer_name||"customer"}?`))return;
-    if(a.__legacy){
-      const localChanged=deleteLegacyAppointmentLocal(id);
-      try{await deleteAppointmentDb(id);}catch(_){}
-      if(localChanged){
-        appointments=appointments.filter(x=>String(x.id)!==String(id));
-        renderAll();
-        return;
-      }
-    }
-    try{
-      await deleteAppointmentDb(id);
-      appointments=appointments.filter(x=>String(x.id)!==String(id));
-      renderAll();
-    }catch(e){
-      console.error("Delete appointment error:",e);
-      alert("Could not delete appointment.\n\n"+(e?.message||e));
-    }
+    appointments=appointments.filter(x=>String(x.id)!==String(id));
+    saveAppointments();renderAll();
   }
-  async function cancelAppointment(id){
+  function cancelAppointment(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
     if(!confirm(`Cancel appointment for ${a.customer_name||"customer"}?`))return;
-    await updateAppointment(id,{status:"cancelled",cancelled_at:new Date().toISOString()});
+    updateAppointment(id,{status:"cancelled",cancelled_at:new Date().toISOString()});
   }
-  async function confirmAppointment(id){
+  function confirmAppointment(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
     if(a.status==="cancelled"){
@@ -9540,12 +9175,12 @@ document.addEventListener("DOMContentLoaded",function(){
       alert("This customer is already marked as Meet Already.");
       return;
     }
-    const t=prompt("Confirm coming time:",String(a.time||"").slice(0,5));
+    const t=prompt("Confirm coming time:",a.time||"");
     if(t===null)return;
     if(!/^\d{2}:\d{2}$/.test(t)){alert("Please enter time in HH:MM format.");return}
-    await updateAppointment(id,{time:t,status:"confirmed",confirmed_at:new Date().toISOString(),cancelled_at:null});
+    updateAppointment(id,{time:t,status:"confirmed",confirmed_at:new Date().toISOString(),cancelled_at:null});
   }
-  async function meetAlready(id){
+  function meetAlready(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
     if(a.status==="cancelled"){
@@ -9553,72 +9188,28 @@ document.addEventListener("DOMContentLoaded",function(){
       return;
     }
     if(!confirm(`Mark ${a.customer_name||"this customer"} as Meet Already?`))return;
-    await updateAppointment(id,{
+    updateAppointment(id,{
       status:"met",
       met_at:new Date().toISOString(),
       confirmed_at:a.confirmed_at||new Date().toISOString(),
       cancelled_at:null
     });
   }
-  async function changeAppointmentDate(id){
+  function changeAppointmentDate(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
     const d=prompt("Select new appointment date (YYYY-MM-DD):",a.date||localDate());
     if(d===null)return;
     if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){alert("Please enter date as YYYY-MM-DD.");return}
-    const t=prompt("Select new appointment time (HH:MM):",String(a.time||"").slice(0,5));
+    const t=prompt("Select new appointment time (HH:MM):",a.time||"");
     if(t===null)return;
     if(!/^\d{2}:\d{2}$/.test(t)){alert("Please enter time as HH:MM.");return}
-    await updateAppointment(id,{date:d,time:t,status:"pending",confirmed_at:null,cancelled_at:null});
-  }
-  function rememberAppointmentReturnPage(){
-    appointmentReturnSection="appointments";
-    const list=A("appointmentListPanel"), upcoming=A("appointmentUpcomingPanel");
-    window.appointmentReturnTab=(upcoming && !upcoming.classList.contains("hidden"))?"upcoming":"list";
-  }
-  function restoreAppointmentReturnPage(){
-    const nav=document.querySelector('.nav[data-section="appointments"]');
-    if(nav)nav.click();
-    setTimeout(()=>{
-      if(window.appointmentReturnTab==="upcoming")A("appointmentUpcomingTab")?.click();
-      else A("appointmentListTab")?.click();
-      window.appointmentReturnTab="list";
-    },0);
-  }
-  function addNewInvoiceForCustomer(id){
-    const a=appointments.find(x=>String(x.id)===String(id));
-    if(!a)return;
-    rememberAppointmentReturnPage();
-    window.appointmentReturnAfterInvoice=true;
-
-    const nav=document.querySelector('.nav[data-section="dermedSale"]');
-    if(nav)nav.click();
-
-    setTimeout(()=>{
-      const toggle=A("dermedAddSaleToggle"), form=A("dermedSaleFormCard");
-      if(form && form.style.display==="none" && toggle)toggle.click();
-      // Use the existing Dermed reset/clear behavior so no previous sale data remains.
-      setTimeout(()=>{
-        A("clearDermedSale")?.click();
-        setTimeout(()=>{
-          const customer=getCustomer(a.customer_id);
-          if(!customer){
-            alert("This appointment customer could not be found in Customer Management.");
-            return;
-          }
-          A("dermedBuyerType").value="customer";
-          A("dermedBuyerId").value=String(customer.id);
-          A("dermedBuyerSearch").value=customer.name||a.customer_name||"";
-          A("dermedBuyerHint").textContent=`Selected: ${customer.name||a.customer_name||"Customer"} · ${customer.customer_code||a.customer_code||"No ID"} · ${customer.phone||a.customer_phone||"No phone"}`;
-          A("dermedBuyerSearch")?.focus();
-        },80);
-      },80);
-    },120);
+    updateAppointment(id,{date:d,time:t,status:"pending",confirmed_at:null,cancelled_at:null});
   }
   function showCustomerInvoices(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
-    rememberAppointmentReturnPage();
+    appointmentReturnSection="appointments";
     // Go directly to the existing Dermed Sale list and filter it to this customer.
     // Phone is the strongest customer-level match; fall back to name.
     const query=String(a.customer_phone||a.customer_name||"").trim();
@@ -9638,11 +9229,6 @@ document.addEventListener("DOMContentLoaded",function(){
     const search=A("dermedSaleSearch");
     if(search)search.value="";
     if(typeof renderDermedSales==="function")renderDermedSales();
-    if(window.appointmentReturnAfterInvoice){
-      window.appointmentReturnAfterInvoice=false;
-      restoreAppointmentReturnPage();
-      return;
-    }
     const nav=document.querySelector(`.nav[data-section="${appointmentReturnSection}"]`);
     if(nav)nav.click();
   }
@@ -9666,7 +9252,6 @@ document.addEventListener("DOMContentLoaded",function(){
       <button type="button" class="light appointment-confirm" data-appt-id="${id}">Confirm Coming</button>
       <button type="button" class="light appointment-change" data-appt-id="${id}">Change Date</button>
       <button type="button" class="light appointment-invoices" data-appt-id="${id}">Go to see Old Invoice</button>
-      <button type="button" class="gold appointment-add-invoice" data-appt-id="${id}">Add New Invoice</button>
       <button type="button" class="light appointment-met" data-appt-id="${id}">Meet Already</button>
       <button type="button" class="light appointment-edit" data-appt-id="${id}">Edit</button>
       <button type="button" class="light appointment-cancel" data-appt-id="${id}">Cancel</button>
@@ -9756,24 +9341,8 @@ document.addEventListener("DOMContentLoaded",function(){
     if(v)A("appointmentMonth").value=v;
     renderUpcoming();
   }
-  function installInvoiceReturnHook(){
-    if(typeof window.closeInvoicePreview!="function" || window.closeInvoicePreview.__appointmentReturnHook)return;
-    const original=window.closeInvoicePreview;
-    const wrapped=function(){
-      original.apply(this,arguments);
-      if(window.appointmentReturnAfterInvoice){
-        window.appointmentReturnAfterInvoice=false;
-        restoreAppointmentReturnPage();
-      }
-    };
-    wrapped.__appointmentReturnHook=true;
-    window.closeInvoicePreview=wrapped;
-  }
   function init(){
-    installInvoiceReturnHook();
-    setTimeout(installInvoiceReturnHook,300);
-    setTimeout(installInvoiceReturnHook,1000);
-    readAppointments().then(ok=>{if(ok)renderAll();});
+    readAppointments();
     clearForm();
     A("appointmentMonth").value=localDate().slice(0,7);
     A("appointmentAddToggle").onclick=()=>{
@@ -9791,8 +9360,7 @@ document.addEventListener("DOMContentLoaded",function(){
       clearForm();
     };
     A("appointmentListSearch").oninput=renderList;
-    A("appointmentListRefresh").onclick=async()=>{const ok=await readAppointments();if(ok)renderAll()};
-    A("appointmentRecoverOld").onclick=recoverOldAppointments;
+    A("appointmentListRefresh").onclick=()=>{readAppointments();renderAll()};
     A("appointmentListTab").onclick=()=>{
       A("appointmentListPanel").classList.remove("hidden");
       A("appointmentUpcomingPanel").classList.add("hidden");
@@ -9826,8 +9394,6 @@ document.addEventListener("DOMContentLoaded",function(){
       if(cr){e.preventDefault();setFormCustomer(getCustomer(cr.dataset.apptCustomer));return}
       const inv=e.target.closest?.(".appointment-invoices");
       if(inv){e.preventDefault();showCustomerInvoices(inv.dataset.apptId);return}
-      const addInv=e.target.closest?.(".appointment-add-invoice");
-      if(addInv){e.preventDefault();addNewInvoiceForCustomer(addInv.dataset.apptId);return}
       const ed=e.target.closest?.(".appointment-edit");
       if(ed){e.preventDefault();editAppointment(ed.dataset.apptId);return}
       const del=e.target.closest?.(".appointment-delete");
@@ -9845,7 +9411,7 @@ document.addEventListener("DOMContentLoaded",function(){
     });
     renderAll();
   }
-  window.refreshAppointments=async()=>{await readAppointments();renderAll()};
+  window.refreshAppointments=()=>{readAppointments();renderAll()};
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
 })();
 </script>
