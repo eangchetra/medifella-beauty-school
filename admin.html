@@ -10236,16 +10236,53 @@ document.addEventListener("DOMContentLoaded",function(){
     };
   }
 
-  function renderCommissionServiceResults(){
+  async function fetchCommissionServicesFromDatabase(q){
+    if(typeof sb==="undefined" || !q)return [];
+    try{
+      const term=String(q).trim();
+      const safe=term.replace(/[%_,]/g," ").trim();
+      if(!safe)return [];
+      const r=await sb.from("medifella_services")
+        .select("*")
+        .or(`name.ilike.%${safe}%,service_code.ilike.%${safe}%,service_type.ilike.%${safe}%`)
+        .order("created_at",{ascending:false})
+        .limit(20);
+      if(r.error){
+        console.warn("Commission service search:",r.error.message);
+        return [];
+      }
+      const found=Array.isArray(r.data)?r.data:[];
+      // Merge freshly fetched services into the shared Service List so the
+      // selected result can be added even when this section initialized
+      // before the main Service List finished loading.
+      if(found.length){
+        const current=serviceRows();
+        const merged=current.slice();
+        found.forEach(x=>{
+          const id=String(x.id??x.service_id??"");
+          const idx=merged.findIndex(y=>String(y.id??y.service_id??"")===id);
+          if(idx>=0)merged[idx]=x; else merged.push(x);
+        });
+        window.services=merged;
+        if(typeof services!=="undefined")services=merged;
+      }
+      return found;
+    }catch(e){
+      console.warn("Commission service search failed:",e);
+      return [];
+    }
+  }
+
+  function renderCommissionServiceResults(rows){
     const input=C("commissionServiceSearch"),box=C("commissionServiceResults");
     if(!input||!box)return;
     const q=String(input.value||"").toLowerCase().trim();
     if(!q){box.innerHTML="";box.classList.remove("show");return}
-    const rows=serviceRows().filter(s=>{
+    const list=(Array.isArray(rows)?rows:serviceRows().filter(s=>{
       const text=`${s.service_code||s.code||""} ${s.name||s.service_name||s.title||""} ${s.service_type||""}`.toLowerCase();
       return text.includes(q);
-    }).slice(0,20);
-    box.innerHTML=rows.map(s=>{
+    })).slice(0,20);
+    box.innerHTML=list.map(s=>{
       const sid=s.id??s.service_id??"";
       const name=s.name??s.service_name??s.title??"Service";
       const code=s.service_code??s.code??"";
@@ -10259,6 +10296,24 @@ document.addEventListener("DOMContentLoaded",function(){
       </button>`;
     }).join("")||'<div class="muted" style="padding:12px">No matching service found.</div>';
     box.classList.add("show");
+  }
+
+  let commissionServiceSearchTimer=null;
+  async function searchCommissionServices(){
+    const input=C("commissionServiceSearch");
+    if(!input)return;
+    const q=String(input.value||"").trim().toLowerCase();
+    if(!q){
+      renderCommissionServiceResults([]);
+      return;
+    }
+    // Show local matches immediately, then refresh from the database. This
+    // fixes the case where the Commission section opens before Service List
+    // data has finished loading.
+    renderCommissionServiceResults();
+    const found=await fetchCommissionServicesFromDatabase(q);
+    if(String(input.value||"").trim().toLowerCase()!==q)return;
+    if(found.length)renderCommissionServiceResults(found);
   }
 
   function addCommissionService(id){
@@ -10397,6 +10452,13 @@ document.addEventListener("DOMContentLoaded",function(){
     });
   }
 
+  function formatCommissionDate(value){
+    const raw=String(value||"").slice(0,10);
+    if(!raw)return "";
+    const m=raw.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m?`${m[3]}/${m[2]}/${m[1]}`:raw;
+  }
+
   function renderCommissionList(){
     const box=C("commissionList");if(!box)return;
     const rows=filteredCommissionRecords();
@@ -10405,7 +10467,7 @@ document.addEventListener("DOMContentLoaded",function(){
     box.innerHTML=rows.length?`<div class="table-wrap"><table class="table">
       <tr><th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th><th>Service Type</th><th>Service Detail</th><th>Unit</th><th>Unit Price</th><th>Discount</th><th>Subtotal</th><th>Commission</th><th>Subtotal Commission</th></tr>
       ${rows.map(x=>`<tr>
-        <td>${escC(String(x.commission_date||x.created_at||"").slice(0,10))}</td>
+        <td>${escC(formatCommissionDate(x.commission_date||x.created_at))}</td>
         <td>${escC(x.staff_name||"")}</td>
         <td>${escC(x.customer_name||"")}</td>
         <td>${escC(x.customer_phone||"")}</td>
@@ -10647,7 +10709,10 @@ document.addEventListener("DOMContentLoaded",function(){
       if(b)selectCommissionCustomer(b.dataset.commissionCustomer);
     });
 
-    C("commissionServiceSearch")?.addEventListener("input",renderCommissionServiceResults);
+    C("commissionServiceSearch")?.addEventListener("input",()=>{
+      if(commissionServiceSearchTimer)clearTimeout(commissionServiceSearchTimer);
+      commissionServiceSearchTimer=setTimeout(searchCommissionServices,120);
+    });
     C("commissionServiceResults")?.addEventListener("click",e=>{
       const b=e.target.closest("[data-commission-service]");
       if(b){
