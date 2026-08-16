@@ -6817,7 +6817,9 @@ boot();
       if(typeof chooseBuyer==="function")chooseBuyer("dermed",x.dataset.bt,x.dataset.bi);
       hide(br);
     })}
-    if(ii&&!ii.dataset.fsb){ii.dataset.fsb="1";ii.addEventListener("input",item);ii.addEventListener("keyup",item);ii.addEventListener("keydown",function(e){if(e.key==="Escape")hide(ir)});ir&&ir.addEventListener("mousedown",function(e){var p=e.target.closest("[data-pid]"),v=e.target.closest("[data-sid]");if(!p&&!v)return;e.preventDefault();if(p&&typeof addSaleProduct==="function")addSaleProduct("dermed",p.dataset.pid);if(v&&typeof addDermedService==="function")addDermedService(v.dataset.sid);ii.value="";hide(ir)})}
+    // Dermed item search is handled by the newer optimized picker below.
+    // Keep the older customer-search behavior unchanged.
+    if(ii&&!ii.dataset.fsb){ii.dataset.fsb="1";}
   }
   document.addEventListener("DOMContentLoaded",function(){bind();setTimeout(bind,500);setTimeout(bind,1500)});
 })();
@@ -7234,11 +7236,16 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   let refreshItemTimer=null;
-  let itemSearchCache={products:[],services:[],productsRef:null,servicesRef:null};
+  let itemSearchCache={
+    productsRef:null, servicesRef:null, stockRef:null,
+    products:[], services:[], stock:new Map()
+  };
 
   function rebuildItemSearchCache(){
-    const ps=Array.isArray(products)?products:[];
-    const ss=Array.isArray(services)?services:[];
+    const ps=Array.isArray(window.products)?window.products:[];
+    const ss=Array.isArray(window.services)?window.services:[];
+    const sm=Array.isArray(window.stockMovements)?window.stockMovements:[];
+
     if(itemSearchCache.productsRef!==ps || itemSearchCache.products.length!==ps.length){
       itemSearchCache.products=ps.map(x=>({
         raw:x,
@@ -7246,6 +7253,7 @@ document.addEventListener("DOMContentLoaded",function(){
       }));
       itemSearchCache.productsRef=ps;
     }
+
     if(itemSearchCache.servicesRef!==ss || itemSearchCache.services.length!==ss.length){
       itemSearchCache.services=ss.map(x=>({
         raw:x,
@@ -7253,20 +7261,31 @@ document.addEventListener("DOMContentLoaded",function(){
       }));
       itemSearchCache.servicesRef=ss;
     }
+
+    if(itemSearchCache.stockRef!==sm){
+      const stock=new Map();
+      for(const m of sm){
+        const id=String(m.product_id||"");
+        if(!id)continue;
+        const q=Number(m.quantity||0);
+        stock.set(id,(stock.get(id)||0)+(String(m.movement_type)==="stock_in"?q:-q));
+      }
+      itemSearchCache.stock=stock;
+      itemSearchCache.stockRef=sm;
+    }
   }
 
   function refreshItemNow(){
-    syncLiveData();
     const input=E("dermedItemSearch"),box=E("dermedItemResults");
     if(!input||!box)return;
 
     const q=norm(input.value);
     if(!q){box.innerHTML="";hide(box);return}
 
+    // Data is already loaded by the Admin Dashboard. Do not copy/sync all
+    // product/service arrays on every keystroke.
     rebuildItemSearchCache();
 
-    // Only take the first 10 matches from each group. This avoids
-    // sorting/mapping the entire product/service database on every keystroke.
     const ps=[];
     for(const entry of itemSearchCache.products){
       if(entry.text.includes(q)){
@@ -7286,8 +7305,12 @@ document.addEventListener("DOMContentLoaded",function(){
     let h="";
     if(ps.length){
       h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">PRODUCTS</div>';
-      h+=ps.map(x=>`<button type="button" data-latest-product-id="${escv(x.id)}"><strong>${escv(x.name)}</strong><div class="muted">Product · ${escv(x.product_code||"")} · ${moneyv(x.price)} · Stock: ${typeof productStock==="function"?productStock(x.id):""}</div></button>`).join("");
+      h+=ps.map(x=>{
+        const stock=itemSearchCache.stock.get(String(x.id))||0;
+        return `<button type="button" data-latest-product-id="${escv(x.id)}"><strong>${escv(x.name)}</strong><div class="muted">Product · ${escv(x.product_code||"")} · ${moneyv(x.price)} · Stock: ${stock}</div></button>`;
+      }).join("");
     }
+
     if(ss.length){
       h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">SERVICES</div>';
       h+=ss.map(x=>`<button type="button" data-latest-service-id="${escv(x.id)}"><strong>${escv(x.name)}</strong><div class="muted">Service · ${escv(x.service_code||"")} · ${escv(x.service_type||"")} · ${moneyv(x.price)}</div></button>`).join("");
@@ -7298,10 +7321,8 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function refreshItem(){
-    // Debounce both input + keyup events so each keystroke causes at most
-    // one search/render. This changes only the Dermed Product/Service picker.
     clearTimeout(refreshItemTimer);
-    refreshItemTimer=setTimeout(refreshItemNow,70);
+    refreshItemTimer=setTimeout(refreshItemNow,50);
   }
 
   function chooseCustomerFromButton(b){
@@ -7330,7 +7351,7 @@ document.addEventListener("DOMContentLoaded",function(){
     if(ii&&!ii.dataset.latestSafe){
       ii.dataset.latestSafe="1";
       ii.addEventListener("input",refreshItem);
-      ii.addEventListener("focus",function(){syncLiveData();rebuildItemSearchCache();});
+      ii.addEventListener("focus",function(){rebuildItemSearchCache();});
     }
 
     if(br&&!br.dataset.latestSafe){
@@ -7374,14 +7395,8 @@ document.addEventListener("DOMContentLoaded",function(){
   }else{
     bind();setTimeout(bind,300);setTimeout(bind,1000)
   }
-  // Keep the existing live-data behavior, but at a much lighter cadence.
-  // Item search itself rebuilds its cache when the products/services arrays change.
-  setInterval(function(){
-    try{
-      if(typeof students!=="undefined")window.students=students;
-      if(typeof customers!=="undefined")window.customers=customers;
-    }catch(e){}
-  },2000);
+  // No periodic product/service sync while typing.
+  // Product/Service arrays are refreshed by the existing dashboard loaders.
 })();
 </script>
 
@@ -9723,6 +9738,65 @@ document.addEventListener("DOMContentLoaded",function(){
     bind();setTimeout(bind,300);setTimeout(bind,1000);
   }
 })();
+</script>
+
+
+<script id="mf-search-input-responsiveness-final">
+(function(){
+  "use strict";
+
+  // Important: this does NOT change what any search does.
+  // It only prevents heavy search-render functions from running synchronously
+  // on every physical keystroke. The latest input is replayed after the user
+  // pauses briefly, so the typed letters can paint immediately.
+  const ids=['studentSearch','saleStudentSearch','saleCourseSearch','salesSearch','appointmentCustomerSearch','appointmentListSearch','stockProductSearch','productSearch','stockSearch','staffInfoSearch','customerSearch','mtsBuyerSearch','mtsProductSearch','mtsSaleSearch','dermedBuyerSearch','dermedItemSearch','dermedSaleSearch','serviceSearch','certStudentSearch','certSearch'];
+  const timers=new Map();
+
+  function install(id){
+    const el=document.getElementById(id);
+    if(!el || el.dataset.mfResponsiveSearch==="1")return;
+    el.dataset.mfResponsiveSearch="1";
+
+    el.addEventListener("input",function(e){
+      if(e.__mfSearchReplay)return;
+
+      e.stopImmediatePropagation();
+
+      const old=timers.get(id);
+      if(old)clearTimeout(old);
+
+      const timer=setTimeout(function(){
+        timers.delete(id);
+        const ev=new Event("input",{bubbles:true,cancelable:true});
+        ev.__mfSearchReplay=true;
+        el.dispatchEvent(ev);
+      },100);
+
+      timers.set(id,timer);
+    },true);
+
+    // A few older search handlers also listen to keyup. Stop those duplicate
+    // renders; the replayed input event above remains the single source.
+    el.addEventListener("keyup",function(e){
+      if(e.__mfSearchReplay)return;
+      e.stopImmediatePropagation();
+    },true);
+  }
+
+  function installAll(){
+    ids.forEach(install);
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",installAll,{once:true});
+  }else{
+    installAll();
+  }
+
+  // Some dashboard sections are initialized later.
+  setTimeout(installAll,300);
+  setTimeout(installAll,1000);
+});
 </script>
 
 </body>
