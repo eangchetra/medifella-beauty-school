@@ -9053,15 +9053,75 @@ document.addEventListener("DOMContentLoaded",function(){
     const ap=h>=12?"PM":"AM", hh=(h%12)||12;
     return `${hh}:${pad(m||0)} ${ap}`;
   }
-  function readAppointments(){
+  async function readAppointments(){
     try{
-      const raw=localStorage.getItem(STORAGE_KEY);
-      appointments=raw?JSON.parse(raw):[];
-      if(!Array.isArray(appointments))appointments=[];
-    }catch(e){appointments=[]}
+      const {data,error}=await sb.from("medifella_appointments")
+        .select("*")
+        .order("date",{ascending:true})
+        .order("time",{ascending:true})
+        .order("created_at",{ascending:false});
+      if(error)throw error;
+      appointments=Array.isArray(data)?data:[];
+
+      // One-time migration of appointments created by the older localStorage version.
+      // This only runs when the database table is empty, so existing database records
+      // are never overwritten or duplicated.
+      if(appointments.length===0){
+        let legacy=[];
+        try{
+          const raw=localStorage.getItem(STORAGE_KEY);
+          legacy=raw?JSON.parse(raw):[];
+        }catch(_){legacy=[]}
+        if(Array.isArray(legacy)&&legacy.length){
+          const rows=legacy.map(a=>({
+            id:String(a.id||("APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8))),
+            customer_id:a.customer_id?String(a.customer_id):null,
+            customer_name:String(a.customer_name||""),
+            customer_phone:String(a.customer_phone||""),
+            customer_code:String(a.customer_code||""),
+            customer_type:String(a.customer_type||"Old Customer"),
+            date:a.date||localDate(),
+            time:a.time||"00:00",
+            note:String(a.note||""),
+            status:String(a.status||"pending"),
+            created_at:a.created_at||new Date().toISOString(),
+            confirmed_at:a.confirmed_at||null,
+            cancelled_at:a.cancelled_at||null,
+            met_at:a.met_at||null
+          }));
+          const {data:inserted,error:insertError}=await sb.from("medifella_appointments").insert(rows).select("*");
+          if(!insertError && Array.isArray(inserted)){
+            appointments=inserted;
+            localStorage.removeItem(STORAGE_KEY);
+          }
+        }
+      }
+    }catch(e){
+      appointments=[];
+      console.error("Appointment database load error:",e);
+      const box=A("appointmentList");
+      if(box)box.innerHTML=`<div class="status error">Appointment database could not be loaded: ${escA(e?.message||e)}</div>`;
+      const up=A("appointmentUpcoming");
+      if(up)up.innerHTML=`<div class="status error">Appointment database could not be loaded. Please run the Appointment Management SQL setup in Supabase.</div>`;
+    }
   }
-  function saveAppointments(){
-    localStorage.setItem(STORAGE_KEY,JSON.stringify(appointments));
+  async function insertAppointment(row){
+    const {data,error}=await sb.from("medifella_appointments").insert(row).select("*").single();
+    if(error)throw error;
+    return data;
+  }
+  async function updateAppointmentDb(id,changes){
+    const {data,error}=await sb.from("medifella_appointments")
+      .update(changes)
+      .eq("id",String(id))
+      .select("*")
+      .single();
+    if(error)throw error;
+    return data;
+  }
+  async function deleteAppointmentDb(id){
+    const {error}=await sb.from("medifella_appointments").delete().eq("id",String(id));
+    if(error)throw error;
   }
   function appointmentCustomer(c){
     return {
@@ -9125,7 +9185,7 @@ document.addEventListener("DOMContentLoaded",function(){
     el.className=error?"status error":"status";
     el.textContent=msg||"";
   }
-  function addAppointment(){
+  async function addAppointment(){
     const customerId=A("appointmentCustomerId").value;
     const c=getCustomer(customerId);
     const date=A("appointmentDate").value;
@@ -9133,38 +9193,65 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!c){showStatus("Please search and select a customer.",true);return}
     if(!date||!time){showStatus("Please select appointment date and time.",true);return}
     const data=appointmentCustomer(c);
-    appointments.push({
+    const row={
       id:"APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
-      customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,customer_type:customerType(),
-      date,time,note:String(A("appointmentNote")?.value||"").trim(),status:"pending",created_at:new Date().toISOString(),confirmed_at:null
-    });
-    saveAppointments();
-    renderAll();
-    showStatus("Appointment saved successfully.",false);
-    setTimeout(clearForm,700);
+      customer_id:data.id||null,
+      customer_name:data.name,
+      customer_phone:data.phone,
+      customer_code:data.code,
+      customer_type:customerType(),
+      date,time,
+      note:String(A("appointmentNote")?.value||"").trim(),
+      status:"pending",
+      created_at:new Date().toISOString(),
+      confirmed_at:null,
+      cancelled_at:null,
+      met_at:null
+    };
+    try{
+      const saved=await insertAppointment(row);
+      appointments.unshift(saved||row);
+      renderAll();
+      showStatus("Appointment saved successfully.",false);
+      setTimeout(clearForm,700);
+    }catch(e){
+      console.error("Save appointment error:",e);
+      showStatus("Could not save appointment: "+(e?.message||e),true);
+    }
   }
-  function updateAppointment(id,changes){
-    const a=appointments.find(x=>String(x.id)===String(id));
-    if(!a)return null;
-    Object.assign(a,changes);
-    saveAppointments();
-    renderAll();
-    return a;
+  async function updateAppointment(id,changes){
+    try{
+      const updated=await updateAppointmentDb(id,changes);
+      const idx=appointments.findIndex(x=>String(x.id)===String(id));
+      if(idx>=0)appointments[idx]=updated||Object.assign(appointments[idx],changes);
+      renderAll();
+      return updated||appointments[idx]||null;
+    }catch(e){
+      console.error("Update appointment error:",e);
+      alert("Could not update appointment.\n\n"+(e?.message||e));
+      return null;
+    }
   }
-  function deleteAppointment(id){
+  async function deleteAppointment(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
     if(!confirm(`Delete appointment for ${a.customer_name||"customer"}?`))return;
-    appointments=appointments.filter(x=>String(x.id)!==String(id));
-    saveAppointments();renderAll();
+    try{
+      await deleteAppointmentDb(id);
+      appointments=appointments.filter(x=>String(x.id)!==String(id));
+      renderAll();
+    }catch(e){
+      console.error("Delete appointment error:",e);
+      alert("Could not delete appointment.\n\n"+(e?.message||e));
+    }
   }
-  function cancelAppointment(id){
+  async function cancelAppointment(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
     if(!confirm(`Cancel appointment for ${a.customer_name||"customer"}?`))return;
-    updateAppointment(id,{status:"cancelled",cancelled_at:new Date().toISOString()});
+    await updateAppointment(id,{status:"cancelled",cancelled_at:new Date().toISOString()});
   }
-  function confirmAppointment(id){
+  async function confirmAppointment(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
     if(a.status==="cancelled"){
@@ -9175,12 +9262,12 @@ document.addEventListener("DOMContentLoaded",function(){
       alert("This customer is already marked as Meet Already.");
       return;
     }
-    const t=prompt("Confirm coming time:",a.time||"");
+    const t=prompt("Confirm coming time:",String(a.time||"").slice(0,5));
     if(t===null)return;
     if(!/^\d{2}:\d{2}$/.test(t)){alert("Please enter time in HH:MM format.");return}
-    updateAppointment(id,{time:t,status:"confirmed",confirmed_at:new Date().toISOString(),cancelled_at:null});
+    await updateAppointment(id,{time:t,status:"confirmed",confirmed_at:new Date().toISOString(),cancelled_at:null});
   }
-  function meetAlready(id){
+  async function meetAlready(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
     if(a.status==="cancelled"){
@@ -9188,23 +9275,23 @@ document.addEventListener("DOMContentLoaded",function(){
       return;
     }
     if(!confirm(`Mark ${a.customer_name||"this customer"} as Meet Already?`))return;
-    updateAppointment(id,{
+    await updateAppointment(id,{
       status:"met",
       met_at:new Date().toISOString(),
       confirmed_at:a.confirmed_at||new Date().toISOString(),
       cancelled_at:null
     });
   }
-  function changeAppointmentDate(id){
+  async function changeAppointmentDate(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
     const d=prompt("Select new appointment date (YYYY-MM-DD):",a.date||localDate());
     if(d===null)return;
     if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){alert("Please enter date as YYYY-MM-DD.");return}
-    const t=prompt("Select new appointment time (HH:MM):",a.time||"");
+    const t=prompt("Select new appointment time (HH:MM):",String(a.time||"").slice(0,5));
     if(t===null)return;
     if(!/^\d{2}:\d{2}$/.test(t)){alert("Please enter time as HH:MM.");return}
-    updateAppointment(id,{date:d,time:t,status:"pending",confirmed_at:null,cancelled_at:null});
+    await updateAppointment(id,{date:d,time:t,status:"pending",confirmed_at:null,cancelled_at:null});
   }
   function rememberAppointmentReturnPage(){
     appointmentReturnSection="appointments";
@@ -9408,7 +9495,7 @@ document.addEventListener("DOMContentLoaded",function(){
     installInvoiceReturnHook();
     setTimeout(installInvoiceReturnHook,300);
     setTimeout(installInvoiceReturnHook,1000);
-    readAppointments();
+    readAppointments().then(()=>renderAll());
     clearForm();
     A("appointmentMonth").value=localDate().slice(0,7);
     A("appointmentAddToggle").onclick=()=>{
@@ -9426,7 +9513,7 @@ document.addEventListener("DOMContentLoaded",function(){
       clearForm();
     };
     A("appointmentListSearch").oninput=renderList;
-    A("appointmentListRefresh").onclick=()=>{readAppointments();renderAll()};
+    A("appointmentListRefresh").onclick=async()=>{await readAppointments();renderAll()};
     A("appointmentListTab").onclick=()=>{
       A("appointmentListPanel").classList.remove("hidden");
       A("appointmentUpcomingPanel").classList.add("hidden");
@@ -9479,7 +9566,7 @@ document.addEventListener("DOMContentLoaded",function(){
     });
     renderAll();
   }
-  window.refreshAppointments=()=>{readAppointments();renderAll()};
+  window.refreshAppointments=async()=>{await readAppointments();renderAll()};
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
 })();
 </script>
