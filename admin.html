@@ -7233,24 +7233,75 @@ document.addEventListener("DOMContentLoaded",function(){
     if(rows.length)show(box);else hide(box);
   }
 
-  function refreshItem(){
+  let refreshItemTimer=null;
+  let itemSearchCache={products:[],services:[],productsRef:null,servicesRef:null};
+
+  function rebuildItemSearchCache(){
+    const ps=Array.isArray(products)?products:[];
+    const ss=Array.isArray(services)?services:[];
+    if(itemSearchCache.productsRef!==ps || itemSearchCache.products.length!==ps.length){
+      itemSearchCache.products=ps.map(x=>({
+        raw:x,
+        text:norm((x.product_code||"")+" "+(x.name||"")+" "+(x.id||""))
+      }));
+      itemSearchCache.productsRef=ps;
+    }
+    if(itemSearchCache.servicesRef!==ss || itemSearchCache.services.length!==ss.length){
+      itemSearchCache.services=ss.map(x=>({
+        raw:x,
+        text:norm((x.service_code||"")+" "+(x.name||"")+" "+(x.service_type||"")+" "+(x.id||""))
+      }));
+      itemSearchCache.servicesRef=ss;
+    }
+  }
+
+  function refreshItemNow(){
     syncLiveData();
-    const input=E("dermedItemSearch"),box=E("dermedItemResults"); if(!input||!box)return;
+    const input=E("dermedItemSearch"),box=E("dermedItemResults");
+    if(!input||!box)return;
+
     const q=norm(input.value);
     if(!q){box.innerHTML="";hide(box);return}
-    const ps=(Array.isArray(products)?products:[]).filter(x=>norm((x.product_code||"")+" "+(x.name||"")+" "+(x.id||"")).includes(q)).slice(0,10);
-    const ss=(Array.isArray(services)?services:[]).filter(x=>norm((x.service_code||"")+" "+(x.name||"")+" "+(x.service_type||"")+" "+(x.id||"")).includes(q)).slice(0,10);
+
+    rebuildItemSearchCache();
+
+    // Only take the first 10 matches from each group. This avoids
+    // sorting/mapping the entire product/service database on every keystroke.
+    const ps=[];
+    for(const entry of itemSearchCache.products){
+      if(entry.text.includes(q)){
+        ps.push(entry.raw);
+        if(ps.length>=10)break;
+      }
+    }
+
+    const ss=[];
+    for(const entry of itemSearchCache.services){
+      if(entry.text.includes(q)){
+        ss.push(entry.raw);
+        if(ss.length>=10)break;
+      }
+    }
+
     let h="";
     if(ps.length){
       h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">PRODUCTS</div>';
-      h+=ps.map(x=>`<button type="button" data-latest-product-id="${escv(x.id)}"><strong>${escv(x.name)}</strong><div class="muted">Product · ${escv(x.product_code||"")} · ${moneyv(x.price)} · Stock: ${typeof productStock==="function"?productStock(x.id):""}</div></button>`).join("")
+      h+=ps.map(x=>`<button type="button" data-latest-product-id="${escv(x.id)}"><strong>${escv(x.name)}</strong><div class="muted">Product · ${escv(x.product_code||"")} · ${moneyv(x.price)} · Stock: ${typeof productStock==="function"?productStock(x.id):""}</div></button>`).join("");
     }
     if(ss.length){
       h+='<div style="padding:8px 12px;font-weight:800;color:#168e9f;background:#f3fbfc">SERVICES</div>';
-      h+=ss.map(x=>`<button type="button" data-latest-service-id="${escv(x.id)}"><strong>${escv(x.name)}</strong><div class="muted">Service · ${escv(x.service_code||"")} · ${escv(x.service_type||"")} · ${moneyv(x.price)}</div></button>`).join("")
+      h+=ss.map(x=>`<button type="button" data-latest-service-id="${escv(x.id)}"><strong>${escv(x.name)}</strong><div class="muted">Service · ${escv(x.service_code||"")} · ${escv(x.service_type||"")} · ${moneyv(x.price)}</div></button>`).join("");
     }
+
     box.innerHTML=h||'<div class="muted" style="padding:10px">No product or service found.</div>';
     if(h)show(box);else hide(box);
+  }
+
+  function refreshItem(){
+    // Debounce both input + keyup events so each keystroke causes at most
+    // one search/render. This changes only the Dermed Product/Service picker.
+    clearTimeout(refreshItemTimer);
+    refreshItemTimer=setTimeout(refreshItemNow,70);
   }
 
   function chooseCustomerFromButton(b){
@@ -7279,8 +7330,7 @@ document.addEventListener("DOMContentLoaded",function(){
     if(ii&&!ii.dataset.latestSafe){
       ii.dataset.latestSafe="1";
       ii.addEventListener("input",refreshItem);
-      ii.addEventListener("keyup",refreshItem);
-      ii.addEventListener("focus",syncLiveData);
+      ii.addEventListener("focus",function(){syncLiveData();rebuildItemSearchCache();});
     }
 
     if(br&&!br.dataset.latestSafe){
@@ -7324,7 +7374,14 @@ document.addEventListener("DOMContentLoaded",function(){
   }else{
     bind();setTimeout(bind,300);setTimeout(bind,1000)
   }
-  setInterval(syncLiveData,1000);
+  // Keep the existing live-data behavior, but at a much lighter cadence.
+  // Item search itself rebuilds its cache when the products/services arrays change.
+  setInterval(function(){
+    try{
+      if(typeof students!=="undefined")window.students=students;
+      if(typeof customers!=="undefined")window.customers=customers;
+    }catch(e){}
+  },2000);
 })();
 </script>
 
