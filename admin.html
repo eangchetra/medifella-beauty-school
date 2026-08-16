@@ -2376,6 +2376,10 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
   <div class="row">
     <div>
+      <label>Commission Date *</label>
+      <input id="commissionDate" type="date" required>
+    </div>
+    <div>
       <label>Customer Phone Number</label>
       <input id="commissionCustomerPhone" readonly>
     </div>
@@ -7357,8 +7361,8 @@ document.addEventListener("DOMContentLoaded",function(){
             buyer,
             buyerType,
             buyerId,
-            staffId,
-            staff,
+            staffId:staffId,
+            staff:staff,
             servicesArr,
             items,
             hasProducts:items.length>0,
@@ -10120,6 +10124,7 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function clearCommissionForm(){
+    if(C("commissionDate"))C("commissionDate").value=todayC();
     ["commissionCustomerId","commissionCustomerPhone"].forEach(id=>{if(C(id))C(id).value=""});
     if(C("commissionCustomerSearch"))C("commissionCustomerSearch").value="";
     if(C("commissionServiceDetail"))C("commissionServiceDetail").value="";
@@ -10134,14 +10139,19 @@ document.addEventListener("DOMContentLoaded",function(){
     return Array.isArray(window.staffInfoRecords)?window.staffInfoRecords:[];
   }
   function populateCommissionStaff(){
-    const rows=staffRows();
+    // Sale Commission Management uses ONLY Sale Staff.
+    // Sale Staff = Job Title "Sale Counter Cashier".
+    // Cashier is never used for commission ownership.
+    const rows=staffRows().filter(s=>
+      String(s.job_title||"").trim().toLowerCase()==="sale counter cashier"
+    );
     ["commissionStaff","commissionFilterStaff"].forEach(id=>{
       const el=C(id);if(!el)return;
       const selected=el.value;
       const all=id==="commissionFilterStaff"
-        ?'<option value="">All Staff</option>'
-        :'<option value="">Select Staff</option>';
-      el.innerHTML=all+rows.map(s=>`<option value="${escC(s.id)}">${escC(s.name_en||s.name_kh||s.name||"Staff")}${s.job_title?` · ${escC(s.job_title)}`:""}</option>`).join("");
+        ?'<option value="">All Sale Staff</option>'
+        :'<option value="">Select Sale Staff</option>';
+      el.innerHTML=all+rows.map(s=>`<option value="${escC(s.id)}">${escC(s.name_en||s.name_kh||s.name||"Staff")} · Sale Counter Cashier</option>`).join("");
       if(selected)el.value=selected;
     });
   }
@@ -10152,10 +10162,14 @@ document.addEventListener("DOMContentLoaded",function(){
     const rows=Array.isArray(window.services)?window.services:[];
     const selected=el.value;
     el.innerHTML='<option value="">Select service</option>'+
-      rows.map(s=>`<option value="${escC(s.id)}" data-price="${escC(s.price||0)}" data-name="${escC(s.name||"")}" data-code="${escC(s.service_code||"")}">
-        ${escC(s.name||"Service")}${s.service_code?` · ${escC(s.service_code)}`:""}${s.price!=null?` · $${moneyC(s.price)}`:""}
-      </option>`).join("");
-    if(selected)el.value=selected;
+      rows.map(s=>{
+        const sid=s.id??s.service_id??"";
+        const name=s.name??s.service_name??s.title??"Service";
+        const price=Number(s.price??s.unit_price??0);
+        const code=s.service_code??s.code??"";
+        return `<option value="${escC(sid)}" data-price="${escC(price)}" data-name="${escC(name)}" data-code="${escC(code)}">${escC(name)}${code?` · ${escC(code)}`:""} · $${moneyC(price)}</option>`;
+      }).join("");
+    if(selected && rows.some(s=>String(s.id??s.service_id??"")===String(selected))) el.value=selected;
   }
 
   function onCommissionServiceSelected(){
@@ -10220,20 +10234,23 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   async function saveCommissionManual(){
-    const staffId=C("commissionStaff")?.value, customerId=C("commissionCustomerId")?.value;
+    const staffId=C("commissionStaff")?.value, customerId=C("commissionCustomerId")?.value, commissionDate=C("commissionDate")?.value||todayC();
     const serviceEl=C("commissionServiceDetail");
     const serviceId=serviceEl?.value||"";
     const detail=serviceEl?.selectedOptions?.[0]?.dataset?.name||"";
-    if(!staffId||!customerId||!serviceId||!detail){
-      C("commissionStatus").innerHTML='<div class="status error">Please select Staff, Customer and a Service from the Service List.</div>';return;
+    if(!staffId||!customerId||!serviceId||!detail||!commissionDate){
+      C("commissionStatus").innerHTML='<div class="status error">Please select Sale Staff, Customer and a Service from the Service List.</div>';return;
     }
     const c=calcCommissionForm();
     if(c.subtotal<=0){C("commissionStatus").innerHTML='<div class="status error">Subtotal must be greater than $0.</div>';return}
     const staff=staffRows().find(x=>String(x.id)===String(staffId));
+    if(!staff || String(staff.job_title||"").trim().toLowerCase()!=="sale counter cashier"){
+      C("commissionStatus").innerHTML='<div class="status error">Please select a Sale Staff with Job Title: Sale Counter Cashier.</div>';return;
+    }
     const customer=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(customerId));
     const type=C("commissionServiceType").value;
     const payload={
-      commission_date:todayC(),staff_id:staffId,staff_name:staff?.name_en||staff?.name_km||"",
+      commission_date:commissionDate,staff_id:staffId,staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
       customer_id:customerId,customer_name:customer?.name||"",customer_phone:customer?.phone||"",
       service_type:type,service_detail:detail,service_id:serviceId,unit:c.unit,unit_price:c.price,discount:c.discount,
       subtotal:c.subtotal,commission_rate:c.rate,commission_amount:c.amount,source:"manual"
@@ -10246,7 +10263,13 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   window.recordFirstDermedSaleCommission=async function({sale,buyer,buyerType,buyerId,staffId,staff,servicesArr,items,hasProducts,adminId}){
+    // Commission belongs to the selected Dermed Sale Staff, NOT the Cashier.
     if(!sale?.id||!staffId)return;
+    const saleStaff=staffRows().find(x=>String(x.id)===String(staffId));
+    if(!saleStaff || String(saleStaff.job_title||"").trim().toLowerCase()!=="sale counter cashier"){
+      console.warn("Commission skipped: selected Sale Staff is not Job Title 'Sale Counter Cashier'.");
+      return;
+    }
 
     // Find ALL Dermed invoices for this customer from the database. The oldest
     // created invoice is the only invoice that can receive commission.
@@ -10314,7 +10337,7 @@ document.addEventListener("DOMContentLoaded",function(){
         student_id:buyerType==="student"?buyerId:null,
         customer_name:buyer?.name||buyer?.full_name||"",
         customer_phone:buyer?.phone||"",
-        service_type:hasProducts?"service_product":"service",
+        service_type:hasProductListItems?"service_product":"service",
         service_detail:(x.name||"Service")+(x.service_type?` · ${x.service_type}`:""),
         service_id:x.service_id||null,
         unit,
@@ -10378,10 +10401,15 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function bindCommission(){
+    if(C("commissionDate") && !C("commissionDate").value) C("commissionDate").value=todayC();
     populateCommissionStaff();
     populateCommissionServices();
     window.refreshCommissionStaffOptions=populateCommissionStaff;
     window.refreshCommissionServiceOptions=populateCommissionServices;
+    setTimeout(populateCommissionStaff,300);
+    setTimeout(populateCommissionServices,300);
+    setTimeout(populateCommissionStaff,1000);
+    setTimeout(populateCommissionServices,1000);
     C("commissionServiceDetail")?.addEventListener("change",onCommissionServiceSelected);
     if(C("commissionUnit"))C("commissionUnit").addEventListener("input",calcCommissionForm);
     if(C("commissionUnitPrice"))C("commissionUnitPrice").addEventListener("input",calcCommissionForm);
