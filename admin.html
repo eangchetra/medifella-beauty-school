@@ -2634,7 +2634,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <label>Phone Number *</label><input id="staffInfoPhone">
 <div class="row"><div><label>Date of Birth *</label><input id="staffInfoDob" type="date"></div><div><label>Enroll Date *</label><input id="staffInfoEnrollDate" type="date"></div></div>
 <div class="row"><div><label>Status *</label><select id="staffInfoStatus"><option>Internship</option><option>Training</option><option>Full</option></select></div><div></div></div>
-<label>Job Title *</label><select id="staffInfoJob"><option>Counter</option><option>Sale</option><option>Marketing</option><option>Graphic Designer</option><option>Beauty Therapist</option><option>Beauty Trainer</option><option>Nurse</option><option>Other</option></select>
+<label>Job Title *</label><select id="staffInfoJob"><option>Counter</option><option>Sale</option><option>Cashier</option><option>Marketing</option><option>Graphic Designer</option><option>Beauty Therapist</option><option>Beauty Trainer</option><option>Nurse</option><option>Other</option></select>
 <input id="staffInfoJobOther" class="hidden" placeholder="Fill other job title">
 <div class="actions" style="margin-top:14px"><button id="saveStaffInfo" class="gold">Save Staff</button><button id="clearStaffInfo" class="light">Clear</button></div>
 <div id="staffInfoStatus"></div>
@@ -2666,7 +2666,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div id="mtsSaleFormCard" class="card sale-form-shell" style="display:none;">
 <div class="sale-header-grid">
 <div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="mtsBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="mtsNewCustomer" class="gold" type="button">+ Customer</button></div><div id="mtsBuyerResults" class="sale-course-picker-results"></div><input id="mtsBuyerType" type="hidden"><input id="mtsBuyerId" type="hidden"><div id="mtsBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
-<div><label>Sale Staff *</label><select id="mtsSaleStaff"></select></div>
+<div><label>Sale Staff *</label><select id="mtsSaleStaff"></select></div><div><label>Cashier *</label><select id="mtsCashier" required></select></div>
 <div><label>Sale Date & Time</label><input id="mtsSaleTime" readonly></div>
 </div>
 <label style="margin-top:18px">Search Product</label><div style="position:relative"><input id="mtsProductSearch" autocomplete="off" placeholder="Search Product ID or Product Name"><div id="mtsProductResults" class="sale-course-picker-results"></div></div>
@@ -2725,7 +2725,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div id="dermedSaleFormCard" class="card sale-form-shell" style="display:none;">
 <div class="sale-header-grid">
 <div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="dermedBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="dermedNewCustomer" class="gold" type="button">+ Customer</button></div><div id="dermedBuyerResults" class="sale-course-picker-results"></div><input id="dermedBuyerType" type="hidden"><input id="dermedBuyerId" type="hidden"><div id="dermedBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
-<div><label>Sale Staff *</label><select id="dermedSaleStaff"></select></div>
+<div><label>Sale Staff *</label><select id="dermedSaleStaff"></select></div><div><label>Cashier *</label><select id="dermedCashier" required></select></div>
 <div><label>Reference No.</label><input id="dermedReferenceNo" readonly placeholder="Auto-generate"></div>
 <div><label>Sale Date & Time</label><input id="dermedSaleTime" readonly></div>
 </div>
@@ -4401,7 +4401,7 @@ function showSaleInvoice(id,size="A4"){
        <div class="mf-info-body">
          <div class="mf-info-row"><div class="label" style="white-space:nowrap">លេខវិក្កយបត្រ / Invoice No.</div><div>${esc(invoiceNumber)}</div></div>
          <div class="mf-info-row"><div class="label">កាលបរិច្ឆេទ / Date Time</div><div>${esc(dateTime)}</div></div>
-         <div class="mf-info-row"><div class="label">អ្នកគិតលុយ / Cashier</div><div>${esc(adminUser?.full_name||adminUser?.username||"Admin")}</div></div>
+         <div class="mf-info-row"><div class="label">អ្នកគិតលុយ / Cashier</div><div>${esc(s.cashier_name||"—")}</div></div>
          <div class="mf-info-row"><div class="label" style="white-space:nowrap">អត្រាប្តូរប្រាក់ / Exchange Rate</div><div class="mf-rate">1 USD = ${rate.toLocaleString("en-US")} ៛</div></div>
        </div>
      </div>
@@ -6171,7 +6171,18 @@ function renderServiceList(){
 }
 function renderInventoryControls(){
  if($("stockStaff"))$("stockStaff").innerHTML='<option value="">Select staff</option>'+staffInfoRecords.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
- ["mtsSaleStaff","dermedSaleStaff"].forEach(id=>{if($(id))$(id).innerHTML='<option value="">Select staff</option>'+staffInfoRecords.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("")});
+ ["mtsSaleStaff","dermedSaleStaff"].forEach(id=>{
+  if($(id)){
+    const saleCounterStaff=staffInfoRecords.filter(x=>String(x.job_title||"").trim().toLowerCase()==="sale counter");
+    $(id).innerHTML='<option value="">Select Sale Staff</option>'+saleCounterStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
+  }
+});
+["mtsCashier","dermedCashier"].forEach(id=>{
+  if($(id)){
+    const cashierStaff=staffInfoRecords.filter(x=>String(x.job_title||"").trim().toLowerCase()==="cashier");
+    $(id).innerHTML='<option value="">Select Cashier</option>'+cashierStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
+  }
+});
 }
 function renderBuyerControls(){
  ["mts","dermed"].forEach(type=>{
@@ -6602,7 +6613,7 @@ async function saveInventorySale(type){
     reference_no:reference,sale_type:code,sale_date:now.slice(0,10),sale_time:now.slice(11),
     student_id:buyerType==="student"?buyerId:null,student_name:buyer?.full_name||buyer?.name||"",
     student_phone:buyer?.phone||"",customer_id:buyerType==="customer"?buyerId:null,customer_type:buyerType,
-    sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",subtotal:subtotal,discount:overallDiscount,shipping:0,grand_total:total,paid:total,balance:0,payment_status:"Paid",sale_status:"Completed",
+    sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",cashier_id:cashierId,cashier_name:((staffInfoRecords||[]).find(x=>String(x.id)===String(cashierId))?.name_en||""),subtotal:subtotal,discount:overallDiscount,shipping:0,grand_total:total,paid:total,balance:0,payment_status:"Paid",sale_status:"Completed",
     items:items.map(x=>({...x,quantity:Number(x.quantity)})),service_items:serviceItems.map(x=>({...x,quantity:Number(x.quantity||1)})),service_total:serviceTotal,notes:""
   };
   const r=await sb.from("medifella_sales").insert({...payload,created_by:adminUser.id}).select().single();if(r.error)throw r.error;
@@ -6748,7 +6759,7 @@ function editDermedSaleFromInvoice(id){
    ? `Selected: ${buyer.full_name||buyer.name||"Customer"} · ${buyer.student_id||buyer.customer_code||""} · ${buyer.phone||s.student_phone||""}`
    : `Selected: ${s.student_name||"Customer"} · ${s.student_phone||""}`;
 
- $("dermedSaleStaff").value=s.sale_staff_id||"";
+ $("dermedSaleStaff").value=s.sale_staff_id||"";$("dermedCashier").value=s.cashier_id||((staffInfoRecords||[]).find(x=>String(x.name_en||"")===String(s.cashier_name||""))?.id||"");
  $("dermedReferenceNo").value=s.reference_no||"";
 
  const d=String(s.sale_date||"");
@@ -7231,7 +7242,7 @@ document.addEventListener("DOMContentLoaded",function(){
     if(E("dermedBuyerType"))E("dermedBuyerType").value="";
     if(E("dermedBuyerId"))E("dermedBuyerId").value="";
     if(E("dermedBuyerHint"))E("dermedBuyerHint").textContent="Choose a student or customer. You can add a new customer.";
-    if(E("dermedSaleStaff"))E("dermedSaleStaff").value="";
+    if(E("dermedSaleStaff"))E("dermedSaleStaff").value="";if(E("dermedCashier"))E("dermedCashier").value="";
     if(E("dermedOverallDiscountType"))E("dermedOverallDiscountType").value="percent";
     if(E("dermedOverallDiscountValue"))E("dermedOverallDiscountValue").value="";
     if(E("dermedPaymentMethod"))E("dermedPaymentMethod").value="Cash";
@@ -7251,7 +7262,7 @@ document.addEventListener("DOMContentLoaded",function(){
   window.editingDermedSaleId = window.editingDermedSaleId || null;
 
   async function saveDermed(){
-    const buyerType=E("dermedBuyerType")?.value,buyerId=E("dermedBuyerId")?.value,staffId=E("dermedSaleStaff")?.value;
+    const buyerType=E("dermedBuyerType")?.value,buyerId=E("dermedBuyerId")?.value,staffId=E("dermedSaleStaff")?.value,cashierId=E("dermedCashier")?.value;
     const c=calc(), items=pItems(), servicesArr=sItems();
     if(!buyerType||!buyerId){msg(E("dermedStatus"),"Please select a Student or Customer.",true);return}
     if(!staffId){msg(E("dermedStatus"),"Please select Sale Staff.",true);return}
@@ -7285,7 +7296,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const payload={
       reference_no:reference,sale_type:code,sale_date:saleDate,sale_time:saleTime,
       student_id:buyerType==="student"?buyerId:null,student_name:buyer?.full_name||buyer?.name||"",student_phone:buyer?.phone||"",
-      customer_id:buyerType==="customer"?buyerId:null,customer_type:buyerType,sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",
+      customer_id:buyerType==="customer"?buyerId:null,customer_type:buyerType,sale_staff_id:staffId,sale_staff_name:staff?.name_en||"",cashier_id:cashierId,cashier_name:((staffInfoRecords||[]).find(x=>String(x.id)===String(cashierId))?.name_en||""),
       subtotal:c.sub,discount:c.odAmount,shipping:0,grand_total:c.initial,
       paid:paid,balance:c.due,payment_status:status,sale_status:"Completed",
       items:itemPayload,service_items:servicePayload,service_total:servicePayload.reduce((n,x)=>n+Number(x.subtotal||0),0),
@@ -8829,7 +8840,7 @@ document.addEventListener("DOMContentLoaded",function(){
       customer_id:buyerType==="customer"?buyerId:null,
       customer_type:buyerType,
       sale_staff_id:staffId,
-      sale_staff_name:staff?.name_en||"",
+      sale_staff_name:staff?.name_en||"",cashier_id:cashierId,cashier_name:((staffInfoRecords||[]).find(x=>String(x.id)===String(cashierId))?.name_en||""),
       subtotal:c.subtotal,
       discount:c.od,
       shipping:0,
@@ -9123,7 +9134,7 @@ document.addEventListener("DOMContentLoaded",function(){
     E("mtsBuyerId")&&(E("mtsBuyerId").value=String(s.student_id||s.customer_id||""));
     E("mtsBuyerSearch")&&(E("mtsBuyerSearch").value=s.student_name||s.customer_name||"");
     E("mtsBuyerHint")&&(E("mtsBuyerHint").textContent=`Selected: ${s.student_name||s.customer_name||"Customer"}${s.student_phone?" · "+s.student_phone:""}`);
-    E("mtsSaleStaff")&&(E("mtsSaleStaff").value=String(s.sale_staff_id||""));
+    E("mtsSaleStaff")&&(E("mtsSaleStaff").value=String(s.sale_staff_id||""));E("mtsCashier")&&(E("mtsCashier").value=String(s.cashier_id||"")||String((staffInfoRecords||[]).find(x=>String(x.name_en||"")===String(s.cashier_name||""))?.id||""));
 
     const dt=String(s.sale_date||"").slice(0,10)+(s.sale_time?"T"+String(s.sale_time).slice(0,8):"");
     if(E("mtsSaleTime"))E("mtsSaleTime").value=dt?dt.replace("T"," "):"";
@@ -9230,10 +9241,10 @@ document.addEventListener("DOMContentLoaded",function(){
 
     const buyerType=E("mtsBuyerType")?.value||"";
     const buyerId=E("mtsBuyerId")?.value||"";
-    const staffId=E("mtsSaleStaff")?.value||"";
+    const staffId=E("mtsSaleStaff")?.value||"";const cashierId=E("mtsCashier")?.value||"";
     const items=Array.isArray(window.mtsSaleItems)?window.mtsSaleItems:[];
     if(!buyerType||!buyerId){msg(E("mtsStatus"),"Please select a Student or Customer.",true);return;}
-    if(!staffId){msg(E("mtsStatus"),"Please select Sale Staff.",true);return;}
+    if(!staffId){msg(E("mtsStatus"),"Please select Sale Staff (Job Title: Sale Counter).",true);return;}if(!cashierId){msg(E("mtsStatus"),"Please select Cashier (Job Title: Cashier).",true);return;}
     if(!items.length){msg(E("mtsStatus"),"Add at least one product.",true);return;}
 
     for(const it of items){
@@ -9271,7 +9282,7 @@ document.addEventListener("DOMContentLoaded",function(){
       customer_id:buyerType==="customer"?buyerId:null,
       customer_type:buyerType,
       sale_staff_id:staffId,
-      sale_staff_name:staff?.name_en||"",
+      sale_staff_name:staff?.name_en||"",cashier_id:cashierId,cashier_name:((staffInfoRecords||[]).find(x=>String(x.id)===String(cashierId))?.name_en||""),
       subtotal:subtotal,
       discount:overallDiscount,
       shipping:0,
@@ -10397,6 +10408,25 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
+
+<script id="cashier-required-validator">
+(function(){
+  document.addEventListener("click",function(e){
+    const btn=e.target.closest && e.target.closest("#saveMtsSale,#saveDermedSale");
+    if(!btn)return;
+    const id=btn.id==="saveMtsSale"?"mtsCashier":"dermedCashier";
+    const cashier=document.getElementById(id);
+    if(!cashier || !cashier.value){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      const status=document.getElementById(btn.id==="saveMtsSale"?"mtsStatus":"dermedStatus");
+      if(status){status.textContent="Please select Cashier.";status.className="status error";}
+      else alert("Please select Cashier.");
+    }
+  },true);
+})();
+</script>
+
 </body>
 </html>
 <style id="mts-invoice-edit-products-v8">
@@ -11306,7 +11336,7 @@ document.addEventListener("DOMContentLoaded",function(){
    const c=calc(),now=phTime(),code='MTS',year=new Date().getFullYear(),prefix=`${code}-${year}-`,existing=salesRecords.filter(x=>String(x.sale_type||'').toUpperCase()==='MTS');let max=0;existing.forEach(x=>{const m=String(x.reference_no||'').match(new RegExp('^'+code+'-'+year+'-(\\d+)$'));if(m)max=Math.max(max,Number(m[1]))});
    const reference=prefix+String(max+1).padStart(4,'0');
    const normalized=items.map(x=>{const d=IC(x);return {...x,quantity:d.q,price:d.p,unit_price:d.p,discount_type:x.discount_type==='usd'?'usd':'percent',discount_value:N(x.discount_value),discount_amount:d.d,subtotal:d.sub}});
-   const payload={reference_no:reference,sale_type:code,sale_date:now.slice(0,10),sale_time:now.slice(11),student_id:buyerType==='student'?buyerId:null,student_name:buyer?.full_name||buyer?.name||'',student_phone:buyer?.phone||'',customer_id:buyerType==='customer'?buyerId:null,customer_type:buyerType,sale_staff_id:staffId,sale_staff_name:staff?.name_en||'',subtotal:c.sub,discount:c.od,shipping:0,grand_total:c.total,paid:c.paid,balance:c.due,payment_status:c.st,payment_method:E('mtsPaymentMethod')?.value||'Cash',sale_status:'Completed',items:normalized,service_items:[],service_total:0,notes:''};
+   const payload={reference_no:reference,sale_type:code,sale_date:now.slice(0,10),sale_time:now.slice(11),student_id:buyerType==='student'?buyerId:null,student_name:buyer?.full_name||buyer?.name||'',student_phone:buyer?.phone||'',customer_id:buyerType==='customer'?buyerId:null,customer_type:buyerType,sale_staff_id:staffId,sale_staff_name:staff?.name_en||'',cashier_id:cashierId,cashier_name:((staffInfoRecords||[]).find(x=>String(x.id)===String(cashierId))?.name_en||""),subtotal:c.sub,discount:c.od,shipping:0,grand_total:c.total,paid:c.paid,balance:c.due,payment_status:c.st,payment_method:E('mtsPaymentMethod')?.value||'Cash',sale_status:'Completed',items:normalized,service_items:[],service_total:0,notes:''};
    try{const r=await sb.from('medifella_sales').insert({...payload,created_by:adminUser.id}).select().single();if(r.error)throw r.error;const movements=items.map(x=>({product_id:x.product_id,movement_type:'sale',quantity:Number(x.quantity),staff_id:staffId,staff_name:staff?.name_en||'',stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));if(movements.length){const mr=await sb.from('medifella_inventory_movements').insert(movements);if(mr.error)throw mr.error}if(c.paid>0){const pr=await sb.from('medifella_sale_payments').insert({sale_id:String(r.data.id),amount:c.paid,payment_method:E('mtsPaymentMethod')?.value||'Cash',payment_date:now.slice(0,10),note:c.st==='Partial'?'Partial Payment':'Paid in Full',created_by:adminUser.id});if(pr.error)console.warn('MTS payment history:',pr.error.message)}msg(E('mtsStatus'),`MTS sale saved. Invoice ${reference}.`);if(typeof resetNewInventorySale==='function')resetNewInventorySale('mts');await loadSales();await loadStockMovements();showSaleInvoice(r.data.id)}catch(e){msg(E('mtsStatus'),e.message||'Could not save MTS sale.',true)}
  }
  function resetMts(){window.mtsSaleItems=[];E('mtsBuyerType')&&(E('mtsBuyerType').value='');E('mtsBuyerId')&&(E('mtsBuyerId').value='');E('mtsBuyerSearch')&&(E('mtsBuyerSearch').value='');E('mtsBuyerHint')&&(E('mtsBuyerHint').textContent='Choose a student or customer. You can add a new customer.');E('mtsSaleStaff')&&(E('mtsSaleStaff').value='');E('mtsOverallDiscountType')&&(E('mtsOverallDiscountType').value='percent');E('mtsOverallDiscountValue')&&(E('mtsOverallDiscountValue').value='');E('mtsPaymentMethod')&&(E('mtsPaymentMethod').value='Cash');E('mtsPaymentStatus')&&(E('mtsPaymentStatus').value='Paid');E('mtsAmountPaidNow')&&(E('mtsAmountPaidNow').value='0.00');if(typeof setAutoTime==='function')setAutoTime('mtsSaleTime');render();totals()}
