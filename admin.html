@@ -7157,10 +7157,30 @@ document.addEventListener("DOMContentLoaded",function(){
         if(upd.error)throw upd.error;
         r=upd;
       }else{
-        r=await sb.from("medifella_sales").insert({...payload,created_by:adminUser.id}).select().single();
-        if(r.error && /sale_time|column .* does not exist/i.test(r.error.message||"")){
-          const p2={...payload};delete p2.sale_time;
-          r=await sb.from("medifella_sales").insert({...p2,created_by:adminUser.id}).select().single();
+        // Reference numbers must remain unique even when salesRecords is stale
+        // (for example, another browser/admin created the previous invoice).
+        let attempt=0;
+        let candidateRef=reference;
+        while(attempt<12){
+          const insertPayload={...payload,reference_no:candidateRef,created_by:adminUser.id};
+          r=await sb.from("medifella_sales").insert(insertPayload).select().single();
+
+          if(r.error && /sale_time|column .* does not exist/i.test(r.error.message||"")){
+            const p2={...insertPayload};delete p2.sale_time;
+            r=await sb.from("medifella_sales").insert(p2).select().single();
+          }
+
+          if(!r.error)break;
+
+          const errText=String(r.error.message||r.error.details||"");
+          if(/duplicate key value violates unique constraint.*medifella_sales_reference_no_key|reference_no.*already exists|duplicate key/i.test(errText)){
+            const m=String(candidateRef).match(/^(DERMED-\d{4}-)(\d+)$/);
+            if(!m)throw r.error;
+            candidateRef=m[1]+String(Number(m[2])+1).padStart(4,"0");
+            attempt++;
+            continue;
+          }
+          throw r.error;
         }
         if(r.error)throw r.error;
         if(paid>0){
@@ -7171,8 +7191,9 @@ document.addEventListener("DOMContentLoaded",function(){
         if(movements.length){const mr=await sb.from("medifella_inventory_movements").insert(movements);if(mr.error)throw mr.error}
       }
       const wasEditing=!!editingId;
+      const savedReference=(r&&r.data&&r.data.reference_no)||reference;
       window.editingDermedSaleId=null;
-      msg(E("dermedStatus"),`${wasEditing?"Dermed sale updated":"Dermed sale saved"}. Invoice ${reference}.`);
+      msg(E("dermedStatus"),`${wasEditing?"Dermed sale updated":"Dermed sale saved"}. Invoice ${savedReference}.`);
       reset();
       if(typeof loadSales==="function")await loadSales();
       if(typeof renderDermedSales==="function")renderDermedSales();
