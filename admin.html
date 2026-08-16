@@ -6115,7 +6115,7 @@ async function loadStockMovements(){
 async function loadStaffInfo(){
  const {data,error}=await sb.from("medifella_staff").select("*").order("created_at",{ascending:false});
  if(error){staffInfoRecords=[]; if($("staffInfoList"))$("staffInfoList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Staff Management SQL setup.</p>`;return}
- staffInfoRecords=data||[]; renderStaffInfoList(); renderInventoryControls(); renderBuyerControls(); if(typeof window.refreshCommissionStaffOptions==="function")window.refreshCommissionStaffOptions();
+ staffInfoRecords=data||[]; renderStaffInfoList(); renderInventoryControls(); if(typeof window.refreshSaleStaffCashierOptions==="function")window.refreshSaleStaffCashierOptions(); renderBuyerControls(); if(typeof window.refreshCommissionStaffOptions==="function")window.refreshCommissionStaffOptions();
 }
 async function loadCustomers(){
  const {data,error}=await sb.from("medifella_customers").select("*").order("created_at",{ascending:false});
@@ -6173,21 +6173,40 @@ function renderServiceList(){
  document.querySelectorAll(".service-edit-btn").forEach(btn=>btn.addEventListener("click",()=>editService(btn.dataset.id)));
  document.querySelectorAll(".service-delete-btn").forEach(btn=>btn.addEventListener("click",()=>deleteService(btn.dataset.id)));
 }
-function renderInventoryControls(){
- if($("stockStaff"))$("stockStaff").innerHTML='<option value="">Select staff</option>'+staffInfoRecords.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
- ["mtsSaleStaff","dermedSaleStaff"].forEach(id=>{
-  if($(id)){
-    const eligibleStaff=staffInfoRecords.filter(x=>String(x.job_title||"").trim().toLowerCase()==="sale counter cashier");
-    $(id).innerHTML='<option value="">Select Sale Staff</option>'+eligibleStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
-  }
-});
-["mtsCashier","dermedCashier"].forEach(id=>{
-  if($(id)){
-    const eligibleStaff=staffInfoRecords.filter(x=>String(x.job_title||"").trim().toLowerCase()==="sale counter cashier");
-    $(id).innerHTML='<option value="">Select Cashier</option>'+eligibleStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
-  }
-});
+function isSaleCounterCashierStaff(x){
+ const title=String(
+   x?.job_title ?? x?.jobTitle ?? x?.job ?? ""
+ ).replace(/\s+/g," ").trim().toLowerCase();
+ return title==="sale counter cashier";
 }
+function renderInventoryControls(){
+ if($("stockStaff")){
+   $("stockStaff").innerHTML='<option value="">Select staff</option>'+
+     staffInfoRecords.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
+ }
+ const eligibleStaff=(Array.isArray(staffInfoRecords)?staffInfoRecords:[]).filter(isSaleCounterCashierStaff);
+
+ ["mtsSaleStaff","dermedSaleStaff"].forEach(id=>{
+   const el=$(id);
+   if(!el)return;
+   const oldValue=el.value;
+   el.innerHTML='<option value="">Select Sale Staff</option>'+
+     eligibleStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · Sale Counter Cashier</option>`).join("");
+   if(oldValue && eligibleStaff.some(x=>String(x.id)===String(oldValue))) el.value=oldValue;
+ });
+
+ ["mtsCashier","dermedCashier"].forEach(id=>{
+   const el=$(id);
+   if(!el)return;
+   const oldValue=el.value;
+   el.innerHTML='<option value="">Select Cashier</option>'+
+     eligibleStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · Sale Counter Cashier</option>`).join("");
+   if(oldValue && eligibleStaff.some(x=>String(x.id)===String(oldValue))) el.value=oldValue;
+ });
+}
+window.refreshSaleStaffCashierOptions=renderInventoryControls;
+try{renderInventoryControls()}catch(e){}
+
 function renderBuyerControls(){
  ["mts","dermed"].forEach(type=>{
    const input=$(type+"BuyerSearch"), results=$(type+"BuyerResults"); if(!input||!results)return;
@@ -6493,7 +6512,7 @@ async function deleteStock(id){if(!confirm("Delete this stock entry? The product
 $("saveStaffInfo").onclick=async()=>{clearMsg($("staffInfoStatus"));const id=$("staffInfoEditId").value,name_en=$("staffInfoNameEn").value.trim(),name_kh=$("staffInfoNameKh").value.trim(),phone=$("staffInfoPhone").value.trim(),date_of_birth=$("staffInfoDob").value,enroll_date=$("staffInfoEnrollDate").value,status=$("staffInfoStatus").value,job=$("staffInfoJob").value,job_title=job==="Other"?$("staffInfoJobOther").value.trim():job;if(!name_en||!name_kh||!phone||!date_of_birth||!enroll_date||!job_title){msg($("staffInfoStatus"),"Please fill all staff fields.",true);return}try{const payload={name_en,name_kh,phone,date_of_birth,enroll_date,status,job_title};let r=id?await sb.from("medifella_staff").update(payload).eq("id",id):await sb.from("medifella_staff").insert({...payload,staff_code:genId("ST",staffInfoRecords,"staff_code")});if(r.error)throw r.error;msg($("staffInfoStatus"),id?"Staff updated.":"Staff added.");clearStaffInfoForm();await loadStaffInfo()}catch(e){msg($("staffInfoStatus"),e.message,true)}};
 $("staffInfoJob").onchange=()=>{$("staffInfoJobOther").classList.toggle("hidden",$("staffInfoJob").value!=="Other")};
 function clearStaffInfoForm(){$("staffInfoEditId").value="";$("staffInfoNameEn").value="";$("staffInfoNameKh").value="";$("staffInfoPhone").value="";$("staffInfoDob").value="";$("staffInfoEnrollDate").value="";$("staffInfoStatus").value="Internship";$("staffInfoJob").value="Counter";$("staffInfoJobOther").value="";$("staffInfoJob").dispatchEvent(new Event("change"))}
-function editStaffInfo(id){const x=staffInfoRecords.find(x=>String(x.id)===String(id));if(!x)return;$("staffInfoEditId").value=x.id;$("staffInfoNameEn").value=x.name_en||"";$("staffInfoNameKh").value=x.name_kh||"";$("staffInfoPhone").value=x.phone||"";$("staffInfoDob").value=x.date_of_birth||"";$("staffInfoEnrollDate").value=x.enroll_date||"";$("staffInfoStatus").value=x.status||"Full";const jobs=["Counter","Sale","Marketing","Graphic Designer","Beauty Therapist","Beauty Trainer","Nurse"];if(jobs.includes(x.job_title)){$("staffInfoJob").value=x.job_title;$("staffInfoJobOther").value=""}else{$("staffInfoJob").value="Other";$("staffInfoJobOther").value=x.job_title}$("staffInfoJob").dispatchEvent(new Event("change"))}
+function editStaffInfo(id){const x=staffInfoRecords.find(x=>String(x.id)===String(id));if(!x)return;$("staffInfoEditId").value=x.id;$("staffInfoNameEn").value=x.name_en||"";$("staffInfoNameKh").value=x.name_kh||"";$("staffInfoPhone").value=x.phone||"";$("staffInfoDob").value=x.date_of_birth||"";$("staffInfoEnrollDate").value=x.enroll_date||"";$("staffInfoStatus").value=x.status||"Full";const jobs=["Counter","Sale","Cashier","Sale Counter Cashier","Marketing","Graphic Designer","Beauty Therapist","Beauty Trainer","Nurse"];if(jobs.includes(x.job_title)){$("staffInfoJob").value=x.job_title;$("staffInfoJobOther").value=""}else{$("staffInfoJob").value="Other";$("staffInfoJobOther").value=x.job_title}$("staffInfoJob").dispatchEvent(new Event("change"))}
 async function deleteStaffInfo(id){if(!confirm("Delete this staff member?"))return;const r=await sb.from("medifella_staff").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadStaffInfo()}
 $("clearStaffInfo").onclick=clearStaffInfoForm;
 
@@ -10142,16 +10161,18 @@ document.addEventListener("DOMContentLoaded",function(){
     // Sale Commission Management uses ONLY Sale Staff.
     // Sale Staff = Job Title "Sale Counter Cashier".
     // Cashier is never used for commission ownership.
-    const rows=staffRows().filter(s=>
-      String(s.job_title||"").trim().toLowerCase()==="sale counter cashier"
-    );
+    const rows=staffRows().filter(s=>{
+      const title=String(s.job_title||"").replace(/\s+/g," ").trim().toLowerCase();
+      return title==="sale counter cashier";
+    });
     ["commissionStaff","commissionFilterStaff"].forEach(id=>{
       const el=C(id);if(!el)return;
       const selected=el.value;
       const all=id==="commissionFilterStaff"
         ?'<option value="">All Sale Staff</option>'
         :'<option value="">Select Sale Staff</option>';
-      el.innerHTML=all+rows.map(s=>`<option value="${escC(s.id)}">${escC(s.name_en||s.name_kh||s.name||"Staff")} · Sale Counter Cashier</option>`).join("");
+      const options=rows.map(s=>`<option value="${escC(s.id)}">${escC(s.name_en||s.name_kh||s.name||"Staff")} · Sale Counter Cashier</option>`).join("");
+      el.innerHTML=all+(options||'<option value="" disabled>No Sale Counter Cashier staff found</option>');
       if(selected)el.value=selected;
     });
   }
@@ -10244,7 +10265,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const c=calcCommissionForm();
     if(c.subtotal<=0){C("commissionStatus").innerHTML='<div class="status error">Subtotal must be greater than $0.</div>';return}
     const staff=staffRows().find(x=>String(x.id)===String(staffId));
-    if(!staff || String(staff.job_title||"").trim().toLowerCase()!=="sale counter cashier"){
+    if(!staff || !isSaleCounterCashierStaff(staff)){
       C("commissionStatus").innerHTML='<div class="status error">Please select a Sale Staff with Job Title: Sale Counter Cashier.</div>';return;
     }
     const customer=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(customerId));
@@ -10263,10 +10284,17 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   window.recordFirstDermedSaleCommission=async function({sale,buyer,buyerType,buyerId,staffId,staff,servicesArr,items,hasProducts,adminId}){
+    // AUTOMATIC COMMISSION IS DERMED SALE ONLY.
+    // Medi Fella Sale and MTS Sale must never create automatic commission records.
+    const saleType=String(sale?.sale_type||"").trim().toUpperCase();
+    if(saleType!=="DERMED"){
+      console.warn("Automatic commission skipped: commission is only for Dermed Sale.");
+      return;
+    }
     // Commission belongs to the selected Dermed Sale Staff, NOT the Cashier.
     if(!sale?.id||!staffId)return;
     const saleStaff=staffRows().find(x=>String(x.id)===String(staffId));
-    if(!saleStaff || String(saleStaff.job_title||"").trim().toLowerCase()!=="sale counter cashier"){
+    if(!saleStaff || !isSaleCounterCashierStaff(saleStaff)){
       console.warn("Commission skipped: selected Sale Staff is not Job Title 'Sale Counter Cashier'.");
       return;
     }
