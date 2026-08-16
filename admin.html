@@ -3000,7 +3000,7 @@ async function getCurrentAccount(){
 
 function applyAccountPermissions(){
   const role=String(currentProfile?.role||"").toLowerCase();
-  const permissions=currentProfile?.permissions||{};
+  const permissions=normalizeStaffPermissions(currentProfile?.permissions);
   const allowed=key=>role==="admin" || permissions[key]===true;
   document.querySelectorAll(".nav").forEach(btn=>{
     btn.classList.toggle("hidden",!allowed(btn.dataset.section));
@@ -5634,6 +5634,46 @@ $("certCreate").onclick=async()=>{
 };
 
 
+function normalizeStaffPermissions(raw){
+  let p=raw;
+  if(typeof p==="string"){
+    try{ p=JSON.parse(p); }catch(e){ p={}; }
+  }
+  if(Array.isArray(p)){
+    const out={};
+    p.forEach(k=>{
+      if(typeof k==="string")out[k]=true;
+    });
+    p=out;
+  }
+  p=p&&typeof p==="object"?p:{};
+
+  // Accept older permission names that may have been stored by the
+  // previous Staff Accounts version.
+  const aliases={
+    dashboard:["dashboard","viewDashboard"],
+    students:["students","studentRegistration","student"],
+    sales:["sales","mediFellaSale","medifellaSale"],
+    mtsSale:["mtsSale","mts","mtsSales"],
+    dermedSale:["dermedSale","dermed","dermedSales"],
+    appointments:["appointments","appointmentManagement","appointment"],
+    products:["products","productManagement","product"],
+    services:["services","servicesManagement","service"],
+    staffManagement:["staffManagement","staff_manage"],
+    customers:["customers","customerManagement","customer"],
+    certificates:["certificates","certificateVerification","certificate"],
+    posts:["posts","newsFeed","news"],
+    courses:["courses","courseManagement","course"],
+    staff:["staff","staffAccounts","staffManagementAccounts"],
+    admins:["admins","adminUsers","adminUsersManagement"]
+  };
+  const out={};
+  Object.keys(aliases).forEach(key=>{
+    out[key]=aliases[key].some(k=>p[k]===true || p[k]===1 || p[k]==="true");
+  });
+  return out;
+}
+
 const STAFF_PERMISSION_KEYS = [
 ["dashboard","permDashboard"],["students","permStudents"],["sales","permSales"],
 ["mtsSale","permMtsSale"],["dermedSale","permDermedSale"],["appointments","permAppointments"],
@@ -5650,7 +5690,8 @@ function getStaffPermissionsFromForm(){
   return permissions;
 }
 function setStaffPermissionsForm(permissions){
-  STAFF_PERMISSION_KEYS.forEach(([key,id])=>$(id).checked=!!(permissions&&permissions[key]));
+  const p=normalizeStaffPermissions(permissions);
+  STAFF_PERMISSION_KEYS.forEach(([key,id])=>$(id).checked=!!p[key]);
 }
 function updateAccountForm(){
   const role=$("accountRole").value;
@@ -5666,17 +5707,27 @@ function renderStaff(){
   const rows=staffProfiles||[];
   $("staffList").innerHTML=rows.length ? rows.map(p=>{
     const role=String(p.role||"staff").toLowerCase();
-    const permissions=p.permissions||{};
+    const permissions=normalizeStaffPermissions(p.permissions);
     const labels=[
-      ["dashboard","Dashboard"],["students","Students"],["sales","Medi Fella Sale"],["certificates","Certificates"],
-      ["posts","News"],["courses","Courses"],["admins","Admin / Users"]
+      ["dashboard","Dashboard"],["students","Students"],["sales","Medi Fella Sale"],
+      ["mtsSale","MTS Sale"],["dermedSale","Dermed Sale"],["appointments","Appointment Management"],
+      ["products","Product Management"],["services","Services Management"],
+      ["staffManagement","Staff Management"],["customers","Customer Management"],
+      ["certificates","Certificate Verification"],["posts","News Feed"],
+      ["courses","Course Management"],["staff","Staff Accounts"],["admins","Admin / Users"]
     ].filter(([k])=>permissions[k]).map(([,label])=>label);
     const summary=role==="admin" ? "Full administrator access" :
       (labels.length?labels.join(" · "):"No permissions selected");
     return `<div class="post">
       <div class="account-row">
         <div>
-          <strong>${esc(p.username||"Account")}</strong>
+          <strong>${esc(
+      String(p.username||"").toLowerCase()==="dermed-staff"
+        ? "Dermed staff"
+        : String(p.username||"").toLowerCase()==="medifella-staff"
+          ? "MediFella staff"
+          : (p.username||"Account")
+    )}</strong>
           <div class="muted" style="margin-top:4px">${esc(role.toUpperCase())} · ${esc(summary)}</div>
         </div>
         <div class="account-actions">
