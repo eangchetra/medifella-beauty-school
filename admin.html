@@ -2670,7 +2670,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div id="mtsSaleFormCard" class="card sale-form-shell" style="display:none;">
 <div class="sale-header-grid">
 <div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="mtsBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="mtsNewCustomer" class="gold" type="button">+ Customer</button></div><div id="mtsBuyerResults" class="sale-course-picker-results"></div><input id="mtsBuyerType" type="hidden"><input id="mtsBuyerId" type="hidden"><div id="mtsBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
-<div><label>Sale Staff *</label><select id="mtsSaleStaff"></select></div><div><label>Cashier *</label><select id="mtsCashier" required></select></div>
+<div><label>Sale Staff *</label><select id="mtsSaleStaff" required></select></div><div><label>Cashier *</label><select id="mtsCashier" required></select></div>
 <div><label>Sale Date & Time</label><input id="mtsSaleTime" readonly></div>
 </div>
 <label style="margin-top:18px">Search Product</label><div style="position:relative"><input id="mtsProductSearch" autocomplete="off" placeholder="Search Product ID or Product Name"><div id="mtsProductResults" class="sale-course-picker-results"></div></div>
@@ -2729,7 +2729,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div id="dermedSaleFormCard" class="card sale-form-shell" style="display:none;">
 <div class="sale-header-grid">
 <div><label>Student / Customer *</label><div style="display:flex;gap:8px"><input id="dermedBuyerSearch" autocomplete="off" placeholder="Search Student or Customer"><button id="dermedNewCustomer" class="gold" type="button">+ Customer</button></div><div id="dermedBuyerResults" class="sale-course-picker-results"></div><input id="dermedBuyerType" type="hidden"><input id="dermedBuyerId" type="hidden"><div id="dermedBuyerHint" class="muted">Choose a student or customer. You can add a new customer.</div></div>
-<div><label>Sale Staff *</label><select id="dermedSaleStaff"></select></div><div><label>Cashier *</label><select id="dermedCashier" required></select></div>
+<div><label>Sale Staff *</label><select id="dermedSaleStaff" required></select></div><div><label>Cashier *</label><select id="dermedCashier" required></select></div>
 <div><label>Reference No.</label><input id="dermedReferenceNo" readonly placeholder="Auto-generate"></div>
 <div><label>Sale Date & Time</label><input id="dermedSaleTime" readonly></div>
 </div>
@@ -6178,8 +6178,10 @@ function isSaleCounterCashierStaff(x){
    x?.job_title ?? x?.jobTitle ?? x?.job ?? ""
  ).replace(/\s+/g," ").trim().toLowerCase();
  // Staff are taken directly from Staff Management (medifella_staff).
- // Only the exact Job Title "Sale Counter Cashier" is eligible.
- return title==="sale counter cashier";
+ // Eligible job titles are ONLY Sale, Counter, Cashier, or the combined
+ // "Sale Counter Cashier" title. This matches the Job Title choices in
+ // Staff Management, where Sale / Counter / Cashier are separate options.
+ return ["sale","counter","cashier","sale counter cashier"].includes(title);
 }
 function renderInventoryControls(){
  if($("stockStaff")){
@@ -10168,17 +10170,14 @@ document.addEventListener("DOMContentLoaded",function(){
     // Sale Commission Management uses ONLY Sale Staff.
     // Sale Staff = Job Title "Sale Counter Cashier".
     // Cashier is never used for commission ownership.
-    const rows=staffRows().filter(s=>{
-      const title=String(s.job_title||"").replace(/\s+/g," ").trim().toLowerCase();
-      return title==="sale counter cashier";
-    });
+    const rows=staffRows().filter(isSaleCounterCashierStaff);
     ["commissionStaff","commissionFilterStaff"].forEach(id=>{
       const el=C(id);if(!el)return;
       const selected=el.value;
       const all=id==="commissionFilterStaff"
         ?'<option value="">All Sale Staff</option>'
         :'<option value="">Select Sale Staff</option>';
-      const options=rows.map(s=>`<option value="${escC(s.id)}">${escC(s.name_en||s.name_kh||s.name||"Staff")} · Sale Counter Cashier</option>`).join("");
+      const options=rows.map(s=>`<option value="${escC(s.id)}">${escC(s.name_en||s.name_kh||s.name||"Staff")} · ${escC(s.job_title||"Staff")}</option>`).join("");
       el.innerHTML=all+(options||'<option value="" disabled>No Sale Counter Cashier staff found</option>');
       if(selected)el.value=selected;
     });
@@ -12392,3 +12391,20 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
+
+<script id="final-sale-staff-cashier-refresh-v2">
+(function(){
+  function refresh(){
+    try{
+      if(typeof window.refreshSaleStaffCashierOptions==="function")window.refreshSaleStaffCashierOptions();
+      if(typeof window.refreshCommissionStaffOptions==="function")window.refreshCommissionStaffOptions();
+    }catch(e){console.warn("Staff dropdown refresh:",e)}
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",function(){
+    refresh();
+    setTimeout(refresh,500);
+    setTimeout(refresh,1500);
+  },{once:true});
+  else {refresh();setTimeout(refresh,500);setTimeout(refresh,1500);}
+})();
+</script>
