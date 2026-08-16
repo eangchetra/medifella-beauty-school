@@ -9749,7 +9749,7 @@ document.addEventListener("DOMContentLoaded",function(){
   // It only prevents heavy search-render functions from running synchronously
   // on every physical keystroke. The latest input is replayed after the user
   // pauses briefly, so the typed letters can paint immediately.
-  const ids=['studentSearch','saleStudentSearch','saleCourseSearch','salesSearch','appointmentCustomerSearch','appointmentListSearch','stockProductSearch','productSearch','stockSearch','staffInfoSearch','customerSearch','mtsBuyerSearch','mtsProductSearch','mtsSaleSearch','dermedBuyerSearch','dermedItemSearch','dermedSaleSearch','serviceSearch','certStudentSearch','certSearch'];
+  const ids=['studentSearch','saleStudentSearch','saleCourseSearch','salesSearch','appointmentCustomerSearch','appointmentListSearch','stockProductSearch','productSearch','stockSearch','staffInfoSearch','customerSearch','mtsBuyerSearch','mtsProductSearch','mtsSaleSearch','serviceSearch','certStudentSearch','certSearch'];
   const timers=new Map();
 
   function install(id){
@@ -9797,6 +9797,126 @@ document.addEventListener("DOMContentLoaded",function(){
   setTimeout(installAll,300);
   setTimeout(installAll,1000);
 });
+</script>
+
+
+<script id="dermed-search-zero-lag-final">
+(function(){
+  "use strict";
+  const timers={};
+
+  function E(id){return document.getElementById(id)}
+  function normFast(v){return String(v||"").toLowerCase().trim()}
+  function escFast(v){
+    return typeof esc==="function"?esc(v):String(v??"").replace(/[&<>"']/g,function(c){
+      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
+    });
+  }
+
+  let studentCache={ref:null,rows:[]};
+  let customerCache={ref:null,rows:[]};
+
+  function rebuildBuyerCache(){
+    const ss=Array.isArray(window.students)?window.students:[];
+    const cs=Array.isArray(window.customers)?window.customers:[];
+    if(studentCache.ref!==ss){
+      studentCache.rows=ss.map(x=>({
+        raw:x,
+        text:normFast((x.student_id||"")+" "+(x.full_name||"")+" "+(x.full_name_km||"")+" "+(x.phone||"")+" "+(x.email||""))
+      }));
+      studentCache.ref=ss;
+    }
+    if(customerCache.ref!==cs){
+      customerCache.rows=cs.map(x=>({
+        raw:x,
+        text:normFast((x.customer_code||"")+" "+(x.name||"")+" "+(x.phone||"")+" "+(x.email||""))
+      }));
+      customerCache.ref=cs;
+    }
+  }
+
+  function fastBuyerSearch(){
+    const input=E("dermedBuyerSearch"),box=E("dermedBuyerResults");
+    if(!input||!box)return;
+    const q=normFast(input.value);
+    if(!q){
+      box.innerHTML="";
+      box.classList.remove("show");
+      box.style.display="none";
+      if(E("dermedBuyerType"))E("dermedBuyerType").value="";
+      if(E("dermedBuyerId"))E("dermedBuyerId").value="";
+      return;
+    }
+
+    rebuildBuyerCache();
+    const rows=[];
+    for(const e of studentCache.rows){
+      if(e.text.includes(q)){
+        const x=e.raw;
+        rows.push({t:"student",id:x.id,code:x.student_id||"",name:x.full_name||x.full_name_km||"Student",phone:x.phone||""});
+        if(rows.length>=10)break;
+      }
+    }
+    if(rows.length<10){
+      for(const e of customerCache.rows){
+        if(e.text.includes(q)){
+          const x=e.raw;
+          rows.push({t:"customer",id:x.id,code:x.customer_code||"",name:x.name||"Customer",phone:x.phone||""});
+          if(rows.length>=10)break;
+        }
+      }
+    }
+
+    box.innerHTML=rows.length
+      ?rows.map(x=>`<button type="button" data-latest-buyer-id="${escFast(x.id)}" data-latest-buyer-type="${escFast(x.t)}">
+          <strong>${escFast(x.name)}</strong>
+          <div class="muted">${escFast(x.t==="student"?"Student":"Customer")} · ${escFast(x.code||"No ID")} · ${escFast(x.phone||"No phone")}</div>
+        </button>`).join("")
+      :'<div class="muted" style="padding:10px">No matching student or customer found.</div>';
+    box.style.display="block";
+    box.classList.add("show");
+  }
+
+  function run(id){
+    if(id==="dermedBuyerSearch")fastBuyerSearch();
+    else if(id==="dermedItemSearch" && typeof refreshItemNow==="function")refreshItemNow();
+    else if(id==="dermedSaleSearch" && typeof renderDermedSales==="function")renderDermedSales();
+  }
+
+  function install(id){
+    const el=E(id);
+    if(!el || el.dataset.dermedZeroLag==="1")return;
+    el.dataset.dermedZeroLag="1";
+
+    // Capture before every existing target listener and prevent all of the
+    // duplicate/heavy Dermed handlers from running on the physical keystroke.
+    el.addEventListener("input",function(e){
+      e.stopImmediatePropagation();
+      clearTimeout(timers[id]);
+      timers[id]=setTimeout(function(){run(id)},60);
+    },true);
+
+    el.addEventListener("keyup",function(e){
+      e.stopImmediatePropagation();
+    },true);
+
+    el.addEventListener("focus",function(){
+      if(id==="dermedBuyerSearch")rebuildBuyerCache();
+      if(id==="dermedItemSearch" && typeof rebuildItemSearchCache==="function")rebuildItemSearchCache();
+    },true);
+  }
+
+  function installAll(){
+    install("dermedBuyerSearch");
+    install("dermedItemSearch");
+    install("dermedSaleSearch");
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",installAll,{once:true});
+  else installAll();
+  setTimeout(installAll,300);
+  setTimeout(installAll,1000);
+})();
 </script>
 
 </body>
