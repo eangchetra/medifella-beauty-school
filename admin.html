@@ -2388,8 +2388,10 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     </div>
   </div>
 
-  <label>Service Detail</label>
-  <input id="commissionServiceDetail" placeholder="Service detail">
+  <label>Service Detail (Select from Service List)</label>
+  <select id="commissionServiceDetail">
+    <option value="">Select service</option>
+  </select>
 
   <div class="row">
     <div><label>Unit</label><input id="commissionUnit" type="number" min="1" step="1" value="1"></div>
@@ -6109,7 +6111,7 @@ async function loadStockMovements(){
 async function loadStaffInfo(){
  const {data,error}=await sb.from("medifella_staff").select("*").order("created_at",{ascending:false});
  if(error){staffInfoRecords=[]; if($("staffInfoList"))$("staffInfoList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Staff Management SQL setup.</p>`;return}
- staffInfoRecords=data||[]; renderStaffInfoList(); renderInventoryControls(); renderBuyerControls();
+ staffInfoRecords=data||[]; renderStaffInfoList(); renderInventoryControls(); renderBuyerControls(); if(typeof window.refreshCommissionStaffOptions==="function")window.refreshCommissionStaffOptions();
 }
 async function loadCustomers(){
  const {data,error}=await sb.from("medifella_customers").select("*").order("created_at",{ascending:false});
@@ -6119,7 +6121,7 @@ async function loadCustomers(){
 async function loadServices(){
  const {data,error}=await sb.from("medifella_services").select("*").order("created_at",{ascending:false});
  if(error){services=[]; if($("serviceList"))$("serviceList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Services Management SQL setup.</p>`;return}
- services=data||[]; renderServiceList(); renderServiceControls();
+ services=data||[]; renderServiceList(); renderServiceControls(); if(typeof window.refreshCommissionServiceOptions==="function")window.refreshCommissionServiceOptions();
 }
 
 function inDateRange(value, fromId, toId){
@@ -10125,10 +10127,33 @@ document.addEventListener("DOMContentLoaded",function(){
     ["commissionStaff","commissionFilterStaff"].forEach(id=>{
       const el=C(id);if(!el)return;
       const selected=el.value;
-      const all=id==="commissionFilterStaff"?'<option value="">All Staff</option>':'<option value="">Select Staff</option>';
-      el.innerHTML=all+rows.map(s=>`<option value="${escC(s.id)}">${escC(s.name_en||s.name_km||s.name||"Staff")}</option>`).join("");
+      const all=id==="commissionFilterStaff"
+        ?'<option value="">All Staff</option>'
+        :'<option value="">Select Staff</option>';
+      el.innerHTML=all+rows.map(s=>`<option value="${escC(s.id)}">${escC(s.name_en||s.name_kh||s.name||"Staff")}${s.job_title?` · ${escC(s.job_title)}`:""}</option>`).join("");
       if(selected)el.value=selected;
     });
+  }
+
+  function populateCommissionServices(){
+    const el=C("commissionServiceDetail");
+    if(!el)return;
+    const rows=Array.isArray(window.services)?window.services:[];
+    const selected=el.value;
+    el.innerHTML='<option value="">Select service</option>'+
+      rows.map(s=>`<option value="${escC(s.id)}" data-price="${escC(s.price||0)}" data-name="${escC(s.name||"")}" data-code="${escC(s.service_code||"")}">
+        ${escC(s.name||"Service")}${s.service_code?` · ${escC(s.service_code)}`:""}${s.price!=null?` · $${moneyC(s.price)}`:""}
+      </option>`).join("");
+    if(selected)el.value=selected;
+  }
+
+  function onCommissionServiceSelected(){
+    const el=C("commissionServiceDetail");
+    const opt=el?.selectedOptions?.[0];
+    if(!opt||!opt.value)return;
+    const price=Number(opt.dataset.price||0);
+    if(C("commissionUnitPrice"))C("commissionUnitPrice").value=price.toFixed(2);
+    calcCommissionForm();
   }
 
   async function loadCommissionRecords(){
@@ -10185,9 +10210,11 @@ document.addEventListener("DOMContentLoaded",function(){
 
   async function saveCommissionManual(){
     const staffId=C("commissionStaff")?.value, customerId=C("commissionCustomerId")?.value;
-    const detail=C("commissionServiceDetail")?.value.trim();
-    if(!staffId||!customerId||!detail){
-      C("commissionStatus").innerHTML='<div class="status error">Please select Staff, Customer and enter Service Detail.</div>';return;
+    const serviceEl=C("commissionServiceDetail");
+    const serviceId=serviceEl?.value||"";
+    const detail=serviceEl?.selectedOptions?.[0]?.dataset?.name||"";
+    if(!staffId||!customerId||!serviceId||!detail){
+      C("commissionStatus").innerHTML='<div class="status error">Please select Staff, Customer and a Service from the Service List.</div>';return;
     }
     const c=calcCommissionForm();
     if(c.subtotal<=0){C("commissionStatus").innerHTML='<div class="status error">Subtotal must be greater than $0.</div>';return}
@@ -10197,7 +10224,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const payload={
       commission_date:todayC(),staff_id:staffId,staff_name:staff?.name_en||staff?.name_km||"",
       customer_id:customerId,customer_name:customer?.name||"",customer_phone:customer?.phone||"",
-      service_type:type,service_detail:detail,unit:c.unit,unit_price:c.price,discount:c.discount,
+      service_type:type,service_detail:detail,service_id:serviceId,unit:c.unit,unit_price:c.price,discount:c.discount,
       subtotal:c.subtotal,commission_rate:c.rate,commission_amount:c.amount,source:"manual"
     };
     const r=await sb.from("medifella_sale_commissions").insert(payload).select().single();
@@ -10341,6 +10368,10 @@ document.addEventListener("DOMContentLoaded",function(){
 
   function bindCommission(){
     populateCommissionStaff();
+    populateCommissionServices();
+    window.refreshCommissionStaffOptions=populateCommissionStaff;
+    window.refreshCommissionServiceOptions=populateCommissionServices;
+    C("commissionServiceDetail")?.addEventListener("change",onCommissionServiceSelected);
     if(C("commissionUnit"))C("commissionUnit").addEventListener("input",calcCommissionForm);
     if(C("commissionUnitPrice"))C("commissionUnitPrice").addEventListener("input",calcCommissionForm);
     if(C("commissionDiscount"))C("commissionDiscount").addEventListener("input",calcCommissionForm);
