@@ -9167,10 +9167,33 @@ document.addEventListener("DOMContentLoaded",function(){
   function confirmAppointment(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
-    const t=prompt("Confirm appointment time:",a.time||"");
+    if(a.status==="cancelled"){
+      alert("This appointment is cancelled. Use Edit to change it or create a new appointment.");
+      return;
+    }
+    if(a.status==="met"){
+      alert("This customer is already marked as Meet Already.");
+      return;
+    }
+    const t=prompt("Confirm coming time:",a.time||"");
     if(t===null)return;
     if(!/^\d{2}:\d{2}$/.test(t)){alert("Please enter time in HH:MM format.");return}
     updateAppointment(id,{time:t,status:"confirmed",confirmed_at:new Date().toISOString(),cancelled_at:null});
+  }
+  function meetAlready(id){
+    const a=appointments.find(x=>String(x.id)===String(id));
+    if(!a)return;
+    if(a.status==="cancelled"){
+      alert("This appointment is cancelled. Edit it or create a new appointment if the customer wants to come again.");
+      return;
+    }
+    if(!confirm(`Mark ${a.customer_name||"this customer"} as Meet Already?`))return;
+    updateAppointment(id,{
+      status:"met",
+      met_at:new Date().toISOString(),
+      confirmed_at:a.confirmed_at||new Date().toISOString(),
+      cancelled_at:null
+    });
   }
   function changeAppointmentDate(id){
     const a=appointments.find(x=>String(x.id)===String(id));
@@ -9183,10 +9206,54 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!/^\d{2}:\d{2}$/.test(t)){alert("Please enter time as HH:MM.");return}
     updateAppointment(id,{date:d,time:t,status:"pending",confirmed_at:null,cancelled_at:null});
   }
+  function rememberAppointmentReturnPage(){
+    appointmentReturnSection="appointments";
+    const list=A("appointmentListPanel"), upcoming=A("appointmentUpcomingPanel");
+    window.appointmentReturnTab=(upcoming && !upcoming.classList.contains("hidden"))?"upcoming":"list";
+  }
+  function restoreAppointmentReturnPage(){
+    const nav=document.querySelector('.nav[data-section="appointments"]');
+    if(nav)nav.click();
+    setTimeout(()=>{
+      if(window.appointmentReturnTab==="upcoming")A("appointmentUpcomingTab")?.click();
+      else A("appointmentListTab")?.click();
+      window.appointmentReturnTab="list";
+    },0);
+  }
+  function addNewInvoiceForCustomer(id){
+    const a=appointments.find(x=>String(x.id)===String(id));
+    if(!a)return;
+    rememberAppointmentReturnPage();
+    window.appointmentReturnAfterInvoice=true;
+
+    const nav=document.querySelector('.nav[data-section="dermedSale"]');
+    if(nav)nav.click();
+
+    setTimeout(()=>{
+      const toggle=A("dermedAddSaleToggle"), form=A("dermedSaleFormCard");
+      if(form && form.style.display==="none" && toggle)toggle.click();
+      // Use the existing Dermed reset/clear behavior so no previous sale data remains.
+      setTimeout(()=>{
+        A("clearDermedSale")?.click();
+        setTimeout(()=>{
+          const customer=getCustomer(a.customer_id);
+          if(!customer){
+            alert("This appointment customer could not be found in Customer Management.");
+            return;
+          }
+          A("dermedBuyerType").value="customer";
+          A("dermedBuyerId").value=String(customer.id);
+          A("dermedBuyerSearch").value=customer.name||a.customer_name||"";
+          A("dermedBuyerHint").textContent=`Selected: ${customer.name||a.customer_name||"Customer"} · ${customer.customer_code||a.customer_code||"No ID"} · ${customer.phone||a.customer_phone||"No phone"}`;
+          A("dermedBuyerSearch")?.focus();
+        },80);
+      },80);
+    },120);
+  }
   function showCustomerInvoices(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
-    appointmentReturnSection="appointments";
+    rememberAppointmentReturnPage();
     // Go directly to the existing Dermed Sale list and filter it to this customer.
     // Phone is the strongest customer-level match; fall back to name.
     const query=String(a.customer_phone||a.customer_name||"").trim();
@@ -9206,6 +9273,11 @@ document.addEventListener("DOMContentLoaded",function(){
     const search=A("dermedSaleSearch");
     if(search)search.value="";
     if(typeof renderDermedSales==="function")renderDermedSales();
+    if(window.appointmentReturnAfterInvoice){
+      window.appointmentReturnAfterInvoice=false;
+      restoreAppointmentReturnPage();
+      return;
+    }
     const nav=document.querySelector(`.nav[data-section="${appointmentReturnSection}"]`);
     if(nav)nav.click();
   }
@@ -9223,6 +9295,19 @@ document.addEventListener("DOMContentLoaded",function(){
     make(today,"appointmentTodayAlert","appointmentTodayCount");
     make(tomorrow,"appointmentTomorrowAlert","appointmentTomorrowCount");
   }
+  function appointmentActionButtons(a){
+    const id=escA(a.id);
+    return `
+      <button type="button" class="light appointment-confirm" data-appt-id="${id}">Confirm Coming</button>
+      <button type="button" class="light appointment-change" data-appt-id="${id}">Change Date</button>
+      <button type="button" class="light appointment-invoices" data-appt-id="${id}">Go to see Old Invoice</button>
+      <button type="button" class="gold appointment-add-invoice" data-appt-id="${id}">Add New Invoice</button>
+      <button type="button" class="light appointment-met" data-appt-id="${id}">Meet Already</button>
+      <button type="button" class="light appointment-edit" data-appt-id="${id}">Edit</button>
+      <button type="button" class="light appointment-cancel" data-appt-id="${id}">Cancel</button>
+      <button type="button" class="light appointment-delete" data-appt-id="${id}">Delete</button>
+    `;
+  }
   function renderList(){
     const q=(A("appointmentListSearch").value||"").trim().toLowerCase();
     const rows=sortAppointments(appointments.filter(a=>!q||customerHay(a).includes(q)||String(a.date||"").includes(q)));
@@ -9231,12 +9316,8 @@ document.addEventListener("DOMContentLoaded",function(){
       <tbody>${rows.map(a=>`<tr>
         <td><strong>${escA(a.customer_code||"—")}</strong><div>${escA(a.customer_name||"—")}</div><div class="muted">${escA(a.customer_phone||"—")}</div><span class="badge ${a.customer_type==="New Customer"?"pending":"verified"}" style="margin-top:5px">${escA(a.customer_type||"Old Customer")}</span>${a.note?`<div style="margin-top:6px;"><strong>Note:</strong> ${escA(a.note)}</div>`:""}</td>
         <td>${escA(formatDate(a.date))}<div class="muted">${escA(formatTime(a.time))}</div></td>
-        <td>${a.status==="confirmed"?'<span class="badge verified">Confirmed</span>':a.status==="cancelled"?'<span class="badge rejected">Cancelled</span>':'<span class="badge pending">Pending</span>'}</td>
-        <td><div class="actions">
-          <button type="button" class="light appointment-invoices" data-appt-id="${escA(a.id)}">Go to See Invoice</button>
-          <button type="button" class="light appointment-edit" data-appt-id="${escA(a.id)}">Edit</button>
-          <button type="button" class="danger appointment-delete" data-appt-id="${escA(a.id)}">Delete</button>
-        </div></td>
+        <td>${a.status==="met"?'<span class="badge verified">Meet Already</span>':a.status==="confirmed"?'<span class="badge verified">Confirmed Coming</span>':a.status==="cancelled"?'<span class="badge rejected">Cancelled</span>':'<span class="badge pending">Pending</span>'}</td>
+        <td><div class="actions">${appointmentActionButtons(a)}</div></td>
       </tr>`).join("")}</tbody></table></div>`:'<div class="appointment-empty">No appointments found.</div>';
   }
   function renderUpcoming(){
@@ -9258,16 +9339,10 @@ document.addEventListener("DOMContentLoaded",function(){
         const confirmed=a.status==="confirmed";
         return `<div class="appointment-ticket ${confirmed?"confirmed":""}">
           <div class="appointment-time">${escA(formatTime(a.time))}</div>
-          <div><div class="appointment-customer-name">${escA(a.customer_name||"Customer")}${confirmed?'<span class="appointment-confirmed-badge">GREEN TICKET · CONFIRMED</span>':''}</div>
+          <div><div class="appointment-customer-name">${escA(a.customer_name||"Customer")}${confirmed?'<span class="appointment-confirmed-badge">GREEN TICKET · CONFIRM COMING</span>':''}</div>
             <div class="muted">${escA(a.customer_code||"No ID")} · ${escA(a.customer_phone||"No phone")} · <strong>${escA(a.customer_type||"Old Customer")}</strong></div>${a.note?`<div style="margin-top:5px;"><strong>Note:</strong> ${escA(a.note)}</div>`:""}</div>
-          <div class="muted">${confirmed?"Confirmed appointment":"Waiting for confirmation"}</div>
-          <div class="appointment-actions">
-            ${!confirmed?`<button type="button" class="btn appointment-confirm" data-appt-id="${escA(a.id)}">Confirm</button>`:""}
-            <button type="button" class="light appointment-change" data-appt-id="${escA(a.id)}">Change Date</button>
-            <button type="button" class="light appointment-invoices" data-appt-id="${escA(a.id)}">Go to See Invoice</button>
-            <button type="button" class="gold appointment-cancel" data-appt-id="${escA(a.id)}">Cancel</button>
-            <button type="button" class="danger appointment-delete" data-appt-id="${escA(a.id)}">Delete</button>
-          </div>
+          <div class="muted">${a.status==="met"?"Customer already came and was met":confirmed?"Confirmed coming":"Waiting for confirmation"}</div>
+          <div class="appointment-actions">${appointmentActionButtons(a)}</div>
         </div>`;
       }).join(""):'<div class="appointment-empty">No customers scheduled for this day.</div>'}</div></div>`).join(""):'<div class="appointment-empty">No days available.</div>';
   }
@@ -9316,7 +9391,23 @@ document.addEventListener("DOMContentLoaded",function(){
     if(v)A("appointmentMonth").value=v;
     renderUpcoming();
   }
+  function installInvoiceReturnHook(){
+    if(typeof window.closeInvoicePreview!="function" || window.closeInvoicePreview.__appointmentReturnHook)return;
+    const original=window.closeInvoicePreview;
+    const wrapped=function(){
+      original.apply(this,arguments);
+      if(window.appointmentReturnAfterInvoice){
+        window.appointmentReturnAfterInvoice=false;
+        restoreAppointmentReturnPage();
+      }
+    };
+    wrapped.__appointmentReturnHook=true;
+    window.closeInvoicePreview=wrapped;
+  }
   function init(){
+    installInvoiceReturnHook();
+    setTimeout(installInvoiceReturnHook,300);
+    setTimeout(installInvoiceReturnHook,1000);
     readAppointments();
     clearForm();
     A("appointmentMonth").value=localDate().slice(0,7);
@@ -9369,6 +9460,8 @@ document.addEventListener("DOMContentLoaded",function(){
       if(cr){e.preventDefault();setFormCustomer(getCustomer(cr.dataset.apptCustomer));return}
       const inv=e.target.closest?.(".appointment-invoices");
       if(inv){e.preventDefault();showCustomerInvoices(inv.dataset.apptId);return}
+      const addInv=e.target.closest?.(".appointment-add-invoice");
+      if(addInv){e.preventDefault();addNewInvoiceForCustomer(addInv.dataset.apptId);return}
       const ed=e.target.closest?.(".appointment-edit");
       if(ed){e.preventDefault();editAppointment(ed.dataset.apptId);return}
       const del=e.target.closest?.(".appointment-delete");
@@ -9377,6 +9470,8 @@ document.addEventListener("DOMContentLoaded",function(){
       if(conf){e.preventDefault();confirmAppointment(conf.dataset.apptId);return}
       const ch=e.target.closest?.(".appointment-change");
       if(ch){e.preventDefault();changeAppointmentDate(ch.dataset.apptId);return}
+      const mt=e.target.closest?.(".appointment-met");
+      if(mt){e.preventDefault();meetAlready(mt.dataset.apptId);return}
       const ca=e.target.closest?.(".appointment-cancel");
       if(ca){e.preventDefault();cancelAppointment(ca.dataset.apptId);return}
       if(e.target.closest?.("#appointmentInvoiceClose,#appointmentInvoiceX")){e.preventDefault();closeInvoiceModal();return}
