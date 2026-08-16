@@ -2426,7 +2426,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
         <div class="appointment-search-wrap">
           <input id="appointmentListSearch" placeholder="Search appointments...">
           <button id="appointmentListRefresh" class="light" type="button">Refresh</button>
-          <button id="appointmentRecoverOld" class="gold" type="button">Recover Old Appointments</button>
+          <button id="appointmentRecoverOld" class="gold" type="button">Sync / Recover Old Appointments</button><div class="muted" style="margin-top:6px">New appointments are stored in Supabase. Old browser appointments remain readable/editable and are kept as a backup.</div>
         </div>
       </div>
       <div id="appointmentList" style="margin-top:14px;">Loading...</div>
@@ -9027,6 +9027,7 @@ document.addEventListener("DOMContentLoaded",function(){
   "use strict";
   const STORAGE_KEY="medi_fella_appointments_v1";
   let appointments=[];
+  let legacyAppointments=[];
   let appointmentReturnSection="appointments";
 
   function A(id){return document.getElementById(id)}
@@ -9144,7 +9145,7 @@ document.addEventListener("DOMContentLoaded",function(){
       showStatus("Recovery failed: "+(e?.message||e),true);
       alert("Recovery failed.\n\n"+(e?.message||e));
     }finally{
-      if(btn){btn.disabled=false;btn.textContent="Recover Old Appointments";}
+      if(btn){btn.disabled=false;btn.textContent="Sync / Recover Old Appointments";}
     }
   }
   async function readAppointments(){
@@ -9155,58 +9156,72 @@ document.addEventListener("DOMContentLoaded",function(){
         .order("time",{ascending:true})
         .order("created_at",{ascending:false});
       if(error)throw error;
-      appointments=Array.isArray(data)?data:[];
 
-      // Migrate appointments from the previous browser-only version when the
-      // database is empty. Do not delete local data unless the database insert
-      // succeeds AND the database can be read back successfully.
-      if(appointments.length===0){
-        let legacy=[];
+      const dbRows=Array.isArray(data)?data:[];
+
+      // Always read the old browser-only appointment records too.
+      // We deliberately DO NOT remove the old local copy.
+      const legacyRaw=readLegacyAppointmentCandidates();
+      const normalizedLegacy=legacyRaw.map((a,i)=>normalizeLegacyAppointment(a,i));
+
+      const dbKeys=new Set(dbRows.map(a=>JSON.stringify([
+        String(a.id||""),String(a.date||""),String(a.time||""),
+        String(a.customer_id||""),String(a.customer_phone||""),
+        String(a.customer_name||"")
+      ])));
+
+      legacyAppointments=[];
+      normalizedLegacy.forEach(r=>{
+        const key=JSON.stringify([
+          String(r.id||""),String(r.date||""),String(r.time||""),
+          String(r.customer_id||""),String(r.customer_phone||""),
+          String(r.customer_name||"")
+        ]);
+        r.__legacy=true;
+
+        // If an old record is already in Supabase, use the Supabase version.
+        if(dbKeys.has(key))return;
+
+        legacyAppointments.push(r);
+      });
+
+      // Try to copy old records into Supabase, but keep the old local copy.
+      // This means old records become editable in the same system while
+      // protecting the original browser data from accidental deletion.
+      if(legacyAppointments.length){
         try{
-          const raw=localStorage.getItem(STORAGE_KEY);
-          legacy=raw?JSON.parse(raw):[];
-        }catch(_){legacy=[]}
-
-        if(Array.isArray(legacy)&&legacy.length){
-          const rows=legacy.map(a=>({
-            id:String(a.id||("APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8))),
-            customer_id:a.customer_id?String(a.customer_id):null,
-            customer_name:String(a.customer_name||""),
-            customer_phone:String(a.customer_phone||""),
-            customer_code:String(a.customer_code||""),
-            customer_type:String(a.customer_type||"Old Customer"),
-            date:a.date||localDate(),
-            time:a.time||"00:00",
-            note:String(a.note||""),
-            status:String(a.status||"pending"),
-            created_at:a.created_at||new Date().toISOString(),
-            confirmed_at:a.confirmed_at||null,
-            cancelled_at:a.cancelled_at||null,
-            met_at:a.met_at||null
-          }));
-
-          // Do not use .select() here: a restrictive SELECT RLS policy can
-          // make a successful INSERT look like a failed migration.
-          const {error:insertError}=await sb.from("medifella_appointments").insert(rows);
-          if(insertError)throw insertError;
-
-          const {data:afterMigration,error:readBackError}=await sb.from("medifella_appointments")
-            .select("*")
-            .order("date",{ascending:true})
-            .order("time",{ascending:true})
-            .order("created_at",{ascending:false});
-          if(readBackError)throw readBackError;
-
-          appointments=Array.isArray(afterMigration)?afterMigration:[];
-          if(appointments.length>=rows.length){
-            localStorage.removeItem(STORAGE_KEY);
+          const rows=legacyAppointments.map(({__legacy,...r})=>r);
+          const {error:legacyInsertError}=await sb.from("medifella_appointments").insert(rows);
+          if(!legacyInsertError){
+            const {data:after,error:afterError}=await sb.from("medifella_appointments")
+              .select("*")
+              .order("date",{ascending:true})
+              .order("time",{ascending:true})
+              .order("created_at",{ascending:false});
+            if(!afterError && Array.isArray(after)){
+              // Rebuild from the database so the old records now have their
+              // normal Supabase identity while local storage remains untouched.
+              appointments=after.map(a=>({...a,__legacy:false}));
+              legacyAppointments=[];
+              return true;
+            }
+          }else{
+            console.warn("Could not copy old appointments to Supabase; showing them from old browser storage.",legacyInsertError);
           }
+        }catch(copyErr){
+          console.warn("Legacy appointment copy failed; showing old records locally.",copyErr);
         }
       }
+
+      appointments=[
+        ...dbRows.map(a=>({...a,__legacy:false})),
+        ...legacyAppointments
+      ];
 
       return true;
     }catch(e){
       appointments=[];
+      legacyAppointments=[];
       const message=String(e?.message||e||"Unknown database error");
       console.error("Appointment database load error:",e);
 
@@ -9338,7 +9353,142 @@ document.addEventListener("DOMContentLoaded",function(){
       showStatus("Could not save appointment: "+(e?.message||e),true);
     }
   }
+  function updateLegacyAppointmentLocal(id,changes){
+    const stores=[localStorage,sessionStorage];
+    let found=false;
+    stores.forEach(store=>{
+      try{
+        for(let i=0;i<store.length;i++){
+          const key=store.key(i);
+          if(!key)continue;
+          const raw=store.getItem(key);
+          if(!raw)continue;
+          let parsed;
+          try{parsed=JSON.parse(raw)}catch(_){continue}
+
+          const patchArray=(arr)=>{
+            if(!Array.isArray(arr))return false;
+            let changed=false;
+            arr.forEach((a)=>{
+              if(a && String(a.id||a.appointment_id||"")===String(id)){
+                Object.assign(a,changes);
+                // Preserve common legacy camelCase fields where present.
+                if("date" in changes)a.appointment_date=changes.date;
+                if("time" in changes)a.appointment_time=changes.time;
+                changed=true;
+              }
+            });
+            return changed;
+          };
+
+          let changed=patchArray(parsed);
+          if(!changed && parsed && typeof parsed==="object"){
+            const walk=(v)=>{
+              if(changed||!v||typeof v!=="object")return;
+              if(Array.isArray(v)){
+                if(patchArray(v))changed=true;
+                if(!changed)v.forEach(walk);
+              }else{
+                Object.values(v).forEach(walk);
+              }
+            };
+            walk(parsed);
+          }
+          if(changed){
+            store.setItem(key,JSON.stringify(parsed));
+            found=true;
+          }
+        }
+      }catch(_){}
+    });
+    return found;
+  }
+
+  function deleteLegacyAppointmentLocal(id){
+    const stores=[localStorage,sessionStorage];
+    let found=false;
+    stores.forEach(store=>{
+      try{
+        for(let i=0;i<store.length;i++){
+          const key=store.key(i);
+          if(!key)continue;
+          const raw=store.getItem(key);
+          if(!raw)continue;
+          let parsed;
+          try{parsed=JSON.parse(raw)}catch(_){continue}
+
+          let changed=false;
+          const cleanArray=(arr)=>{
+            if(!Array.isArray(arr))return arr;
+            const before=arr.length;
+            const kept=arr.filter(a=>String(a?.id||a?.appointment_id||"")!==String(id));
+            if(kept.length!==before)changed=true;
+            kept.forEach(a=>{
+              if(a && typeof a==="object"){
+                for(const [k,v] of Object.entries(a)){
+                  if(v && typeof v==="object")a[k]=cleanNested(v);
+                }
+              }
+            });
+            return kept;
+          };
+          const cleanNested=(v)=>{
+            if(Array.isArray(v))return cleanArray(v);
+            if(v&&typeof v==="object"){
+              Object.keys(v).forEach(k=>v[k]=cleanNested(v[k]));
+            }
+            return v;
+          };
+
+          if(Array.isArray(parsed)){
+            parsed=cleanArray(parsed);
+          }else if(parsed&&typeof parsed==="object"){
+            const walk=(v)=>{
+              if(!v||typeof v!=="object")return v;
+              if(Array.isArray(v))return cleanArray(v);
+              Object.keys(v).forEach(k=>v[k]=walk(v[k]));
+              return v;
+            };
+            parsed=walk(parsed);
+          }
+
+          if(changed){
+            store.setItem(key,JSON.stringify(parsed));
+            found=true;
+          }
+        }
+      }catch(_){}
+    });
+    return found;
+  }
+
   async function updateAppointment(id,changes){
+    const existing=appointments.find(x=>String(x.id)===String(id));
+    if(!existing)return null;
+
+    // Old browser appointment: keep it editable even if Supabase cannot
+    // accept the update. If it was already copied to Supabase, update there too.
+    if(existing.__legacy){
+      const localChanged=updateLegacyAppointmentLocal(id,changes);
+      try{
+        const updated=await updateAppointmentDb(id,changes);
+        const idx=appointments.findIndex(x=>String(x.id)===String(id));
+        if(idx>=0)appointments[idx]=updated||Object.assign(appointments[idx],changes,{__legacy:false});
+        renderAll();
+        return updated||appointments[idx]||null;
+      }catch(e){
+        if(localChanged){
+          const idx=appointments.findIndex(x=>String(x.id)===String(id));
+          if(idx>=0)appointments[idx]=Object.assign({},appointments[idx],changes,{__legacy:true});
+          renderAll();
+          showStatus("Old appointment updated in the original browser data. It could not be synced to Supabase yet.",true);
+          return appointments[idx]||null;
+        }
+        alert("Could not update old appointment.\n\n"+(e?.message||e));
+        return null;
+      }
+    }
+
     try{
       const updated=await updateAppointmentDb(id,changes);
       const idx=appointments.findIndex(x=>String(x.id)===String(id));
@@ -9355,6 +9505,15 @@ document.addEventListener("DOMContentLoaded",function(){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
     if(!confirm(`Delete appointment for ${a.customer_name||"customer"}?`))return;
+    if(a.__legacy){
+      const localChanged=deleteLegacyAppointmentLocal(id);
+      try{await deleteAppointmentDb(id);}catch(_){}
+      if(localChanged){
+        appointments=appointments.filter(x=>String(x.id)!==String(id));
+        renderAll();
+        return;
+      }
+    }
     try{
       await deleteAppointmentDb(id);
       appointments=appointments.filter(x=>String(x.id)!==String(id));
