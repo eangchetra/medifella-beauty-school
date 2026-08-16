@@ -2426,6 +2426,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
         <div class="appointment-search-wrap">
           <input id="appointmentListSearch" placeholder="Search appointments...">
           <button id="appointmentListRefresh" class="light" type="button">Refresh</button>
+          <button id="appointmentRecoverOld" class="gold" type="button">Recover Old Appointments</button>
         </div>
       </div>
       <div id="appointmentList" style="margin-top:14px;">Loading...</div>
@@ -9053,6 +9054,99 @@ document.addEventListener("DOMContentLoaded",function(){
     const ap=h>=12?"PM":"AM", hh=(h%12)||12;
     return `${hh}:${pad(m||0)} ${ap}`;
   }
+  function looksLikeAppointmentObject(a){
+    if(!a || typeof a!=="object" || Array.isArray(a))return false;
+    const hasDate=!!(a.date||a.appointment_date||a.appointmentDate);
+    const hasTime=!!(a.time||a.appointment_time||a.appointmentTime);
+    const hasCustomer=!!(a.customer_name||a.customerName||a.name||a.customer_phone||a.customerPhone||a.customer_id||a.customerId||a.customer_code||a.customerCode);
+    return hasDate && (hasTime || hasCustomer);
+  }
+  function findAppointmentArrays(value,found,seen){
+    if(value===null || typeof value!=="object" || seen.has(value))return;
+    seen.add(value);
+    if(Array.isArray(value)){
+      const matches=value.filter(looksLikeAppointmentObject);
+      if(matches.length)found.push(matches);
+      value.slice(0,1000).forEach(v=>findAppointmentArrays(v,found,seen));
+      return;
+    }
+    Object.keys(value).slice(0,2000).forEach(k=>findAppointmentArrays(value[k],found,seen));
+  }
+  function readLegacyAppointmentCandidates(){
+    const candidates=[];
+    const stores=[localStorage,sessionStorage];
+    stores.forEach(store=>{
+      const keys=[];
+      try{for(let i=0;i<store.length;i++){const k=store.key(i);if(k)keys.push(k)}}catch(_){ }
+      if(!keys.includes(STORAGE_KEY))keys.push(STORAGE_KEY);
+      keys.forEach(key=>{
+        try{
+          const raw=store.getItem(key);if(!raw)return;
+          const parsed=JSON.parse(raw);
+          if(key===STORAGE_KEY && Array.isArray(parsed))candidates.push(parsed);
+          else findAppointmentArrays(parsed,candidates,new Set());
+        }catch(_){ }
+      });
+    });
+    const flat=[],seen=new Set();
+    candidates.flat().forEach(a=>{
+      if(!looksLikeAppointmentObject(a))return;
+      const sig=JSON.stringify([a.id||a.appointment_id||"",a.date||a.appointment_date||a.appointmentDate||"",a.time||a.appointment_time||a.appointmentTime||"",a.customer_id||a.customerId||"",a.customer_phone||a.customerPhone||"",a.customer_name||a.customerName||a.name||""]);
+      if(seen.has(sig))return;seen.add(sig);flat.push(a);
+    });
+    return flat;
+  }
+  function normalizeLegacyAppointment(a,index){
+    const date=a.date||a.appointment_date||a.appointmentDate||localDate();
+    const time=a.time||a.appointment_time||a.appointmentTime||"00:00";
+    let status=String(a.status||"pending").toLowerCase();
+    if(status==="meet"||status==="meet already")status="met";
+    if(!["pending","confirmed","cancelled","met"].includes(status))status="pending";
+    return {
+      id:String(a.id||a.appointment_id||("APT-RECOVER-"+Date.now()+"-"+index+"-"+Math.random().toString(36).slice(2,7))),
+      customer_id:(a.customer_id||a.customerId)?String(a.customer_id||a.customerId):null,
+      customer_name:String(a.customer_name||a.customerName||a.name||""),
+      customer_phone:String(a.customer_phone||a.customerPhone||a.phone||""),
+      customer_code:String(a.customer_code||a.customerCode||a.code||""),
+      customer_type:String(a.customer_type||a.customerType||"Old Customer"),
+      date:String(date),time:String(time).slice(0,8),note:String(a.note||a.notes||""),status,
+      created_at:a.created_at||a.createdAt||new Date().toISOString(),
+      confirmed_at:a.confirmed_at||a.confirmedAt||null,cancelled_at:a.cancelled_at||a.cancelledAt||null,met_at:a.met_at||a.metAt||null
+    };
+  }
+  async function recoverOldAppointments(){
+    const btn=A("appointmentRecoverOld");
+    if(btn){btn.disabled=true;btn.textContent="Recovering...";}
+    try{
+      const legacy=readLegacyAppointmentCandidates();
+      if(!legacy.length){
+        showStatus("No old appointment data was found in this browser's local/session storage.",true);
+        alert("No old appointment data was found in this browser. If the old appointments were already deleted from browser storage, they cannot be recovered from this HTML file.");
+        return;
+      }
+      const {data:existing,error:readError}=await sb.from("medifella_appointments").select("id,customer_id,date,time,customer_phone,customer_name");
+      if(readError)throw readError;
+      const existingKeys=new Set((existing||[]).map(a=>JSON.stringify([String(a.id||""),String(a.date||""),String(a.time||""),String(a.customer_id||""),String(a.customer_phone||""),String(a.customer_name||"")])));
+      const rows=[];
+      legacy.forEach((a,i)=>{
+        const r=normalizeLegacyAppointment(a,i);
+        const key=JSON.stringify([r.id,r.date,r.time,String(r.customer_id||""),r.customer_phone,r.customer_name]);
+        if(!existingKeys.has(key)){existingKeys.add(key);rows.push(r);}
+      });
+      if(!rows.length){showStatus("Old appointment data was found, but all of it is already in Supabase.",false);await readAppointments();renderAll();return;}
+      const {error:insertError}=await sb.from("medifella_appointments").insert(rows);
+      if(insertError)throw insertError;
+      await readAppointments();renderAll();
+      showStatus(`Recovered ${rows.length} old appointment${rows.length===1?"":"s"} successfully.`,false);
+      alert(`Recovered ${rows.length} old appointment${rows.length===1?"":"s"} successfully.`);
+    }catch(e){
+      console.error("Appointment recovery error:",e);
+      showStatus("Recovery failed: "+(e?.message||e),true);
+      alert("Recovery failed.\n\n"+(e?.message||e));
+    }finally{
+      if(btn){btn.disabled=false;btn.textContent="Recover Old Appointments";}
+    }
+  }
   async function readAppointments(){
     try{
       const {data,error}=await sb.from("medifella_appointments")
@@ -9539,6 +9633,7 @@ document.addEventListener("DOMContentLoaded",function(){
     };
     A("appointmentListSearch").oninput=renderList;
     A("appointmentListRefresh").onclick=async()=>{const ok=await readAppointments();if(ok)renderAll()};
+    A("appointmentRecoverOld").onclick=recoverOldAppointments;
     A("appointmentListTab").onclick=()=>{
       A("appointmentListPanel").classList.remove("hidden");
       A("appointmentUpcomingPanel").classList.add("hidden");
