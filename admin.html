@@ -2368,8 +2368,8 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
         <label>Customer Phone Number / Name / ID *</label>
         <div style="display:flex;gap:8px;align-items:flex-start">
           <div style="flex:1;position:relative">
-            <input id="appointmentCustomerSearch" autocomplete="off" placeholder="Search customer...">
-            <input id="appointmentCustomerId" type="hidden">
+            <input id="appointmentCustomerSearch" autocomplete="off" placeholder="Search Student or Customer">
+            <input id="appointmentCustomerId" type="hidden"><input id="appointmentCustomerSource" type="hidden" value="customer">
             <div id="appointmentCustomerResults" class="appointment-results"></div>
           </div>
           <div style="width:180px">
@@ -2379,7 +2379,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
             </select>
           </div>
         </div>
-        <div id="appointmentCustomerHint" class="muted" style="margin-top:6px;">Search and select a customer.</div>
+        <div id="appointmentCustomerHint" class="muted" style="margin-top:6px;">Search and select a student or customer.</div>
         <label style="margin-top:12px;">Note</label>
         <textarea id="appointmentNote" rows="3" placeholder="Write a note (optional)..."></textarea>
         <div class="muted" style="margin-top:5px;">Optional — you can leave this blank.</div>
@@ -2426,7 +2426,6 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
         <div class="appointment-search-wrap">
           <input id="appointmentListSearch" placeholder="Search appointments...">
           <button id="appointmentListRefresh" class="light" type="button">Refresh</button>
-          <button id="appointmentRecoverOld" class="gold" type="button">Recover Old Appointments</button>
         </div>
       </div>
       <div id="appointmentList" style="margin-top:14px;">Loading...</div>
@@ -4555,6 +4554,83 @@ function openPrintFromCanvas(canvas,paper,sale){
 
 
 
+
+
+<script id="dermed-product-add-final-fix">
+(function(){
+  "use strict";
+  function E(id){return document.getElementById(id)}
+  function n(v){const x=Number(String(v??"").replace(/[$,\s]/g,""));return Number.isFinite(x)?x:0}
+  function syncData(){
+    try{
+      if(typeof products!=="undefined")window.products=products;
+      if(typeof services!=="undefined")window.services=services;
+    }catch(e){}
+  }
+
+  function addDermedProductDirect(pid){
+    syncData();
+    const list=Array.isArray(window.products)?window.products:[];
+    const p=list.find(x=>String(x.id)===String(pid));
+    if(!p)return;
+
+    const arr=window.dermedSaleItems||(window.dermedSaleItems=[]);
+    const existing=arr.find(x=>String(x.product_id)===String(pid));
+    if(existing){
+      const stock=typeof productStock==="function"?Math.max(0,n(productStock(existing.product_id))):999999;
+      existing.quantity=Math.min(Math.max(1,n(existing.quantity)+1),Math.max(1,stock));
+    }else{
+      arr.push({
+        product_id:p.id,
+        product_code:p.product_code||"",
+        name:p.name||"",
+        price:n(p.price),
+        quantity:1,
+        discount_type:"percent",
+        discount_value:0
+      });
+    }
+
+    if(typeof window.__renderDermedItems==="function"){
+      window.__renderDermedItems();
+    }
+    const input=E("dermedItemSearch"),box=E("dermedItemResults");
+    if(input)input.value="";
+    if(box){box.innerHTML="";box.classList.remove("show");box.style.display="none";}
+  }
+
+  // Keep the existing MTS product behavior untouched; only fix Dermed.
+  const previousAdd=window.addSaleProduct;
+  window.addSaleProduct=function(type,pid){
+    if(type==="dermed"){
+      return addDermedProductDirect(pid);
+    }
+    if(typeof previousAdd==="function")return previousAdd.apply(this,arguments);
+  };
+
+  function bind(){
+    const box=E("dermedItemResults");
+    if(!box || box.dataset.dermedProductFinalBound==="1")return;
+    box.dataset.dermedProductFinalBound="1";
+
+    const choose=function(e){
+      const target=e.target.closest("[data-latest-product-id]");
+      if(!target || !box.contains(target))return;
+      e.preventDefault();
+      e.stopPropagation();
+      addDermedProductDirect(target.dataset.latestProductId);
+    };
+    box.addEventListener("mousedown",choose,true);
+    box.addEventListener("click",choose,true);
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",function(){bind();setTimeout(bind,300);setTimeout(bind,1000)});
+  }else{
+    bind();setTimeout(bind,300);setTimeout(bind,1000);
+  }
+})();
+</script>
 
 </body>
 </html>`;
@@ -6962,6 +7038,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const r=E("dermedItemResults"); if(r){r.innerHTML="";r.classList.remove("show");}
   };
 
+  window.__renderDermedItems=renderItems;
   function renderItems(){
     const body=E("dermedItems"); if(!body)return;
     const rows=[];
@@ -9054,99 +9131,6 @@ document.addEventListener("DOMContentLoaded",function(){
     const ap=h>=12?"PM":"AM", hh=(h%12)||12;
     return `${hh}:${pad(m||0)} ${ap}`;
   }
-  function looksLikeAppointmentObject(a){
-    if(!a || typeof a!=="object" || Array.isArray(a))return false;
-    const hasDate=!!(a.date||a.appointment_date||a.appointmentDate);
-    const hasTime=!!(a.time||a.appointment_time||a.appointmentTime);
-    const hasCustomer=!!(a.customer_name||a.customerName||a.name||a.customer_phone||a.customerPhone||a.customer_id||a.customerId||a.customer_code||a.customerCode);
-    return hasDate && (hasTime || hasCustomer);
-  }
-  function findAppointmentArrays(value,found,seen){
-    if(value===null || typeof value!=="object" || seen.has(value))return;
-    seen.add(value);
-    if(Array.isArray(value)){
-      const matches=value.filter(looksLikeAppointmentObject);
-      if(matches.length)found.push(matches);
-      value.slice(0,1000).forEach(v=>findAppointmentArrays(v,found,seen));
-      return;
-    }
-    Object.keys(value).slice(0,2000).forEach(k=>findAppointmentArrays(value[k],found,seen));
-  }
-  function readLegacyAppointmentCandidates(){
-    const candidates=[];
-    const stores=[localStorage,sessionStorage];
-    stores.forEach(store=>{
-      const keys=[];
-      try{for(let i=0;i<store.length;i++){const k=store.key(i);if(k)keys.push(k)}}catch(_){ }
-      if(!keys.includes(STORAGE_KEY))keys.push(STORAGE_KEY);
-      keys.forEach(key=>{
-        try{
-          const raw=store.getItem(key);if(!raw)return;
-          const parsed=JSON.parse(raw);
-          if(key===STORAGE_KEY && Array.isArray(parsed))candidates.push(parsed);
-          else findAppointmentArrays(parsed,candidates,new Set());
-        }catch(_){ }
-      });
-    });
-    const flat=[],seen=new Set();
-    candidates.flat().forEach(a=>{
-      if(!looksLikeAppointmentObject(a))return;
-      const sig=JSON.stringify([a.id||a.appointment_id||"",a.date||a.appointment_date||a.appointmentDate||"",a.time||a.appointment_time||a.appointmentTime||"",a.customer_id||a.customerId||"",a.customer_phone||a.customerPhone||"",a.customer_name||a.customerName||a.name||""]);
-      if(seen.has(sig))return;seen.add(sig);flat.push(a);
-    });
-    return flat;
-  }
-  function normalizeLegacyAppointment(a,index){
-    const date=a.date||a.appointment_date||a.appointmentDate||localDate();
-    const time=a.time||a.appointment_time||a.appointmentTime||"00:00";
-    let status=String(a.status||"pending").toLowerCase();
-    if(status==="meet"||status==="meet already")status="met";
-    if(!["pending","confirmed","cancelled","met"].includes(status))status="pending";
-    return {
-      id:String(a.id||a.appointment_id||("APT-RECOVER-"+Date.now()+"-"+index+"-"+Math.random().toString(36).slice(2,7))),
-      customer_id:(a.customer_id||a.customerId)?String(a.customer_id||a.customerId):null,
-      customer_name:String(a.customer_name||a.customerName||a.name||""),
-      customer_phone:String(a.customer_phone||a.customerPhone||a.phone||""),
-      customer_code:String(a.customer_code||a.customerCode||a.code||""),
-      customer_type:String(a.customer_type||a.customerType||"Old Customer"),
-      date:String(date),time:String(time).slice(0,8),note:String(a.note||a.notes||""),status,
-      created_at:a.created_at||a.createdAt||new Date().toISOString(),
-      confirmed_at:a.confirmed_at||a.confirmedAt||null,cancelled_at:a.cancelled_at||a.cancelledAt||null,met_at:a.met_at||a.metAt||null
-    };
-  }
-  async function recoverOldAppointments(){
-    const btn=A("appointmentRecoverOld");
-    if(btn){btn.disabled=true;btn.textContent="Recovering...";}
-    try{
-      const legacy=readLegacyAppointmentCandidates();
-      if(!legacy.length){
-        showStatus("No old appointment data was found in this browser's local/session storage.",true);
-        alert("No old appointment data was found in this browser. If the old appointments were already deleted from browser storage, they cannot be recovered from this HTML file.");
-        return;
-      }
-      const {data:existing,error:readError}=await sb.from("medifella_appointments").select("id,customer_id,date,time,customer_phone,customer_name");
-      if(readError)throw readError;
-      const existingKeys=new Set((existing||[]).map(a=>JSON.stringify([String(a.id||""),String(a.date||""),String(a.time||""),String(a.customer_id||""),String(a.customer_phone||""),String(a.customer_name||"")])));
-      const rows=[];
-      legacy.forEach((a,i)=>{
-        const r=normalizeLegacyAppointment(a,i);
-        const key=JSON.stringify([r.id,r.date,r.time,String(r.customer_id||""),r.customer_phone,r.customer_name]);
-        if(!existingKeys.has(key)){existingKeys.add(key);rows.push(r);}
-      });
-      if(!rows.length){showStatus("Old appointment data was found, but all of it is already in Supabase.",false);await readAppointments();renderAll();return;}
-      const {error:insertError}=await sb.from("medifella_appointments").insert(rows);
-      if(insertError)throw insertError;
-      await readAppointments();renderAll();
-      showStatus(`Recovered ${rows.length} old appointment${rows.length===1?"":"s"} successfully.`,false);
-      alert(`Recovered ${rows.length} old appointment${rows.length===1?"":"s"} successfully.`);
-    }catch(e){
-      console.error("Appointment recovery error:",e);
-      showStatus("Recovery failed: "+(e?.message||e),true);
-      alert("Recovery failed.\n\n"+(e?.message||e));
-    }finally{
-      if(btn){btn.disabled=false;btn.textContent="Recover Old Appointments";}
-    }
-  }
   async function readAppointments(){
     try{
       const {data,error}=await sb.from("medifella_appointments")
@@ -9157,16 +9141,15 @@ document.addEventListener("DOMContentLoaded",function(){
       if(error)throw error;
       appointments=Array.isArray(data)?data:[];
 
-      // Migrate appointments from the previous browser-only version when the
-      // database is empty. Do not delete local data unless the database insert
-      // succeeds AND the database can be read back successfully.
+      // One-time migration of appointments created by the older localStorage version.
+      // This only runs when the database table is empty, so existing database records
+      // are never overwritten or duplicated.
       if(appointments.length===0){
         let legacy=[];
         try{
           const raw=localStorage.getItem(STORAGE_KEY);
           legacy=raw?JSON.parse(raw):[];
         }catch(_){legacy=[]}
-
         if(Array.isArray(legacy)&&legacy.length){
           const rows=legacy.map(a=>({
             id:String(a.id||("APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8))),
@@ -9184,46 +9167,22 @@ document.addEventListener("DOMContentLoaded",function(){
             cancelled_at:a.cancelled_at||null,
             met_at:a.met_at||null
           }));
-
-          // Do not use .select() here: a restrictive SELECT RLS policy can
-          // make a successful INSERT look like a failed migration.
-          const {error:insertError}=await sb.from("medifella_appointments").insert(rows);
-          if(insertError)throw insertError;
-
-          const {data:afterMigration,error:readBackError}=await sb.from("medifella_appointments")
-            .select("*")
-            .order("date",{ascending:true})
-            .order("time",{ascending:true})
-            .order("created_at",{ascending:false});
-          if(readBackError)throw readBackError;
-
-          appointments=Array.isArray(afterMigration)?afterMigration:[];
-          if(appointments.length>=rows.length){
+          const {data:inserted,error:insertError}=await sb.from("medifella_appointments").insert(rows).select("*");
+          if(!insertError && Array.isArray(inserted)){
+            appointments=inserted;
             localStorage.removeItem(STORAGE_KEY);
           }
         }
       }
-
-      return true;
     }catch(e){
       appointments=[];
-      const message=String(e?.message||e||"Unknown database error");
       console.error("Appointment database load error:",e);
-
       const box=A("appointmentList");
-      if(box)box.innerHTML=
-        `<div class="status error"><strong>Appointment database error</strong><br>${escA(message)}<br><br>`+
-        `Please run the Appointment Management SQL setup in Supabase, then click Refresh.</div>`;
-
+      if(box)box.innerHTML=`<div class="status error">Appointment database could not be loaded: ${escA(e?.message||e)}</div>`;
       const up=A("appointmentUpcoming");
-      if(up)up.innerHTML=
-        `<div class="status error"><strong>Appointment database error</strong><br>${escA(message)}<br><br>`+
-        `Please run the Appointment Management SQL setup in Supabase, then click Refresh.</div>`;
-
-      return false;
+      if(up)up.innerHTML=`<div class="status error">Appointment database could not be loaded. Please run the Appointment Management SQL setup in Supabase.</div>`;
     }
   }
-
   async function insertAppointment(row){
     const {data,error}=await sb.from("medifella_appointments").insert(row).select("*").single();
     if(error)throw error;
@@ -9242,16 +9201,21 @@ document.addEventListener("DOMContentLoaded",function(){
     const {error}=await sb.from("medifella_appointments").delete().eq("id",String(id));
     if(error)throw error;
   }
-  function appointmentCustomer(c){
+  function appointmentCustomer(c, source){
+    const isStudent=String(source||c?.__appointmentSource||"customer")==="student";
     return {
       id:String(c?.id||""),
-      name:String(c?.name||""),
+      name:String(isStudent?(c?.full_name||c?.full_name_km||"Student"):(c?.name||"Customer")),
       phone:String(c?.phone||""),
-      code:String(c?.customer_code||"")
+      code:String(isStudent?(c?.student_id||""):(c?.customer_code||"")),
+      source:isStudent?"student":"customer"
     };
   }
-  function getCustomer(id){
-    return (typeof customers!=="undefined" ? customers : []).find(c=>String(c.id)===String(id));
+  function getCustomer(id, source){
+    if(String(source||"")==="student"){
+      return (typeof students!=="undefined"&&Array.isArray(students)?students:[]).find(s=>String(s.id)===String(id));
+    }
+    return (typeof customers!=="undefined"&&Array.isArray(customers)?customers:[]).find(c=>String(c.id)===String(id));
   }
   function sortAppointments(list){
     return list.slice().sort((a,b)=>{
@@ -9266,29 +9230,40 @@ document.addEventListener("DOMContentLoaded",function(){
   function customerType(){
     return String(A("appointmentCustomerType")?.value||"Old Customer");
   }
-  function setFormCustomer(c){
+  function setFormCustomer(c, source){
     if(!c)return;
-    A("appointmentCustomerId").value=String(c.id);
-    A("appointmentCustomerSearch").value=c.name||"";
-    A("appointmentCustomerHint").textContent=`Selected: ${c.name||"Customer"} · ${c.customer_code||"No ID"} · ${c.phone||"No phone"}`;
+    const isStudent=String(source||c.__appointmentSource||"customer")==="student";
+    const name=isStudent?(c.full_name||c.full_name_km||"Student"):(c.name||"Customer");
+    const code=isStudent?(c.student_id||""):(c.customer_code||"");
+    A("appointmentCustomerId").value=String(c.id||"");
+    if(A("appointmentCustomerSource"))A("appointmentCustomerSource").value=isStudent?"student":"customer";
+    A("appointmentCustomerSearch").value=name;
+    A("appointmentCustomerHint").textContent=`Selected: ${name} · ${code||"No ID"} · ${c.phone||"No phone"}`;
     A("appointmentCustomerResults").classList.remove("show");
   }
   function renderCustomerPicker(){
     const input=A("appointmentCustomerSearch"), box=A("appointmentCustomerResults");
     if(!input||!box)return;
     const q=(input.value||"").trim().toLowerCase();
-    const list=(typeof customers!=="undefined" ? customers : []).filter(c=>{
-      if(!q)return false;
-      return [c.name,c.phone,c.customer_code].join(" ").toLowerCase().includes(q);
-    }).slice(0,25);
-    box.innerHTML=list.length?list.map(c=>`<button type="button" data-appt-customer="${escA(c.id)}">
-      <strong>${escA(c.name||"Customer")}</strong>
-      <div class="muted">${escA(c.customer_code||"No ID")} · ${escA(c.phone||"No phone")}</div>
-    </button>`).join(""):`<div style="padding:12px" class="muted">${q?"No matching customer found.":"Type to search customers."}</div>`;
+    if(!q){box.innerHTML="";box.classList.remove("show");return}
+    const rows=[];
+    const studentList=(typeof students!=="undefined"&&Array.isArray(students))?students:[];
+    const customerList=(typeof customers!=="undefined"&&Array.isArray(customers))?customers:[];
+    studentList.filter(s=>[s.student_id,s.full_name,s.full_name_km,s.phone,s.email].join(" ").toLowerCase().includes(q))
+      .slice(0,10).forEach(s=>rows.push({source:"student",id:s.id,code:s.student_id||"",name:s.full_name||s.full_name_km||"Student",phone:s.phone||""}));
+    customerList.filter(c=>[c.customer_code,c.name,c.phone,c.email].join(" ").toLowerCase().includes(q))
+      .slice(0,10).forEach(c=>rows.push({source:"customer",id:c.id,code:c.customer_code||"",name:c.name||"Customer",phone:c.phone||""}));
+    box.innerHTML=rows.length
+      ?rows.map(r=>`<button type="button" data-appt-customer="${escA(r.id)}" data-appt-source="${escA(r.source)}">
+          <strong>${escA(r.name)}</strong>
+          <div class="muted">${escA(r.source==="student"?"Student":"Customer")} · ${escA(r.code||"No ID")} · ${escA(r.phone||"No phone")}</div>
+        </button>`).join("")
+      :`<div style="padding:12px" class="muted">No matching student or customer found.</div>`;
     box.classList.add("show");
   }
   function clearForm(){
     A("appointmentCustomerId").value="";
+    if(A("appointmentCustomerSource"))A("appointmentCustomerSource").value="customer";
     A("appointmentCustomerSearch").value="";
     A("appointmentCustomerHint").textContent="Search and select a customer.";
     if(A("appointmentCustomerType"))A("appointmentCustomerType").value="Old Customer";
@@ -9306,18 +9281,20 @@ document.addEventListener("DOMContentLoaded",function(){
   }
   async function addAppointment(){
     const customerId=A("appointmentCustomerId").value;
-    const c=getCustomer(customerId);
+    const customerSource=A("appointmentCustomerSource")?.value||"customer";
+    const c=getCustomer(customerId,customerSource);
     const date=A("appointmentDate").value;
     const time=A("appointmentTime").value;
     if(!c){showStatus("Please search and select a customer.",true);return}
     if(!date||!time){showStatus("Please select appointment date and time.",true);return}
-    const data=appointmentCustomer(c);
+    const data=appointmentCustomer(c,customerSource);
     const row={
       id:"APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
       customer_id:data.id||null,
       customer_name:data.name,
       customer_phone:data.phone,
       customer_code:data.code,
+      customer_source:data.source,
       customer_type:customerType(),
       date,time,
       note:String(A("appointmentNote")?.value||"").trim(),
@@ -9442,15 +9419,19 @@ document.addEventListener("DOMContentLoaded",function(){
       setTimeout(()=>{
         A("clearDermedSale")?.click();
         setTimeout(()=>{
-          const customer=getCustomer(a.customer_id);
+          const source=a.customer_source||"customer";
+          const customer=getCustomer(a.customer_id,source);
           if(!customer){
-            alert("This appointment customer could not be found in Customer Management.");
+            alert("This appointment student/customer could not be found.");
             return;
           }
-          A("dermedBuyerType").value="customer";
+          const isStudent=source==="student";
+          const name=isStudent?(customer.full_name||customer.full_name_km||a.customer_name||"Student"):(customer.name||a.customer_name||"Customer");
+          const code=isStudent?(customer.student_id||a.customer_code||"No ID"):(customer.customer_code||a.customer_code||"No ID");
+          A("dermedBuyerType").value=isStudent?"student":"customer";
           A("dermedBuyerId").value=String(customer.id);
-          A("dermedBuyerSearch").value=customer.name||a.customer_name||"";
-          A("dermedBuyerHint").textContent=`Selected: ${customer.name||a.customer_name||"Customer"} · ${customer.customer_code||a.customer_code||"No ID"} · ${customer.phone||a.customer_phone||"No phone"}`;
+          A("dermedBuyerSearch").value=name;
+          A("dermedBuyerHint").textContent=`Selected: ${name} · ${code} · ${customer.phone||a.customer_phone||"No phone"}`;
           A("dermedBuyerSearch")?.focus();
         },80);
       },80);
@@ -9556,10 +9537,12 @@ document.addEventListener("DOMContentLoaded",function(){
   function editAppointment(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
-    const c=getCustomer(a.customer_id);
-    if(c)setFormCustomer(c);
+    const source=a.customer_source||"customer";
+    const c=getCustomer(a.customer_id,source);
+    if(c)setFormCustomer(c,source);
     else{
       A("appointmentCustomerId").value=a.customer_id||"";
+      if(A("appointmentCustomerSource"))A("appointmentCustomerSource").value=source;
       A("appointmentCustomerSearch").value=a.customer_name||"";
       A("appointmentCustomerHint").textContent=`Selected: ${a.customer_name||"Customer"} · ${a.customer_code||"No ID"} · ${a.customer_phone||"No phone"}`;
     }
@@ -9579,12 +9562,13 @@ document.addEventListener("DOMContentLoaded",function(){
     if(editId){
       const a=appointments.find(x=>String(x.id)===String(editId));
       if(!a)return;
-      const c=getCustomer(A("appointmentCustomerId").value);
-      if(!c){showStatus("Please select a customer.",true);return}
+      const customerSource=A("appointmentCustomerSource")?.value||"customer";
+      const c=getCustomer(A("appointmentCustomerId").value,customerSource);
+      if(!c){showStatus("Please select a student or customer.",true);return}
       const date=A("appointmentDate").value,time=A("appointmentTime").value;
       if(!date||!time){showStatus("Please select date and time.",true);return}
-      const data=appointmentCustomer(c);
-      updateAppointment(editId,{customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,customer_type:customerType(),date,time,note:String(A("appointmentNote")?.value||"").trim()});
+      const data=appointmentCustomer(c,customerSource);
+      updateAppointment(editId,{customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,customer_source:data.source,customer_type:customerType(),date,time,note:String(A("appointmentNote")?.value||"").trim()});
       showStatus("Appointment updated successfully.",false);
       A("saveAppointment").textContent="Save Appointment";
       delete A("saveAppointment").dataset.editId;
@@ -9614,7 +9598,7 @@ document.addEventListener("DOMContentLoaded",function(){
     installInvoiceReturnHook();
     setTimeout(installInvoiceReturnHook,300);
     setTimeout(installInvoiceReturnHook,1000);
-    readAppointments().then(ok=>{if(ok)renderAll();});
+    readAppointments().then(()=>renderAll());
     clearForm();
     A("appointmentMonth").value=localDate().slice(0,7);
     A("appointmentAddToggle").onclick=()=>{
@@ -9632,8 +9616,7 @@ document.addEventListener("DOMContentLoaded",function(){
       clearForm();
     };
     A("appointmentListSearch").oninput=renderList;
-    A("appointmentListRefresh").onclick=async()=>{const ok=await readAppointments();if(ok)renderAll()};
-    A("appointmentRecoverOld").onclick=recoverOldAppointments;
+    A("appointmentListRefresh").onclick=async()=>{await readAppointments();renderAll()};
     A("appointmentListTab").onclick=()=>{
       A("appointmentListPanel").classList.remove("hidden");
       A("appointmentUpcomingPanel").classList.add("hidden");
@@ -9664,7 +9647,12 @@ document.addEventListener("DOMContentLoaded",function(){
         if(close)close.style.display="none";
       }
       const cr=e.target.closest?.("[data-appt-customer]");
-      if(cr){e.preventDefault();setFormCustomer(getCustomer(cr.dataset.apptCustomer));return}
+      if(cr){
+        e.preventDefault();
+        const source=cr.dataset.apptSource||"customer";
+        setFormCustomer(getCustomer(cr.dataset.apptCustomer,source),source);
+        return;
+      }
       const inv=e.target.closest?.(".appointment-invoices");
       if(inv){e.preventDefault();showCustomerInvoices(inv.dataset.apptId);return}
       const addInv=e.target.closest?.(".appointment-add-invoice");
