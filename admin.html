@@ -6115,7 +6115,7 @@ async function loadStockMovements(){
 async function loadStaffInfo(){
  const {data,error}=await sb.from("medifella_staff").select("*").order("created_at",{ascending:false});
  if(error){staffInfoRecords=[]; if($("staffInfoList"))$("staffInfoList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Staff Management SQL setup.</p>`;return}
- staffInfoRecords=data||[]; renderStaffInfoList(); renderInventoryControls(); if(typeof window.refreshSaleStaffCashierOptions==="function")window.refreshSaleStaffCashierOptions(); renderBuyerControls(); if(typeof window.refreshCommissionStaffOptions==="function")window.refreshCommissionStaffOptions();
+ staffInfoRecords=Array.isArray(data)?data:[]; renderStaffInfoList(); renderInventoryControls(); if(typeof window.refreshSaleStaffCashierOptions==="function")window.refreshSaleStaffCashierOptions(); renderBuyerControls(); if(typeof window.refreshCommissionStaffOptions==="function")window.refreshCommissionStaffOptions();
 }
 async function loadCustomers(){
  const {data,error}=await sb.from("medifella_customers").select("*").order("created_at",{ascending:false});
@@ -6177,7 +6177,10 @@ function isSaleCounterCashierStaff(x){
  const title=String(
    x?.job_title ?? x?.jobTitle ?? x?.job ?? ""
  ).replace(/\s+/g," ").trim().toLowerCase();
- return title==="sale counter cashier";
+ // Staff are taken directly from Staff Management (medifella_staff).
+ // Eligible counter staff roles are Sale, Counter, Cashier, or the combined
+ // "Sale Counter Cashier" title.
+ return ["sale","counter","cashier","sale counter cashier"].includes(title);
 }
 function renderInventoryControls(){
  if($("stockStaff")){
@@ -6191,7 +6194,7 @@ function renderInventoryControls(){
    if(!el)return;
    const oldValue=el.value;
    el.innerHTML='<option value="">Select Sale Staff</option>'+
-     eligibleStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · Sale Counter Cashier</option>`).join("");
+     eligibleStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`).join("");
    if(oldValue && eligibleStaff.some(x=>String(x.id)===String(oldValue))) el.value=oldValue;
  });
 
@@ -6200,7 +6203,7 @@ function renderInventoryControls(){
    if(!el)return;
    const oldValue=el.value;
    el.innerHTML='<option value="">Select Cashier</option>'+
-     eligibleStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · Sale Counter Cashier</option>`).join("");
+     eligibleStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`).join("");
    if(oldValue && eligibleStaff.some(x=>String(x.id)===String(oldValue))) el.value=oldValue;
  });
 }
