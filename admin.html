@@ -4583,7 +4583,7 @@ function openPrintFromCanvas(canvas,paper,sale){
     };
   }
   function getCustomer(id){
-    return (window.customers||[]).find(c=>String(c.id)===String(id));
+    return (typeof customers!=="undefined" ? customers : []).find(c=>String(c.id)===String(id));
   }
   function sortAppointments(list){
     return list.slice().sort((a,b)=>{
@@ -4606,7 +4606,7 @@ function openPrintFromCanvas(canvas,paper,sale){
     const input=A("appointmentCustomerSearch"), box=A("appointmentCustomerResults");
     if(!input||!box)return;
     const q=(input.value||"").trim().toLowerCase();
-    const list=(window.customers||[]).filter(c=>{
+    const list=(typeof customers!=="undefined" ? customers : []).filter(c=>{
       if(!q)return false;
       return [c.name,c.phone,c.customer_code].join(" ").toLowerCase().includes(q);
     }).slice(0,25);
@@ -4690,7 +4690,7 @@ function openPrintFromCanvas(canvas,paper,sale){
     updateAppointment(id,{date:d,time:t,status:"pending",confirmed_at:null,cancelled_at:null});
   }
   function invoiceRowsForCustomer(a){
-    const list=(window.salesRecords||[]).filter(s=>{
+    const list=(typeof salesRecords!=="undefined" ? salesRecords : []).filter(s=>{
       if(String(s.sale_type||"").toUpperCase()!=="DERMED")return false;
       const sameId=a.customer_id && (String(s.customer_id||"")===String(a.customer_id));
       const samePhone=a.customer_phone && String(s.student_phone||"")===String(a.customer_phone);
