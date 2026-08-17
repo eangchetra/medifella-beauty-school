@@ -2417,6 +2417,9 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     <div>
       <label>Staff Name</label>
       <select id="commissionStaff"><option value="">Select Sale Staff</option></select>
+      <div id="commissionStaffRateHint" class="muted" style="margin-top:7px">
+        Select a Sale Staff to load the commission rates automatically.
+      </div>
     </div>
     <div>
       <label>Customer Name</label>
@@ -2529,7 +2532,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
   <h2>+ Sale Staff</h2>
   <div class="row">
     <div><label>Sale Staff *</label><select id="saleStaffConfigStaff"><option value="">Choose existing staff</option></select></div>
-    <div><label>Product Commission % *</label><input id="saleStaffProductRate" type="text" inputmode="decimal" placeholder="0"><div class="muted">Applies to all products from Product Management.</div></div>
+    <div><label>Product Commission % *</label><input id="saleStaffProductRate" type="text" inputmode="decimal" value="0" placeholder="0"><div class="muted">Default: 0% — no product commission. You can change it if needed.</div></div>
   </div>
   <div class="row">
     <div><label>Service Commission % *</label><input id="saleStaffServiceRate" type="text" inputmode="decimal" placeholder="3"><div class="muted">Applies to all services marked as Service.</div></div>
@@ -10233,7 +10236,27 @@ document.addEventListener("DOMContentLoaded",function(){
   // Only Service = 3%
   function commissionRateForService(service){
     const type=serviceTypeLabel(service?.service_type);
-    return type==="Only Service"?0.03:0.02;
+    const staffId=C("commissionStaff")?.value||"";
+    const cfg=typeof window.getCurrentSaleStaffConfig==="function"
+      ? window.getCurrentSaleStaffConfig(staffId)
+      : null;
+    if(!cfg)return 0;
+    if(type==="Only Service")return Number(cfg.service_rate||0)/100;
+    if(type==="Service With Product")return Number(cfg.service_product_rate||0)/100;
+    return 0;
+  }
+
+  function refreshCommissionStaffRateHint(){
+    const box=C("commissionStaffRateHint"), staffId=C("commissionStaff")?.value||"";
+    if(!box)return;
+    const cfg=typeof window.getCurrentSaleStaffConfig==="function"
+      ? window.getCurrentSaleStaffConfig(staffId)
+      : null;
+    if(!cfg){
+      box.innerHTML='<span class="muted">Select a Sale Staff to load the commission rates automatically.</span>';
+      return;
+    }
+    box.innerHTML=`<strong>Commission Rates:</strong> Product ${Number(cfg.product_rate||0)}% &nbsp; | &nbsp; Service ${Number(cfg.service_rate||0)}% &nbsp; | &nbsp; Service With Product ${Number(cfg.service_product_rate||0)}%`;
   }
 
   function rebuildCommissionCustomerCache(){
@@ -10543,6 +10566,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const saveBtn=C("saveSaleCommission");
     if(saveBtn){saveBtn.dataset.editing="";saveBtn.textContent="Save Sale Commission";}
     renderCommissionItems();
+    refreshCommissionStaffRateHint();
     if(C("commissionStatus"))C("commissionStatus").innerHTML="";
   }
 
@@ -10553,19 +10577,27 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function populateCommissionStaff(){
-    // Sale Commission Management uses ONLY Sale Staff from Staff Management.
-    // Sale Staff = Job Title "Sale Counter Cashier".
-    const rows=staffRows().filter(isSaleCounterCashierStaff);
+    // Sale Commission Management uses Sale Staff records configured in
+    // Sale Staff Management. It does NOT filter by Staff Management Job Title.
+    const all=Array.isArray(window.saleStaffConfigs)?window.saleStaffConfigs:[];
+    const latestMap=new Map();
+    [...all]
+      .filter(x=>x && x.active!==false && x.staff_id)
+      .sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")))
+      .forEach(x=>{const k=String(x.staff_id);if(!latestMap.has(k))latestMap.set(k,x)});
+    const rows=[...latestMap.values()];
+
     ["commissionStaff","commissionFilterStaff"].forEach(id=>{
       const el=C(id);if(!el)return;
       const selected=el.value;
-      const all=id==="commissionFilterStaff"
+      const first=id==="commissionFilterStaff"
         ?'<option value="">All Sale Staff</option>'
         :'<option value="">Select Sale Staff</option>';
-      const options=rows.map(s=>`<option value="${escC(s.id)}">${escC(s.name_en||s.name_kh||s.name||"Staff")} · ${escC(s.job_title||"Staff")}</option>`).join("");
-      el.innerHTML=all+(options||'<option value="" disabled>No Sale Counter Cashier staff found</option>');
-      if(selected)el.value=selected;
+      const options=rows.map(x=>`<option value="${escC(x.staff_id)}">${escC(x.staff_name||"Sale Staff")} · P ${Number(x.product_rate||0)}% / S ${Number(x.service_rate||0)}% / SP ${Number(x.service_product_rate||0)}%</option>`).join("");
+      el.innerHTML=first+(options||'<option value="" disabled>No Sale Staff configured</option>');
+      if(selected && rows.some(x=>String(x.staff_id)===String(selected)))el.value=selected;
     });
+    refreshCommissionStaffRateHint();
   }
 
   function populateCommissionServices(){
@@ -10670,8 +10702,11 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!oldRows.length)throw new Error("The commission record being edited could not be found.");
     const staffId=C("commissionStaff")?.value, customerId=C("commissionCustomerId")?.value, commissionDate=C("commissionDate")?.value||todayC(), items=window.commissionItems||[];
     const staff=staffRows().find(x=>String(x.id)===String(staffId));
+    const staffConfig=typeof window.getCurrentSaleStaffConfig==="function"
+      ? window.getCurrentSaleStaffConfig(staffId)
+      : null;
     const customer=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(customerId));
-    if(!staff||!isSaleCounterCashierStaff(staff))throw new Error("Please select a Sale Staff with Job Title: Sale Counter Cashier.");
+    if(!staff||!staffConfig)throw new Error("Please select a Sale Staff from Sale Staff Management.");
     if(!customer)throw new Error("Please search and select the customer again.");
     if(!items.length)throw new Error("Please add at least one service from the Service List.");
     const rows=[];
@@ -10761,8 +10796,11 @@ document.addEventListener("DOMContentLoaded",function(){
     }
 
     const staff=staffRows().find(x=>String(x.id)===String(staffId));
-    if(!staff || !isSaleCounterCashierStaff(staff)){
-      C("commissionStatus").innerHTML='<div class="status error">Please select a Sale Staff with Job Title: Sale Counter Cashier.</div>';
+    const staffConfig=typeof window.getCurrentSaleStaffConfig==="function"
+      ? window.getCurrentSaleStaffConfig(staffId)
+      : null;
+    if(!staff || !staffConfig){
+      C("commissionStatus").innerHTML='<div class="status error">Please select a Sale Staff from Sale Staff Management.</div>';
       return;
     }
 
@@ -11043,6 +11081,7 @@ document.addEventListener("DOMContentLoaded",function(){
 
     C("saveSaleCommission")?.addEventListener("click",saveCommissionManual);
     C("clearSaleCommission")?.addEventListener("click",clearCommissionForm);
+    C("commissionStaff")?.addEventListener("change",()=>{refreshCommissionStaffRateHint();renderCommissionItems();});
     C("commissionRefresh")?.addEventListener("click",renderCommissionList);
     C("commissionFilterStaff")?.addEventListener("change",renderCommissionList);
     C("commissionFromDate")?.addEventListener("change",renderCommissionList);
@@ -13223,6 +13262,7 @@ document.addEventListener("DOMContentLoaded",function(){
       const r=await sb.from("medifella_sale_staff").select("*").order("created_at",{ascending:false});
       if(r.error)throw r.error;
       configs=Array.isArray(r.data)?r.data:[];window.saleStaffConfigs=configs;renderList();refreshDermedSaleStaff();
+      if(typeof window.refreshCommissionStaffOptions==="function")window.refreshCommissionStaffOptions();
     }catch(e){
       configs=[];window.saleStaffConfigs=[];
       if(box)box.innerHTML='<div class="status error">'+escV(e.message||e)+'<br><span class="muted">Run the Sale Staff Management SQL setup before using this section.</span></div>';
@@ -13237,7 +13277,7 @@ document.addEventListener("DOMContentLoaded",function(){
   }
   function clearForm(){
     if(E("saleStaffConfigStaff"))E("saleStaffConfigStaff").value="";
-    if(E("saleStaffProductRate"))E("saleStaffProductRate").value="";
+    if(E("saleStaffProductRate"))E("saleStaffProductRate").value="0";
     if(E("saleStaffServiceRate"))E("saleStaffServiceRate").value="";
     if(E("saleStaffServiceProductRate"))E("saleStaffServiceProductRate").value="";
     if(E("saleStaffConfigDate"))E("saleStaffConfigDate").value=today();
@@ -13316,6 +13356,7 @@ document.addEventListener("DOMContentLoaded",function(){
     document.addEventListener("click",e=>{const n=e.target.closest?.('.nav[data-section="dermedSale"]');if(n)setTimeout(refreshDermedSaleStaff,50)});
     setInterval(refreshDermedSaleStaff,1500);
     setInterval(fillStaffSelect,2000);
+    setInterval(()=>{if(typeof window.refreshCommissionStaffOptions==="function")window.refreshCommissionStaffOptions()},1500);
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind,{once:true});else bind();
 })();
