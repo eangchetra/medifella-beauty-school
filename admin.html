@@ -4258,7 +4258,7 @@ function renderSales(){
  $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date / Time</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{
    const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
    const dt=saleDateValue(s),time=saleField(s,["sale_time","time"],"");
-   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button>${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.showPartialPaymentHistory('${attr(s.id)}'); return false;">Partial Payment History</button>`:""}${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
+   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button>${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.showPartialPaymentHistory('${attr(s.id)}'); return false;">View Payment</button>`:""}${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
  }).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
  updateSalesMetrics();
 }
@@ -6785,7 +6785,7 @@ function renderMtsSales(){
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
        <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
-       ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.showPartialPaymentHistory('${attr(x.id)}'); return false;">Partial Payment History</button>`:""}
+       ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.showPartialPaymentHistory('${attr(x.id)}'); return false;">View Payment</button>`:""}
        ${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -6820,7 +6820,7 @@ function renderDermedSales(){
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
        <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
-       ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.showPartialPaymentHistory('${attr(x.id)}'); return false;">Partial Payment History</button>`:""}
+       ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.showPartialPaymentHistory('${attr(x.id)}'); return false;">View Payment</button>`:""}
        ${bal>0.005?`<button class="gold" type="button" onclick="recordDermedSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -13512,6 +13512,7 @@ document.addEventListener("DOMContentLoaded",function(){
   });
   document.addEventListener("keydown",e=>{if(e.key==="Escape")closeHistory();});
 
-  // Buttons are rendered directly by the three sale-list render functions above.\n  
+  // Buttons are rendered directly by the three sale-list render functions above.
+})();
 </script>
 
