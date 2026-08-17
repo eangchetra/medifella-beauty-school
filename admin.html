@@ -4746,37 +4746,6 @@ function openPrintFromCanvas(canvas,paper,sale){
 
 
 
-<script id="view-invoice-button-fix">
-(function(){
-  "use strict";
-  window.openSaleInvoiceSafe = function(id, size, type){
-    try{
-      const sid=String(id||"");
-      if(!sid){ alert("Invoice ID is missing."); return false; }
-
-      if(type==="DERMED" && typeof window.showDermedSaleInvoice==="function"){
-        window.currentInvoiceId=sid;
-        window.showDermedSaleInvoice(sid, size||"A4");
-        return false;
-      }
-
-      if(typeof window.showSaleInvoice==="function"){
-        window.currentInvoiceId=sid;
-        window.showSaleInvoice(sid, size||"A4");
-        return false;
-      }
-
-      alert("View Invoice is not available. Please refresh the Admin Dashboard.");
-      return false;
-    }catch(err){
-      console.error("View Invoice error:",err);
-      alert("Could not open the invoice: "+(err && err.message ? err.message : String(err)));
-      return false;
-    }
-  };
-})();
-</script>
-
 </body>
 
 </html>`;
@@ -13555,7 +13524,9 @@ document.addEventListener("DOMContentLoaded",function(){
   });
   document.addEventListener("keydown",e=>{if(e.key==="Escape")closeHistory();});
 
-  // Buttons are rendered directly by the three sale-list render functions above.\n  
+  // Buttons are rendered directly by the three sale-list render functions above.
+})();
+
 </script>
 
 <script id="view-invoice-repair-v1">
