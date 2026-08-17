@@ -10819,7 +10819,10 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function commissionBatchKey(x){
+    // Automatic Dermed commission rows are grouped by their source sale.
+    // Manual commission rows continue to use their existing grouping.
     if(x?.source_sale_id)return `sale:${x.source_sale_id}`;
+    if(x?.sale_id && String(x?.source||"").toLowerCase().includes("dermed"))return `sale:${x.sale_id}`;
     if(x?.reference_no)return `ref:${x.reference_no}`;
     if(x?.created_at)return `manual:${x.created_at}`;
     return `row:${x?.id??""}`;
@@ -10910,8 +10913,8 @@ document.addEventListener("DOMContentLoaded",function(){
     const rows=filteredCommissionRecords(), totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0), totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
     const groups=[],seen=new Set();
     rows.forEach(x=>{const key=commissionBatchKey(x);if(seen.has(key))return;seen.add(key);groups.push({row:x,rows:rows.filter(y=>commissionBatchKey(y)===key)});});
-    box.innerHTML=groups.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th><th>Services</th><th>Grand Subtotal</th><th>Grand Commission</th><th>Actions</th></tr></thead><tbody>
-      ${groups.map(g=>{const s=commissionBatchSummary(g.rows),key=commissionBatchKey(g.row);return `<tr><td>${escC(formatCommissionDate(s.date))}</td><td>${escC(s.staff)}</td><td>${escC(s.customer)}</td><td>${escC(s.phone)}</td><td><button type="button" class="light commission-view-btn" data-commission-view="${escC(key)}">View Details (${s.count})</button></td><td>$${moneyC(s.subtotal)}</td><td>$${moneyC(s.commission)}</td><td><div class="actions"><button type="button" class="light commission-edit-btn" data-commission-edit="${escC(key)}">Edit</button><button type="button" class="danger commission-delete-btn" data-commission-delete="${escC(key)}">Delete</button></div></td></tr>`;}).join("")}
+    box.innerHTML=groups.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th><th>Source</th><th>Services</th><th>Grand Subtotal</th><th>Grand Commission</th><th>Actions</th></tr></thead><tbody>
+      ${groups.map(g=>{const s=commissionBatchSummary(g.rows),key=commissionBatchKey(g.row);return `<tr><td>${escC(formatCommissionDate(s.date))}</td><td>${escC(s.staff)}</td><td>${escC(s.customer)}</td><td>${escC(s.phone)}</td><td>${String(g.row?.source||"").toLowerCase().includes("dermed")?"Automatic (Dermed)":"Manual"}</td><td><button type="button" class="light commission-view-btn" data-commission-view="${escC(key)}">View Details (${s.count})</button></td><td>$${moneyC(s.subtotal)}</td><td>$${moneyC(s.commission)}</td><td><div class="actions"><button type="button" class="light commission-edit-btn" data-commission-edit="${escC(key)}">Edit</button><button type="button" class="danger commission-delete-btn" data-commission-delete="${escC(key)}">Delete</button></div></td></tr>`;}).join("")}
     </tbody></table></div>`:'<p class="muted">No commission records found.</p>';
     C("commissionGrandTotal").innerHTML=`<div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div><div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>`;
   }
@@ -11213,6 +11216,7 @@ document.addEventListener("DOMContentLoaded",function(){
         rows.push({
           commission_date:commissionDate,
           sale_id:sale.id,
+          source_sale_id:sale.id,
           staff_id:staffId,
           staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
           customer_id:buyerId||null,
@@ -11268,6 +11272,7 @@ document.addEventListener("DOMContentLoaded",function(){
           rows.push({
             commission_date:commissionDate,
             sale_id:sale.id,
+          source_sale_id:sale.id,
             staff_id:staffId,
             staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
             customer_id:buyerId||null,
@@ -11303,6 +11308,7 @@ document.addEventListener("DOMContentLoaded",function(){
           rows.push({
             commission_date:commissionDate,
             sale_id:sale.id,
+          source_sale_id:sale.id,
             staff_id:staffId,
             staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
             customer_id:buyerId||null,
@@ -11328,12 +11334,10 @@ document.addEventListener("DOMContentLoaded",function(){
     // Nothing commissionable in the first payment.
     if(!rows.length)return;
 
-    // Save automatically as part of creating the Dermed invoice.
-    const insertResult=await sb
-      .from("medifella_sale_commissions")
-      .insert(rows);
-
-    if(insertResult.error)throw insertResult.error;
+    // Save automatically using the same robust commission writer used by
+    // the manual +Add Sale Commission form. This keeps automatic Dermed
+    // commissions in the exact same commission list/table as manual ones.
+    await insertCommissionRows(rows);
 
     // Refresh the Commission List immediately if it is currently open.
     if(typeof loadCommissionRecords==="function"){
@@ -13960,7 +13964,7 @@ document.addEventListener("DOMContentLoaded",function(){
       const existing=await sb.from("medifella_sale_commissions")
         .select("id")
         .eq("source_sale_id",String(sale.id))
-        .eq("source","dermed_auto")
+        
         .limit(1);
       if(!existing.error && Array.isArray(existing.data) && existing.data.length){
         return;
