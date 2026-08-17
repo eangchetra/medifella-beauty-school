@@ -2046,6 +2046,18 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 #commissionRetryLoad{margin-top:2px}
 </style>
 </style>
+<style id="record-payment-modal-style">
+#recordPaymentModal.rpm-overlay{position:fixed!important;inset:0!important;z-index:1000000!important;display:none!important;align-items:center!important;justify-content:center!important;padding:16px!important;background:rgba(0,0,0,.38)!important;box-sizing:border-box!important}
+#recordPaymentModal.rpm-overlay.show{display:flex!important}
+#recordPaymentModal .rpm-card{width:min(430px,calc(100vw - 32px));background:#fff;border-radius:14px;padding:22px;box-shadow:0 20px 60px rgba(0,0,0,.28);box-sizing:border-box}
+#recordPaymentModal .rpm-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px}
+#recordPaymentModal .rpm-head h2{margin:0 0 4px}
+#recordPaymentModal .rpm-close{border:0;background:#eee;border-radius:8px;padding:7px 10px;cursor:pointer}
+#recordPaymentModal .rpm-due{margin:14px 0;padding:11px 12px;background:#f5f6f7;border-radius:8px;font-weight:700}
+#recordPaymentModal label{display:block;margin:10px 0 5px;font-weight:600}
+#recordPaymentModal input,#recordPaymentModal select{width:100%;min-height:42px;padding:9px 11px;border:1px solid #ccd2d8;border-radius:8px;box-sizing:border-box;background:#fff}
+#recordPaymentModal .rpm-actions{display:flex;justify-content:flex-end;gap:8px;margin-top:18px}
+</style>
 </head>
 <body>
 
@@ -4294,30 +4306,68 @@ function updateSalesMetrics(){
  $("mSalesDue").textContent=listSaleRecords.filter(s=>saleStatus(saleTotal(s),salePaid(s))!=="Paid").length;
 }
 
-async function recordSalePayment(id){
- const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
- const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
- const raw=prompt(`Due for ${saleRef(s)} is ${money(balance)}.\nEnter additional payment amount:`,String(balance));
- if(raw===null)return;
- const amount=parseMoneyInput(raw);
- if(amount<=0||amount>balance+0.005){alert("Enter a valid payment amount not greater than the Due amount.");return}
- const method=prompt("Payment method (Cash / ABA / Bank Transfer / Card / Other):","Cash")||"Cash";
- try{
-   const paymentDate=new Date();
-   const{error:pe}=await sb.from("medifella_sale_payments").insert({
-     sale_id:String(id),amount,payment_method:method,
-     payment_date:paymentDate.toISOString().slice(0,10),
-     note:"Additional payment",created_by:adminUser.id
-   });
-   if(pe)throw pe;
-   const newPaid=paid+amount;
-   const{error:se}=await sb.from("medifella_sales").update({
-     paid:newPaid,balance:Math.max(0,total-newPaid),payment_status:saleStatus(total,newPaid)
-   }).eq("id",id);
-   if(se)throw se;
-   await loadSales();
- }catch(e){alert(e.message||"Could not record payment.")}
+function ensurePaymentEntryModal(){
+ const id="recordPaymentModal";
+ let m=document.getElementById(id);
+ if(m)return m;
+ m=document.createElement("div");m.id=id;m.className="rpm-overlay";m.innerHTML=`
+   <div class="rpm-card" role="dialog" aria-modal="true" aria-labelledby="rpmTitle">
+    <div class="rpm-head"><div><h2 id="rpmTitle">Record Payment</h2><div id="rpmRef" class="muted"></div></div><button type="button" id="rpmClose" class="rpm-close">Close</button></div>
+    <div id="rpmDue" class="rpm-due"></div>
+    <label for="rpmAmount">Payment Amount</label>
+    <input id="rpmAmount" type="number" min="0.01" step="0.01" inputmode="decimal" autocomplete="off">
+    <label for="rpmMethod">Payment Method</label>
+    <select id="rpmMethod"><option>Cash</option><option>ABA</option><option>Bank Transfer</option><option>Card</option><option>Other</option></select>
+    <div id="rpmError" class="status error" style="display:none;margin-top:10px"></div>
+    <div class="rpm-actions"><button type="button" id="rpmCancel" class="light">Cancel</button><button type="button" id="rpmSave" class="gold">Save Payment</button></div>
+   </div>`;
+ document.body.appendChild(m);
+ const close=()=>{m.classList.remove("show");window.__rpmSale=null};
+ document.getElementById("rpmClose").onclick=close;document.getElementById("rpmCancel").onclick=close;
+ m.addEventListener("click",e=>{if(e.target===m)close()});
+ document.getElementById("rpmSave").onclick=async()=>{
+   const ctx=window.__rpmSale;if(!ctx)return;
+   const err=document.getElementById("rpmError");err.style.display="none";
+   const amount=Number(document.getElementById("rpmAmount").value);const method=document.getElementById("rpmMethod").value||"Cash";
+   if(!Number.isFinite(amount)||amount<=0||amount>ctx.balance+0.005){err.textContent=`Enter an amount from $0.01 up to ${money(ctx.balance)}.`;err.style.display="block";return}
+   const btn=document.getElementById("rpmSave");btn.disabled=true;btn.textContent="Saving...";
+   try{
+     const now=new Date();
+     const payment={sale_id:String(ctx.id),amount,payment_method:method,payment_date:now.toISOString().slice(0,10),note:"Additional payment"};
+     if(adminUser?.id)payment.created_by=adminUser.id;
+     const pr=await sb.from("medifella_sale_payments").insert(payment).select("*").maybeSingle();
+     if(pr.error)throw pr.error;
+     const newPaid=ctx.paid+amount;
+     const sr=await sb.from("medifella_sales").update({paid:newPaid,balance:Math.max(0,ctx.total-newPaid),payment_status:saleStatus(ctx.total,newPaid)}).eq("id",ctx.id);
+     if(sr.error)throw sr.error;
+     if(Array.isArray(window.salePayments))window.salePayments.push(pr.data||payment);
+     const row=(Array.isArray(window.salesRecords)?window.salesRecords:[]).find(x=>String(x.id)===String(ctx.id));
+     if(row){row.paid=newPaid;row.balance=Math.max(0,ctx.total-newPaid);row.payment_status=saleStatus(ctx.total,newPaid)}
+     close();
+     if(typeof loadSales==="function")await loadSales();
+   }catch(e){err.textContent=e?.message||"Could not record payment.";err.style.display="block"}
+   finally{btn.disabled=false;btn.textContent="Save Payment"}
+ };
+ return m;
 }
+
+function openPaymentEntry(id){
+ const s=(Array.isArray(salesRecords)?salesRecords:[]).find(x=>String(x.id)===String(id));if(!s)return false;
+ const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);if(balance<=0.005)return false;
+ const m=ensurePaymentEntryModal();
+ document.getElementById("rpmRef").textContent=saleRef(s)||"Sale";
+ document.getElementById("rpmDue").textContent=`Remaining Due: ${money(balance)}`;
+ document.getElementById("rpmAmount").value=balance.toFixed(2);
+ document.getElementById("rpmMethod").value="Cash";
+ document.getElementById("rpmError").style.display="none";
+ window.__rpmSale={id:String(id),total,paid,balance};
+ m.classList.add("show");
+ setTimeout(()=>{const a=document.getElementById("rpmAmount");a?.focus();a?.select()},0);
+ return false;
+}
+
+async function recordSalePayment(id){ return openPaymentEntry(id); }
+async function recordDermedSalePayment(id){ return openPaymentEntry(id); }
 
 function showSaleInvoice(id,size="A4"){
  window.currentInvoiceId = id;
