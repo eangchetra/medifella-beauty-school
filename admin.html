@@ -3335,7 +3335,10 @@ sb.auth.onAuthStateChange(async (event)=>{
   if(event==="SIGNED_OUT"){location.reload();return}
   if(event==="SIGNED_IN"||event==="TOKEN_REFRESHED"){
     const account=await getCurrentAccount();
-    if(account){adminUser=account.user;currentProfile=account.profile;applyAccountPermissions();}
+    if(account){
+      adminUser=account.user;currentProfile=account.profile;applyAccountPermissions();
+      if(typeof loadCommissionRecords==='function')setTimeout(()=>loadCommissionRecords(),100);
+    }
   }
 });
 async function refreshAll(){
@@ -11141,6 +11144,9 @@ document.addEventListener("DOMContentLoaded",function(){
 
     renderCommissionItems();
     loadCommissionRecords();
+    // Guaranteed retry after the page/authentication client has had time to initialize.
+    setTimeout(()=>loadCommissionRecords(),1500);
+    setTimeout(()=>loadCommissionRecords(),3500);
   }
 
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bindCommission,{once:true});
