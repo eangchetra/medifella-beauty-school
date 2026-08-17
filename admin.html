@@ -10239,26 +10239,38 @@ document.addEventListener("DOMContentLoaded",function(){
   async function fetchCommissionServicesFromDatabase(q){
     if(typeof sb==="undefined" || !q)return [];
     try{
-      const term=String(q).trim();
-      const safe=term.replace(/[%_,]/g," ").trim();
-      if(!safe)return [];
+      const term=String(q).trim().toLowerCase();
+      if(!term)return [];
+
+      // Do not depend on a particular Supabase column/operator for the
+      // commission search.  The Service Management section already uses
+      // medifella_services, so fetch the same records and search them locally.
+      // This also supports service name, service ID/code, and service type.
       const r=await sb.from("medifella_services")
         .select("*")
-        .or(`name.ilike.%${safe}%,service_code.ilike.%${safe}%,service_type.ilike.%${safe}%`)
         .order("created_at",{ascending:false})
-        .limit(20);
+        .limit(500);
       if(r.error){
         console.warn("Commission service search:",r.error.message);
         return [];
       }
-      const found=Array.isArray(r.data)?r.data:[];
-      // Merge freshly fetched services into the shared Service List so the
-      // selected result can be added even when this section initialized
-      // before the main Service List finished loading.
-      if(found.length){
+
+      const all=Array.isArray(r.data)?r.data:[];
+      const found=all.filter(x=>{
+        const haystack=[
+          x.id, x.service_id, x.service_code, x.code,
+          x.name, x.service_name, x.title, x.service_type,
+          x.type
+        ].map(v=>String(v??"").toLowerCase()).join(" ");
+        return haystack.includes(term);
+      }).slice(0,20);
+
+      // Merge the freshly fetched Service Management records into the shared
+      // array so clicking a result can always add the exact selected service.
+      if(all.length){
         const current=serviceRows();
         const merged=current.slice();
-        found.forEach(x=>{
+        all.forEach(x=>{
           const id=String(x.id??x.service_id??"");
           const idx=merged.findIndex(y=>String(y.id??y.service_id??"")===id);
           if(idx>=0)merged[idx]=x; else merged.push(x);
@@ -10279,7 +10291,8 @@ document.addEventListener("DOMContentLoaded",function(){
     const q=String(input.value||"").toLowerCase().trim();
     if(!q){box.innerHTML="";box.classList.remove("show");return}
     const list=(Array.isArray(rows)?rows:serviceRows().filter(s=>{
-      const text=`${s.service_code||s.code||""} ${s.name||s.service_name||s.title||""} ${s.service_type||""}`.toLowerCase();
+      const text=[s.id,s.service_id,s.service_code,s.code,s.name,s.service_name,s.title,s.service_type,s.type]
+        .map(v=>String(v??"").toLowerCase()).join(" ");
       return text.includes(q);
     })).slice(0,20);
     box.innerHTML=list.map(s=>{
