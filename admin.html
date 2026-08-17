@@ -10398,6 +10398,54 @@ document.addEventListener("DOMContentLoaded",function(){
     renderCommissionServiceResults(found);
   }
 
+  function addCommissionService(key){
+    const keyText=String(key??"");
+    const local=commissionServiceSearchRows(C("commissionServiceSearch")?.value||"");
+    let service=local.find(s=>String(s?.id??s?.service_id??s?._commissionKey??s?.service_code??s?.name??"")===keyText);
+    if(!service){
+      const all=(Array.isArray(window.services)?window.services:[]).concat(Array.isArray(window.commissionSearchServices)?window.commissionSearchServices:[]);
+      service=all.find(s=>String(s?.id??s?.service_id??s?._commissionKey??s?.service_code??s?.name??"")===keyText);
+    }
+    if(!service)return;
+
+    const serviceId=service.id??service.service_id??null;
+    const serviceCode=service.service_code??service.code??"";
+    const name=service.name??service.service_name??service.title??"Service";
+    const type=serviceTypeLabel(service.service_type);
+    if(type!=="Only Service" && type!=="Service With Product"){
+      if(C("commissionStatus"))C("commissionStatus").innerHTML='<div class="status error">This service does not have a valid Service Type in the Service List.</div>';
+      return;
+    }
+    const price=Math.max(0,Number(service.price??service.unit_price??0));
+
+    // Do not add the exact same service twice; instead increase its quantity.
+    const existing=(window.commissionItems||[]).find(x=>
+      String(x.service_id??"")===String(serviceId??"") &&
+      String(x.service_code??"")===String(serviceCode) &&
+      String(x.name??"")===String(name)
+    );
+    if(existing){
+      existing.quantity=Math.max(1,Number(existing.quantity||1))+1;
+    }else{
+      window.commissionItems.push({
+        service_id:serviceId,
+        service_code:serviceCode,
+        name:name,
+        service_type:type,
+        quantity:1,
+        price:price,
+        discount:0
+      });
+    }
+
+    renderCommissionItems();
+    if(C("commissionServiceSearch"))C("commissionServiceSearch").value="";
+    if(C("commissionServiceResults")){
+      C("commissionServiceResults").innerHTML="";
+      C("commissionServiceResults").classList.remove("show");
+    }
+  }
+
   function commissionItemCalc(x){
     const unit=Math.max(1,Number(x.quantity||1));
     const price=Math.max(0,Number(x.price||0));
