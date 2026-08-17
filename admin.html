@@ -10236,49 +10236,67 @@ document.addEventListener("DOMContentLoaded",function(){
     };
   }
 
+  function normalizeCommissionSearchText(v){
+    return String(v??"").toLowerCase().normalize("NFKC").replace(/[^a-z0-9\u1780-\u17ff]+/gi," ").trim();
+  }
+
+  function commissionServiceMatches(s,q){
+    const needle=normalizeCommissionSearchText(q);
+    if(!needle)return false;
+    const fields=[s?.id,s?.service_id,s?.service_code,s?.code,s?.name,s?.service_name,s?.title,s?.service_type,s?.type];
+    const hay=fields.map(normalizeCommissionSearchText).join(" ");
+    if(hay.includes(needle))return true;
+    // Also support searches such as "co2 laser" when the stored name has
+    // punctuation/spaces in a different form.
+    const tokens=needle.split(/\s+/).filter(Boolean);
+    return tokens.length>1 && tokens.every(t=>hay.includes(t));
+  }
+
+  function mergeCommissionServices(all){
+    if(!Array.isArray(all)||!all.length)return;
+    const current=serviceRows().slice();
+    all.forEach(x=>{
+      const id=String(x?.id??x?.service_id??"");
+      const idx=id?current.findIndex(y=>String(y?.id??y?.service_id??"")===id):-1;
+      if(idx>=0)current[idx]=x; else current.push(x);
+    });
+    window.services=current;
+    try{ services=current; }catch(e){}
+  }
+
   async function fetchCommissionServicesFromDatabase(q){
     if(typeof sb==="undefined" || !q)return [];
-    try{
-      const term=String(q).trim().toLowerCase();
-      if(!term)return [];
+    const term=String(q).trim();
+    if(!term)return [];
 
-      // Do not depend on a particular Supabase column/operator for the
-      // commission search.  The Service Management section already uses
-      // medifella_services, so fetch the same records and search them locally.
-      // This also supports service name, service ID/code, and service type.
-      const r=await sb.from("medifella_services")
-        .select("*")
+    // First make sure the same Service Management data is available locally.
+    let local=serviceRows();
+    if(!local.length && typeof loadServices==="function"){
+      try{ await loadServices(); local=serviceRows(); }catch(e){ console.warn("Commission local service load:",e); }
+    }
+    const localFound=local.filter(x=>commissionServiceMatches(x,term)).slice(0,20);
+    if(localFound.length)return localFound;
+
+    try{
+      // Use the exact columns used by Services Management.  This avoids a
+      // fragile broad query and makes the commission picker use the same list.
+      let r=await sb.from("medifella_services")
+        .select("id,service_code,name,service_type,price,created_at")
         .order("created_at",{ascending:false})
-        .limit(500);
+        .limit(1000);
+
+      // If the project has a slightly different schema, fall back to *.
+      if(r.error){
+        r=await sb.from("medifella_services").select("*").limit(1000);
+      }
       if(r.error){
         console.warn("Commission service search:",r.error.message);
         return [];
       }
 
       const all=Array.isArray(r.data)?r.data:[];
-      const found=all.filter(x=>{
-        const haystack=[
-          x.id, x.service_id, x.service_code, x.code,
-          x.name, x.service_name, x.title, x.service_type,
-          x.type
-        ].map(v=>String(v??"").toLowerCase()).join(" ");
-        return haystack.includes(term);
-      }).slice(0,20);
-
-      // Merge the freshly fetched Service Management records into the shared
-      // array so clicking a result can always add the exact selected service.
-      if(all.length){
-        const current=serviceRows();
-        const merged=current.slice();
-        all.forEach(x=>{
-          const id=String(x.id??x.service_id??"");
-          const idx=merged.findIndex(y=>String(y.id??y.service_id??"")===id);
-          if(idx>=0)merged[idx]=x; else merged.push(x);
-        });
-        window.services=merged;
-        if(typeof services!=="undefined")services=merged;
-      }
-      return found;
+      mergeCommissionServices(all);
+      return all.filter(x=>commissionServiceMatches(x,term)).slice(0,20);
     }catch(e){
       console.warn("Commission service search failed:",e);
       return [];
