@@ -4757,6 +4757,23 @@ function openPrintFromCanvas(canvas,paper,sale){
 })();
 <\/script>
 
+
+<style id="payment-view-immediate-style">
+  #partialPaymentHistoryModal .pph-quick{
+    display:grid;grid-template-columns:repeat(4,minmax(0,1fr));
+    gap:10px;margin-bottom:8px
+  }
+  #partialPaymentHistoryModal .pph-quick>div{
+    background:#f6f7f8;border-radius:10px;padding:9px 10px
+  }
+  #partialPaymentHistoryModal .pph-quick span{
+    display:block;font-size:12px;color:#6b7280;margin-bottom:3px
+  }
+  #partialPaymentHistoryModal .pph-quick strong{font-size:15px}
+  @media(max-width:700px){
+    #partialPaymentHistoryModal .pph-quick{grid-template-columns:repeat(2,minmax(0,1fr))}
+  }
+</style>
 </body>
 
 </html>`;
@@ -10188,6 +10205,8 @@ document.addEventListener("DOMContentLoaded",function(){
 
 <script id="sale-commission-management">
 (function(){
+  let commissionLoadSequence=0;
+  let commissionLoadTimer=null;
   "use strict";
   const C=id=>document.getElementById(id);
   const moneyC=v=>Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -10588,14 +10607,13 @@ document.addEventListener("DOMContentLoaded",function(){
   async function loadCommissionRecords(retry=0){
     const box=C("commissionList");
     if(!box)return;
+    const seq=++commissionLoadSequence;
 
-    // The commission section can be opened immediately after login. If the
-    // Supabase client/session is not ready yet, retry instead of leaving the
-    // screen permanently stuck on "Loading...".
     if(typeof sb==="undefined" || !sb){
-      if(retry<10){
+      if(retry<12){
         box.innerHTML='<p class="muted">Connecting to the commission database...</p>';
-        setTimeout(()=>loadCommissionRecords(retry+1),500);
+        clearTimeout(commissionLoadTimer);
+        commissionLoadTimer=setTimeout(()=>loadCommissionRecords(retry+1),500);
       }else{
         box.innerHTML='<p class="status error">Commission database is not ready. Please refresh the page.</p>';
       }
@@ -10605,40 +10623,45 @@ document.addEventListener("DOMContentLoaded",function(){
     box.innerHTML='<p class="muted">Loading commission records...</p>';
 
     try{
-      let r=await sb.from("medifella_sale_commissions")
+      const query=sb.from("medifella_sale_commissions")
         .select("*")
         .order("commission_date",{ascending:false})
         .order("created_at",{ascending:false});
 
-      // If an older table/schema does not support one of the ordering
-      // columns, retry with a simpler query. This does not change any data.
-      if(r.error){
-        console.warn("Commission ordered query:",r.error.message);
-        r=await sb.from("medifella_sale_commissions").select("*");
+      const timeout=new Promise((_,reject)=>setTimeout(
+        ()=>reject(new Error("Commission database request timed out. Please click Search/Refresh again.")),
+        10000
+      ));
+
+      let r;
+      try{
+        r=await Promise.race([query,timeout]);
+      }catch(firstErr){
+        console.warn("Commission ordered query:",firstErr);
+        const fallback=sb.from("medifella_sale_commissions").select("*");
+        r=await Promise.race([fallback,timeout]);
       }
 
+      if(seq!==commissionLoadSequence)return;
+
       if(r.error){
-        console.error("Commission table read:",r.error);
-        window.commissionRecords=[];
-        box.innerHTML=`<div class="status error">
-          Could not read the old commission records from Supabase.<br>
-          <strong>${escC(r.error.message||"Unknown database error")}</strong>
-          <div class="muted" style="margin-top:6px">
-            If the message says "row-level security policy", the table needs a
-            SELECT policy for authenticated users. No commission records were deleted.
-          </div>
-        </div>`;
-        C("commissionGrandTotal").innerHTML="";
-        return;
+        throw r.error;
       }
 
       window.commissionRecords=Array.isArray(r.data)?r.data:[];
       renderCommissionList();
     }catch(e){
-      console.error("Commission table read exception:",e);
+      if(seq!==commissionLoadSequence)return;
+      console.error("Commission table read:",e);
       window.commissionRecords=[];
-      box.innerHTML=`<div class="status error">Could not load commission records: ${escC(e.message||e)}</div>`;
-      C("commissionGrandTotal").innerHTML="";
+      box.innerHTML=`<div class="status error">
+        Could not load the sale commission records.<br>
+        <strong>${escC(e.message||"Unknown database error")}</strong>
+        <div class="muted" style="margin-top:6px">
+          Existing commission records in Supabase were not deleted.
+        </div>
+      </div>`;
+      if(C("commissionGrandTotal"))C("commissionGrandTotal").innerHTML="";
     }
   }
 
@@ -11114,7 +11137,7 @@ document.addEventListener("DOMContentLoaded",function(){
     C("saveSaleCommission")?.addEventListener("click",saveCommissionManual);
     C("clearSaleCommission")?.addEventListener("click",clearCommissionForm);
     C("commissionStaff")?.addEventListener("change",()=>{refreshCommissionStaffRateHint();renderCommissionItems();});
-    C("commissionRefresh")?.addEventListener("click",renderCommissionList);
+    C("commissionRefresh")?.addEventListener("click",()=>loadCommissionRecords());
     C("commissionFilterStaff")?.addEventListener("change",renderCommissionList);
     C("commissionFromDate")?.addEventListener("change",renderCommissionList);
     C("commissionToDate")?.addEventListener("change",renderCommissionList);
@@ -11123,9 +11146,6 @@ document.addEventListener("DOMContentLoaded",function(){
 
     renderCommissionItems();
     loadCommissionRecords();
-    // Guaranteed retry after the page/authentication client has had time to initialize.
-    setTimeout(()=>loadCommissionRecords(),1500);
-    setTimeout(()=>loadCommissionRecords(),3500);
   }
 
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bindCommission,{once:true});
@@ -11318,13 +11338,18 @@ document.addEventListener("DOMContentLoaded",function(){
   const E=id=>document.getElementById(id);
   const esc2=v=>typeof window.esc==='function'?window.esc(v):String(v??"").replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
   const money2=v=>typeof window.money==='function'?window.money(v):"$"+Number(v||0).toFixed(2);
+  const getDB=()=>(
+    (typeof window.sb!=="undefined" && window.sb) ||
+    (typeof sb!=="undefined" && sb) ||
+    null
+  );
 
   async function getSale(id){
     const sid=String(id||"").trim();
     if(!sid) return null;
     let s=Array.isArray(window.salesRecords)?window.salesRecords.find(x=>String(x.id)===sid):null;
-    if(!s && window.sb){
-      const r=await window.sb.from("medifella_sales").select("*").eq("id",sid).maybeSingle();
+    if(!s && getDB()){
+      const r=await getDB().from("medifella_sales").select("*").eq("id",sid).maybeSingle();
       if(r.error) throw r.error;
       s=r.data||null;
       if(s && Array.isArray(window.salesRecords)){
@@ -11344,11 +11369,16 @@ document.addEventListener("DOMContentLoaded",function(){
       const s=await getSale(sid);
       if(!s){alert("Sale record not found.");return false;}
       window.currentInvoiceId=sid;
-      if(typeof window.showSaleInvoice!=="function"){
+      const saleType=String(s.sale_type||"").trim().toUpperCase();
+      if(saleType==="DERMED" && typeof window.showDermedSaleInvoice==="function"){
+        window.showDermedSaleInvoice(sid,size||"A4");
+      }else if(typeof window.showSaleInvoice==="function"){
+        window.showSaleInvoice(sid,size||"A4");
+      }else if(typeof showSaleInvoice==="function"){
+        showSaleInvoice(sid,size||"A4");
+      }else{
         alert("Invoice function is not available. Please refresh the Admin Dashboard.");
-        return false;
       }
-      window.showSaleInvoice(sid,size||"A4");
     }catch(err){
       console.error("View Invoice error:",err);
       alert("Could not open the invoice: "+(err?.message||String(err)));
@@ -11412,7 +11442,7 @@ document.addEventListener("DOMContentLoaded",function(){
 
   async function submitPayment(){
     const ctx=window.__activePaymentDialog;
-    if(!ctx||!window.sb)return;
+    if(!ctx||!getDB())return;
     const amount=typeof window.parseMoneyInput==='function'?window.parseMoneyInput(E("spdAmount").value):Number(String(E("spdAmount").value).replace(/[$,\s]/g,""));
     const method=E("spdMethod").value||"Cash";
     const err=E("spdError");
@@ -11421,11 +11451,11 @@ document.addEventListener("DOMContentLoaded",function(){
     const btn=E("spdConfirm");btn.disabled=true;btn.textContent="Saving...";
     try{
       const now=new Date();
-      const pr=await window.sb.from("medifella_sale_payments").insert({sale_id:ctx.id,amount,payment_method:method,payment_date:now.toISOString().slice(0,10),note:"Additional payment",created_by:window.adminUser?.id||null});
+      const pr=await getDB().from("medifella_sale_payments").insert({sale_id:ctx.id,amount,payment_method:method,payment_date:now.toISOString().slice(0,10),note:"Additional payment",created_by:window.adminUser?.id||null});
       if(pr.error)throw pr.error;
       const newPaid=ctx.paid+amount;
       const status=typeof window.saleStatus==='function'?window.saleStatus(ctx.total,newPaid):(newPaid>=ctx.total-0.005?"Paid":"Partial");
-      const sr=await window.sb.from("medifella_sales").update({paid:newPaid,balance:Math.max(0,ctx.total-newPaid),payment_status:status}).eq("id",ctx.id);
+      const sr=await getDB().from("medifella_sales").update({paid:newPaid,balance:Math.max(0,ctx.total-newPaid),payment_status:status}).eq("id",ctx.id);
       if(sr.error)throw sr.error;
       E("salePaymentDialog")?.classList.remove("show");
       window.__activePaymentDialog=null;
@@ -11463,7 +11493,7 @@ document.addEventListener("DOMContentLoaded",function(){
     <div class="table-wrap"><table class="pph-table"><thead><tr><th>#</th><th>Payment Date & Time</th><th>Amount</th><th>Payment Method</th></tr></thead><tbody><tr><td>—</td><td>Loading details…</td><td>${money2(paid)}</td><td>${esc2(sale?.payment_method||"Cash")}</td></tr></tbody></table></div>`;
 
     try{
-      const q=await window.sb.from("medifella_sale_payments").select("*").eq("sale_id",String(id)).order("created_at",{ascending:true});
+      const q=await getDB().from("medifella_sale_payments").select("*").eq("sale_id",String(id)).order("created_at",{ascending:true});
       if(q.error)throw q.error;
       const rows=Array.isArray(q.data)?q.data:[];
       if(!rows.length){
