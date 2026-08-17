@@ -4258,7 +4258,7 @@ function renderSales(){
  $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date / Time</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{
    const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
    const dt=saleDateValue(s),time=saleField(s,["sale_time","time"],"");
-   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button>${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.viewPaymentHistory('${attr(s.id)}'); return false;">View Payment</button>`:""}${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
+   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="return window.openSaleInvoiceSafe('${attr(s.id)}','A4','MEDIFELLA');">View Invoice</button>${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.viewPaymentHistory('${attr(s.id)}'); return false;">View Payment</button>`:""}${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
  }).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
  updateSalesMetrics();
 }
@@ -4744,6 +4744,38 @@ function openPrintFromCanvas(canvas,paper,sale){
 
 
 
+
+
+<script id="view-invoice-button-fix">
+(function(){
+  "use strict";
+  window.openSaleInvoiceSafe = function(id, size, type){
+    try{
+      const sid=String(id||"");
+      if(!sid){ alert("Invoice ID is missing."); return false; }
+
+      if(type==="DERMED" && typeof window.showDermedSaleInvoice==="function"){
+        window.currentInvoiceId=sid;
+        window.showDermedSaleInvoice(sid, size||"A4");
+        return false;
+      }
+
+      if(typeof window.showSaleInvoice==="function"){
+        window.currentInvoiceId=sid;
+        window.showSaleInvoice(sid, size||"A4");
+        return false;
+      }
+
+      alert("View Invoice is not available. Please refresh the Admin Dashboard.");
+      return false;
+    }catch(err){
+      console.error("View Invoice error:",err);
+      alert("Could not open the invoice: "+(err && err.message ? err.message : String(err)));
+      return false;
+    }
+  };
+})();
+</script>
 
 </body>
 
@@ -6784,7 +6816,7 @@ function renderMtsSales(){
      <td>${money(bal)}</td>
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
-       <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       <button class="light" type="button" onclick="return window.openSaleInvoiceSafe('${attr(x.id)}','A4','MTS');">View Invoice</button>
        ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.viewPaymentHistory('${attr(x.id)}'); return false;">View Payment</button>`:""}
        ${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
@@ -6819,7 +6851,7 @@ function renderDermedSales(){
      <td>${money(bal)}</td>
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
-       <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       <button class="light" type="button" onclick="return window.openSaleInvoiceSafe('${attr(x.id)}','A4','DERMED');">View Invoice</button>
        ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.viewPaymentHistory('${attr(x.id)}'); return false;">View Payment</button>`:""}
        ${bal>0.005?`<button class="gold" type="button" onclick="recordDermedSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
@@ -13526,3 +13558,60 @@ document.addEventListener("DOMContentLoaded",function(){
   // Buttons are rendered directly by the three sale-list render functions above.\n  
 </script>
 
+<script id="view-invoice-repair-v1">
+(function(){
+  async function openSaleInvoiceRobust(id,size){
+    try{
+      id=String(id||"").trim();
+      if(!id){alert("Sale ID is missing.");return false;}
+      let s=Array.isArray(window.salesRecords)?window.salesRecords.find(x=>String(x.id)===id):null;
+      if(!s && typeof salesRecords!=='undefined' && Array.isArray(salesRecords)){
+        s=salesRecords.find(x=>String(x.id)===id);
+      }
+      if(!s && window.sb){
+        const r=await window.sb.from("medifella_sales").select("*").eq("id",id).maybeSingle();
+        if(r.error)throw r.error;
+        s=r.data;
+        if(s){
+          if(Array.isArray(window.salesRecords)) window.salesRecords.push(s);
+          if(String(s.sale_type||"").toUpperCase()==="DERMED" && typeof window.showDermedSaleInvoice==="function"){
+            window.showDermedSaleInvoice(id,size||"A4");
+            return false;
+          }
+        }
+      }
+      if(!s){alert("Sale record not found.");return false;}
+      window.currentInvoiceId=id;
+      if(String(s.sale_type||"").toUpperCase()==="DERMED" && typeof window.showDermedSaleInvoice==="function"){
+        window.showDermedSaleInvoice(id,size||"A4");
+      }else if(typeof window.showSaleInvoice==="function"){
+        window.showSaleInvoice(id,size||"A4");
+      }else if(typeof showSaleInvoice==="function"){
+        showSaleInvoice(id,size||"A4");
+      }else{
+        alert("Invoice function is not available. Please refresh the page.");
+      }
+    }catch(e){
+      console.error("View Invoice:",e);
+      alert(e?.message||"Could not open invoice.");
+    }
+    return false;
+  }
+  window.openSaleInvoiceRobust=openSaleInvoiceRobust;
+
+  function patchInvoiceButtons(){
+    document.querySelectorAll('button').forEach(btn=>{
+      const oc=btn.getAttribute('onclick')||"";
+      if(oc.includes('window.showSaleInvoice(') || oc.includes('window.showDermedSaleInvoice(')){
+        const m=oc.match(/(?:showSaleInvoice|showDermedSaleInvoice)\('([^']+)'/);
+        if(!m)return;
+        const id=m[1].replace(/\\'/g,"'");
+        btn.onclick=function(e){e.preventDefault();e.stopPropagation();return window.openSaleInvoiceRobust(id,'A4');};
+      }
+    });
+  }
+  patchInvoiceButtons();
+  const observer=new MutationObserver(patchInvoiceButtons);
+  observer.observe(document.body,{childList:true,subtree:true});
+})();
+</script>
