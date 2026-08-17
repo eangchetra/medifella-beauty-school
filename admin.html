@@ -2032,25 +2032,6 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
   .commission-entry-totals,.commission-grand-total{display:grid;grid-template-columns:1fr}
 }
 </style>
-
-<style id="sale-commission-grouped-list">
-.commission-grouped-table th{background:#42b8c8;color:#fff;white-space:nowrap}
-.commission-grouped-table td{vertical-align:middle}
-.commission-list-actions{white-space:nowrap}
-.commission-list-actions button{margin-right:5px}
-.commission-details-modal{display:none;position:fixed;inset:0;z-index:999999}
-.commission-details-modal.show{display:block}
-.commission-details-backdrop{position:absolute;inset:0;background:rgba(0,0,0,.42)}
-.commission-details-dialog{position:relative;z-index:2;width:min(1100px,94vw);max-height:86vh;overflow:auto;margin:7vh auto;background:#fff;border-radius:14px;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:20px}
-.commission-details-head{display:flex;align-items:flex-start;justify-content:space-between;gap:16px;margin-bottom:14px}
-.commission-details-head h3{margin:0 0 4px}
-.commission-details-total{display:flex;justify-content:flex-end;gap:30px;margin-top:15px;padding-top:12px;border-top:1px solid var(--line)}
-@media(max-width:700px){
-  .commission-details-dialog{width:96vw;margin:3vh auto;padding:12px}
-  .commission-details-total{display:block}
-  .commission-details-total strong{display:block;margin-top:6px}
-}
-</style>
 </head>
 <body>
 
@@ -10117,8 +10098,6 @@ document.addEventListener("DOMContentLoaded",function(){
 
   window.commissionRecords=window.commissionRecords||[];
   window.commissionItems=window.commissionItems||[];
-  window.commissionEditingGroup=null;
-  window.commissionEditingIds=[];
   let commissionCustomerCache={ref:null,rows:[]};
 
   function serviceRows(){
@@ -10447,182 +10426,33 @@ document.addEventListener("DOMContentLoaded",function(){
     return m?`${m[3]}/${m[2]}/${m[1]}`:raw;
   }
 
-  function commissionGroupKey(x){
-    const sourceSale=String(x?.source_sale_id||"").trim();
-    if(sourceSale)return "sale:"+sourceSale;
-    const ref=String(x?.reference_no||"").trim();
-    if(ref)return "ref:"+ref;
-    return "id:"+String(x?.id||"");
-  }
-
-  function groupedCommissionRecords(){
-    const groups=new Map();
-    for(const x of filteredCommissionRecords()){
-      const key=commissionGroupKey(x);
-      if(!groups.has(key))groups.set(key,[]);
-      groups.get(key).push(x);
-    }
-    return Array.from(groups.entries()).map(([key,items])=>{
-      const first=items[0]||{};
-      return {
-        key, items,
-        date:first.commission_date||first.created_at||"",
-        staff_id:first.staff_id||"",
-        staff_name:first.staff_name||"",
-        customer_id:first.customer_id||"",
-        customer_name:first.customer_name||"",
-        customer_phone:first.customer_phone||"",
-        subtotal:items.reduce((n,x)=>n+Number(x.subtotal||0),0),
-        commission:items.reduce((n,x)=>n+Number(x.commission_amount||0),0)
-      };
-    });
-  }
-
-  function commissionDetailsHtml(group){
-    const rows=group.items||[];
-    return `<div class="commission-details-list">
-      <div class="table-wrap"><table class="table">
-        <thead><tr>
-          <th>Service Detail</th><th>Service Type</th><th>Unit</th><th>Unit Price</th>
-          <th>Discount</th><th>Subtotal</th><th>Commission</th><th>Subtotal Commission</th>
-        </tr></thead>
-        <tbody>${rows.map(x=>`<tr>
-          <td>${escC(x.service_detail||"")}</td>
-          <td>${escC(serviceTypeLabel(x.service_type==="service_product"?"Service With Product":"Only Service"))}</td>
-          <td>${escC(x.unit??1)}</td>
-          <td>$${moneyC(x.unit_price)}</td>
-          <td>$${moneyC(x.discount)}</td>
-          <td>$${moneyC(x.subtotal)}</td>
-          <td>${Number(x.commission_rate||0)*100}%</td>
-          <td>$${moneyC(x.commission_amount)}</td>
-        </tr>`).join("")}</tbody>
-      </table></div>
-    </div>`;
-  }
-
-  function showCommissionDetails(key){
-    const group=groupedCommissionRecords().find(g=>g.key===key);
-    if(!group)return;
-    let modal=C("commissionDetailsModal");
-    if(!modal){
-      modal=document.createElement("div");
-      modal.id="commissionDetailsModal";
-      modal.className="commission-details-modal";
-      document.body.appendChild(modal);
-    }
-    modal.innerHTML=`<div class="commission-details-backdrop" data-close-commission-details></div>
-      <div class="commission-details-dialog" role="dialog" aria-modal="true">
-        <div class="commission-details-head">
-          <div>
-            <h3>Commission Service Details</h3>
-            <div class="muted">${escC(group.customer_name||"")} · ${escC(group.staff_name||"")}</div>
-          </div>
-          <button type="button" class="light" data-close-commission-details>×</button>
-        </div>
-        ${commissionDetailsHtml(group)}
-        <div class="commission-details-total">
-          <strong>Total Subtotal: $${moneyC(group.subtotal)}</strong>
-          <strong>Total Commission: $${moneyC(group.commission)}</strong>
-        </div>
-      </div>`;
-    modal.classList.add("show");
-    modal.querySelectorAll("[data-close-commission-details]").forEach(b=>b.addEventListener("click",()=>modal.classList.remove("show")));
-  }
-
   function renderCommissionList(){
     const box=C("commissionList");if(!box)return;
-    const groups=groupedCommissionRecords();
-    const totalSubtotal=groups.reduce((n,g)=>n+g.subtotal,0);
-    const totalCommission=groups.reduce((n,g)=>n+g.commission,0);
-
-    box.innerHTML=groups.length?`<div class="table-wrap"><table class="table commission-grouped-table">
-      <thead><tr>
-        <th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th>
-        <th>Services</th><th>Total Subtotal</th><th>Total Commission</th><th>Actions</th>
-      </tr></thead>
-      <tbody>${groups.map(g=>`<tr>
-        <td>${escC(String(g.date||"").slice(0,10))}</td>
-        <td>${escC(g.staff_name||"")}</td>
-        <td>${escC(g.customer_name||"")}</td>
-        <td>${escC(g.customer_phone||"")}</td>
-        <td><button type="button" class="light commission-view-details" data-commission-view="${escC(g.key)}">View Details</button></td>
-        <td>$${moneyC(g.subtotal)}</td>
-        <td>$${moneyC(g.commission)}</td>
-        <td class="commission-list-actions">
-          <button type="button" class="light" data-commission-edit="${escC(g.key)}">Edit</button>
-          <button type="button" class="danger" data-commission-delete="${escC(g.key)}">Delete</button>
-        </td>
-      </tr>`).join("")}</tbody>
+    const rows=filteredCommissionRecords();
+    const totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0);
+    const totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
+    box.innerHTML=rows.length?`<div class="table-wrap"><table class="table">
+      <tr><th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th><th>Service Type</th><th>Service Detail</th><th>Unit</th><th>Unit Price</th><th>Discount</th><th>Subtotal</th><th>Commission</th><th>Subtotal Commission</th></tr>
+      ${rows.map(x=>`<tr>
+        <td>${escC(formatCommissionDate(x.commission_date||x.created_at))}</td>
+        <td>${escC(x.staff_name||"")}</td>
+        <td>${escC(x.customer_name||"")}</td>
+        <td>${escC(x.customer_phone||"")}</td>
+        <td>${escC(serviceTypeLabel(x.service_type==="service_product"?"Service With Product":"Only Service"))}</td>
+        <td>${escC(x.service_detail||"")}</td>
+        <td>${escC(x.unit??1)}</td>
+        <td>$${moneyC(x.unit_price)}</td>
+        <td>$${moneyC(x.discount)}</td>
+        <td>$${moneyC(x.subtotal)}</td>
+        <td>${Number(x.commission_rate||0)*100}%</td>
+        <td>$${moneyC(x.commission_amount)}</td>
+      </tr>`).join("")}
     </table></div>`:'<p class="muted">No commission records found.</p>';
-
     C("commissionGrandTotal").innerHTML=`
       <div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div>
       <div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>
     `;
-
-    box.querySelectorAll("[data-commission-view]").forEach(b=>b.addEventListener("click",()=>showCommissionDetails(b.dataset.commissionView)));
-    box.querySelectorAll("[data-commission-edit]").forEach(b=>b.addEventListener("click",()=>editCommissionGroup(b.dataset.commissionEdit)));
-    box.querySelectorAll("[data-commission-delete]").forEach(b=>b.addEventListener("click",()=>deleteCommissionGroup(b.dataset.commissionDelete)));
   }
-
-  function beginCommissionEdit(group){
-    const first=group.items[0];
-    if(!first)return;
-    window.commissionEditingGroup=group.key;
-    window.commissionEditingIds=group.items.map(x=>x.id).filter(Boolean);
-
-    if(C("commissionStaff"))C("commissionStaff").value=String(first.staff_id||"");
-    if(C("commissionCustomerId"))C("commissionCustomerId").value=String(first.customer_id||"");
-    if(C("commissionCustomerSearch"))C("commissionCustomerSearch").value=first.customer_name||"";
-    if(C("commissionCustomerPhone"))C("commissionCustomerPhone").value=first.customer_phone||"";
-    if(C("commissionDate"))C("commissionDate").value=String(first.commission_date||"").slice(0,10);
-
-    window.commissionItems=group.items.map(x=>({
-      service_id:x.service_id||null,
-      name:x.service_detail||"Service",
-      service_code:"",
-      service_type:x.service_type==="service_product"?"Service With Product":"Only Service",
-      quantity:Number(x.unit||1),
-      price:Number(x.unit_price||0),
-      discount:Number(x.discount||0)
-    }));
-    renderCommissionItems();
-
-    const save=C("saveSaleCommission");
-    if(save)save.textContent="Save Change";
-    C("commissionStatus").innerHTML='<div class="status">Editing this commission. Make your changes, then click Save Change.</div>';
-    document.getElementById("saleCommission")?.scrollIntoView({behavior:"smooth",block:"start"});
-  }
-
-  function editCommissionGroup(key){
-    const group=groupedCommissionRecords().find(g=>g.key===key);
-    if(group)beginCommissionEdit(group);
-  }
-
-  async function deleteCommissionGroup(key){
-    const group=groupedCommissionRecords().find(g=>g.key===key);
-    if(!group)return;
-    const label=group.customer_name||"this commission";
-    if(!confirm(`Delete this entire commission for ${label}?\n\nAll ${group.items.length} service item(s) in this commission will be deleted.`))return;
-    try{
-      const ids=group.items.map(x=>x.id).filter(Boolean);
-      if(ids.length){
-        const r=await sb.from("medifella_sale_commissions").delete().in("id",ids);
-        if(r.error)throw r.error;
-      }
-      await loadCommissionRecords();
-    }catch(e){
-      alert("Could not delete the commission.\n\n"+(e?.message||e));
-    }
-  }
-
-  function resetCommissionEditState(){
-    window.commissionEditingGroup=null;
-    window.commissionEditingIds=[];
-    const save=C("saveSaleCommission");
-    if(save)save.textContent="Save Sale Commission";
-  }
-
 
   async function insertCommissionRows(rows){
     let pending=rows.map(x=>({...x}));
@@ -10662,15 +10492,6 @@ document.addEventListener("DOMContentLoaded",function(){
       return;
     }
     const customer=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(customerId));
-    const existingGroupKey=window.commissionEditingGroup;
-    const existingGroups=existingGroupKey?groupedCommissionRecords():[];
-    const editingGroup=existingGroupKey?existingGroups.find(g=>g.key===existingGroupKey):null;
-
-    // Use reference_no to keep all services from one manual commission together.
-    // Existing Dermed records already use reference_no/source_sale_id for grouping.
-    const referenceNo=editingGroup?.items?.[0]?.reference_no ||
-      ("COMM-"+new Date().getTime()+"-"+Math.random().toString(36).slice(2,7).toUpperCase());
-
     const rows=items.map(x=>{
       const c=commissionItemCalc(x);
       return {
@@ -10689,8 +10510,7 @@ document.addEventListener("DOMContentLoaded",function(){
         subtotal:c.subtotal,
         commission_rate:c.rate,
         commission_amount:c.amount,
-        source:"manual",
-        reference_no:referenceNo
+        source:"manual"
       };
     }).filter(x=>x.subtotal>0);
 
@@ -10700,42 +10520,14 @@ document.addEventListener("DOMContentLoaded",function(){
     }
 
     try{
-      if(editingGroup){
-        const oldIds=editingGroup.items.map(x=>x.id).filter(Boolean);
-        const common=Math.min(oldIds.length,rows.length);
-
-        // Update existing rows first.
-        for(let i=0;i<common;i++){
-          const r=await sb.from("medifella_sale_commissions").update(rows[i]).eq("id",oldIds[i]);
-          if(r.error)throw r.error;
-        }
-
-        // Add newly added services.
-        if(rows.length>oldIds.length){
-          await insertCommissionRows(rows.slice(oldIds.length));
-        }
-
-        // Remove services that were deleted during editing.
-        if(oldIds.length>rows.length){
-          const removeIds=oldIds.slice(rows.length);
-          const r=await sb.from("medifella_sale_commissions").delete().in("id",removeIds);
-          if(r.error)throw r.error;
-        }
-
-        C("commissionStatus").innerHTML='<div class="status">Sale commission updated successfully.</div>';
-      }else{
-        await insertCommissionRows(rows);
-        C("commissionStatus").innerHTML='<div class="status">Sale commission saved successfully.</div>';
-      }
-
-      resetCommissionEditState();
+      await insertCommissionRows(rows);
+      C("commissionStatus").innerHTML='<div class="status">Sale commission saved successfully.</div>';
       clearCommissionForm();
       await loadCommissionRecords();
     }catch(e){
       C("commissionStatus").innerHTML=`<div class="status error">${escC(e.message||"Could not save sale commission.")}</div>`;
     }
   }
-
 
   window.recordFirstDermedSaleCommission=async function({sale,buyer,buyerType,buyerId,staffId,staff,servicesArr,items,hasProducts,adminId}){
     // AUTOMATIC COMMISSION IS DERMED SALE ONLY.
@@ -10909,7 +10701,7 @@ document.addEventListener("DOMContentLoaded",function(){
     });
 
     C("saveSaleCommission")?.addEventListener("click",saveCommissionManual);
-    C("clearSaleCommission")?.addEventListener("click",()=>{resetCommissionEditState();clearCommissionForm();});
+    C("clearSaleCommission")?.addEventListener("click",clearCommissionForm);
     C("commissionRefresh")?.addEventListener("click",renderCommissionList);
     C("commissionFilterStaff")?.addEventListener("change",renderCommissionList);
     C("commissionFromDate")?.addEventListener("change",renderCommissionList);
