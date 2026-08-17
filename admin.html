@@ -2442,12 +2442,6 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     </div>
   </div>
 
-  <div class="commission-rule-note">
-    <strong>Commission Rule:</strong>
-    <span id="commissionRuleDynamic">Select a Sale Staff to load the commission rates automatically.</span>
-    <span>No need to choose or fill the commission type — it is automatic from the Service List.</span>
-  </div>
-
   <div class="commission-service-picker">
     <label>Search Service / Add Items</label>
     <div class="commission-search-line">
@@ -10255,7 +10249,7 @@ document.addEventListener("DOMContentLoaded",function(){
     }
     box.innerHTML=`<strong>Commission Rates:</strong> Product ${Number(cfg.product_rate||0)}% &nbsp; | &nbsp; Service ${Number(cfg.service_rate||0)}% &nbsp; | &nbsp; Service With Product ${Number(cfg.service_product_rate||0)}%`;
     const rule=C("commissionRuleDynamic");
-    if(rule) rule.innerHTML=`Service With Product = <strong>${Number(cfg.service_product_rate||0)}%</strong> &nbsp; | &nbsp; Only Service = <strong>${Number(cfg.service_rate||0)}%</strong>`;
+    if(rule) rule.textContent="";
   }
 
   function rebuildCommissionCustomerCache(){
