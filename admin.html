@@ -4258,7 +4258,7 @@ function renderSales(){
  $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date / Time</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{
    const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
    const dt=saleDateValue(s),time=saleField(s,["sale_time","time"],"");
-   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button>${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.showPartialPaymentHistory('${attr(s.id)}'); return false;">View Payment</button>`:""}${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
+   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button>${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.viewPaymentHistory('${attr(s.id)}'); return false;">View Payment</button>`:""}${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
  }).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
  updateSalesMetrics();
 }
@@ -6785,7 +6785,7 @@ function renderMtsSales(){
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
        <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
-       ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.showPartialPaymentHistory('${attr(x.id)}'); return false;">View Payment</button>`:""}
+       ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.viewPaymentHistory('${attr(x.id)}'); return false;">View Payment</button>`:""}
        ${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -6820,7 +6820,7 @@ function renderDermedSales(){
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
        <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
-       ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.showPartialPaymentHistory('${attr(x.id)}'); return false;">View Payment</button>`:""}
+       ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.viewPaymentHistory('${attr(x.id)}'); return false;">View Payment</button>`:""}
        ${bal>0.005?`<button class="gold" type="button" onclick="recordDermedSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -13424,7 +13424,7 @@ document.addEventListener("DOMContentLoaded",function(){
   <div class="pph-card" role="dialog" aria-modal="true" aria-labelledby="pphTitle">
     <div class="pph-head">
       <div>
-        <h2 id="pphTitle" style="margin:0">Partial Payment History</h2>
+        <h2 id="pphTitle" style="margin:0">View Payment</h2>
         <div id="pphSubtitle" class="muted" style="margin-top:4px"></div>
       </div>
       <button type="button" class="pph-close" id="pphClose">Close</button>
@@ -13457,26 +13457,33 @@ document.addEventListener("DOMContentLoaded",function(){
     return (Array.isArray(salesRecords)?salesRecords:[]).find(x=>String(x.id)===String(id))||null;
   }
 
-  async function showPartialPaymentHistory(id){
-    const s=getSaleById(id);
-    if(!s){alert("Sale record not found.");return;}
+  async function viewPaymentHistory(id){
     const modal=E("partialPaymentHistoryModal"), body=E("pphBody"), sub=E("pphSubtitle");
-    if(!modal||!body)return;
-    sub.textContent=`${saleRef(s)||s.reference_no||"Invoice"} · ${saleCustomer(s)||s.student_name||s.customer_name||"Customer"}`;
-    modal.classList.add("show"); modal.setAttribute("aria-hidden","false");
+    if(!modal||!body){ alert("Payment history window is not available."); return; }
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden","false");
     body.innerHTML='<p class="muted">Loading payment history...</p>';
 
     try{
-      let rows=[];
+      // Read the payment history directly from Supabase using the sale ID.
+      // This avoids relying on the currently rendered sale-list array.
       const q=await sb.from("medifella_sale_payments")
         .select("*")
         .eq("sale_id",String(id))
         .order("created_at",{ascending:true});
-      if(!q.error) rows=q.data||[];
-      else {
-        console.warn("Payment history query:",q.error.message);
-        rows=(Array.isArray(salePayments)?salePayments:[]).filter(p=>String(p.sale_id)===String(id));
-      }
+
+      if(q.error) throw q.error;
+      const rows=Array.isArray(q.data)?q.data:[];
+
+      let sale=null;
+      try{
+        const sr=await sb.from("medifella_sales").select("*").eq("id",String(id)).maybeSingle();
+        if(!sr.error) sale=sr.data;
+      }catch(_){ }
+
+      const ref=sale ? (sale.reference_no||sale.invoice_no||sale.invoice_number||"Invoice") : "Invoice";
+      const customer=sale ? (sale.customer_name||sale.student_name||"Customer") : "Customer";
+      sub.textContent=`${ref} · ${customer}`;
 
       if(!rows.length){
         body.innerHTML='<p class="muted">No payment history has been recorded for this sale.</p>';
@@ -13495,10 +13502,14 @@ document.addEventListener("DOMContentLoaded",function(){
       </table></div>
       <div class="pph-total">Total Paid: ${moneyv(total)}</div>`;
     }catch(err){
-      body.innerHTML=`<p class="error status">${escv(err?.message||"Could not load payment history.")}</p>`;
+      console.error("View Payment:",err);
+      body.innerHTML=`<p class="error status">Could not load payment history: ${escv(err?.message||"Unknown error")}</p>`;
     }
   }
-  window.showPartialPaymentHistory=showPartialPaymentHistory;
+  window.viewPaymentHistory=viewPaymentHistory;
+  // Keep the old function name as a compatibility alias.
+  window.showPartialPaymentHistory=viewPaymentHistory;
+
 
   function closeHistory(){
     const modal=E("partialPaymentHistoryModal");
@@ -13512,7 +13523,6 @@ document.addEventListener("DOMContentLoaded",function(){
   });
   document.addEventListener("keydown",e=>{if(e.key==="Escape")closeHistory();});
 
-  // Buttons are rendered directly by the three sale-list render functions above.
-})();
+  // Buttons are rendered directly by the three sale-list render functions above.\n  
 </script>
 
