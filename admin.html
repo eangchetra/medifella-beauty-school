@@ -10172,8 +10172,8 @@ document.addEventListener("DOMContentLoaded",function(){
 
   function serviceTypeLabel(type){
     const t=String(type||"").trim().toLowerCase();
-    if(t.includes("only service"))return "Only Service";
-    if(t.includes("with product")||t.includes("service with product"))return "Service With Product";
+    if(t.includes("only service")||t === "service" || t === "only_service" || t === "only-service")return "Only Service";
+    if(t.includes("with product")||t.includes("service with product")||t === "service_product" || t === "service-product")return "Service With Product";
     return String(type||"Service");
   }
 
@@ -10223,12 +10223,10 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function commissionItemFromService(id){
-    const key=String(id??"");
-    const s=serviceRows().find(x=>String(x.id??x.service_id??x._commissionKey??x.service_code??"")===key)
-      || (Array.isArray(window.commissionSearchServices)?window.commissionSearchServices.find(x=>String(x.id??x.service_id??x._commissionKey??x.service_code??"")===key):null);
+    const s=serviceRows().find(x=>String(x.id??x.service_id)===String(id));
     if(!s)return null;
     return {
-      service_id:s.id??s.service_id??null,
+      service_id:s.id??s.service_id,
       service_code:s.service_code??s.code??"",
       name:s.name??s.service_name??s.title??"Service",
       service_type:serviceTypeLabel(s.service_type),
@@ -10239,129 +10237,101 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function normalizeCommissionSearchText(v){
-    return String(v??"")
-      .replace(/[₀-₉]/g,ch=>String("₀₁₂₃₄₅₆₇₈₉".indexOf(ch)))
-      .toLowerCase()
-      .normalize("NFKC")
-      .replace(/[^a-z0-9\u1780-\u17ff]+/gi," ")
-      .trim();
+    return String(v??"").toLowerCase().normalize("NFKC").replace(/[^a-z0-9\u1780-\u17ff]+/gi," ").trim();
   }
 
   function commissionServiceMatches(s,q){
     const needle=normalizeCommissionSearchText(q);
     if(!needle)return false;
-    const fields=[
-      s?.id,s?.service_id,s?.service_code,s?.code,s?._commissionKey,
-      s?.name,s?.service_name,s?.title,s?.service_type,s?.type
-    ];
+    const fields=[s?.id,s?.service_id,s?.service_code,s?.code,s?.name,s?.service_name,s?.title,s?.service_type,s?.type];
     const hay=fields.map(normalizeCommissionSearchText).join(" ");
     if(hay.includes(needle))return true;
+    // Also support searches such as "co2 laser" when the stored name has
+    // punctuation/spaces in a different form.
     const tokens=needle.split(/\s+/).filter(Boolean);
     return tokens.length>1 && tokens.every(t=>hay.includes(t));
   }
 
-  function commissionServiceSearchRows(q){
-    const rows=Array.isArray(window.services)?window.services:
-      (typeof services!=="undefined" && Array.isArray(services)?services:[]);
-    const extra=Array.isArray(window.commissionSearchServices)?window.commissionSearchServices:[];
-    const all=rows.concat(extra);
-    const seen=new Set();
-    return all.filter(x=>{
-      const k=String(x?.id??x?.service_id??x?._commissionKey??x?.service_code??x?.name??"");
-      if(seen.has(k))return false; seen.add(k); return commissionServiceMatches(x,q);
-    }).slice(0,20);
-  }
-
   function mergeCommissionServices(all){
     if(!Array.isArray(all)||!all.length)return;
-    const current=Array.isArray(window.services)?window.services.slice():[];
+    const current=serviceRows().slice();
     all.forEach(x=>{
       const id=String(x?.id??x?.service_id??"");
-      if(!id)return;
-      const idx=current.findIndex(y=>String(y?.id??y?.service_id??"")===id);
+      const idx=id?current.findIndex(y=>String(y?.id??y?.service_id??"")===id):-1;
       if(idx>=0)current[idx]=x; else current.push(x);
     });
     window.services=current;
     try{ services=current; }catch(e){}
   }
 
-  function normalizeSaleServiceItems(data){
-    const out=[];
-    (Array.isArray(data)?data:[]).forEach(sale=>{
-      let items=sale?.service_items;
-      if(typeof items==='string'){
-        try{items=JSON.parse(items)}catch(e){items=[]}
-      }
-      if(!Array.isArray(items))return;
-      items.forEach((item,idx)=>{
-        if(!item || typeof item!=='object')return;
-        const name=item.name??item.service_name??item.title??"";
-        const code=item.service_code??item.code??"";
-        if(!name && !code)return;
-        const key=`sale-service-${code||name}-${idx}`;
-        out.push({
-          id:null,
-          service_id:null,
-          _commissionKey:key,
-          service_code:code,
-          name,
-          service_type:item.service_type??"Only Service",
-          price:Number(item.unit_price??item.price??item.subtotal??0),
-          _fromSale:true
-        });
-      });
-    });
-    return out;
-  }
-
   async function fetchCommissionServicesFromDatabase(q){
-    if(typeof sb==="undefined" || !q)return [];
-    const term=String(q).trim();
-    let found=commissionServiceSearchRows(term);
+    const term=String(q||"").trim();
+    if(!term) return [];
+
+    const norm=v=>String(v??"").toLowerCase().normalize("NFKC").replace(/[^a-z0-9\u1780-\u17ff]+/gi," ").trim();
+    const matches=(s)=>{
+      const needle=norm(term); if(!needle)return false;
+      const hay=[s?.id,s?.service_id,s?.service_code,s?.code,s?.name,s?.service_name,s?.title,s?.service_type,s?.type]
+        .map(norm).join(" ");
+      if(hay.includes(needle))return true;
+      const tokens=needle.split(/\s+/).filter(Boolean);
+      return tokens.length>1 && tokens.every(t=>hay.includes(t));
+    };
+
+    // 1) Use the already-loaded Service List immediately.
+    let local=serviceRows();
+    let found=local.filter(matches).slice(0,20);
     if(found.length)return found;
 
-    // First refresh the same Service List used by Services Management.
+    // 2) Refresh the real Service Management list.
     if(typeof loadServices==="function"){
       try{
         await loadServices();
-        found=commissionServiceSearchRows(term);
+        local=serviceRows();
+        found=local.filter(matches).slice(0,20);
         if(found.length)return found;
-      }catch(e){ console.warn("Commission service refresh failed:",e); }
+      }catch(e){console.warn("Commission loadServices failed",e);}
     }
 
-    // Query the Service List directly. Do not depend on the current local cache.
-    try{
-      const r=await sb.from("medifella_services")
-        .select("id,service_code,name,service_type,price,created_at")
-        .order("created_at",{ascending:false})
-        .limit(1000);
-      if(!r.error && Array.isArray(r.data)){
-        mergeCommissionServices(r.data);
-        found=commissionServiceSearchRows(term);
-        if(found.length)return found;
-      }else if(r.error){
-        console.warn("medifella_services search:",r.error.message);
-      }
-    }catch(e){ console.warn("medifella_services search failed:",e); }
+    // 3) Directly read the existing Services Management table.
+    if(typeof sb!=="undefined"){
+      try{
+        const r=await sb.from("medifella_services").select("*").order("created_at",{ascending:false}).limit(1000);
+        if(!r.error && Array.isArray(r.data)){
+          mergeCommissionServices(r.data);
+          window.commissionSearchServices=r.data;
+          found=r.data.filter(matches).slice(0,20);
+          if(found.length)return found;
+        }else if(r.error){console.warn("medifella_services",r.error.message);}
+      }catch(e){console.warn("Direct service query failed",e);}
 
-    // Last fallback: existing Dermed sales contain the exact service_items JSONB.
-    // This lets the commission search still find services such as CO2 Fractional Laser
-    // even if the Service List cache is stale or the service table is temporarily blocked.
-    try{
-      const r=await sb.from("medifella_sales")
-        .select("service_items")
-        .order("created_at",{ascending:false})
-        .limit(200);
-      if(!r.error){
-        const derived=normalizeSaleServiceItems(r.data);
-        window.commissionSearchServices=derived;
-        found=derived.filter(x=>commissionServiceMatches(x,term)).slice(0,20);
-        if(found.length)return found;
-      }else{
-        console.warn("medifella_sales fallback:",r.error.message);
-      }
-    }catch(e){ console.warn("sales service fallback failed:",e); }
-
+      // 4) Last fallback: services already stored in existing Dermed invoices.
+      try{
+        const r=await sb.from("medifella_sales").select("service_items").order("created_at",{ascending:false}).limit(200);
+        if(!r.error && Array.isArray(r.data)){
+          const fallback=[];
+          r.data.forEach(sale=>{
+            const items=Array.isArray(sale.service_items)?sale.service_items:[];
+            items.forEach(item=>{
+              const x={
+                id:item.service_id??item.id??item.service_code??item.name,
+                service_id:item.service_id??item.id??null,
+                service_code:item.service_code??item.code??"",
+                name:item.name??item.service_name??"Service",
+                service_type:item.service_type??item.type??"",
+                price:Number(item.price??item.unit_price??item.subtotal??0),
+                _fromSale:true
+              };
+              if(matches(x))fallback.push(x);
+            });
+          });
+          window.commissionSearchServices=(Array.isArray(window.commissionSearchServices)?window.commissionSearchServices:[]).concat(fallback);
+          const unique=[]; const seen=new Set();
+          fallback.forEach(x=>{const k=String(x.service_id??x.id??x.service_code??x.name);if(!seen.has(k)){seen.add(k);unique.push(x);}});
+          if(unique.length)return unique.slice(0,20);
+        }
+      }catch(e){console.warn("Sale service fallback failed",e);}
+    }
     return [];
   }
 
@@ -10369,20 +10339,17 @@ document.addEventListener("DOMContentLoaded",function(){
     const input=C("commissionServiceSearch"),box=C("commissionServiceResults");
     if(!input||!box)return;
     const q=String(input.value||"").trim();
-    if(!q){box.innerHTML="";box.classList.remove("show");return}
-    const list=(Array.isArray(rows)?rows:commissionServiceSearchRows(q)).slice(0,20);
+    if(!q){box.innerHTML="";box.classList.remove("show");return;}
+    const list=(Array.isArray(rows)?rows:[]).slice(0,20);
     box.innerHTML=list.map(s=>{
-      const sid=s.id??s.service_id??s._commissionKey??s.service_code??s.name;
+      const sid=s.id??s.service_id??s.service_code??s.name;
       const name=s.name??s.service_name??s.title??"Service";
       const code=s.service_code??s.code??"";
-      const type=serviceTypeLabel(s.service_type);
-      const rate=commissionRateForService(s)*100;
+      const type=serviceTypeLabel(s.service_type??s.type);
+      const rate=type==="Only Service"?3:2;
       const price=Number(s.price??s.unit_price??0);
-      return `<button type="button" data-commission-service="${escC(sid)}">
-        <div class="service-picker-name">${escC(name)}${code?` · ${escC(code)}`:""}</div>
-        <div class="service-picker-meta">${escC(type)} · $${moneyC(price)} · Commission ${rate}%</div>
-      </button>`;
-    }).join("")||'<div class="muted" style="padding:12px">No matching service found.</div>';
+      return `<button type="button" data-commission-service="${escC(sid)}"><div class="service-picker-name">${escC(name)}${code?` · ${escC(code)}`:""}</div><div class="service-picker-meta">${escC(type)} · $${moneyC(price)} · Commission ${rate}%</div></button>`;
+    }).join("") || '<div class="muted" style="padding:12px">No matching service found.</div>';
     box.classList.add("show");
   }
 
@@ -10392,58 +10359,43 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!input)return;
     const q=String(input.value||"").trim();
     if(!q){renderCommissionServiceResults([]);return;}
-    renderCommissionServiceResults(commissionServiceSearchRows(q));
+    renderCommissionServiceResults(serviceRows().filter(s=>commissionServiceMatches(s,q)));
     const found=await fetchCommissionServicesFromDatabase(q);
     if(String(input.value||"").trim()!==q)return;
     renderCommissionServiceResults(found);
   }
 
-  function addCommissionService(key){
-    const keyText=String(key??"");
-    const local=commissionServiceSearchRows(C("commissionServiceSearch")?.value||"");
-    let service=local.find(s=>String(s?.id??s?.service_id??s?._commissionKey??s?.service_code??s?.name??"")===keyText);
-    if(!service){
-      const all=(Array.isArray(window.services)?window.services:[]).concat(Array.isArray(window.commissionSearchServices)?window.commissionSearchServices:[]);
-      service=all.find(s=>String(s?.id??s?.service_id??s?._commissionKey??s?.service_code??s?.name??"")===keyText);
-    }
-    if(!service)return;
+  function addCommissionService(id){
+    const key=String(id??"");
+    const all=[];
+    serviceRows().forEach(x=>all.push(x));
+    (Array.isArray(window.commissionSearchServices)?window.commissionSearchServices:[]).forEach(x=>all.push(x));
+    let s=all.find(x=>String(x?.id??x?.service_id??x?.service_code??x?.code??x?.name??"")===key);
+    if(!s)return;
 
-    const serviceId=service.id??service.service_id??null;
-    const serviceCode=service.service_code??service.code??"";
-    const name=service.name??service.service_name??service.title??"Service";
-    const type=serviceTypeLabel(service.service_type);
+    const type=serviceTypeLabel(s.service_type??s.type);
     if(type!=="Only Service" && type!=="Service With Product"){
-      if(C("commissionStatus"))C("commissionStatus").innerHTML='<div class="status error">This service does not have a valid Service Type in the Service List.</div>';
+      if(C("commissionStatus"))C("commissionStatus").innerHTML='<div class="status error">This service has no valid Service Type. Please set it in Services Management.</div>';
       return;
     }
-    const price=Math.max(0,Number(service.price??service.unit_price??0));
-
-    // Do not add the exact same service twice; instead increase its quantity.
-    const existing=(window.commissionItems||[]).find(x=>
-      String(x.service_id??"")===String(serviceId??"") &&
-      String(x.service_code??"")===String(serviceCode) &&
-      String(x.name??"")===String(name)
-    );
+    const item={
+      service_id:s.id??s.service_id??null,
+      service_code:s.service_code??s.code??"",
+      name:s.name??s.service_name??s.title??"Service",
+      service_type:type,
+      price:Math.max(0,Number(s.price??s.unit_price??0)),
+      quantity:1,
+      discount:0
+    };
+    const existing=window.commissionItems.find(x=>String(x.service_id??"")===String(item.service_id??"") && String(x.name)===String(item.name));
     if(existing){
       existing.quantity=Math.max(1,Number(existing.quantity||1))+1;
     }else{
-      window.commissionItems.push({
-        service_id:serviceId,
-        service_code:serviceCode,
-        name:name,
-        service_type:type,
-        quantity:1,
-        price:price,
-        discount:0
-      });
+      window.commissionItems.push(item);
     }
-
     renderCommissionItems();
-    if(C("commissionServiceSearch"))C("commissionServiceSearch").value="";
-    if(C("commissionServiceResults")){
-      C("commissionServiceResults").innerHTML="";
-      C("commissionServiceResults").classList.remove("show");
-    }
+    const input=C("commissionServiceSearch"); if(input){input.value="";input.focus();}
+    const box=C("commissionServiceResults"); if(box){box.innerHTML="";box.classList.remove("show");}
   }
 
   function commissionItemCalc(x){
@@ -10452,9 +10404,8 @@ document.addEventListener("DOMContentLoaded",function(){
     const discount=Math.max(0,Number(x.discount||0));
     const subtotal=Math.max(0,unit*price-discount);
     const service=serviceRows().find(s=>String(s.id??s.service_id)===String(x.service_id))||x;
-    const type=serviceTypeLabel(service?.service_type);
     const rate=commissionRateForService(service);
-    return {unit,price,discount,subtotal,rate,amount:subtotal*rate,type};
+    return {unit,price,discount,subtotal,rate,amount:subtotal*rate};
   }
 
   function renderCommissionItems(){
@@ -10462,9 +10413,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const rows=window.commissionItems||[];
     body.innerHTML=rows.length?rows.map((x,i)=>{
       const c=commissionItemCalc(x);
-      const type=c.type==="Only Service"||c.type==="Service With Product"
-        ? c.type
-        : serviceTypeLabel(x.service_type);
+      const type=serviceTypeLabel(x.service_type);
       return `<tr data-commission-index="${i}">
         <td>
           <div class="commission-service-name">${escC(x.name||"Service")}</div>
@@ -10606,42 +10555,18 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   async function insertCommissionRows(rows){
-    /*
-     * Write commission rows without SELECT/RETURNING. This matches the
-     * working sale-save pattern and avoids a successful INSERT being
-     * reported as failed when SELECT is restricted by RLS.
-     *
-     * created_by is optional. When the current admin user is available we
-     * include it, which also supports policies that require the creator to
-     * be recorded. If an older commission table does not have that column,
-     * the retry below removes only that optional column.
-     */
-    let pending=rows.map(x=>{
-      const row={...x};
-      if(adminUser?.id && row.created_by==null)row.created_by=adminUser.id;
-      return row;
-    });
-
+    let pending=rows.map(x=>({...x}));
     for(let attempt=0;attempt<12;attempt++){
       const r=await sb.from("medifella_sale_commissions").insert(pending);
       if(!r.error)return r;
-
       const errText=String(r.error.message||r.error.details||"");
       const columnMatch=
         errText.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']? (?:of relation .* )?does not exist/i) ||
         errText.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i) ||
         errText.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
-
       if(columnMatch && pending.length && Object.prototype.hasOwnProperty.call(pending[0],columnMatch[1])){
         pending.forEach(row=>{delete row[columnMatch[1]]});
         continue;
-      }
-
-      const lower=errText.toLowerCase();
-      if(lower.includes("row-level security") || lower.includes("violates row-level security policy")){
-        throw new Error(
-          "Supabase blocked the commission save with RLS. The commission table needs an INSERT policy for the logged-in Medi Fella admin/staff account."
-        );
       }
       throw r.error;
     }
@@ -10652,55 +10577,31 @@ document.addEventListener("DOMContentLoaded",function(){
     const staffId=C("commissionStaff")?.value;
     const customerId=C("commissionCustomerId")?.value;
     const commissionDate=C("commissionDate")?.value||todayC();
-    const saveBtn=C("saveSaleCommission");
-
     if(!staffId||!customerId||!commissionDate){
       C("commissionStatus").innerHTML='<div class="status error">Please select Sale Staff, Customer and Commission Date.</div>';
       return;
     }
-
     const items=window.commissionItems||[];
     if(!items.length){
       C("commissionStatus").innerHTML='<div class="status error">Please add at least one service from the Service List.</div>';
       return;
     }
-
     const staff=staffRows().find(x=>String(x.id)===String(staffId));
     if(!staff || !isSaleCounterCashierStaff(staff)){
       C("commissionStatus").innerHTML='<div class="status error">Please select a Sale Staff with Job Title: Sale Counter Cashier.</div>';
       return;
     }
-
-    const customer=(Array.isArray(window.customers)?window.customers:[])
-      .find(x=>String(x.id)===String(customerId));
-    if(!customer){
-      C("commissionStatus").innerHTML='<div class="status error">The selected customer could not be found. Please search and select the customer again.</div>';
-      return;
-    }
-
-    const rows=[];
-    for(const x of items){
-      const service=serviceRows().find(s=>String(s.id??s.service_id)===String(x.service_id))||x;
-      const type=serviceTypeLabel(service?.service_type);
-
-      // Never guess a commission rate for an unknown service type.
-      if(type!=="Only Service" && type!=="Service With Product"){
-        C("commissionStatus").innerHTML=
-          `<div class="status error">Service "${escC(x.name||"Service")}" does not have a valid Service Type in the Service List. Please set it to Only Service or Service With Product.</div>`;
-        return;
-      }
-
-      const c=commissionItemCalc({...x,service_type:type});
-      if(c.subtotal<=0)continue;
-
-      rows.push({
+    const customer=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(customerId));
+    const rows=items.map(x=>{
+      const c=commissionItemCalc(x);
+      return {
         commission_date:commissionDate,
         staff_id:staffId,
         staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
         customer_id:customerId,
         customer_name:customer?.name||"",
         customer_phone:customer?.phone||"",
-        service_type:type==="Only Service"?"service":"service_product",
+        service_type:serviceTypeLabel(x.service_type)==="Only Service"?"service":"service_product",
         service_detail:x.name||"Service",
         service_id:x.service_id||null,
         unit:c.unit,
@@ -10710,17 +10611,12 @@ document.addEventListener("DOMContentLoaded",function(){
         commission_rate:c.rate,
         commission_amount:c.amount,
         source:"manual"
-      });
-    }
+      };
+    }).filter(x=>x.subtotal>0);
 
     if(!rows.length){
       C("commissionStatus").innerHTML='<div class="status error">At least one service must have a subtotal greater than $0.</div>';
       return;
-    }
-
-    if(saveBtn){
-      saveBtn.disabled=true;
-      saveBtn.textContent="Saving...";
     }
 
     try{
@@ -10730,11 +10626,6 @@ document.addEventListener("DOMContentLoaded",function(){
       await loadCommissionRecords();
     }catch(e){
       C("commissionStatus").innerHTML=`<div class="status error">${escC(e.message||"Could not save sale commission.")}</div>`;
-    }finally{
-      if(saveBtn){
-        saveBtn.disabled=false;
-        saveBtn.textContent="Save Sale Commission";
-      }
     }
   }
 
