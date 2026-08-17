@@ -10279,15 +10279,22 @@ document.addEventListener("DOMContentLoaded",function(){
     const term=String(q??"").trim();
     if(!term)return [];
 
-    // Always search the currently loaded Service List first.
+    // First use the same in-memory Service List used by Services Management.
+    // This keeps the Commission page tied to the exact Service List records.
     let local=serviceRows();
     let found=local.filter(x=>commissionServiceMatches(x,term)).slice(0,20);
     if(found.length)return found;
 
-    // Then query the same table used by Services Management.
+    // If the Service List has not finished loading yet, load it directly from
+    // the same Supabase table. Use a broad query first so searching by service
+    // name, code, type, or Khmer text all works reliably.
     if(typeof sb!=="undefined" && sb){
       try{
-        const r=await sb.from("medifella_services").select("*").order("created_at",{ascending:false}).limit(1000);
+        const r=await sb.from("medifella_services")
+          .select("id,service_code,name,service_type,price,created_at")
+          .order("created_at",{ascending:false})
+          .limit(1000);
+
         if(!r.error && Array.isArray(r.data)){
           mergeCommissionServices(r.data);
           found=r.data.filter(x=>commissionServiceMatches(x,term)).slice(0,20);
@@ -10299,7 +10306,24 @@ document.addEventListener("DOMContentLoaded",function(){
         console.warn("Commission service query failed:",e);
       }
     }
-    return [];
+
+    // Last retry: services may have been refreshed while the async query was
+    // running. Check the live array one more time before showing no results.
+    return serviceRows().filter(x=>commissionServiceMatches(x,term)).slice(0,20);
+  }
+
+  async function preloadCommissionServices(){
+    if(typeof sb==="undefined" || !sb)return;
+    try{
+      const r=await sb.from("medifella_services")
+        .select("id,service_code,name,service_type,price,created_at")
+        .order("created_at",{ascending:false})
+        .limit(1000);
+      if(!r.error && Array.isArray(r.data))mergeCommissionServices(r.data);
+      else if(r.error)console.warn("Commission service preload:",r.error.message||r.error);
+    }catch(e){
+      console.warn("Commission service preload failed:",e);
+    }
   }
 
   function renderCommissionServiceResults(rows){
@@ -10734,6 +10758,10 @@ document.addEventListener("DOMContentLoaded",function(){
     setTimeout(populateCommissionStaff,300);
     setTimeout(populateCommissionStaff,1000);
     setTimeout(populateCommissionServices,1000);
+    // Also preload the Service List for Sale Commission. This fixes the case
+    // where the Commission section opens before loadServices() finishes.
+    preloadCommissionServices();
+    setTimeout(preloadCommissionServices,800);
 
     C("commissionCustomerSearch")?.addEventListener("input",renderCommissionCustomerResults);
     C("commissionCustomerResults")?.addEventListener("click",e=>{
@@ -10745,13 +10773,25 @@ document.addEventListener("DOMContentLoaded",function(){
       if(commissionServiceSearchTimer)clearTimeout(commissionServiceSearchTimer);
       commissionServiceSearchTimer=setTimeout(searchCommissionServices,120);
     });
-    C("commissionServiceResults")?.addEventListener("click",e=>{
-      const b=e.target.closest("[data-commission-service]");
-      if(b){
+    const commissionResults=C("commissionServiceResults");
+    if(commissionResults && commissionResults.dataset.commissionClickBound!=="1"){
+      commissionResults.dataset.commissionClickBound="1";
+
+      // Use mousedown capture as well as click so a result is selectable even
+      // if another dashboard handler stops the normal click event.
+      const chooseCommissionService=e=>{
+        const b=e.target.closest("[data-commission-service]");
+        if(!b || !commissionResults.contains(b))return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        if(b.dataset.commissionChosen==="1")return;
+        b.dataset.commissionChosen="1";
         addCommissionService(b.dataset.commissionService);
-        renderCommissionServiceResults();
-      }
-    });
+      };
+      commissionResults.addEventListener("mousedown",chooseCommissionService,true);
+      commissionResults.addEventListener("click",chooseCommissionService,true);
+    }
     C("commissionAddItem")?.addEventListener("click",()=>{
       C("commissionServiceSearch")?.focus();
       renderCommissionServiceResults();
