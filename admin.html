@@ -10237,12 +10237,10 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function normalizeCommissionSearchText(v){
-    // Normalize common Unicode variants so searches such as "co2" also
-    // match service names written as "CO₂" (subscript 2), and tolerate
-    // punctuation/spaces used in service names.
-    const subscriptMap={"₀":"0","₁":"1","₂":"2","₃":"3","₄":"4","₅":"5","₆":"6","₇":"7","₈":"8","₉":"9"};
+    // Make service searching tolerant of CO2/CO₂, punctuation, dashes,
+    // Khmer text, spaces and case differences.
     return String(v??"")
-      .replace(/[₀₁₂₃₄₅₆₇₈₉]/g,ch=>subscriptMap[ch]||ch)
+      .replace(/[₀-₉]/g,ch=>String("₀₁₂₃₄₅₆₇₈₉".indexOf(ch)))
       .toLowerCase()
       .normalize("NFKC")
       .replace(/[^a-z0-9\u1780-\u17ff]+/gi," ")
@@ -10252,18 +10250,26 @@ document.addEventListener("DOMContentLoaded",function(){
   function commissionServiceMatches(s,q){
     const needle=normalizeCommissionSearchText(q);
     if(!needle)return false;
-    const fields=[s?.id,s?.service_id,s?.service_code,s?.code,s?.name,s?.service_name,s?.title,s?.service_type,s?.type];
+    const fields=[
+      s?.id,s?.service_id,s?.service_code,s?.code,
+      s?.name,s?.service_name,s?.title,
+      s?.service_type,s?.type
+    ];
     const hay=fields.map(normalizeCommissionSearchText).join(" ");
     if(hay.includes(needle))return true;
-    // Also support searches such as "co2 laser" when the stored name has
-    // punctuation/spaces in a different form.
     const tokens=needle.split(/\s+/).filter(Boolean);
     return tokens.length>1 && tokens.every(t=>hay.includes(t));
   }
 
+  function commissionServiceSearchRows(q){
+    const rows=Array.isArray(window.services)?window.services:
+      (typeof services!=="undefined" && Array.isArray(services)?services:[]);
+    return rows.filter(x=>commissionServiceMatches(x,q)).slice(0,20);
+  }
+
   function mergeCommissionServices(all){
     if(!Array.isArray(all)||!all.length)return;
-    const current=serviceRows().slice();
+    const current=Array.isArray(window.services)?window.services.slice():[];
     all.forEach(x=>{
       const id=String(x?.id??x?.service_id??"");
       const idx=id?current.findIndex(y=>String(y?.id??y?.service_id??"")===id):-1;
@@ -10276,50 +10282,39 @@ document.addEventListener("DOMContentLoaded",function(){
   async function fetchCommissionServicesFromDatabase(q){
     if(typeof sb==="undefined" || !q)return [];
     const term=String(q).trim();
-    if(!term)return [];
 
-    // First make sure the same Service Management data is available locally.
-    let local=serviceRows();
-    if(!local.length && typeof loadServices==="function"){
-      try{ await loadServices(); local=serviceRows(); }catch(e){ console.warn("Commission local service load:",e); }
+    // IMPORTANT: use the exact same service list already loaded by
+    // Services Management first. This is the source of truth.
+    let found=commissionServiceSearchRows(term);
+    if(found.length)return found;
+
+    // Refresh the same table before reporting no results. The previous
+    // version only refreshed when the local list was completely empty,
+    // which could leave a stale/partial list in the Commission page.
+    if(typeof loadServices==="function"){
+      try{
+        await loadServices();
+        found=commissionServiceSearchRows(term);
+        if(found.length)return found;
+      }catch(e){
+        console.warn("Commission service refresh failed:",e);
+      }
     }
-    const localFound=local.filter(x=>commissionServiceMatches(x,term)).slice(0,20);
-    if(localFound.length)return localFound;
 
+    // Final direct database fallback. Fetch the complete Service List and
+    // search locally so CO₂ and other Unicode/punctuation variants work.
     try{
-      // Use the exact columns used by Services Management.  This avoids a
-      // fragile broad query and makes the commission picker use the same list.
-      let r=await sb.from("medifella_services")
-        .select("id,service_code,name,service_type,price,created_at")
+      const r=await sb.from("medifella_services")
+        .select("*")
         .order("created_at",{ascending:false})
         .limit(1000);
-
-      // If the project has a slightly different schema, fall back to *.
       if(r.error){
-        r=await sb.from("medifella_services").select("*").limit(1000);
-      }
-      if(!r.error && (!Array.isArray(r.data) || !r.data.length)){
-        // Service Management itself uses select("*"). Retry once in case
-        // the first query was affected by a stale/partial response.
-        const retry=await sb.from("medifella_services").select("*").limit(1000);
-        if(!retry.error)r=retry;
-      }
-      if(r.error){
-        console.warn("Commission service search:",r.error.message);
+        console.warn("Commission service database search:",r.error.message);
         return [];
       }
-
       const all=Array.isArray(r.data)?r.data:[];
       mergeCommissionServices(all);
-
-      // Search the complete Service Management list client-side. This is
-      // important for names containing Unicode symbols such as CO₂.
-      let found=all.filter(x=>commissionServiceMatches(x,term)).slice(0,20);
-      if(!found.length){
-        const merged=serviceRows();
-        found=merged.filter(x=>commissionServiceMatches(x,term)).slice(0,20);
-      }
-      return found;
+      return all.filter(x=>commissionServiceMatches(x,term)).slice(0,20);
     }catch(e){
       console.warn("Commission service search failed:",e);
       return [];
@@ -10352,18 +10347,19 @@ document.addEventListener("DOMContentLoaded",function(){
   async function searchCommissionServices(){
     const input=C("commissionServiceSearch");
     if(!input)return;
-    const q=String(input.value||"").trim().toLowerCase();
+    const q=String(input.value||"").trim();
     if(!q){
       renderCommissionServiceResults([]);
       return;
     }
-    // Show local matches immediately, then refresh from the database. This
-    // fixes the case where the Commission section opens before Service List
-    // data has finished loading.
-    renderCommissionServiceResults();
+
+    // Always search the actual Service List first.
+    const local=commissionServiceSearchRows(q);
+    renderCommissionServiceResults(local);
+
     const found=await fetchCommissionServicesFromDatabase(q);
-    if(String(input.value||"").trim().toLowerCase()!==q)return;
-    if(found.length)renderCommissionServiceResults(found);
+    if(String(input.value||"").trim()!==q)return;
+    renderCommissionServiceResults(found);
   }
 
   function addCommissionService(id){
