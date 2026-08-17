@@ -2074,6 +2074,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <button class="nav" data-section="mtsSale">🧾 MTS Sale</button>
 <button class="nav" data-section="dermedSale">🧾 Dermed Sale</button>
 <button class="nav" data-section="saleCommission">💰 Sale Commission Management</button>
+<button class="nav" data-section="saleStaffManagement">👤 Sale Staff Management</button>
 <button class="nav" data-section="appointments">📅 Appointment Management</button>
 <button class="nav" data-section="products">📦 Product Management</button>
 <button class="nav" data-section="services">🧴 Services Management</button>
@@ -2522,6 +2523,30 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
   <div id="commissionGrandTotal" class="commission-grand-total"></div>
 </div>
 </section>
+<section id="saleStaffManagement" class="section">
+<h1>Sale Staff Management</h1>
+<div class="card">
+  <h2>+ Sale Staff</h2>
+  <div class="row">
+    <div><label>Sale Staff *</label><select id="saleStaffConfigStaff"><option value="">Choose existing staff</option></select></div>
+    <div><label>Product Commission % *</label><input id="saleStaffProductRate" type="text" inputmode="decimal" placeholder="0"><div class="muted">Applies to all products from Product Management.</div></div>
+  </div>
+  <div class="row">
+    <div><label>Service Commission % *</label><input id="saleStaffServiceRate" type="text" inputmode="decimal" placeholder="3"><div class="muted">Applies to all services marked as Service.</div></div>
+    <div><label>Service With Product Commission % *</label><input id="saleStaffServiceProductRate" type="text" inputmode="decimal" placeholder="2"><div class="muted">Applies to all services marked as Service With Product.</div></div>
+  </div>
+  <div class="row"><div><label>Effective From *</label><input id="saleStaffConfigDate" type="date"></div><div></div></div>
+  <div class="muted" style="margin-top:6px">Saving changed rates creates a new record. Previous sale records keep their original commission.</div>
+  <div id="saleStaffConfigStatus"></div>
+  <div class="actions" style="margin-top:14px"><button id="saveSaleStaffConfig" type="button" class="gold">Save Sale Staff</button><button id="clearSaleStaffConfig" type="button" class="light">Clear</button></div>
+</div>
+<div class="card" style="margin-top:18px">
+  <h2>Sale Staff List</h2>
+  <div class="toolbar"><input id="saleStaffConfigSearch" placeholder="Search sale staff name"><button id="saleStaffConfigRefresh" class="light" type="button">Refresh</button></div>
+  <div id="saleStaffConfigList">Loading...</div>
+</div>
+</section>
+
 <section id="appointments" class="section">
   <div class="appointment-titlebar">
     <div>
@@ -2909,6 +2934,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div class="card"><h2>Add New Service</h2><input type="hidden" id="serviceEditId">
 <label>Name of Service *</label><input id="serviceName">
 <label>Type *</label><select id="serviceType"><option>Service With Product</option><option>Only Service</option></select>
+<label>Payment Type *</label><select id="servicePaymentType"><option value="Single">Single</option><option value="Package">Package</option></select>
 <label>Price (USD) *</label><input id="servicePrice" type="text" inputmode="decimal" autocomplete="off" spellcheck="false" placeholder="e.g. 0.01, 10, 50.50" style="width:100%;pointer-events:auto;user-select:text;-webkit-user-select:text;cursor:text;">
 <div class="actions" style="margin-top:14px"><button id="saveService" type="button" class="gold">Save Service</button><button id="clearService" class="light">Clear</button></div><div id="serviceStatus"></div></div>
 <div class="card"><h2>Service List</h2><div class="toolbar"><input id="serviceSearch" placeholder="Search Service ID or Service Name"><button id="serviceRefresh" class="light">Refresh</button></div><div id="serviceList">Loading...</div></div>
@@ -3071,6 +3097,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <label style="font-weight:400"><input id="permMtsSale" type="checkbox"> MTS Sale</label>
 <label style="font-weight:400"><input id="permDermedSale" type="checkbox"> Dermed Sale</label>
 <label style="font-weight:400"><input id="permSaleCommission" type="checkbox"> Sale Commission Management</label>
+<label style="font-weight:400"><input id="permSaleStaffManagement" type="checkbox"> Sale Staff Management</label>
 <label style="font-weight:400"><input id="permAppointments" type="checkbox"> Appointment Management</label>
 <label style="font-weight:400"><input id="permProducts" type="checkbox"> Product Management</label>
 <label style="font-weight:400"><input id="permServices" type="checkbox"> Services Management</label>
@@ -3295,7 +3322,7 @@ document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{
    updateSaleDateTimeDisplay();
    $("saleReference").value=nextSaleReference();
  }
- if(["products","mtsSale","dermedSale","services","staffManagement","customers","appointments"].includes(b.dataset.section)){
+ if(["products","mtsSale","dermedSale","services","staffManagement","customers","appointments","saleStaffManagement"].includes(b.dataset.section)){
    renderInventoryControls(); renderBuyerControls(); renderServiceControls();
    if(b.dataset.section==="products") renderProductList();
    if(b.dataset.section==="mtsSale") renderMtsSales();
@@ -4920,6 +4947,7 @@ async function printInvoice(id,size="A4"){
 <scr`+`ipt>
 window.onload=function(){setTimeout(function(){window.print();},250);};
 <\/script>
+
 </body>
 </html>`;
 
@@ -5829,6 +5857,7 @@ function normalizeStaffPermissions(raw){
     mtsSale:["mtsSale","mts","mtsSales"],
     dermedSale:["dermedSale","dermed","dermedSales"],
     saleCommission:["saleCommission","saleCommissionManagement","commission","commissions"],
+    saleStaffManagement:["saleStaffManagement","saleStaff","saleStaffCommission","saleStaffManagementSettings"],
     appointments:["appointments","appointmentManagement","appointment"],
     products:["products","productManagement","product"],
     services:["services","servicesManagement","service"],
@@ -5849,7 +5878,7 @@ function normalizeStaffPermissions(raw){
 
 const STAFF_PERMISSION_KEYS = [
 ["dashboard","permDashboard"],["students","permStudents"],["sales","permSales"],
-["mtsSale","permMtsSale"],["dermedSale","permDermedSale"],["saleCommission","permSaleCommission"],["appointments","permAppointments"],
+["mtsSale","permMtsSale"],["dermedSale","permDermedSale"],["saleCommission","permSaleCommission"],["saleStaffManagement","permSaleStaffManagement"],["appointments","permAppointments"],
 ["products","permProducts"],["services","permServices"],["staffManagement","permStaffManagement"],
 ["customers","permCustomers"],["certificates","permCertificates"],["posts","permPosts"],
 ["courses","permCourses"],["staff","permStaffAccounts"],["admins","permAdmins"]
@@ -5883,7 +5912,7 @@ function renderStaff(){
     const permissions=normalizeStaffPermissions(p.permissions);
     const labels=[
       ["dashboard","Dashboard"],["students","Students"],["sales","Medi Fella Sale"],
-      ["mtsSale","MTS Sale"],["dermedSale","Dermed Sale"],["saleCommission","Sale Commission Management"],["appointments","Appointment Management"],
+      ["mtsSale","MTS Sale"],["dermedSale","Dermed Sale"],["saleCommission","Sale Commission Management"],["saleStaffManagement","Sale Staff Management"],["appointments","Appointment Management"],
       ["products","Product Management"],["services","Services Management"],
       ["staffManagement","Staff Management"],["customers","Customer Management"],
       ["certificates","Certificate Verification"],["posts","News Feed"],
@@ -6247,7 +6276,7 @@ function renderServiceList(){
  if(!$("serviceList"))return;
  const q=($("serviceSearch")?.value||"").trim().toLowerCase();
  const rows=services.filter(x=>(`${x.service_code||""} ${x.name||""}`).toLowerCase().includes(q));
- $("serviceList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Service ID</th><th>Name of Service</th><th>Type</th><th>Price</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.service_code)}</td><td>${esc(x.name)}</td><td>${esc(x.service_type)}</td><td>${money(x.price)}</td><td><div class="actions"><button type="button" class="light service-edit-btn" data-id="${attr(x.id)}">Edit</button><button type="button" class="danger service-delete-btn" data-id="${attr(x.id)}">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No services found.</p>';
+ $("serviceList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Service ID</th><th>Name of Service</th><th>Type</th><th>Payment</th><th>Price</th><th>Action</th></tr>${rows.map(x=>`<tr><td>${esc(x.service_code)}</td><td>${esc(x.name)}</td><td>${esc(x.service_type)}</td><td>${esc(x.service_payment_type||"Single")}</td><td>${money(x.price)}</td><td><div class="actions"><button type="button" class="light service-edit-btn" data-id="${attr(x.id)}">Edit</button><button type="button" class="danger service-delete-btn" data-id="${attr(x.id)}">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No services found.</p>';
  document.querySelectorAll(".service-edit-btn").forEach(btn=>btn.addEventListener("click",()=>editService(btn.dataset.id)));
  document.querySelectorAll(".service-delete-btn").forEach(btn=>btn.addEventListener("click",()=>deleteService(btn.dataset.id)));
 }
@@ -6604,7 +6633,7 @@ function editCustomer(id){const x=customers.find(x=>String(x.id)===String(id));i
 async function deleteCustomer(id){if(!confirm("Delete this customer?"))return;const r=await sb.from("medifella_customers").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadCustomers()}
 $("clearCustomer").onclick=clearCustomerForm;
 
-$("saveService").onclick=async()=>{clearMsg($("serviceStatus"));const id=$("serviceEditId").value,name=$("serviceName").value.trim(),service_type=$("serviceType").value,rawPrice=$("servicePrice").value.trim(),price=Number(rawPrice);if(!name||rawPrice===""||!Number.isFinite(price)||price<0){msg($("serviceStatus"),"Service Name and Price are required.",true);return}try{const payload={name,service_type,price};let r=id?await sb.from("medifella_services").update(payload).eq("id",id):await sb.from("medifella_services").insert({...payload,service_code:genId("SV",services,"service_code")});if(r.error)throw r.error;msg($("serviceStatus"),id?"Service updated.":"Service added.");clearServiceForm();await loadServices()}catch(e){msg($("serviceStatus"),e.message,true)}};
+$("saveService").onclick=async()=>{clearMsg($("serviceStatus"));const id=$("serviceEditId").value,name=$("serviceName").value.trim(),service_type=$("serviceType").value,service_payment_type=$("servicePaymentType")?.value||"Single",rawPrice=$("servicePrice").value.trim(),price=Number(rawPrice);if(!name||rawPrice===""||!Number.isFinite(price)||price<0){msg($("serviceStatus"),"Service Name and Price are required.",true);return}try{const payload={name,service_type,service_payment_type,price};let r=id?await sb.from("medifella_services").update(payload).eq("id",id):await sb.from("medifella_services").insert({...payload,service_code:genId("SV",services,"service_code")});if(r.error)throw r.error;msg($("serviceStatus"),id?"Service updated.":"Service added.");clearServiceForm();await loadServices()}catch(e){msg($("serviceStatus"),e.message,true)}};
 document.addEventListener("input",function(e){
  if(e.target && e.target.id==="servicePrice"){
    const pos=e.target.selectionStart;
@@ -6615,13 +6644,14 @@ document.addEventListener("input",function(e){
    }
  }
 });
-function clearServiceForm(){$("serviceEditId").value="";$("serviceName").value="";$("serviceType").value="Service With Product";$("servicePrice").value=""}
+function clearServiceForm(){$("serviceEditId").value="";$("serviceName").value="";$("serviceType").value="Service With Product";if($("servicePaymentType"))$("servicePaymentType").value="Single";$("servicePrice").value=""}
 function editService(id){
  const x=services.find(x=>String(x.id)===String(id));
  if(!x){alert("Service record not found. Please refresh the Service List.");return}
  $("serviceEditId").value=x.id;
  $("serviceName").value=x.name||"";
  $("serviceType").value=x.service_type||"Only Service";
+ if($("servicePaymentType"))$("servicePaymentType").value=x.service_payment_type||"Single";
  $("servicePrice").value=(x.price ?? "").toString();
  const form=document.getElementById("services");
  const nameInput=document.getElementById("serviceName");
@@ -6648,7 +6678,7 @@ function addDermedService(id){
  const x=services.find(x=>String(x.id)===String(id));if(!x)return;
  const arr=window.dermedServiceItems||(window.dermedServiceItems=[]);
  if(arr.some(y=>String(y.service_id)===String(id)))return;
- arr.push({service_id:x.id,service_code:x.service_code,name:x.name,service_type:x.service_type,price:Number(x.price||0),quantity:1});
+ arr.push({service_id:x.id,service_code:x.service_code,name:x.name,service_type:x.service_type,service_payment_type:x.service_payment_type||"Single",price:Number(x.price||0),quantity:1});
  renderDermedCombinedItems();
  $("dermedServiceSearch").value="";$("dermedServiceResults").classList.remove("show");
 }
@@ -6877,7 +6907,7 @@ function editDermedSaleFromInvoice(id){
    discount_type:x.discount_type||"percent",discount_value:Number(x.discount_value??0)
  }));
  window.dermedServiceItems=(Array.isArray(s.service_items)?s.service_items:[]).map(x=>({
-   service_id:x.service_id,service_code:x.service_code,name:x.name,service_type:x.service_type,
+   service_id:x.service_id,service_code:x.service_code,name:x.name,service_type:x.service_type,service_payment_type:x.service_payment_type||"Single",
    price:Number(x.price??x.unit_price??0),quantity:Number(x.quantity??1),
    discount_type:x.discount_type||"percent",discount_value:Number(x.discount_value??0)
  }));
@@ -7218,7 +7248,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const s=getServices().find(x=>String(x.id)===String(id)); if(!s)return;
     const arr=sItems();
     if(arr.some(x=>String(x.service_id)===String(id)))return;
-    arr.push({service_id:s.id,service_code:s.service_code,name:s.name,service_type:s.service_type,price:num(s.price),quantity:1,discount_type:"percent",discount_value:0});
+    arr.push({service_id:s.id,service_code:s.service_code,name:s.name,service_type:s.service_type,service_payment_type:s.service_payment_type||"Single",price:num(s.price),quantity:1,discount_type:"percent",discount_value:0});
     renderItems();
     const i=E("dermedItemSearch"); if(i)i.value="";
     const r=E("dermedItemResults"); if(r){r.innerHTML="";r.classList.remove("show");}
@@ -7376,7 +7406,19 @@ document.addEventListener("DOMContentLoaded",function(){
     const status=c.status, paid=c.paid;
     if(status==="Paid" && paid+0.005<c.initial){msg(E("dermedStatus"),"Paid status requires the full Initial Total.",true);return}
     if(status==="Due" && paid>0.005){msg(E("dermedStatus"),"Due status must have $0.00 paid.",true);return}
-    if(status==="Partial" && (paid<=0 || paid>=c.initial-0.005)){msg(E("dermedStatus"),"Partial Payment must be greater than $0 and less than the Initial Total.",true);return}
+    if(status==="Partial"){
+      const rawLineTotal=[...items,...servicesArr].reduce((n,x)=>{
+        const q=Math.max(1,num(x.quantity)),p=Math.max(0,num(x.price)),base=q*p,d=itemDiscount(base,x.discount_type||"percent",x.discount_value||0);return n+Math.max(0,base-d);
+      },0);
+      const invoiceScale=rawLineTotal>0?Math.min(1,c.initial/rawLineTotal):1;
+      const requiredNow=[...items.map(x=>({package:false,subtotal:Math.max(0,num(x.price)*Math.max(1,num(x.quantity))-itemDiscount(num(x.price)*Math.max(1,num(x.quantity)),x.discount_type||"percent",x.discount_value||0))})),...servicesArr.map(x=>({package:String(x.service_payment_type||"Single").toLowerCase()==="package",subtotal:Math.max(0,num(x.price)*Math.max(1,num(x.quantity))-itemDiscount(num(x.price)*Math.max(1,num(x.quantity)),x.discount_type||"percent",x.discount_value||0))}))].filter(x=>!x.package).reduce((n,x)=>n+x.subtotal*invoiceScale,0);
+      const hasPackage=servicesArr.some(x=>String(x.service_payment_type||"Single").toLowerCase()==="package");
+      if(!hasPackage || paid+0.005<requiredNow || paid>=c.initial-0.005){msg(E("dermedStatus"),"Partial Payment is allowed only when Package services are included, and all Products / Single services must be fully paid first.",true);return}
+    }
+    if(status==="Due"){
+      const hasNonPackage=items.length>0 || servicesArr.some(x=>String(x.service_payment_type||"Single").toLowerCase()!=="package");
+      if(hasNonPackage){msg(E("dermedStatus"),"Products and Single services must be paid at the time of sale. Due is allowed only for Package services.",true);return}
+    }
     const buyer=buyerType==="student"?students.find(x=>String(x.id)===String(buyerId)):customers.find(x=>String(x.id)===String(buyerId));
     const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
     const now=phTime();
@@ -7452,10 +7494,9 @@ document.addEventListener("DOMContentLoaded",function(){
         const movements=items.map(x=>({product_id:x.product_id,movement_type:"sale",quantity:Math.max(1,num(x.quantity)),staff_id:staffId,staff_name:staff?.name_en||"",stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));
         if(movements.length){const mr=await sb.from("medifella_inventory_movements").insert(movements);if(mr.error)throw mr.error}
       }
-      // Commission belongs to the customer's FIRST Dermed invoice.
-      // For the first invoice, editing the invoice recalculates its commission
-      // from the edited services. Later invoices never create commission.
-      if(r?.data?.id){
+      // Create commission only when a new Dermed sale is created.
+      // Editing an old invoice never changes the commission already recorded for that sale.
+      if(r?.data?.id && !editingId){
         try{
           await recordFirstDermedSaleCommission({
             sale:r.data,
@@ -13155,6 +13196,128 @@ document.addEventListener("DOMContentLoaded",function(){
 
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind,{once:true});
   else bind();
+})();
+</script>
+
+<script id="sale-staff-management-v1">
+(function(){
+  "use strict";
+  const E=id=>document.getElementById(id);
+  const escV=v=>typeof esc==="function"?esc(v):String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const attrV=v=>typeof attr==="function"?attr(v):String(v??"").replace(/"/g,"&quot;");
+  const N=v=>{const n=Number(String(v??"").replace(/[$,\s%]/g,""));return Number.isFinite(n)?Math.max(0,n):0};
+  const today=()=>new Date().toISOString().slice(0,10);
+  let configs=[];
+  window.saleStaffConfigs=[];
+  function staffList(){return Array.isArray(window.staffInfoRecords)?window.staffInfoRecords:[]}
+  function staffName(s){return s?.name_en||s?.name_kh||s?.name_km||s?.name||"Staff"}
+  function fillStaffSelect(){
+    const el=E("saleStaffConfigStaff");if(!el)return;
+    const old=el.value;
+    el.innerHTML='<option value="">Choose existing staff</option>'+staffList().map(s=>'<option value="'+attrV(s.id)+'">'+escV(staffName(s))+(s.job_title?' · '+escV(s.job_title):'')+'</option>').join('');
+    if(old)el.value=old;
+  }
+  async function loadConfigs(){
+    const box=E("saleStaffConfigList");if(box)box.textContent="Loading...";
+    try{
+      const r=await sb.from("medifella_sale_staff").select("*").order("created_at",{ascending:false});
+      if(r.error)throw r.error;
+      configs=Array.isArray(r.data)?r.data:[];window.saleStaffConfigs=configs;renderList();refreshDermedSaleStaff();
+    }catch(e){
+      configs=[];window.saleStaffConfigs=[];
+      if(box)box.innerHTML='<div class="status error">'+escV(e.message||e)+'<br><span class="muted">Run the Sale Staff Management SQL setup before using this section.</span></div>';
+      refreshDermedSaleStaff();
+    }
+  }
+  function renderList(){
+    const box=E("saleStaffConfigList");if(!box)return;
+    const q=(E("saleStaffConfigSearch")?.value||"").trim().toLowerCase();
+    const rows=configs.filter(x=>String(x.staff_name||"").toLowerCase().includes(q));
+    box.innerHTML=rows.length?'<div class="table-wrap"><table class="table"><thead><tr><th>Sale Staff Name</th><th>Product</th><th>Service</th><th>Service With Product</th><th>Effective From</th><th>Action</th></tr></thead><tbody>'+rows.map(x=>'<tr><td>'+escV(x.staff_name||'')+'</td><td>'+N(x.product_rate)+'%</td><td>'+N(x.service_rate)+'%</td><td>'+N(x.service_product_rate)+'%</td><td>'+escV(String(x.effective_from||x.created_at||'').slice(0,10))+'</td><td><div class="actions"><button type="button" class="light sale-staff-edit" data-id="'+attrV(x.id)+'">Edit</button><button type="button" class="danger sale-staff-delete" data-id="'+attrV(x.id)+'">Delete</button></div></td></tr>').join('')+'</tbody></table></div>':'<p class="muted">No Sale Staff records found.</p>';
+  }
+  function clearForm(){
+    if(E("saleStaffConfigStaff"))E("saleStaffConfigStaff").value="";
+    if(E("saleStaffProductRate"))E("saleStaffProductRate").value="";
+    if(E("saleStaffServiceRate"))E("saleStaffServiceRate").value="";
+    if(E("saleStaffServiceProductRate"))E("saleStaffServiceProductRate").value="";
+    if(E("saleStaffConfigDate"))E("saleStaffConfigDate").value=today();
+  }
+  function editConfig(id){
+    const x=configs.find(r=>String(r.id)===String(id));if(!x)return;
+    E("saleStaffConfigStaff").value=x.staff_id||"";E("saleStaffProductRate").value=N(x.product_rate);E("saleStaffServiceRate").value=N(x.service_rate);E("saleStaffServiceProductRate").value=N(x.service_product_rate);E("saleStaffConfigDate").value=String(x.effective_from||x.created_at||today()).slice(0,10);
+    if(E("saleStaffConfigStatus"))E("saleStaffConfigStatus").innerHTML='<div class="status">Editing this rate record. Saving creates a NEW record and does not change the old record.</div>';
+  }
+  async function saveConfig(){
+    const staffId=E("saleStaffConfigStaff")?.value,s=staffList().find(x=>String(x.id)===String(staffId));
+    const date=E("saleStaffConfigDate")?.value||today(),pr=N(E("saleStaffProductRate")?.value),sr=N(E("saleStaffServiceRate")?.value),spr=N(E("saleStaffServiceProductRate")?.value);
+    if(!staffId||!s){E("saleStaffConfigStatus").innerHTML='<div class="status error">Please choose an existing staff member.</div>';return}
+    if(pr>100||sr>100||spr>100){E("saleStaffConfigStatus").innerHTML='<div class="status error">Commission rates must be between 0% and 100%.</div>';return}
+    const payload={staff_id:staffId,staff_name:staffName(s),product_rate:pr,service_rate:sr,service_product_rate:spr,effective_from:date,active:true,created_by:adminUser?.id||null};
+    const btn=E("saveSaleStaffConfig");if(btn){btn.disabled=true;btn.textContent="Saving..."}
+    try{const r=await sb.from("medifella_sale_staff").insert(payload);if(r.error)throw r.error;E("saleStaffConfigStatus").innerHTML='<div class="status">Sale Staff saved. A new commission-rate record was created.</div>';clearForm();await loadConfigs();}
+    catch(e){E("saleStaffConfigStatus").innerHTML='<div class="status error">'+escV(e.message||e)+'</div>'}
+    finally{if(btn){btn.disabled=false;btn.textContent="Save Sale Staff"}}
+  }
+  async function deleteConfig(id){
+    const x=configs.find(r=>String(r.id)===String(id));if(!x)return;
+    if(!confirm('Delete Sale Staff commission record for '+(x.staff_name||'staff')+'? Old sale records will remain unchanged.'))return;
+    const r=await sb.from("medifella_sale_staff").delete().eq("id",id);if(r.error){alert(r.error.message);return}await loadConfigs();
+  }
+  function latestConfigs(){
+    const map=new Map();
+    [...configs].sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||""))).forEach(x=>{if(x.active===false)return;const k=String(x.staff_id||"");if(k&&!map.has(k))map.set(k,x)});
+    return [...map.values()];
+  }
+  function refreshDermedSaleStaff(){
+    const el=E("dermedSaleStaff");if(!el)return;const old=el.value,latest=latestConfigs();
+    el.innerHTML='<option value="">Select Sale Staff</option>'+latest.map(x=>'<option value="'+attrV(x.staff_id)+'">'+escV(x.staff_name||'Staff')+' · P '+N(x.product_rate)+'% / S '+N(x.service_rate)+'% / SP '+N(x.service_product_rate)+'%</option>').join('');
+    if(old&&latest.some(x=>String(x.staff_id)===String(old)))el.value=old;
+  }
+  window.refreshSaleStaffManagementOptions=refreshDermedSaleStaff;
+  window.getCurrentSaleStaffConfig=function(staffId){return latestConfigs().find(x=>String(x.staff_id)===String(staffId))||null};
+  function serviceType(t){const s=String(t||"").toLowerCase();return s.includes("with product")||s.includes("service_product")?"Service With Product":"Only Service"}
+  function paymentType(x){return String(x?.service_payment_type||"Single").toLowerCase()==="package"?"Package":"Single"}
+  function lineSubtotal(x){const q=Math.max(1,N(x.quantity??x.unit??1)),p=N(x.price??x.unit_price),base=q*p;const dt=String(x.discount_type||"percent").toLowerCase(),dv=N(x.discount_value);const d=dt==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);return Math.max(0,base-d)}
+
+  window.recordFirstDermedSaleCommission=async function({sale,buyer,buyerType,buyerId,staffId,staff,servicesArr,items,adminId}){
+    if(String(sale?.sale_type||"").trim().toUpperCase()!=="DERMED"||!sale?.id||!staffId)return;
+    const cfg=window.getCurrentSaleStaffConfig(staffId);if(!cfg){console.warn("Commission skipped: no Sale Staff Management record for selected Sale Staff.");return}
+    const del=await sb.from("medifella_sale_commissions").delete().eq("source_sale_id",sale.id).eq("source","dermed_auto");
+    if(del.error&&!/source_sale_id|source.*column|column .* does not exist|schema cache/i.test(String(del.error.message||"")))throw del.error;
+    const productLines=(Array.isArray(items)?items:[]).map(x=>({kind:"product",name:x.name||"Product",product_id:x.product_id||null,service_id:null,service_type:null,payment_type:"Single",subtotal:lineSubtotal(x)})).filter(x=>x.subtotal>0);
+    const serviceLines=(Array.isArray(servicesArr)?servicesArr:[]).map(x=>({kind:"service",name:x.name||"Service",product_id:null,service_id:x.service_id||null,service_type:serviceType(x.service_type),payment_type:paymentType(x),subtotal:lineSubtotal(x)})).filter(x=>x.subtotal>0);
+    const lines=[...productLines,...serviceLines];if(!lines.length)return;
+    const nonPackageTotal=lines.filter(x=>x.kind==="product"||x.payment_type!=="Package").reduce((n,x)=>n+x.subtotal,0);
+    const paidTotal=Math.min(N(sale.paid),N(sale.grand_total||sale.subtotal||0));
+    if(String(sale.payment_status||"")==="Partial"&&paidTotal+0.005<nonPackageTotal){console.warn("Partial Dermed payment is below the required full payment for products/single services; no commission was created.");return}
+    let packagePaid=Math.max(0,paidTotal-nonPackageTotal);const packageTotal=lines.filter(x=>x.kind==="service"&&x.payment_type==="Package").reduce((n,x)=>n+x.subtotal,0);packagePaid=Math.min(packagePaid,packageTotal);
+    const rows=[];
+    for(const x of lines){
+      let base=0,rate=0;
+      if(x.kind==="product"){base=x.subtotal;rate=N(cfg.product_rate)/100}
+      else if(x.payment_type!=="Package"){base=x.subtotal;rate=(x.service_type==="Service With Product"?N(cfg.service_product_rate):N(cfg.service_rate))/100}
+      else{base=Math.min(x.subtotal,packagePaid);packagePaid=Math.max(0,packagePaid-base);rate=(x.service_type==="Service With Product"?N(cfg.service_product_rate):N(cfg.service_rate))/100}
+      const amount=base*rate;if(base<=0||rate<=0)continue;
+      rows.push({commission_date:String(sale.sale_date||today()).slice(0,10),staff_id:staffId,staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||cfg.staff_name||"",customer_id:buyerType==="customer"?buyerId:null,student_id:buyerType==="student"?buyerId:null,customer_name:buyer?.name||buyer?.full_name||"",customer_phone:buyer?.phone||"",service_type:x.kind==="product"?"product":(x.service_type==="Service With Product"?"service_product":"service"),service_detail:x.name,service_id:x.service_id,product_id:x.product_id,unit:1,unit_price:base,discount:0,subtotal:base,commission_rate:rate,commission_amount:amount,source:"dermed_auto",source_sale_id:sale.id,reference_no:sale.reference_no||"",created_by:adminId||null});
+    }
+    if(!rows.length)return;
+    let pending=rows;
+    for(let attempt=0;attempt<8;attempt++){
+      const r=await sb.from("medifella_sale_commissions").insert(pending);if(!r.error)return;
+      const e=String(r.error.message||r.error.details||""),m=e.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']?.*does not exist/i)||e.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i)||e.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
+      if(m&&pending[0]&&Object.prototype.hasOwnProperty.call(pending[0],m[1])){pending=pending.map(x=>{const y={...x};delete y[m[1]];return y});continue}throw r.error;
+    }
+  };
+  function bind(){
+    if(E("saleStaffConfigDate")&&!E("saleStaffConfigDate").value)E("saleStaffConfigDate").value=today();fillStaffSelect();
+    E("saveSaleStaffConfig")?.addEventListener("click",saveConfig);E("clearSaleStaffConfig")?.addEventListener("click",clearForm);E("saleStaffConfigSearch")?.addEventListener("input",renderList);E("saleStaffConfigRefresh")?.addEventListener("click",loadConfigs);
+    E("saleStaffConfigList")?.addEventListener("click",e=>{const ed=e.target.closest(".sale-staff-edit"),del=e.target.closest(".sale-staff-delete");if(ed)editConfig(ed.dataset.id);if(del)deleteConfig(del.dataset.id)});
+    loadConfigs();
+    document.addEventListener("click",e=>{const n=e.target.closest?.('.nav[data-section="dermedSale"]');if(n)setTimeout(refreshDermedSaleStaff,50)});
+    setInterval(refreshDermedSaleStaff,1500);
+    setInterval(fillStaffSelect,2000);
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind,{once:true});else bind();
 })();
 </script>
 
