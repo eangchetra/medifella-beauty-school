@@ -2444,8 +2444,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
   <div class="commission-rule-note">
     <strong>Commission Rule:</strong>
-    Service With Product = <strong>2%</strong> &nbsp; | &nbsp;
-    Only Service = <strong>3%</strong>
+    <span id="commissionRuleDynamic">Select a Sale Staff to load the commission rates automatically.</span>
     <span>No need to choose or fill the commission type — it is automatic from the Service List.</span>
   </div>
 
@@ -10231,9 +10230,7 @@ document.addEventListener("DOMContentLoaded",function(){
     return String(type||"Service");
   }
 
-  // USER RULE:
-  // Service With Product = 2%
-  // Only Service = 3%
+  // Commission rates come from the selected Sale Staff Management record.
   function commissionRateForService(service){
     const type=serviceTypeLabel(service?.service_type);
     const staffId=C("commissionStaff")?.value||"";
@@ -10257,6 +10254,8 @@ document.addEventListener("DOMContentLoaded",function(){
       return;
     }
     box.innerHTML=`<strong>Commission Rates:</strong> Product ${Number(cfg.product_rate||0)}% &nbsp; | &nbsp; Service ${Number(cfg.service_rate||0)}% &nbsp; | &nbsp; Service With Product ${Number(cfg.service_product_rate||0)}%`;
+    const rule=C("commissionRuleDynamic");
+    if(rule) rule.innerHTML=`Service With Product = <strong>${Number(cfg.service_product_rate||0)}%</strong> &nbsp; | &nbsp; Only Service = <strong>${Number(cfg.service_rate||0)}%</strong>`;
   }
 
   function rebuildCommissionCustomerCache(){
@@ -10935,11 +10934,20 @@ document.addEventListener("DOMContentLoaded",function(){
     const serviceItems=Array.isArray(servicesArr)?servicesArr:[];
     if(!serviceItems.length)return;
 
-    // Rate is determined separately for EACH service from the Service List:
-    // Service With Product = 2%; Only Service = 3%.
+    // Rate is determined separately for EACH service from the selected Sale Staff's
+    // saved Sale Staff Management rates.
+    const staffConfig=window.getCurrentSaleStaffConfig(staffId);
+    if(!staffConfig){
+      console.warn("Dermed commission skipped: selected Sale Staff has no active commission configuration.");
+      return;
+    }
     const rows=serviceItems.map(x=>{
       const serviceType=serviceTypeLabel(x.service_type);
-      const rate=serviceType==="Only Service"?0.03:0.02;
+      const rate=serviceType==="Only Service"
+        ? Number(staffConfig.service_rate||0)/100
+        : serviceType==="Service With Product"
+          ? Number(staffConfig.service_product_rate||0)/100
+          : 0;
       const unit=Math.max(1,num(x.quantity));
       const price=Math.max(0,num(x.price));
       const base=unit*price;
