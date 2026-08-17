@@ -10603,17 +10603,61 @@ document.addEventListener("DOMContentLoaded",function(){
     renderCommissionServiceResults();
   }
 
-  async function loadCommissionRecords(){
-    if(typeof sb==="undefined")return;
-    const r=await sb.from("medifella_sale_commissions").select("*").order("commission_date",{ascending:false}).order("created_at",{ascending:false});
-    if(r.error){
-      console.warn("Commission table load:",r.error.message);
-      window.commissionRecords=[];
-      renderCommissionList();
+  async function loadCommissionRecords(retry=0){
+    const box=C("commissionList");
+    if(!box)return;
+
+    // The commission section can be opened immediately after login. If the
+    // Supabase client/session is not ready yet, retry instead of leaving the
+    // screen permanently stuck on "Loading...".
+    if(typeof sb==="undefined" || !sb){
+      if(retry<10){
+        box.innerHTML='<p class="muted">Connecting to the commission database...</p>';
+        setTimeout(()=>loadCommissionRecords(retry+1),500);
+      }else{
+        box.innerHTML='<p class="status error">Commission database is not ready. Please refresh the page.</p>';
+      }
       return;
     }
-    window.commissionRecords=r.data||[];
-    renderCommissionList();
+
+    box.innerHTML='<p class="muted">Loading commission records...</p>';
+
+    try{
+      let r=await sb.from("medifella_sale_commissions")
+        .select("*")
+        .order("commission_date",{ascending:false})
+        .order("created_at",{ascending:false});
+
+      // If an older table/schema does not support one of the ordering
+      // columns, retry with a simpler query. This does not change any data.
+      if(r.error){
+        console.warn("Commission ordered query:",r.error.message);
+        r=await sb.from("medifella_sale_commissions").select("*");
+      }
+
+      if(r.error){
+        console.error("Commission table read:",r.error);
+        window.commissionRecords=[];
+        box.innerHTML=`<div class="status error">
+          Could not read the old commission records from Supabase.<br>
+          <strong>${escC(r.error.message||"Unknown database error")}</strong>
+          <div class="muted" style="margin-top:6px">
+            If the message says "row-level security policy", the table needs a
+            SELECT policy for authenticated users. No commission records were deleted.
+          </div>
+        </div>`;
+        C("commissionGrandTotal").innerHTML="";
+        return;
+      }
+
+      window.commissionRecords=Array.isArray(r.data)?r.data:[];
+      renderCommissionList();
+    }catch(e){
+      console.error("Commission table read exception:",e);
+      window.commissionRecords=[];
+      box.innerHTML=`<div class="status error">Could not load commission records: ${escC(e.message||e)}</div>`;
+      C("commissionGrandTotal").innerHTML="";
+    }
   }
 
   function filteredCommissionRecords(){
