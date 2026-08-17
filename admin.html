@@ -4258,7 +4258,7 @@ function renderSales(){
  $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date / Time</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{
    const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
    const dt=saleDateValue(s),time=saleField(s,["sale_time","time"],"");
-   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button>${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
+   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button>${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.showPartialPaymentHistory('${attr(s.id)}'); return false;">Partial Payment History</button>`:""}${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
  }).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
  updateSalesMetrics();
 }
@@ -6785,6 +6785,7 @@ function renderMtsSales(){
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
        <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.showPartialPaymentHistory('${attr(x.id)}'); return false;">Partial Payment History</button>`:""}
        ${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -6819,6 +6820,7 @@ function renderDermedSales(){
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
        <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.showPartialPaymentHistory('${attr(x.id)}'); return false;">Partial Payment History</button>`:""}
        ${bal>0.005?`<button class="gold" type="button" onclick="recordDermedSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -13510,63 +13512,6 @@ document.addEventListener("DOMContentLoaded",function(){
   });
   document.addEventListener("keydown",e=>{if(e.key==="Escape")closeHistory();});
 
-  function saleHasPayment(s){
-    const paid=typeof salePaid==="function"?Number(salePaid(s)):Number(s?.paid||s?.paid_amount||s?.amount_paid||0);
-    return paid>0.005;
-  }
-
-  function addHistoryButtons(containerId){
-    const box=E(containerId);
-    if(!box)return;
-    const rows=box.querySelectorAll("table tbody tr");
-    rows.forEach(row=>{
-      if(row.querySelector(".partial-payment-history-btn"))return;
-      const cells=row.querySelectorAll("td");
-      if(!cells.length)return;
-      const refCell=cells[1];
-      const ref=String(refCell?.innerText||"").trim();
-      const sale=(Array.isArray(salesRecords)?salesRecords:[]).find(s=>{
-        const r=typeof saleRef==="function"?saleRef(s):String(s.reference_no||"");
-        return r && r===ref;
-      });
-      if(!sale || !saleHasPayment(s))return;
-      const actions=row.querySelector(".actions") || cells[cells.length-1];
-      if(!actions)return;
-      const b=document.createElement("button");
-      b.type="button";
-      b.className="light partial-payment-history-btn";
-      b.textContent="Partial Payment History";
-      b.addEventListener("click",()=>showPartialPaymentHistory(sale.id));
-      actions.appendChild(b);
-    });
-  }
-
-  function wrap(name,containerId){
-    if(typeof window[name]!=="function" || window[name].__pphWrapped)return;
-    const original=window[name];
-    const wrapped=function(){
-      const result=original.apply(this,arguments);
-      setTimeout(()=>addHistoryButtons(containerId),0);
-      return result;
-    };
-    wrapped.__pphWrapped=true;
-    window[name]=wrapped;
-  }
-
-  function install(){
-    wrap("renderSales","salesList");
-    wrap("renderMtsSales","mtsSalesList");
-    wrap("renderDermedSales","dermedSalesList");
-    setTimeout(()=>addHistoryButtons("salesList"),300);
-    setTimeout(()=>addHistoryButtons("mtsSalesList"),300);
-    setTimeout(()=>addHistoryButtons("dermedSalesList"),300);
-    setTimeout(()=>addHistoryButtons("salesList"),1200);
-    setTimeout(()=>addHistoryButtons("mtsSalesList"),1200);
-    setTimeout(()=>addHistoryButtons("dermedSalesList"),1200);
-  }
-
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
-  else install();
-})();
+  // Buttons are rendered directly by the three sale-list render functions above.\n  
 </script>
 
