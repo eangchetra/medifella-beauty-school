@@ -1,6 +1,7 @@
 <!doctype html>
 <html lang="en">
 <head>
+<!-- MEDIFELLA ADMIN BUILD: 2026-08-18 SALES + COMMISSION FIX -->
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Medi Fella Admin Dashboard</title>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
@@ -3691,10 +3692,12 @@ async function loadSales(){
  ]);
  if(sr.error){
    $("salesList").innerHTML=`<p class="muted">Sales database is not ready yet. Run the Medi Fella Sale SQL setup in Supabase SQL Editor first.</p><p class="error status">${esc(sr.error.message)}</p>`;
-   salesRecords=[];salePayments=[];renderSaleStudentOptions();updateSalesMetrics();return;
+   salesRecords=[];salePayments=[];window.salesRecords=salesRecords;window.salePayments=salePayments;renderSaleStudentOptions();updateSalesMetrics();return;
  }
  salesRecords=sr.data||[];
  salePayments=pr.error?[]:(pr.data||[]);
+ window.salesRecords=salesRecords;
+ window.salePayments=salePayments;
  renderSaleStudentOptions();
  try{renderSales()}catch(e){
    console.error("Medi Fella Sale render error:",e);
@@ -4757,9 +4760,7 @@ function openPrintFromCanvas(canvas,paper,sale){
 
 
 
-</body>
-
-</html>`;
+`;
 
  printWin.document.open();
  printWin.document.write(html);
@@ -10612,110 +10613,104 @@ document.addEventListener("DOMContentLoaded",function(){
     renderCommissionServiceResults();
   }
 
-  async function loadCommissionRecords(retry=0){
+  async function loadCommissionRecords(){
     const box=C("commissionList");
     if(!box)return;
 
-    // SALE COMMISSION ONLY:
-    // Keep one database request at a time. The previous version scheduled
-    // several automatic retries, so slow Supabase responses could overlap and
-    // keep replacing the list with "Loading...".
-    window.__commissionLoadSeq=(window.__commissionLoadSeq||0)+1;
-    const seq=window.__commissionLoadSeq;
+    // Never start two commission requests at the same time.
+    if(window.__commissionLoadPromise)return window.__commissionLoadPromise;
 
-    if(window.__commissionLoadPromise){
-      try{return await window.__commissionLoadPromise;}catch(_){}
-    }
-
-    const run=async()=>{
-      // Wait briefly for the Supabase client/session instead of starting
-      // multiple competing requests during login.
-      if(typeof sb==="undefined" || !sb){
-        if(retry<10){
-          box.innerHTML='<p class="muted">Connecting to the commission database...</p>';
-          await new Promise(resolve=>setTimeout(resolve,500));
-          return loadCommissionRecords(retry+1);
-        }
-        box.innerHTML='<div class="status error">Commission database is not ready. Please refresh the page.</div>';
-        C("commissionGrandTotal").innerHTML="";
-        return;
-      }
-
-      if(seq===window.__commissionLoadSeq){
+    const run=(async()=>{
+      // Keep the existing records visible while refreshing. Only show
+      // "Loading..." when there are no records to display yet.
+      const hasRecords=Array.isArray(window.commissionRecords) && window.commissionRecords.length>0;
+      if(!hasRecords){
         box.innerHTML='<p class="muted">Loading commission records...</p>';
       }
 
+      if(typeof sb==="undefined" || !sb){
+        if(!hasRecords){
+          box.innerHTML='<div class="status error">Commission database is not ready. Please refresh the page.</div>';
+        }
+        return;
+      }
+
+      const timeoutMs=10000;
+      let timer=null;
+      let controller=null;
+
       try{
-        // Confirm the current auth session before reading the commission table.
-        // This prevents the common "loads forever immediately after login"
-        // situation when the dashboard renders before the session is ready.
-        if(sb.auth?.getSession){
-          const sessionResult=await Promise.race([
-            sb.auth.getSession(),
-            new Promise((_,reject)=>setTimeout(()=>reject(new Error("Authentication session is taking too long to initialize.")),7000))
-          ]);
-          if(sessionResult?.error)throw sessionResult.error;
+        controller=new AbortController();
+
+        let request=sb.from("medifella_sale_commissions").select("*");
+        if(typeof request.abortSignal==="function"){
+          request=request.abortSignal(controller.signal);
         }
 
-        // Read only the fields used by Sale Commission Management. This is
-        // faster than repeatedly downloading unused database columns while
-        // keeping the existing commission list, details, edit, delete and
-        // export features working.
-        let q=sb.from("medifella_sale_commissions")
-          .select("id,commission_date,created_at,staff_id,staff_name,customer_id,customer_name,customer_phone,service_type,service_detail,service_id,service_code,unit,unit_price,discount,subtotal,commission_rate,commission_amount,source,source_sale_id,reference_no,created_by")
-          .order("commission_date",{ascending:false})
-          .order("created_at",{ascending:false});
+        const timeout=new Promise((_,reject)=>{
+          timer=setTimeout(()=>{
+            try{controller.abort();}catch(_){}
+            reject(new Error("Commission records request timed out."));
+          },timeoutMs);
+        });
 
-        let r=await Promise.race([
-          q,
-          new Promise((_,reject)=>setTimeout(()=>reject(new Error("Commission records are taking too long to load.")),12000))
-        ]);
-
-        // Some older installations may not have all optional source columns.
-        // Retry with the core fields rather than breaking the whole section.
-        if(r.error){
-          console.warn("Commission detailed query:",r.error.message);
-          q=sb.from("medifella_sale_commissions")
-            .select("id,commission_date,created_at,staff_id,staff_name,customer_id,customer_name,customer_phone,service_type,service_detail,service_id,unit,unit_price,discount,subtotal,commission_rate,commission_amount")
-            .order("commission_date",{ascending:false})
-            .order("created_at",{ascending:false});
-          r=await Promise.race([
-            q,
-            new Promise((_,reject)=>setTimeout(()=>reject(new Error("Commission records are taking too long to load.")),12000))
-          ]);
-        }
+        let r=await Promise.race([request,timeout]);
 
         if(r.error)throw r.error;
 
-        // Ignore a result from an older request if a newer refresh already
-        // started. This prevents stale data from replacing fresh data.
-        if(seq!==window.__commissionLoadSeq)return;
+        const rows=Array.isArray(r.data)?r.data:[];
+        rows.sort((a,b)=>{
+          const da=String(a.commission_date||a.created_at||"");
+          const db=String(b.commission_date||b.created_at||"");
+          return db.localeCompare(da);
+        });
 
-        window.commissionRecords=Array.isArray(r.data)?r.data:[];
+        window.commissionRecords=rows;
         renderCommissionList();
-      }catch(e){
-        if(seq!==window.__commissionLoadSeq)return;
-        console.error("Commission table read:",e);
-        window.commissionRecords=window.commissionRecords||[];
-        box.innerHTML=`<div class="status error">
-          Could not load Sale Commission records.<br>
-          <strong>${escC(e.message||"Unknown database error")}</strong>
-          <div style="margin-top:8px">
-            <button type="button" class="light" id="commissionRetryLoad">Retry</button>
-          </div>
-        </div>`;
-        C("commissionGrandTotal").innerHTML="";
-      }
-    };
 
-    window.__commissionLoadPromise=run();
+      }catch(e){
+        console.error("Commission table read:",e);
+
+        // Do not destroy already-loaded records because a refresh failed.
+        if(hasRecords){
+          renderCommissionList();
+          const status=C("commissionStatus");
+          if(status){
+            status.innerHTML=`<div class="status error">
+              Commission list refresh failed: ${escC(e?.message||"Unknown database error")}
+              <button type="button" class="light" id="commissionRetryLoad" style="margin-left:8px">Retry</button>
+            </div>`;
+          }
+        }else{
+          window.commissionRecords=[];
+          box.innerHTML=`<div class="status error">
+            Could not load Sale Commission records.<br>
+            <strong>${escC(e?.message||"Unknown database error")}</strong>
+            <div style="margin-top:8px">
+              <button type="button" class="light" id="commissionRetryLoad">Retry</button>
+            </div>
+          </div>`;
+          if(C("commissionGrandTotal"))C("commissionGrandTotal").innerHTML="";
+        }
+      }finally{
+        if(timer)clearTimeout(timer);
+      }
+    })();
+
+    window.__commissionLoadPromise=run;
     try{
-      return await window.__commissionLoadPromise;
+      return await run;
     }finally{
       window.__commissionLoadPromise=null;
     }
   }
-
+  window.loadCommissionRecords=loadCommissionRecords;
+  document.addEventListener("click",function(e){
+    if(e.target && e.target.id==="commissionRetryLoad"){
+      e.preventDefault();
+      loadCommissionRecords();
+    }
+  });
   function filteredCommissionRecords(){
     const staff=C("commissionFilterStaff")?.value||"";
     const from=C("commissionFromDate")?.value||"";
@@ -11301,8 +11296,6 @@ document.addEventListener("DOMContentLoaded",function(){
   document.addEventListener("keydown",e=>{if(e.key==="Escape")close();});
 })();
 </script>
-</body>
-</html>
 <style id="mts-invoice-edit-products-v8">
 #mtsItems .mts-v8-discount{display:flex;align-items:center;gap:6px}
 #mtsItems .mts-v8-discount select{width:64px}
@@ -13559,3 +13552,6 @@ document.addEventListener("DOMContentLoaded",function(){
   else setTimeout(start,500);
 })();
 </script>
+</body>
+
+</html>
