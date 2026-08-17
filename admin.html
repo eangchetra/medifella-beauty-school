@@ -3209,6 +3209,44 @@ async function getCurrentAccount(){
  return {user,profile};
 }
 
+function normalizeStaffPermissions(value){
+  // Accept the permission formats used by older Medi Fella records:
+  // object/JSON object or an array of section names. Missing permissions
+  // remain false for staff; administrators are handled separately.
+  let p=value;
+  if(typeof p==="string"){
+    try{p=JSON.parse(p)}catch(e){
+      p=p.split(",").map(x=>String(x).trim()).filter(Boolean);
+    }
+  }
+
+  const keys=[
+    "dashboard","students","sales","mtsSale","dermedSale","saleCommission",
+    "saleStaffManagement","appointments","products","services",
+    "staffManagement","customers","certificates","posts","courses",
+    "staff","admins"
+  ];
+  const out={};
+  keys.forEach(k=>out[k]=false);
+
+  if(Array.isArray(p)){
+    p.forEach(k=>{
+      const key=String(k||"").trim();
+      if(Object.prototype.hasOwnProperty.call(out,key)) out[key]=true;
+    });
+    return out;
+  }
+
+  if(p && typeof p==="object"){
+    keys.forEach(k=>{
+      if(p[k]===true || p[k]===1 || String(p[k]).toLowerCase()==="true"){
+        out[k]=true;
+      }
+    });
+  }
+  return out;
+}
+
 function applyAccountPermissions(){
   const role=String(currentProfile?.role||"").toLowerCase();
   const permissions=normalizeStaffPermissions(currentProfile?.permissions);
