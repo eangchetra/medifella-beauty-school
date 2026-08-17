@@ -2397,6 +2397,23 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
 
 
+
+<style id="commission-grouped-ui">
+.commission-group-table{min-width:1050px}
+.commission-group-table td{vertical-align:top}
+.commission-view-details-btn{font-weight:800}
+.commission-action-buttons{display:flex;gap:7px;flex-wrap:wrap}
+.commission-action-buttons button{white-space:nowrap}
+.commission-modal{position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px}
+.commission-modal-card{background:#fff;border-radius:14px;max-width:1100px;width:100%;max-height:88vh;overflow:auto;box-shadow:0 20px 60px rgba(0,0,0,.25);padding:20px}
+.commission-modal-head{display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px}
+.commission-modal-head h3{margin:0}
+.commission-detail-table{width:100%;border-collapse:collapse;min-width:760px}
+.commission-detail-table th{background:#42b8c8;color:#fff;padding:9px;text-align:left}
+.commission-detail-table td{padding:9px;border-bottom:1px solid #e5eeee}
+.commission-detail-total{display:flex;justify-content:flex-end;gap:24px;margin-top:14px;font-weight:800}
+.commission-editing-note{margin:0 0 12px;padding:10px 12px;border-radius:8px;background:#fff7dc;border:1px solid #ead28a;color:#6b5510;font-weight:700}
+</style>
 <section id="saleCommission" class="section">
 <h1>Sale Commission Management</h1>
 
@@ -10088,88 +10105,6 @@ document.addEventListener("DOMContentLoaded",function(){
 </script>
 
 
-<script id="mf-search-input-responsiveness-final">
-(function(){
-  "use strict";
-
-  // Important: this does NOT change what any search does.
-  // It only prevents heavy search-render functions from running synchronously
-  // on every physical keystroke. The latest input is replayed after the user
-  // pauses briefly, so the typed letters can paint immediately.
-  const ids=['studentSearch','saleStudentSearch','saleCourseSearch','salesSearch','appointmentCustomerSearch','appointmentListSearch','stockProductSearch','productSearch','stockSearch','staffInfoSearch','customerSearch','mtsBuyerSearch','mtsProductSearch','mtsSaleSearch','serviceSearch','certStudentSearch','certSearch'];
-  const timers=new Map();
-
-  function install(id){
-    const el=document.getElementById(id);
-    if(!el || el.dataset.mfResponsiveSearch==="1")return;
-    el.dataset.mfResponsiveSearch="1";
-
-    el.addEventListener("input",function(e){
-      if(e.__mfSearchReplay)return;
-
-      e.stopImmediatePropagation();
-
-      const old=timers.get(id);
-      if(old)clearTimeout(old);
-
-      const timer=setTimeout(function(){
-        timers.delete(id);
-        const ev=new Event("input",{bubbles:true,cancelable:true});
-        ev.__mfSearchReplay=true;
-        el.dispatchEvent(ev);
-      },100);
-
-      timers.set(id,timer);
-    },true);
-
-    // A few older search handlers also listen to keyup. Stop those duplicate
-    // renders; the replayed input event above remains the single source.
-    el.addEventListener("keyup",function(e){
-      if(e.__mfSearchReplay)return;
-      e.stopImmediatePropagation();
-    },true);
-  }
-
-  function installAll(){
-    ids.forEach(install);
-  }
-
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",installAll,{once:true});
-  }else{
-    installAll();
-  }
-
-  // Some dashboard sections are initialized later.
-  setTimeout(installAll,300);
-  setTimeout(installAll,1000);
-})();
-</script>
-
-
-
-
-
-
-
-
-
-<style id="commission-grouped-list-v1">
-#commissionList .commission-group-row td{vertical-align:middle}
-#commissionList .commission-actions{white-space:nowrap}
-#commissionList .commission-actions button{margin:2px 4px 2px 0}
-#commissionList .commission-view-btn{cursor:pointer}
-#commissionList .commission-edit-btn{cursor:pointer}
-#commissionList .commission-delete-btn{cursor:pointer}
-.mf-commission-modal-backdrop{position:fixed;inset:0;background:rgba(0,0,0,.45);display:flex;align-items:center;justify-content:center;padding:20px;z-index:99999}
-.mf-commission-modal{background:#fff;border-radius:12px;max-width:980px;width:min(980px,96vw);max-height:88vh;overflow:auto;box-shadow:0 18px 60px rgba(0,0,0,.25);padding:20px}
-.mf-commission-modal h3{margin:0 0 12px}
-.mf-commission-modal table{width:100%;border-collapse:collapse}
-.mf-commission-modal th,.mf-commission-modal td{padding:8px;border-bottom:1px solid #e5e7eb;text-align:left}
-.mf-commission-modal .mf-modal-head{display:flex;justify-content:space-between;gap:12px;align-items:center;margin-bottom:12px}
-.mf-commission-modal .mf-close{border:0;background:#eef2f3;border-radius:8px;padding:7px 11px;cursor:pointer}
-.commission-editing-note{margin-top:10px;padding:9px 12px;border-radius:8px;background:#fff8df;border:1px solid #ead69a;color:#6d5600}
-</style>
 <script id="sale-commission-management">
 (function(){
   "use strict";
@@ -10181,8 +10116,6 @@ document.addEventListener("DOMContentLoaded",function(){
   window.commissionRecords=window.commissionRecords||[];
   window.commissionItems=window.commissionItems||[];
   let commissionCustomerCache={ref:null,rows:[]};
-  let editingCommissionGroup=null;
-  window.commissionDisplayGroups=[];
 
   function serviceRows(){
     return Array.isArray(window.services)?window.services:
@@ -10245,6 +10178,7 @@ document.addEventListener("DOMContentLoaded",function(){
   // as the single source of truth. Search results are stored by a local key
   // so clicking a result always adds the exact object that was displayed.
   window.__commissionSearchMap = window.__commissionSearchMap || new Map();
+  window.__commissionEdit = window.__commissionEdit || null;
 
   function commissionItemFromService(id){
     const key=String(id??"");
@@ -10439,23 +10373,7 @@ document.addEventListener("DOMContentLoaded",function(){
     return {subtotal,commission};
   }
 
-  function setCommissionEditMode(on, label){
-    const btn=C("saveSaleCommission");
-    const title=C("commissionStatus");
-    if(btn)btn.textContent=on?(label||"Save Change"):"Save Sale Commission";
-    if(title && !on && title.dataset.commissionEditing==="1"){
-      title.innerHTML="";
-      delete title.dataset.commissionEditing;
-    }
-    if(on && title){
-      title.dataset.commissionEditing="1";
-      title.innerHTML='<div class="commission-editing-note">Editing this commission. Make your changes, then click <strong>Save Change</strong>.</div>';
-    }
-  }
-
   function clearCommissionForm(){
-    editingCommissionGroup=null;
-    setCommissionEditMode(false);
     if(C("commissionDate"))C("commissionDate").value=todayC();
     ["commissionCustomerId","commissionCustomerPhone"].forEach(id=>{if(C(id))C(id).value=""});
     if(C("commissionCustomerSearch"))C("commissionCustomerSearch").value="";
@@ -10528,176 +10446,205 @@ document.addEventListener("DOMContentLoaded",function(){
 
   function commissionGroupKey(x){
     const ref=String(x?.reference_no||"").trim();
-    if(ref)return "ref:"+ref;
-    const created=String(x?.created_at||"").slice(0,16);
-    return [
-      "legacy",
-      String(x?.commission_date||x?.created_at||"").slice(0,10),
-      String(x?.staff_id||""),
-      String(x?.customer_id||""),
-      String(x?.customer_phone||""),
-      String(x?.source||""),
-      created
-    ].join("|");
+    if(ref)return `ref:${ref}`;
+    const created=String(x?.created_at||"").slice(0,19);
+    const date=String(x?.commission_date||x?.created_at||"").slice(0,10);
+    const staff=String(x?.staff_id||x?.staff_name||"");
+    const customer=String(x?.customer_id||x?.student_id||x?.customer_name||"");
+    const source=String(x?.source||"manual");
+    return `legacy:${date}|${staff}|${customer}|${source}|${created}`;
   }
 
-  function groupCommissionRecords(rows){
+  function groupedCommissionRecords(rows){
     const map=new Map();
-    (Array.isArray(rows)?rows:[]).forEach(x=>{
+    (rows||[]).forEach(x=>{
       const key=commissionGroupKey(x);
       if(!map.has(key))map.set(key,[]);
       map.get(key).push(x);
     });
-    return Array.from(map.entries()).map(([key,items])=>{
-      const first=items[0]||{};
-      return {
-        key,
-        items,
-        date:first.commission_date||first.created_at||"",
-        staff_id:first.staff_id||"",
-        staff_name:first.staff_name||"",
-        customer_id:first.customer_id||"",
-        customer_name:first.customer_name||"",
-        customer_phone:first.customer_phone||"",
-        reference_no:first.reference_no||"",
-        subtotal:items.reduce((n,x)=>n+Number(x.subtotal||0),0),
-        commission:items.reduce((n,x)=>n+Number(x.commission_amount||0),0)
-      };
-    });
+    return Array.from(map.entries()).map(([key,items])=>({key,items}));
   }
 
-  function showCommissionDetails(groupIndex){
-    const g=window.commissionDisplayGroups?.[Number(groupIndex)];
-    if(!g)return;
-    const rows=g.items||[];
-    const backdrop=document.createElement("div");
-    backdrop.className="mf-commission-modal-backdrop";
-    backdrop.innerHTML=`
-      <div class="mf-commission-modal" role="dialog" aria-modal="true">
-        <div class="mf-modal-head">
-          <div>
-            <h3>Commission Service Details</h3>
-            <div class="muted">${escC(formatCommissionDate(g.date))} · ${escC(g.staff_name)} · ${escC(g.customer_name)}</div>
-          </div>
-          <button type="button" class="mf-close" data-commission-modal-close>Close</button>
-        </div>
-        <div class="table-wrap">
-          <table>
-            <thead><tr>
-              <th>Service Detail</th><th>Service Type</th><th>Unit</th><th>Unit Price</th>
-              <th>Discount</th><th>Subtotal</th><th>Commission</th><th>Subtotal Commission</th>
-            </tr></thead>
-            <tbody>
-              ${rows.map(x=>`<tr>
-                <td>${escC(x.service_detail||"")}</td>
-                <td>${escC(serviceTypeLabel(x.service_type==="service_product"?"Service With Product":"Only Service"))}</td>
-                <td>${escC(x.unit??1)}</td>
-                <td>$${moneyC(x.unit_price)}</td>
-                <td>$${moneyC(x.discount)}</td>
-                <td>$${moneyC(x.subtotal)}</td>
-                <td>${Number(x.commission_rate||0)*100}%</td>
-                <td>$${moneyC(x.commission_amount)}</td>
-              </tr>`).join("")}
-            </tbody>
-          </table>
-        </div>
-        <div style="display:flex;justify-content:flex-end;gap:24px;margin-top:14px;font-weight:700">
-          <span>Total Subtotal: $${moneyC(g.subtotal)}</span>
-          <span>Total Commission: $${moneyC(g.commission)}</span>
-        </div>
-      </div>`;
-    document.body.appendChild(backdrop);
-    const close=()=>backdrop.remove();
-    backdrop.addEventListener("click",e=>{
-      if(e.target===backdrop || e.target.closest("[data-commission-modal-close]"))close();
-    });
+  function commissionGroupTotals(items){
+    return {
+      subtotal:(items||[]).reduce((n,x)=>n+Number(x?.subtotal||0),0),
+      commission:(items||[]).reduce((n,x)=>n+Number(x?.commission_amount||0),0)
+    };
   }
 
-  function editCommissionGroup(groupIndex){
-    const g=window.commissionDisplayGroups?.[Number(groupIndex)];
-    if(!g || !g.items?.length)return;
-    const first=g.items[0];
-    const staffId=first.staff_id||"";
-    const customerId=first.customer_id||"";
-    const staffEl=C("commissionStaff");
-    if(staffEl)staffEl.value=String(staffId);
-    C("commissionDate").value=String(first.commission_date||first.created_at||"").slice(0,10);
-    C("commissionCustomerId").value=String(customerId);
+  function commissionGroupReference(items){
+    const ref=String((items||[]).find(x=>String(x?.reference_no||"").trim())?.reference_no||"").trim();
+    return ref || "—";
+  }
+
+  function commissionServiceSummary(items){
+    const count=(items||[]).length;
+    return count===1 ? "1 service" : `${count} services`;
+  }
+
+  function renderCommissionList(){
+    const box=C("commissionList");if(!box)return;
+    const rows=filteredCommissionRecords();
+    const groups=groupedCommissionRecords(rows);
+    const totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0);
+    const totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
+
+    box.innerHTML=groups.length?`<div class="table-wrap"><table class="table commission-group-table">
+      <thead><tr><th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th><th>Services</th><th>Total Subtotal</th><th>Total Commission</th><th>Action</th></tr></thead>
+      <tbody>${groups.map(g=>{
+        const first=g.items[0]||{};
+        const totals=commissionGroupTotals(g.items);
+        const key=encodeURIComponent(g.key);
+        return `<tr>
+          <td>${escC(formatCommissionDate(first.commission_date||first.created_at))}</td>
+          <td>${escC(first.staff_name||"")}</td>
+          <td>${escC(first.customer_name||"")}</td>
+          <td>${escC(first.customer_phone||"")}</td>
+          <td><button type="button" class="light commission-view-details-btn" data-commission-view="${escC(key)}">View Details</button><div class="muted" style="margin-top:4px">${escC(commissionServiceSummary(g.items))}</div></td>
+          <td>$${moneyC(totals.subtotal)}</td>
+          <td>$${moneyC(totals.commission)}</td>
+          <td><div class="commission-action-buttons"><button type="button" class="light" data-commission-edit="${escC(key)}">Edit</button><button type="button" class="danger" data-commission-delete="${escC(key)}">Delete</button></div></td>
+        </tr>`;
+      }).join("")}</tbody>
+    </table></div>`:'<p class="muted">No commission records found.</p>';
+
+    C("commissionGrandTotal").innerHTML=`
+      <div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div>
+      <div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>
+    `;
+  }
+
+  function findCommissionGroup(encodedKey){
+    const key=decodeURIComponent(String(encodedKey||""));
+    return groupedCommissionRecords(window.commissionRecords||[]).find(g=>g.key===key)||null;
+  }
+
+  function closeCommissionModal(){
+    const m=C("commissionModal");
+    if(m)m.remove();
+  }
+
+  function showCommissionDetails(encodedKey){
+    const group=findCommissionGroup(encodedKey); if(!group)return;
+    closeCommissionModal();
+    const first=group.items[0]||{};
+    const totals=commissionGroupTotals(group.items);
+    const rows=group.items.map(x=>`<tr>
+      <td>${escC(x.service_detail||"")}</td>
+      <td>${escC(serviceTypeLabel(x.service_type==="service_product"?"Service With Product":"Only Service"))}</td>
+      <td>${escC(x.unit??1)}</td>
+      <td>$${moneyC(x.unit_price)}</td>
+      <td>$${moneyC(x.discount)}</td>
+      <td>$${moneyC(x.subtotal)}</td>
+      <td>${Number(x.commission_rate||0)*100}%</td>
+      <td>$${moneyC(x.commission_amount)}</td>
+    </tr>`).join("");
+    const modal=document.createElement("div");
+    modal.id="commissionModal";
+    modal.className="commission-modal";
+    modal.innerHTML=`<div class="commission-modal-card">
+      <div class="commission-modal-head"><div><h3>Commission Service Details</h3><div class="muted">${escC(formatCommissionDate(first.commission_date||first.created_at))} · ${escC(first.staff_name||"")} · ${escC(first.customer_name||"")}</div></div><button type="button" class="light" data-commission-close>Close</button></div>
+      <div class="table-wrap"><table class="commission-detail-table"><thead><tr><th>Service Detail</th><th>Service Type</th><th>Unit</th><th>Unit Price</th><th>Discount</th><th>Subtotal</th><th>Commission</th><th>Subtotal Commission</th></tr></thead><tbody>${rows}</tbody></table></div>
+      <div class="commission-detail-total"><span>Total Subtotal: $${moneyC(totals.subtotal)}</span><span>Total Commission: $${moneyC(totals.commission)}</span></div>
+    </div>`;
+    document.body.appendChild(modal);
+    modal.addEventListener("click",e=>{if(e.target===modal||e.target.closest("[data-commission-close]"))closeCommissionModal();});
+  }
+
+  function startCommissionEdit(encodedKey){
+    const group=findCommissionGroup(encodedKey); if(!group||!group.items.length)return;
+    const first=group.items[0];
+    window.__commissionEdit={groupKey:group.key,ids:group.items.map(x=>String(x.id)),reference_no:String(first.reference_no||"")};
+    C("commissionStaff").value=String(first.staff_id||"");
+    C("commissionDate").value=String(first.commission_date||todayC()).slice(0,10);
+    C("commissionCustomerId").value=String(first.customer_id||first.student_id||"");
     C("commissionCustomerSearch").value=first.customer_name||"";
     C("commissionCustomerPhone").value=first.customer_phone||"";
-    C("commissionServiceSearch").value="";
-    C("commissionServiceResults").innerHTML="";
-    C("commissionServiceResults").classList.remove("show");
-    window.commissionItems=(g.items||[]).map(x=>({
+    window.commissionItems=group.items.map(x=>({
       service_id:x.service_id||null,
       service_code:x.service_code||"",
       name:x.service_detail||"Service",
       service_type:serviceTypeLabel(x.service_type==="service_product"?"Service With Product":"Only Service"),
       price:Number(x.unit_price||0),
       quantity:Math.max(1,Number(x.unit||1)),
-      discount:Number(x.discount||0)
+      discount:Math.max(0,Number(x.discount||0))
     }));
-    editingCommissionGroup={
-      key:g.key,
-      rowIds:g.items.map(x=>x.id).filter(Boolean),
-      reference_no:g.reference_no||""
-    };
-    setCommissionEditMode(true,"Save Change");
     renderCommissionItems();
-    const card=document.querySelector(".commission-entry-card");
-    card?.scrollIntoView({behavior:"smooth",block:"start"});
+    const btn=C("saveSaleCommission"); if(btn)btn.textContent="Save Change";
+    const title=document.querySelector("#saleCommission .commission-entry-card h2");
+    if(title)title.innerHTML="✎ Edit Sale Commission";
+    let note=C("commissionEditingNote");
+    if(!note){note=document.createElement("div");note.id="commissionEditingNote";note.className="commission-editing-note";C("commissionStatus")?.before(note);}
+    note.textContent="Editing this commission. Make your changes, then click Save Change.";
+    C("commissionStatus").innerHTML="";
+    document.getElementById("saleCommission")?.scrollIntoView({behavior:"smooth",block:"start"});
   }
 
-  async function deleteCommissionGroup(groupIndex){
-    const g=window.commissionDisplayGroups?.[Number(groupIndex)];
-    if(!g || !g.items?.length)return;
-    if(!confirm(`Delete this commission for ${g.customer_name||"this customer"}? This will delete all ${g.items.length} service item(s) in this commission.`))return;
-    const ids=g.items.map(x=>x.id).filter(Boolean);
+  function clearCommissionEditState(){
+    window.__commissionEdit=null;
+    const btn=C("saveSaleCommission"); if(btn)btn.textContent="Save Sale Commission";
+    const title=document.querySelector("#saleCommission .commission-entry-card h2");
+    if(title)title.textContent="+ Add Sale Commission";
+    C("commissionEditingNote")?.remove();
+  }
+
+  async function deleteCommissionGroup(encodedKey){
+    const group=findCommissionGroup(encodedKey); if(!group)return;
+    const first=group.items[0]||{};
+    const label=`${first.customer_name||"this customer"} — ${formatCommissionDate(first.commission_date||first.created_at)}`;
+    if(!confirm(`Delete this entire commission for ${label}? This will delete all ${group.items.length} service item(s).`))return;
+    const ids=group.items.map(x=>x.id).filter(Boolean);
     if(!ids.length){
-      C("commissionStatus").innerHTML='<div class="status error">This commission record has no row IDs, so it cannot be safely deleted.</div>';
+      window.commissionRecords=(window.commissionRecords||[]).filter(x=>commissionGroupKey(x)!==group.key);
+      renderCommissionList();
       return;
     }
-    try{
-      const r=await sb.from("medifella_sale_commissions").delete().in("id",ids);
-      if(r.error)throw r.error;
-      if(editingCommissionGroup?.key===g.key)clearCommissionForm();
-      await loadCommissionRecords();
-      C("commissionStatus").innerHTML='<div class="status">Commission deleted successfully.</div>';
-    }catch(e){
-      C("commissionStatus").innerHTML=`<div class="status error">${escC(e.message||"Could not delete the commission.")}</div>`;
+    const r=await sb.from("medifella_sale_commissions").delete().in("id",ids);
+    if(r.error){
+      alert(r.error.message||"Could not delete this commission.");
+      return;
     }
+    if(window.__commissionEdit?.groupKey===group.key)clearCommissionEditState();
+    await loadCommissionRecords();
   }
 
-  function renderCommissionList(){
-    const box=C("commissionList");if(!box)return;
-    const rows=filteredCommissionRecords();
-    const groups=groupCommissionRecords(rows);
-    window.commissionDisplayGroups=groups;
-    const totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0);
-    const totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
-    box.innerHTML=groups.length?`<div class="table-wrap"><table class="table">
-      <tr>
-        <th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th>
-        <th>Services</th><th>Total Subtotal</th><th>Total Commission</th><th>Action</th>
-      </tr>
-      ${groups.map((g,i)=>`<tr class="commission-group-row">
-        <td>${escC(formatCommissionDate(g.date))}</td>
-        <td>${escC(g.staff_name)}</td>
-        <td>${escC(g.customer_name)}</td>
-        <td>${escC(g.customer_phone)}</td>
-        <td><button type="button" class="light commission-view-btn" data-commission-action="view" data-commission-index="${i}">View Details</button></td>
-        <td>$${moneyC(g.subtotal)}</td>
-        <td>$${moneyC(g.commission)}</td>
-        <td class="commission-actions">
-          <button type="button" class="light commission-edit-btn" data-commission-action="edit" data-commission-index="${i}">Edit</button>
-          <button type="button" class="danger commission-delete-btn" data-commission-action="delete" data-commission-index="${i}">Delete</button>
-        </td>
-      </tr>`).join("")}
-    </table></div>`:'<p class="muted">No commission records found.</p>';
-    C("commissionGrandTotal").innerHTML=`
-      <div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div>
-      <div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>
-    `;
+  async function updateCommissionGroup(){
+    const edit=window.__commissionEdit; if(!edit)return false;
+    const staffId=C("commissionStaff")?.value;
+    const customerId=C("commissionCustomerId")?.value;
+    const commissionDate=C("commissionDate")?.value||todayC();
+    const items=window.commissionItems||[];
+    if(!staffId||!customerId||!commissionDate){C("commissionStatus").innerHTML='<div class="status error">Please select Sale Staff, Customer and Commission Date.</div>';return true;}
+    if(!items.length){C("commissionStatus").innerHTML='<div class="status error">Please add at least one service from the Service List.</div>';return true;}
+    const staff=staffRows().find(x=>String(x.id)===String(staffId));
+    const customer=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(customerId));
+    if(!staff || !isSaleCounterCashierStaff(staff)){C("commissionStatus").innerHTML='<div class="status error">Please select a Sale Staff with Job Title: Sale Counter Cashier.</div>';return true;}
+    const rows=items.map(x=>{const c=commissionItemCalc(x);return {commission_date:commissionDate,staff_id:staffId,staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",customer_id:customerId,customer_name:customer?.name||C("commissionCustomerSearch")?.value||"",customer_phone:customer?.phone||C("commissionCustomerPhone")?.value||"",service_type:serviceTypeLabel(x.service_type)==="Only Service"?"service":"service_product",service_detail:x.name||"Service",service_id:x.service_id||null,unit:c.unit,unit_price:c.price,discount:c.discount,subtotal:c.subtotal,commission_rate:c.rate,commission_amount:c.amount,source:"manual",reference_no:edit.reference_no||undefined};}).filter(x=>x.subtotal>0);
+    if(!rows.length){C("commissionStatus").innerHTML='<div class="status error">At least one service must have a subtotal greater than $0.</div>';return true;}
+    try{
+      const oldIds=edit.ids||[];
+      const common=Math.min(oldIds.length,rows.length);
+      for(let i=0;i<common;i++){
+        const payload={...rows[i]};
+        if(payload.reference_no===undefined)delete payload.reference_no;
+        const r=await sb.from("medifella_sale_commissions").update(payload).eq("id",oldIds[i]);
+        if(r.error)throw r.error;
+      }
+      if(rows.length>oldIds.length){
+        const extra=rows.slice(oldIds.length);
+        if(edit.reference_no)extra.forEach(x=>x.reference_no=edit.reference_no);
+        await insertCommissionRows(extra);
+      }else if(oldIds.length>rows.length){
+        const remove=oldIds.slice(rows.length);
+        const r=await sb.from("medifella_sale_commissions").delete().in("id",remove);
+        if(r.error)throw r.error;
+      }
+      C("commissionStatus").innerHTML='<div class="status">Commission changes saved successfully.</div>';
+      clearCommissionEditState();
+      clearCommissionForm();
+      await loadCommissionRecords();
+    }catch(e){C("commissionStatus").innerHTML=`<div class="status error">${escC(e.message||"Could not save commission changes.")}</div>`;}
+    return true;
   }
 
   async function insertCommissionRows(rows){
@@ -10719,69 +10666,37 @@ document.addEventListener("DOMContentLoaded",function(){
     throw new Error("Could not save the sale commission.");
   }
 
-  function makeCommissionReference(){
-    const d=new Date();
-    const pad=n=>String(n).padStart(2,"0");
-    return `COMMISSION-${d.getFullYear()}${pad(d.getMonth()+1)}${pad(d.getDate())}-${pad(d.getHours())}${pad(d.getMinutes())}${pad(d.getSeconds())}-${Math.random().toString(36).slice(2,7).toUpperCase()}`;
-  }
-
-  async function deleteCommissionRows(ids){
-    const clean=(Array.isArray(ids)?ids:[]).filter(Boolean);
-    if(!clean.length)return;
-    const r=await sb.from("medifella_sale_commissions").delete().in("id",clean);
-    if(r.error)throw r.error;
-  }
-
   async function saveCommissionManual(){
+    if(window.__commissionEdit){ await updateCommissionGroup(); return; }
     const staffId=C("commissionStaff")?.value;
     const customerId=C("commissionCustomerId")?.value;
     const commissionDate=C("commissionDate")?.value||todayC();
-    const saveBtn=C("saveSaleCommission");
-
     if(!staffId||!customerId||!commissionDate){
       C("commissionStatus").innerHTML='<div class="status error">Please select Sale Staff, Customer and Commission Date.</div>';
       return;
     }
-
     const items=window.commissionItems||[];
     if(!items.length){
       C("commissionStatus").innerHTML='<div class="status error">Please add at least one service from the Service List.</div>';
       return;
     }
-
     const staff=staffRows().find(x=>String(x.id)===String(staffId));
     if(!staff || !isSaleCounterCashierStaff(staff)){
       C("commissionStatus").innerHTML='<div class="status error">Please select a Sale Staff with Job Title: Sale Counter Cashier.</div>';
       return;
     }
-
-    const customer=(Array.isArray(window.customers)?window.customers:[])
-      .find(x=>String(x.id)===String(customerId));
-    if(!customer){
-      C("commissionStatus").innerHTML='<div class="status error">The selected customer could not be found. Please search and select the customer again.</div>';
-      return;
-    }
-
-    const referenceNo=editingCommissionGroup?.reference_no || makeCommissionReference();
-    const rows=[];
-    for(const x of items){
-      const service=serviceRows().find(s=>String(s.id??s.service_id)===String(x.service_id))||x;
-      const type=serviceTypeLabel(service?.service_type);
-      if(type!=="Only Service" && type!=="Service With Product"){
-        C("commissionStatus").innerHTML=
-          `<div class="status error">Service "${escC(x.name||"Service")}" does not have a valid Service Type in the Service List. Please set it to Only Service or Service With Product.</div>`;
-        return;
-      }
-      const c=commissionItemCalc({...x,service_type:type});
-      if(c.subtotal<=0)continue;
-      rows.push({
+    const customer=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(customerId));
+    const commissionReference = `COMM-${String(commissionDate).replace(/-/g,"")}-${Date.now().toString(36).toUpperCase()}`;
+    const rows=items.map(x=>{
+      const c=commissionItemCalc(x);
+      return {
         commission_date:commissionDate,
         staff_id:staffId,
         staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
         customer_id:customerId,
         customer_name:customer?.name||"",
         customer_phone:customer?.phone||"",
-        service_type:type==="Only Service"?"service":"service_product",
+        service_type:serviceTypeLabel(x.service_type)==="Only Service"?"service":"service_product",
         service_detail:x.name||"Service",
         service_id:x.service_id||null,
         unit:c.unit,
@@ -10790,36 +10705,23 @@ document.addEventListener("DOMContentLoaded",function(){
         subtotal:c.subtotal,
         commission_rate:c.rate,
         commission_amount:c.amount,
-        reference_no:referenceNo,
-        source:"manual"
-      });
-    }
+        source:"manual",
+        reference_no:commissionReference
+      };
+    }).filter(x=>x.subtotal>0);
 
     if(!rows.length){
       C("commissionStatus").innerHTML='<div class="status error">At least one service must have a subtotal greater than $0.</div>';
       return;
     }
 
-    if(saveBtn){
-      saveBtn.disabled=true;
-      saveBtn.textContent=editingCommissionGroup?"Saving Change...":"Saving...";
-    }
-
     try{
-      if(editingCommissionGroup?.rowIds?.length){
-        await deleteCommissionRows(editingCommissionGroup.rowIds);
-      }
       await insertCommissionRows(rows);
-      C("commissionStatus").innerHTML=`<div class="status">${editingCommissionGroup?"Commission updated successfully.":"Sale commission saved successfully."}</div>`;
+      C("commissionStatus").innerHTML='<div class="status">Sale commission saved successfully.</div>';
       clearCommissionForm();
       await loadCommissionRecords();
     }catch(e){
-      C("commissionStatus").innerHTML=`<div class="status error">${escC(e.message||"Could not save the sale commission.")}</div>`;
-    }finally{
-      if(saveBtn){
-        saveBtn.disabled=false;
-        saveBtn.textContent="Save Sale Commission";
-      }
+      C("commissionStatus").innerHTML=`<div class="status error">${escC(e.message||"Could not save sale commission.")}</div>`;
     }
   }
 
@@ -10995,13 +10897,12 @@ document.addEventListener("DOMContentLoaded",function(){
     });
 
     C("commissionList")?.addEventListener("click",e=>{
-      const b=e.target.closest("[data-commission-action]");
-      if(!b)return;
-      const i=Number(b.dataset.commissionIndex);
-      const action=b.dataset.commissionAction;
-      if(action==="view")showCommissionDetails(i);
-      else if(action==="edit")editCommissionGroup(i);
-      else if(action==="delete")deleteCommissionGroup(i);
+      const view=e.target.closest("[data-commission-view]");
+      if(view){showCommissionDetails(view.dataset.commissionView);return;}
+      const edit=e.target.closest("[data-commission-edit]");
+      if(edit){startCommissionEdit(edit.dataset.commissionEdit);return;}
+      const del=e.target.closest("[data-commission-delete]");
+      if(del){deleteCommissionGroup(del.dataset.commissionDelete);return;}
     });
 
     C("saveSaleCommission")?.addEventListener("click",saveCommissionManual);
@@ -12940,260 +12841,69 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
-<script id="sale-commission-search-add-final-fix">
+<script id="sale-commission-search-add-isolated-fix">
 (function(){
   "use strict";
-
-  /*
-    FINAL FIX — Sale Commission only.
-    Flow:
-      type -> search Services Management / medifella_services
-      -> click result -> add exact displayed service to commissionItems
-      -> clear search -> search next service
-    This deliberately uses a result Map so the clicked row can never disappear
-    because the local Services array has not finished loading.
-  */
-
-  function commissionFixStart(){
+  function install(){
     const input=document.getElementById("commissionServiceSearch");
     const box=document.getElementById("commissionServiceResults");
-    if(!input || !box || input.dataset.mfFinalCommissionBound==="1") return;
+    if(!input || !box || box.dataset.mfIsolatedBound==="1") return;
+    box.dataset.mfIsolatedBound="1";
 
-    input.dataset.mfFinalCommissionBound="1";
-    window.__mfCommissionFinalMap = new Map();
-    let timer=null;
-    let requestNo=0;
-
-    const escLocal = v => String(v ?? "").replace(/[&<>"']/g, c => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-    }[c]));
-
-    const normalize = v => String(v ?? "")
-      .toLowerCase()
-      .normalize("NFKC")
-      .replace(/[₂]/g,"2")
-      .replace(/[^a-z0-9\u1780-\u17ff]+/gi," ")
-      .trim();
-
-    const serviceType = v => {
-      const t=String(v ?? "").trim().toLowerCase().replace(/[_-]+/g," ");
-      if(t.includes("only service") || t==="service") return "Only Service";
-      if(t.includes("with product") || t.includes("service with product") || t==="service product")
-        return "Service With Product";
-      return String(v ?? "Service");
-    };
-
-    const rateFor = s => serviceType(s?.service_type ?? s?.type)==="Only Service" ? 0.03 : 0.02;
-
-    const getLocalServices = () => {
-      if(Array.isArray(window.services)) return window.services;
-      try{
-        if(typeof services!=="undefined" && Array.isArray(services)) return services;
-      }catch(_){}
-      return [];
-    };
-
-    const matches = (s,q) => {
-      const needle=normalize(q);
-      if(!needle) return false;
-      const fields=[
-        s?.id,s?.service_id,s?.service_code,s?.code,
-        s?.name,s?.service_name,s?.title,s?.service_type,s?.type
-      ];
-      const hay=fields.map(normalize).join(" ");
-      if(hay.includes(needle)) return true;
-      const tokens=needle.split(/\s+/).filter(Boolean);
-      return tokens.length>1 && tokens.every(t=>hay.includes(t));
-    };
-
-    const serviceId = s => String(
-      s?.id ?? s?.service_id ?? s?.service_code ?? s?.code ?? ""
-    );
-
-    const showResults = rows => {
-      const q=String(input.value||"").trim();
-      if(!q){
-        box.innerHTML="";
-        box.classList.remove("show");
-        window.__mfCommissionFinalMap.clear();
-        return;
-      }
-
-      const list=(Array.isArray(rows)?rows:[]).slice(0,20);
-      window.__mfCommissionFinalMap.clear();
-
-      box.innerHTML=list.map((s,i)=>{
-        const sid=serviceId(s) || ("row-"+i);
-        window.__mfCommissionFinalMap.set(sid,s);
-
-        const name=s?.name ?? s?.service_name ?? s?.title ?? "Service";
-        const code=s?.service_code ?? s?.code ?? "";
-        const type=serviceType(s?.service_type ?? s?.type);
-        const price=Number(s?.price ?? s?.unit_price ?? 0);
-        const already=(window.commissionItems||[]).some(
-          x=>String(x?.service_id ?? "")===String(s?.id ?? s?.service_id ?? "")
-        );
-
-        return `<button type="button"
-          data-mf-final-commission-service="${escLocal(sid)}"
-          style="display:block;width:100%;text-align:left;padding:11px 12px;background:#fff;border:0;border-bottom:1px solid #dce7e8;cursor:pointer">
-          <div style="font-weight:800">${escLocal(name)}${code ? ` · ${escLocal(code)}` : ""}</div>
-          <div class="muted" style="margin-top:3px">
-            ${escLocal(type)} · $${price.toFixed(2)} · Commission ${rateFor(s)*100}%
-            ${already ? " · Already added" : ""}
-          </div>
-        </button>`;
-      }).join("") || '<div class="muted" style="padding:12px">No matching service found.</div>';
-
-      box.classList.add("show");
-      box.style.display="block";
-    };
-
-    const search = async () => {
-      const q=String(input.value||"").trim();
-      const myRequest=++requestNo;
-
-      if(!q){
-        showResults([]);
-        return;
-      }
-
-      // First show already-loaded Services immediately.
-      const local=getLocalServices().filter(s=>matches(s,q)).slice(0,20);
-      showResults(local);
-
-      // Then query the database directly so the search does not depend on
-      // whether the Services Management loader has finished.
-      if(typeof sb==="undefined" || !sb) return;
-
-      try{
-        const r=await sb.from("medifella_services")
-          .select("*")
-          .order("created_at",{ascending:false})
-          .limit(1000);
-
-        if(myRequest!==requestNo) return;
-        if(String(input.value||"").trim()!==q) return;
-        if(r.error) {
-          console.warn("Sale Commission service search:", r.error.message||r.error);
-          return;
-        }
-
-        const all=Array.isArray(r.data)?r.data:[];
-        const found=all.filter(s=>matches(s,q)).slice(0,20);
-
-        // Keep the exact DB objects available to the click handler.
-        if(Array.isArray(window.services)){
-          const current=window.services.slice();
-          all.forEach(s=>{
-            const id=serviceId(s);
-            const idx=id ? current.findIndex(x=>serviceId(x)===id) : -1;
-            if(idx>=0) current[idx]=s;
-            else current.push(s);
-          });
-          window.services=current;
-        }
-
-        showResults(found);
-      }catch(e){
-        console.warn("Sale Commission service search failed:",e);
-      }
-    };
-
-    input.addEventListener("input",function(e){
-      // Prevent the older Commission search handler from rendering a second,
-      // conflicting result list.
-      e.stopImmediatePropagation();
-      clearTimeout(timer);
-      timer=setTimeout(search,80);
-    },true);
-
-    input.addEventListener("keydown",function(e){
-      if(e.key==="Escape"){
-        e.preventDefault();
-        input.value="";
-        showResults([]);
-      }
-    },true);
-
-    // mousedown is important: it fires before input blur, so the result can
-    // always be selected on touch/mouse without losing the displayed row.
+    // Use capture-phase mousedown so the exact result is captured before
+    // any blur/other click behavior can clear the result list.
     box.addEventListener("mousedown",function(e){
-      const btn=e.target.closest("[data-mf-final-commission-service]");
+      const btn=e.target.closest("[data-commission-service]");
       if(!btn || !box.contains(btn)) return;
-
       e.preventDefault();
-      e.stopImmediatePropagation();
+      e.stopPropagation();
 
-      const sid=btn.getAttribute("data-mf-final-commission-service");
-      const service=window.__mfCommissionFinalMap.get(String(sid));
+      const id=String(btn.getAttribute("data-commission-service")||"");
+      const map=window.__commissionSearchMap;
+      const service=map && typeof map.get==="function" ? map.get(id) : null;
       if(!service) return;
 
-      window.commissionItems=Array.isArray(window.commissionItems)
-        ? window.commissionItems : [];
+      window.commissionItems=Array.isArray(window.commissionItems)?window.commissionItems:[];
 
-      const id=service.id ?? service.service_id ?? null;
-      if(!id) return;
+      const serviceId=service.id ?? service.service_id ?? service.service_code ?? service.code;
+      if(serviceId==null || serviceId==="") return;
 
-      const existing=window.commissionItems.find(
-        x=>String(x?.service_id ?? "")===String(id)
-      );
+      const type=(typeof serviceTypeLabel==="function")
+        ? serviceTypeLabel(service.service_type ?? service.type)
+        : String(service.service_type ?? service.type ?? "Service");
 
+      const item={
+        service_id:serviceId,
+        service_code:service.service_code ?? service.code ?? "",
+        name:service.name ?? service.service_name ?? service.title ?? "Service",
+        service_type:type,
+        price:Math.max(0,Number(service.price ?? service.unit_price ?? 0)),
+        quantity:1,
+        discount:0
+      };
+
+      const existing=window.commissionItems.find(x=>String(x.service_id)===String(item.service_id));
       if(existing){
         existing.quantity=Math.max(1,Number(existing.quantity||1)+1);
       }else{
-        window.commissionItems.push({
-          service_id:id,
-          service_code:service.service_code ?? service.code ?? "",
-          name:service.name ?? service.service_name ?? service.title ?? "Service",
-          service_type:serviceType(service.service_type ?? service.type),
-          price:Math.max(0,Number(service.price ?? service.unit_price ?? 0)),
-          quantity:1,
-          discount:0
-        });
+        window.commissionItems.push(item);
       }
 
-      if(typeof window.renderCommissionItems==="function"){
-        window.renderCommissionItems();
-      }
+      if(typeof window.renderCommissionItems==="function") window.renderCommissionItems();
+      // renderCommissionItems is normally local to the commission script, so
+      // also dispatch the same result through the existing button behavior if needed.
+      if(typeof renderCommissionItems==="function") renderCommissionItems();
 
       input.value="";
-      window.__mfCommissionFinalMap.clear();
       box.innerHTML="";
       box.classList.remove("show");
-      box.style.display="none";
       input.focus();
     },true);
-
-    box.addEventListener("click",function(e){
-      // mousedown performs the add. Block older click handlers so they cannot
-      // add the same service twice.
-      const btn=e.target.closest("[data-mf-final-commission-service]");
-      if(btn){
-        e.preventDefault();
-        e.stopImmediatePropagation();
-      }
-    },true);
-
-    // + Add Item simply focuses the search field. It never creates an empty row.
-    const addBtn=document.getElementById("commissionAddItem");
-    if(addBtn && addBtn.dataset.mfFinalCommissionAddBound!=="1"){
-      addBtn.dataset.mfFinalCommissionAddBound="1";
-      addBtn.addEventListener("click",function(e){
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        input.focus();
-      },true);
-    }
   }
-
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",commissionFixStart,{once:true});
-  }else{
-    commissionFixStart();
-  }
-  setTimeout(commissionFixStart,300);
-  setTimeout(commissionFixStart,1000);
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
+  else install();
+  setTimeout(install,300);
+  setTimeout(install,1000);
 })();
 </script>
 
