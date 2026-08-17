@@ -10088,71 +10088,6 @@ document.addEventListener("DOMContentLoaded",function(){
 </script>
 
 
-<script id="mf-search-input-responsiveness-final">
-(function(){
-  "use strict";
-
-  // Important: this does NOT change what any search does.
-  // It only prevents heavy search-render functions from running synchronously
-  // on every physical keystroke. The latest input is replayed after the user
-  // pauses briefly, so the typed letters can paint immediately.
-  const ids=['studentSearch','saleStudentSearch','saleCourseSearch','salesSearch','appointmentCustomerSearch','appointmentListSearch','stockProductSearch','productSearch','stockSearch','staffInfoSearch','customerSearch','mtsBuyerSearch','mtsProductSearch','mtsSaleSearch','serviceSearch','certStudentSearch','certSearch'];
-  const timers=new Map();
-
-  function install(id){
-    const el=document.getElementById(id);
-    if(!el || el.dataset.mfResponsiveSearch==="1")return;
-    el.dataset.mfResponsiveSearch="1";
-
-    el.addEventListener("input",function(e){
-      if(e.__mfSearchReplay)return;
-
-      e.stopImmediatePropagation();
-
-      const old=timers.get(id);
-      if(old)clearTimeout(old);
-
-      const timer=setTimeout(function(){
-        timers.delete(id);
-        const ev=new Event("input",{bubbles:true,cancelable:true});
-        ev.__mfSearchReplay=true;
-        el.dispatchEvent(ev);
-      },100);
-
-      timers.set(id,timer);
-    },true);
-
-    // A few older search handlers also listen to keyup. Stop those duplicate
-    // renders; the replayed input event above remains the single source.
-    el.addEventListener("keyup",function(e){
-      if(e.__mfSearchReplay)return;
-      e.stopImmediatePropagation();
-    },true);
-  }
-
-  function installAll(){
-    ids.forEach(install);
-  }
-
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",installAll,{once:true});
-  }else{
-    installAll();
-  }
-
-  // Some dashboard sections are initialized later.
-  setTimeout(installAll,300);
-  setTimeout(installAll,1000);
-})();
-</script>
-
-
-
-
-
-
-
-
 <script id="sale-commission-management">
 (function(){
   "use strict";
@@ -12701,260 +12636,69 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
-<script id="sale-commission-search-add-final-fix">
+<script id="sale-commission-search-add-isolated-fix">
 (function(){
   "use strict";
-
-  /*
-    FINAL FIX — Sale Commission only.
-    Flow:
-      type -> search Services Management / medifella_services
-      -> click result -> add exact displayed service to commissionItems
-      -> clear search -> search next service
-    This deliberately uses a result Map so the clicked row can never disappear
-    because the local Services array has not finished loading.
-  */
-
-  function commissionFixStart(){
+  function install(){
     const input=document.getElementById("commissionServiceSearch");
     const box=document.getElementById("commissionServiceResults");
-    if(!input || !box || input.dataset.mfFinalCommissionBound==="1") return;
+    if(!input || !box || box.dataset.mfIsolatedBound==="1") return;
+    box.dataset.mfIsolatedBound="1";
 
-    input.dataset.mfFinalCommissionBound="1";
-    window.__mfCommissionFinalMap = new Map();
-    let timer=null;
-    let requestNo=0;
-
-    const escLocal = v => String(v ?? "").replace(/[&<>"']/g, c => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-    }[c]));
-
-    const normalize = v => String(v ?? "")
-      .toLowerCase()
-      .normalize("NFKC")
-      .replace(/[₂]/g,"2")
-      .replace(/[^a-z0-9\u1780-\u17ff]+/gi," ")
-      .trim();
-
-    const serviceType = v => {
-      const t=String(v ?? "").trim().toLowerCase().replace(/[_-]+/g," ");
-      if(t.includes("only service") || t==="service") return "Only Service";
-      if(t.includes("with product") || t.includes("service with product") || t==="service product")
-        return "Service With Product";
-      return String(v ?? "Service");
-    };
-
-    const rateFor = s => serviceType(s?.service_type ?? s?.type)==="Only Service" ? 0.03 : 0.02;
-
-    const getLocalServices = () => {
-      if(Array.isArray(window.services)) return window.services;
-      try{
-        if(typeof services!=="undefined" && Array.isArray(services)) return services;
-      }catch(_){}
-      return [];
-    };
-
-    const matches = (s,q) => {
-      const needle=normalize(q);
-      if(!needle) return false;
-      const fields=[
-        s?.id,s?.service_id,s?.service_code,s?.code,
-        s?.name,s?.service_name,s?.title,s?.service_type,s?.type
-      ];
-      const hay=fields.map(normalize).join(" ");
-      if(hay.includes(needle)) return true;
-      const tokens=needle.split(/\s+/).filter(Boolean);
-      return tokens.length>1 && tokens.every(t=>hay.includes(t));
-    };
-
-    const serviceId = s => String(
-      s?.id ?? s?.service_id ?? s?.service_code ?? s?.code ?? ""
-    );
-
-    const showResults = rows => {
-      const q=String(input.value||"").trim();
-      if(!q){
-        box.innerHTML="";
-        box.classList.remove("show");
-        window.__mfCommissionFinalMap.clear();
-        return;
-      }
-
-      const list=(Array.isArray(rows)?rows:[]).slice(0,20);
-      window.__mfCommissionFinalMap.clear();
-
-      box.innerHTML=list.map((s,i)=>{
-        const sid=serviceId(s) || ("row-"+i);
-        window.__mfCommissionFinalMap.set(sid,s);
-
-        const name=s?.name ?? s?.service_name ?? s?.title ?? "Service";
-        const code=s?.service_code ?? s?.code ?? "";
-        const type=serviceType(s?.service_type ?? s?.type);
-        const price=Number(s?.price ?? s?.unit_price ?? 0);
-        const already=(window.commissionItems||[]).some(
-          x=>String(x?.service_id ?? "")===String(s?.id ?? s?.service_id ?? "")
-        );
-
-        return `<button type="button"
-          data-mf-final-commission-service="${escLocal(sid)}"
-          style="display:block;width:100%;text-align:left;padding:11px 12px;background:#fff;border:0;border-bottom:1px solid #dce7e8;cursor:pointer">
-          <div style="font-weight:800">${escLocal(name)}${code ? ` · ${escLocal(code)}` : ""}</div>
-          <div class="muted" style="margin-top:3px">
-            ${escLocal(type)} · $${price.toFixed(2)} · Commission ${rateFor(s)*100}%
-            ${already ? " · Already added" : ""}
-          </div>
-        </button>`;
-      }).join("") || '<div class="muted" style="padding:12px">No matching service found.</div>';
-
-      box.classList.add("show");
-      box.style.display="block";
-    };
-
-    const search = async () => {
-      const q=String(input.value||"").trim();
-      const myRequest=++requestNo;
-
-      if(!q){
-        showResults([]);
-        return;
-      }
-
-      // First show already-loaded Services immediately.
-      const local=getLocalServices().filter(s=>matches(s,q)).slice(0,20);
-      showResults(local);
-
-      // Then query the database directly so the search does not depend on
-      // whether the Services Management loader has finished.
-      if(typeof sb==="undefined" || !sb) return;
-
-      try{
-        const r=await sb.from("medifella_services")
-          .select("*")
-          .order("created_at",{ascending:false})
-          .limit(1000);
-
-        if(myRequest!==requestNo) return;
-        if(String(input.value||"").trim()!==q) return;
-        if(r.error) {
-          console.warn("Sale Commission service search:", r.error.message||r.error);
-          return;
-        }
-
-        const all=Array.isArray(r.data)?r.data:[];
-        const found=all.filter(s=>matches(s,q)).slice(0,20);
-
-        // Keep the exact DB objects available to the click handler.
-        if(Array.isArray(window.services)){
-          const current=window.services.slice();
-          all.forEach(s=>{
-            const id=serviceId(s);
-            const idx=id ? current.findIndex(x=>serviceId(x)===id) : -1;
-            if(idx>=0) current[idx]=s;
-            else current.push(s);
-          });
-          window.services=current;
-        }
-
-        showResults(found);
-      }catch(e){
-        console.warn("Sale Commission service search failed:",e);
-      }
-    };
-
-    input.addEventListener("input",function(e){
-      // Prevent the older Commission search handler from rendering a second,
-      // conflicting result list.
-      e.stopImmediatePropagation();
-      clearTimeout(timer);
-      timer=setTimeout(search,80);
-    },true);
-
-    input.addEventListener("keydown",function(e){
-      if(e.key==="Escape"){
-        e.preventDefault();
-        input.value="";
-        showResults([]);
-      }
-    },true);
-
-    // mousedown is important: it fires before input blur, so the result can
-    // always be selected on touch/mouse without losing the displayed row.
+    // Use capture-phase mousedown so the exact result is captured before
+    // any blur/other click behavior can clear the result list.
     box.addEventListener("mousedown",function(e){
-      const btn=e.target.closest("[data-mf-final-commission-service]");
+      const btn=e.target.closest("[data-commission-service]");
       if(!btn || !box.contains(btn)) return;
-
       e.preventDefault();
-      e.stopImmediatePropagation();
+      e.stopPropagation();
 
-      const sid=btn.getAttribute("data-mf-final-commission-service");
-      const service=window.__mfCommissionFinalMap.get(String(sid));
+      const id=String(btn.getAttribute("data-commission-service")||"");
+      const map=window.__commissionSearchMap;
+      const service=map && typeof map.get==="function" ? map.get(id) : null;
       if(!service) return;
 
-      window.commissionItems=Array.isArray(window.commissionItems)
-        ? window.commissionItems : [];
+      window.commissionItems=Array.isArray(window.commissionItems)?window.commissionItems:[];
 
-      const id=service.id ?? service.service_id ?? null;
-      if(!id) return;
+      const serviceId=service.id ?? service.service_id ?? service.service_code ?? service.code;
+      if(serviceId==null || serviceId==="") return;
 
-      const existing=window.commissionItems.find(
-        x=>String(x?.service_id ?? "")===String(id)
-      );
+      const type=(typeof serviceTypeLabel==="function")
+        ? serviceTypeLabel(service.service_type ?? service.type)
+        : String(service.service_type ?? service.type ?? "Service");
 
+      const item={
+        service_id:serviceId,
+        service_code:service.service_code ?? service.code ?? "",
+        name:service.name ?? service.service_name ?? service.title ?? "Service",
+        service_type:type,
+        price:Math.max(0,Number(service.price ?? service.unit_price ?? 0)),
+        quantity:1,
+        discount:0
+      };
+
+      const existing=window.commissionItems.find(x=>String(x.service_id)===String(item.service_id));
       if(existing){
         existing.quantity=Math.max(1,Number(existing.quantity||1)+1);
       }else{
-        window.commissionItems.push({
-          service_id:id,
-          service_code:service.service_code ?? service.code ?? "",
-          name:service.name ?? service.service_name ?? service.title ?? "Service",
-          service_type:serviceType(service.service_type ?? service.type),
-          price:Math.max(0,Number(service.price ?? service.unit_price ?? 0)),
-          quantity:1,
-          discount:0
-        });
+        window.commissionItems.push(item);
       }
 
-      if(typeof window.renderCommissionItems==="function"){
-        window.renderCommissionItems();
-      }
+      if(typeof window.renderCommissionItems==="function") window.renderCommissionItems();
+      // renderCommissionItems is normally local to the commission script, so
+      // also dispatch the same result through the existing button behavior if needed.
+      if(typeof renderCommissionItems==="function") renderCommissionItems();
 
       input.value="";
-      window.__mfCommissionFinalMap.clear();
       box.innerHTML="";
       box.classList.remove("show");
-      box.style.display="none";
       input.focus();
     },true);
-
-    box.addEventListener("click",function(e){
-      // mousedown performs the add. Block older click handlers so they cannot
-      // add the same service twice.
-      const btn=e.target.closest("[data-mf-final-commission-service]");
-      if(btn){
-        e.preventDefault();
-        e.stopImmediatePropagation();
-      }
-    },true);
-
-    // + Add Item simply focuses the search field. It never creates an empty row.
-    const addBtn=document.getElementById("commissionAddItem");
-    if(addBtn && addBtn.dataset.mfFinalCommissionAddBound!=="1"){
-      addBtn.dataset.mfFinalCommissionAddBound="1";
-      addBtn.addEventListener("click",function(e){
-        e.preventDefault();
-        e.stopImmediatePropagation();
-        input.focus();
-      },true);
-    }
   }
-
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",commissionFixStart,{once:true});
-  }else{
-    commissionFixStart();
-  }
-  setTimeout(commissionFixStart,300);
-  setTimeout(commissionFixStart,1000);
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
+  else install();
+  setTimeout(install,300);
+  setTimeout(install,1000);
 })();
 </script>
 
