@@ -10368,8 +10368,9 @@ document.addEventListener("DOMContentLoaded",function(){
     const discount=Math.max(0,Number(x.discount||0));
     const subtotal=Math.max(0,unit*price-discount);
     const service=serviceRows().find(s=>String(s.id??s.service_id)===String(x.service_id))||x;
+    const type=serviceTypeLabel(service?.service_type);
     const rate=commissionRateForService(service);
-    return {unit,price,discount,subtotal,rate,amount:subtotal*rate};
+    return {unit,price,discount,subtotal,rate,amount:subtotal*rate,type};
   }
 
   function renderCommissionItems(){
@@ -10377,7 +10378,9 @@ document.addEventListener("DOMContentLoaded",function(){
     const rows=window.commissionItems||[];
     body.innerHTML=rows.length?rows.map((x,i)=>{
       const c=commissionItemCalc(x);
-      const type=serviceTypeLabel(x.service_type);
+      const type=c.type==="Only Service"||c.type==="Service With Product"
+        ? c.type
+        : serviceTypeLabel(x.service_type);
       return `<tr data-commission-index="${i}">
         <td>
           <div class="commission-service-name">${escC(x.name||"Service")}</div>
@@ -10519,18 +10522,42 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   async function insertCommissionRows(rows){
-    let pending=rows.map(x=>({...x}));
+    /*
+     * Write commission rows without SELECT/RETURNING. This matches the
+     * working sale-save pattern and avoids a successful INSERT being
+     * reported as failed when SELECT is restricted by RLS.
+     *
+     * created_by is optional. When the current admin user is available we
+     * include it, which also supports policies that require the creator to
+     * be recorded. If an older commission table does not have that column,
+     * the retry below removes only that optional column.
+     */
+    let pending=rows.map(x=>{
+      const row={...x};
+      if(adminUser?.id && row.created_by==null)row.created_by=adminUser.id;
+      return row;
+    });
+
     for(let attempt=0;attempt<12;attempt++){
       const r=await sb.from("medifella_sale_commissions").insert(pending);
       if(!r.error)return r;
+
       const errText=String(r.error.message||r.error.details||"");
       const columnMatch=
         errText.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']? (?:of relation .* )?does not exist/i) ||
         errText.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i) ||
         errText.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
+
       if(columnMatch && pending.length && Object.prototype.hasOwnProperty.call(pending[0],columnMatch[1])){
         pending.forEach(row=>{delete row[columnMatch[1]]});
         continue;
+      }
+
+      const lower=errText.toLowerCase();
+      if(lower.includes("row-level security") || lower.includes("violates row-level security policy")){
+        throw new Error(
+          "Supabase blocked the commission save with RLS. The commission table needs an INSERT policy for the logged-in Medi Fella admin/staff account."
+        );
       }
       throw r.error;
     }
@@ -10541,31 +10568,55 @@ document.addEventListener("DOMContentLoaded",function(){
     const staffId=C("commissionStaff")?.value;
     const customerId=C("commissionCustomerId")?.value;
     const commissionDate=C("commissionDate")?.value||todayC();
+    const saveBtn=C("saveSaleCommission");
+
     if(!staffId||!customerId||!commissionDate){
       C("commissionStatus").innerHTML='<div class="status error">Please select Sale Staff, Customer and Commission Date.</div>';
       return;
     }
+
     const items=window.commissionItems||[];
     if(!items.length){
       C("commissionStatus").innerHTML='<div class="status error">Please add at least one service from the Service List.</div>';
       return;
     }
+
     const staff=staffRows().find(x=>String(x.id)===String(staffId));
     if(!staff || !isSaleCounterCashierStaff(staff)){
       C("commissionStatus").innerHTML='<div class="status error">Please select a Sale Staff with Job Title: Sale Counter Cashier.</div>';
       return;
     }
-    const customer=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(customerId));
-    const rows=items.map(x=>{
-      const c=commissionItemCalc(x);
-      return {
+
+    const customer=(Array.isArray(window.customers)?window.customers:[])
+      .find(x=>String(x.id)===String(customerId));
+    if(!customer){
+      C("commissionStatus").innerHTML='<div class="status error">The selected customer could not be found. Please search and select the customer again.</div>';
+      return;
+    }
+
+    const rows=[];
+    for(const x of items){
+      const service=serviceRows().find(s=>String(s.id??s.service_id)===String(x.service_id))||x;
+      const type=serviceTypeLabel(service?.service_type);
+
+      // Never guess a commission rate for an unknown service type.
+      if(type!=="Only Service" && type!=="Service With Product"){
+        C("commissionStatus").innerHTML=
+          `<div class="status error">Service "${escC(x.name||"Service")}" does not have a valid Service Type in the Service List. Please set it to Only Service or Service With Product.</div>`;
+        return;
+      }
+
+      const c=commissionItemCalc({...x,service_type:type});
+      if(c.subtotal<=0)continue;
+
+      rows.push({
         commission_date:commissionDate,
         staff_id:staffId,
         staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
         customer_id:customerId,
         customer_name:customer?.name||"",
         customer_phone:customer?.phone||"",
-        service_type:serviceTypeLabel(x.service_type)==="Only Service"?"service":"service_product",
+        service_type:type==="Only Service"?"service":"service_product",
         service_detail:x.name||"Service",
         service_id:x.service_id||null,
         unit:c.unit,
@@ -10575,12 +10626,17 @@ document.addEventListener("DOMContentLoaded",function(){
         commission_rate:c.rate,
         commission_amount:c.amount,
         source:"manual"
-      };
-    }).filter(x=>x.subtotal>0);
+      });
+    }
 
     if(!rows.length){
       C("commissionStatus").innerHTML='<div class="status error">At least one service must have a subtotal greater than $0.</div>';
       return;
+    }
+
+    if(saveBtn){
+      saveBtn.disabled=true;
+      saveBtn.textContent="Saving...";
     }
 
     try{
@@ -10590,6 +10646,11 @@ document.addEventListener("DOMContentLoaded",function(){
       await loadCommissionRecords();
     }catch(e){
       C("commissionStatus").innerHTML=`<div class="status error">${escC(e.message||"Could not save sale commission.")}</div>`;
+    }finally{
+      if(saveBtn){
+        saveBtn.disabled=false;
+        saveBtn.textContent="Save Sale Commission";
+      }
     }
   }
 
