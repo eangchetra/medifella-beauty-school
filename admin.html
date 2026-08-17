@@ -3325,6 +3325,9 @@ document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{
    if(b.dataset.section==="dermedSale") renderDermedSales();
    if(b.dataset.section==="appointments" && typeof window.refreshAppointments==="function") window.refreshAppointments();
  }
+ if(b.dataset.section==="saleCommission"){
+   loadCommissionRecords();
+ }
 });
 
 
@@ -3337,7 +3340,8 @@ sb.auth.onAuthStateChange(async (event)=>{
 });
 async function refreshAll(){
  await Promise.all([loadStudents(),loadCertificates(),loadCourses(),loadPosts(),loadStaff(),loadSales(),
-   loadProducts(),loadStockMovements(),loadStaffInfo(),loadCustomers(),loadServices()]);
+   loadProducts(),loadStockMovements(),loadStaffInfo(),loadCustomers(),loadServices(),
+   loadCommissionRecords()]);
  renderInventoryControls(); renderBuyerControls(); renderServiceControls(); updateMetrics();
 }
 
