@@ -13418,3 +13418,38 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
+
+<script id="commission-final-repair">
+(function(){
+  "use strict";
+  const URL="https://dwrpriwxbjgxpsvhclai.supabase.co";
+  const KEY="sb_publishable_gwLGNpQg4mo-Ae_OvlGiMQ_rZVx7S3I";
+  const el=id=>document.getElementById(id);
+  const esc2=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const money=v=>Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const date=v=>{const x=String(v||"").slice(0,10),m=x.match(/^(\d{4})-(\d{2})-(\d{2})$/);return m?`${m[3]}/${m[2]}/${m[1]}`:x};
+  const batchKey=x=>x?.source_sale_id?"sale:"+x.source_sale_id:x?.reference_no?"ref:"+x.reference_no:x?.created_at?"manual:"+x.created_at:"row:"+(x?.id||"");
+  async function run(){
+    const box=el("commissionList"); if(!box)return;
+    box.innerHTML='<p class="muted">Loading existing commission records...</p>';
+    try{
+      const client=window.__commissionRepairClient||window.supabase.createClient(URL,KEY,{auth:{persistSession:true,autoRefreshToken:true,detectSessionInUrl:true}});
+      window.__commissionRepairClient=client;
+      const sr=await client.auth.getSession();
+      if(sr.error)throw sr.error;
+      if(!sr.data?.session){box.innerHTML='<p class="muted">Waiting for admin login session...</p>';setTimeout(run,1000);return;}
+      let r=await client.from("medifella_sale_commissions").select("*").order("commission_date",{ascending:false}).order("created_at",{ascending:false});
+      if(r.error)r=await client.from("medifella_sale_commissions").select("*");
+      if(r.error)throw r.error;
+      const rows=Array.isArray(r.data)?r.data:[]; window.commissionRecords=rows;
+      if(!rows.length){box.innerHTML='<p class="muted">No commission records found in the database.</p>';if(el("commissionGrandTotal"))el("commissionGrandTotal").innerHTML="";return;}
+      const groups=[],seen=new Set();
+      rows.forEach(x=>{const k=batchKey(x);if(seen.has(k))return;seen.add(k);const rr=rows.filter(y=>batchKey(y)===k),f=rr[0]||{};groups.push({date:f.commission_date||f.created_at||"",staff:f.staff_name||"",customer:f.customer_name||"",phone:f.customer_phone||"",rows:rr,subtotal:rr.reduce((n,y)=>n+Number(y.subtotal||0),0),commission:rr.reduce((n,y)=>n+Number(y.commission_amount||0),0)});});
+      box.innerHTML=`<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th><th>Services</th><th>Grand Subtotal</th><th>Grand Commission</th></tr></thead><tbody>${groups.map(g=>`<tr><td>${esc2(date(g.date))}</td><td>${esc2(g.staff)}</td><td>${esc2(g.customer)}</td><td>${esc2(g.phone)}</td><td>${g.rows.length}</td><td>$${money(g.subtotal)}</td><td>$${money(g.commission)}</td></tr>`).join("")}</tbody></table></div>`;
+      if(el("commissionGrandTotal")){const st=rows.reduce((n,x)=>n+Number(x.subtotal||0),0),co=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);el("commissionGrandTotal").innerHTML=`<div><span>Grand Total Subtotal</span><strong>$${money(st)}</strong></div><div><span>Grand Total Commission</span><strong>$${money(co)}</strong></div>`;}
+    }catch(e){console.error("FINAL COMMISSION REPAIR:",e);box.innerHTML=`<div class="status error"><strong>Commission records could not be loaded.</strong><br>${esc2(e?.message||e)}<div class="muted" style="margin-top:8px">Your existing database records were not deleted by this repair.</div></div>`;}
+  }
+  function start(){setTimeout(run,300);setTimeout(run,1800);setTimeout(run,4000)}
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
+})();
+</script>
