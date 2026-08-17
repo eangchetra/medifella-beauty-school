@@ -2032,14 +2032,13 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
   .commission-entry-totals,.commission-grand-total{display:grid;grid-template-columns:1fr}
 }
 </style>
-
-<style id="sale-commission-update-ui">
+<style id="sale-commission-grouped-edit-delete-css">
 .commission-modal-overlay{position:fixed;inset:0;background:#0008;z-index:100;display:none;overflow:auto;padding:24px}
-.commission-modal-overlay.show{display:block}.commission-modal{width:min(1100px,100%);margin:20px auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 20px 60px #0005}
+.commission-modal-overlay.show{display:block}
+.commission-modal{width:min(1100px,100%);margin:20px auto;background:#fff;border-radius:16px;padding:20px;box-shadow:0 20px 60px #0005}
 .commission-modal-head{display:flex;justify-content:space-between;align-items:flex-start;gap:12px;border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:14px}
-.commission-detail-info{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;background:#f5fafb;border:1px solid var(--line);border-radius:10px;padding:12px;margin-bottom:14px}
+.commission-detail-info{display:grid;grid-template-columns:repeat(4,1fr);gap:10px;margin-bottom:14px}
 .commission-modal-total{display:flex;justify-content:flex-end;gap:28px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:12px;padding-top:14px;color:var(--teal)}
-.commission-view-btn,.commission-edit-btn,.commission-delete-btn{white-space:nowrap}
 @media(max-width:800px){.commission-detail-info{grid-template-columns:1fr 1fr}.commission-modal-overlay{padding:8px}.commission-modal{padding:14px;margin:5px auto}}
 </style>
 </head>
@@ -4725,6 +4724,7 @@ function openPrintFromCanvas(canvas,paper,sale){
 
 
 </body>
+
 </html>`;
 
  printWin.document.open();
@@ -10795,14 +10795,21 @@ document.addEventListener("DOMContentLoaded",function(){
   async function saveCommissionManual(){
     const btn=C("saveSaleCommission");
     if(btn?.dataset.editing==="1"){
-      btn.disabled=true;btn.textContent="Saving...";
+      btn.disabled=true;
+      btn.textContent="Saving...";
       try{
         await updateCommissionBatch();
-        window.__editingCommissionBatchKey=null;btn.dataset.editing="";
+        window.__editingCommissionBatchKey=null;
+        btn.dataset.editing="";
         C("commissionStatus").innerHTML='<div class="status">Sale commission updated successfully.</div>';
-        clearCommissionForm();await loadCommissionRecords();
-      }catch(e){C("commissionStatus").innerHTML=`<div class="status error">${escC(e.message||"Could not update sale commission.")}</div>`;}
-      finally{btn.disabled=false;if(btn.dataset.editing!=="1")btn.textContent="Save Sale Commission";}
+        clearCommissionForm();
+        await loadCommissionRecords();
+      }catch(e){
+        C("commissionStatus").innerHTML=`<div class="status error">${escC(e.message||"Could not update sale commission.")}</div>`;
+      }finally{
+        btn.disabled=false;
+        if(btn.dataset.editing!=="1")btn.textContent="Save Sale Commission";
+      }
       return;
     }
     return saveCommissionManualCreate();
@@ -10985,9 +10992,13 @@ document.addEventListener("DOMContentLoaded",function(){
       if(!key)return;
       const row=(window.commissionRecords||[]).find(x=>commissionBatchKey(x)===key);
       if(!row)return;
-      if(view)renderCommissionDetails(row);else if(edit)editCommissionRecord(row);else if(del)deleteCommissionRecord(row);
+      if(view)renderCommissionDetails(row);
+      else if(edit)editCommissionRecord(row);
+      else if(del)deleteCommissionRecord(row);
     });
-    document.addEventListener("click",e=>{if(e.target.closest("[data-close-commission-modal]")||e.target.id==="commissionDetailsOverlay")closeCommissionModal();});
+    document.addEventListener("click",e=>{
+      if(e.target.closest("[data-close-commission-modal]")||e.target.id==="commissionDetailsOverlay")closeCommissionModal();
+    });
 
     C("saveSaleCommission")?.addEventListener("click",saveCommissionManual);
     C("clearSaleCommission")?.addEventListener("click",clearCommissionForm);
