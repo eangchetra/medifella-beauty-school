@@ -10237,7 +10237,16 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function normalizeCommissionSearchText(v){
-    return String(v??"").toLowerCase().normalize("NFKC").replace(/[^a-z0-9\u1780-\u17ff]+/gi," ").trim();
+    // Normalize common Unicode variants so searches such as "co2" also
+    // match service names written as "CO₂" (subscript 2), and tolerate
+    // punctuation/spaces used in service names.
+    const subscriptMap={"₀":"0","₁":"1","₂":"2","₃":"3","₄":"4","₅":"5","₆":"6","₇":"7","₈":"8","₉":"9"};
+    return String(v??"")
+      .replace(/[₀₁₂₃₄₅₆₇₈₉]/g,ch=>subscriptMap[ch]||ch)
+      .toLowerCase()
+      .normalize("NFKC")
+      .replace(/[^a-z0-9\u1780-\u17ff]+/gi," ")
+      .trim();
   }
 
   function commissionServiceMatches(s,q){
@@ -10289,6 +10298,12 @@ document.addEventListener("DOMContentLoaded",function(){
       if(r.error){
         r=await sb.from("medifella_services").select("*").limit(1000);
       }
+      if(!r.error && (!Array.isArray(r.data) || !r.data.length)){
+        // Service Management itself uses select("*"). Retry once in case
+        // the first query was affected by a stale/partial response.
+        const retry=await sb.from("medifella_services").select("*").limit(1000);
+        if(!retry.error)r=retry;
+      }
       if(r.error){
         console.warn("Commission service search:",r.error.message);
         return [];
@@ -10296,7 +10311,15 @@ document.addEventListener("DOMContentLoaded",function(){
 
       const all=Array.isArray(r.data)?r.data:[];
       mergeCommissionServices(all);
-      return all.filter(x=>commissionServiceMatches(x,term)).slice(0,20);
+
+      // Search the complete Service Management list client-side. This is
+      // important for names containing Unicode symbols such as CO₂.
+      let found=all.filter(x=>commissionServiceMatches(x,term)).slice(0,20);
+      if(!found.length){
+        const merged=serviceRows();
+        found=merged.filter(x=>commissionServiceMatches(x,term)).slice(0,20);
+      }
+      return found;
     }catch(e){
       console.warn("Commission service search failed:",e);
       return [];
@@ -10308,11 +10331,7 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!input||!box)return;
     const q=String(input.value||"").toLowerCase().trim();
     if(!q){box.innerHTML="";box.classList.remove("show");return}
-    const list=(Array.isArray(rows)?rows:serviceRows().filter(s=>{
-      const text=[s.id,s.service_id,s.service_code,s.code,s.name,s.service_name,s.title,s.service_type,s.type]
-        .map(v=>String(v??"").toLowerCase()).join(" ");
-      return text.includes(q);
-    })).slice(0,20);
+    const list=(Array.isArray(rows)?rows:serviceRows().filter(s=>commissionServiceMatches(s,q))).slice(0,20);
     box.innerHTML=list.map(s=>{
       const sid=s.id??s.service_id??"";
       const name=s.name??s.service_name??s.title??"Service";
