@@ -2041,6 +2041,85 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .commission-modal-total{display:flex;justify-content:flex-end;gap:28px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:12px;padding-top:14px;color:var(--teal)}
 @media(max-width:800px){.commission-detail-info{grid-template-columns:1fr 1fr}.commission-modal-overlay{padding:8px}.commission-modal{padding:14px;margin:5px auto}}
 </style>
+
+<style id="payment-dialog-position-fix">
+#salePaymentDialog{
+  position:fixed !important;
+  inset:0 !important;
+  z-index:999999 !important;
+  display:none !important;
+  align-items:center !important;
+  justify-content:center !important;
+  padding:20px !important;
+  margin:0 !important;
+  background:rgba(0,0,0,.35) !important;
+  box-sizing:border-box !important;
+}
+#salePaymentDialog.show{
+  display:flex !important;
+}
+#salePaymentDialog .spd-card{
+  position:relative !important;
+  width:min(430px,calc(100vw - 40px)) !important;
+  max-height:calc(100vh - 40px) !important;
+  overflow:auto !important;
+  margin:0 auto !important;
+  padding:22px !important;
+  background:#fff !important;
+  border-radius:14px !important;
+  box-shadow:0 18px 55px rgba(0,0,0,.25) !important;
+  box-sizing:border-box !important;
+}
+#salePaymentDialog .spd-title{
+  font-size:21px !important;
+  font-weight:700 !important;
+  margin-bottom:5px !important;
+}
+#salePaymentDialog .spd-due{
+  margin:10px 0 16px !important;
+  padding:10px 12px !important;
+  border-radius:8px !important;
+  background:#f5f6f7 !important;
+  font-weight:600 !important;
+}
+#salePaymentDialog label{
+  display:block !important;
+  margin:11px 0 5px !important;
+  font-weight:600 !important;
+}
+#salePaymentDialog input,
+#salePaymentDialog select{
+  width:100% !important;
+  min-height:42px !important;
+  padding:9px 11px !important;
+  box-sizing:border-box !important;
+  border:1px solid #cfd4d8 !important;
+  border-radius:8px !important;
+  background:#fff !important;
+}
+#salePaymentDialog .spd-actions{
+  display:flex !important;
+  justify-content:flex-end !important;
+  gap:8px !important;
+  margin-top:18px !important;
+}
+#salePaymentDialog .spd-actions button{
+  min-height:40px !important;
+  padding:8px 15px !important;
+  border:0 !important;
+  border-radius:8px !important;
+  cursor:pointer !important;
+}
+#salePaymentDialog .spd-cancel{background:#e9ecef !important;color:#333 !important}
+#salePaymentDialog .spd-confirm{background:#b28a36 !important;color:#fff !important}
+@media(max-width:520px){
+  #salePaymentDialog{padding:12px !important}
+  #salePaymentDialog .spd-card{
+    width:calc(100vw - 24px) !important;
+    padding:18px !important;
+  }
+}
+</style>
 </head>
 <body>
 
@@ -3137,7 +3216,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 const SUPABASE_URL="https://dwrpriwxbjgxpsvhclai.supabase.co";
 const SUPABASE_ANON_KEY="sb_publishable_gwLGNpQg4mo-Ae_OvlGiMQ_rZVx7S3I";
 const CLOUDFLARE_STORAGE_URL="https://medi-fella-storage.eang-chetraafs.workers.dev";
-const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY); window.sb=sb;
 const $=id=>document.getElementById(id);
 function msg(el,text,error=false){el.className="status"+(error?" error":"");el.textContent=text}
 function clearMsg(el){el.className="";el.textContent=""}
@@ -3682,7 +3761,7 @@ async function loadSales(){
    salesRecords=[];salePayments=[];renderSaleStudentOptions();updateSalesMetrics();return;
  }
  salesRecords=sr.data||[];
- salePayments=pr.error?[]:(pr.data||[]);
+ salePayments=pr.error?[]:(pr.data||[]); window.salePayments=salePayments;
  renderSaleStudentOptions();
  try{renderSales()}catch(e){
    console.error("Medi Fella Sale render error:",e);
@@ -10205,8 +10284,6 @@ document.addEventListener("DOMContentLoaded",function(){
 
 <script id="sale-commission-management">
 (function(){
-  let commissionLoadSequence=0;
-  let commissionLoadTimer=null;
   "use strict";
   const C=id=>document.getElementById(id);
   const moneyC=v=>Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
@@ -10607,13 +10684,14 @@ document.addEventListener("DOMContentLoaded",function(){
   async function loadCommissionRecords(retry=0){
     const box=C("commissionList");
     if(!box)return;
-    const seq=++commissionLoadSequence;
 
+    // The commission section can be opened immediately after login. If the
+    // Supabase client/session is not ready yet, retry instead of leaving the
+    // screen permanently stuck on "Loading...".
     if(typeof sb==="undefined" || !sb){
-      if(retry<12){
+      if(retry<10){
         box.innerHTML='<p class="muted">Connecting to the commission database...</p>';
-        clearTimeout(commissionLoadTimer);
-        commissionLoadTimer=setTimeout(()=>loadCommissionRecords(retry+1),500);
+        setTimeout(()=>loadCommissionRecords(retry+1),500);
       }else{
         box.innerHTML='<p class="status error">Commission database is not ready. Please refresh the page.</p>';
       }
@@ -10623,45 +10701,40 @@ document.addEventListener("DOMContentLoaded",function(){
     box.innerHTML='<p class="muted">Loading commission records...</p>';
 
     try{
-      const query=sb.from("medifella_sale_commissions")
+      let r=await sb.from("medifella_sale_commissions")
         .select("*")
         .order("commission_date",{ascending:false})
         .order("created_at",{ascending:false});
 
-      const timeout=new Promise((_,reject)=>setTimeout(
-        ()=>reject(new Error("Commission database request timed out. Please click Search/Refresh again.")),
-        10000
-      ));
-
-      let r;
-      try{
-        r=await Promise.race([query,timeout]);
-      }catch(firstErr){
-        console.warn("Commission ordered query:",firstErr);
-        const fallback=sb.from("medifella_sale_commissions").select("*");
-        r=await Promise.race([fallback,timeout]);
+      // If an older table/schema does not support one of the ordering
+      // columns, retry with a simpler query. This does not change any data.
+      if(r.error){
+        console.warn("Commission ordered query:",r.error.message);
+        r=await sb.from("medifella_sale_commissions").select("*");
       }
 
-      if(seq!==commissionLoadSequence)return;
-
       if(r.error){
-        throw r.error;
+        console.error("Commission table read:",r.error);
+        window.commissionRecords=[];
+        box.innerHTML=`<div class="status error">
+          Could not read the old commission records from Supabase.<br>
+          <strong>${escC(r.error.message||"Unknown database error")}</strong>
+          <div class="muted" style="margin-top:6px">
+            If the message says "row-level security policy", the table needs a
+            SELECT policy for authenticated users. No commission records were deleted.
+          </div>
+        </div>`;
+        C("commissionGrandTotal").innerHTML="";
+        return;
       }
 
       window.commissionRecords=Array.isArray(r.data)?r.data:[];
       renderCommissionList();
     }catch(e){
-      if(seq!==commissionLoadSequence)return;
-      console.error("Commission table read:",e);
+      console.error("Commission table read exception:",e);
       window.commissionRecords=[];
-      box.innerHTML=`<div class="status error">
-        Could not load the sale commission records.<br>
-        <strong>${escC(e.message||"Unknown database error")}</strong>
-        <div class="muted" style="margin-top:6px">
-          Existing commission records in Supabase were not deleted.
-        </div>
-      </div>`;
-      if(C("commissionGrandTotal"))C("commissionGrandTotal").innerHTML="";
+      box.innerHTML=`<div class="status error">Could not load commission records: ${escC(e.message||e)}</div>`;
+      C("commissionGrandTotal").innerHTML="";
     }
   }
 
@@ -11137,7 +11210,7 @@ document.addEventListener("DOMContentLoaded",function(){
     C("saveSaleCommission")?.addEventListener("click",saveCommissionManual);
     C("clearSaleCommission")?.addEventListener("click",clearCommissionForm);
     C("commissionStaff")?.addEventListener("change",()=>{refreshCommissionStaffRateHint();renderCommissionItems();});
-    C("commissionRefresh")?.addEventListener("click",()=>loadCommissionRecords());
+    C("commissionRefresh")?.addEventListener("click",renderCommissionList);
     C("commissionFilterStaff")?.addEventListener("change",renderCommissionList);
     C("commissionFromDate")?.addEventListener("change",renderCommissionList);
     C("commissionToDate")?.addEventListener("change",renderCommissionList);
@@ -11146,6 +11219,9 @@ document.addEventListener("DOMContentLoaded",function(){
 
     renderCommissionItems();
     loadCommissionRecords();
+    // Guaranteed retry after the page/authentication client has had time to initialize.
+    setTimeout(()=>loadCommissionRecords(),1500);
+    setTimeout(()=>loadCommissionRecords(),3500);
   }
 
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bindCommission,{once:true});
@@ -11332,50 +11408,49 @@ document.addEventListener("DOMContentLoaded",function(){
 
 
 <!-- FINAL SALE INVOICE / PAYMENT UX FIX -->
-<script id="final-sale-invoice-payment-ux-fix-v2">
+<script id="final-sale-invoice-payment-ux-fix-v3">
 (function(){
   "use strict";
   const E=id=>document.getElementById(id);
-  const esc2=v=>typeof window.esc==='function'?window.esc(v):String(v??"").replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
-  const money2=v=>typeof window.money==='function'?window.money(v):"$"+Number(v||0).toFixed(2);
-  const getDB=()=>(
-    (typeof window.sb!=="undefined" && window.sb) ||
-    (typeof sb!=="undefined" && sb) ||
-    null
-  );
+  const esc2=v=>typeof window.esc==="function"?window.esc(v):String(v??"").replace(/[&<>\"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c]));
+  const money2=v=>typeof window.money==="function"?window.money(v):"$"+Number(v||0).toFixed(2);
+  const getDB=()=>window.sb||null;
+
+  function cachedSale(id){
+    const sid=String(id||"").trim();
+    if(!sid)return null;
+    const a=Array.isArray(window.salesRecords)?window.salesRecords:[];
+    return a.find(x=>String(x.id)===sid)||null;
+  }
 
   async function getSale(id){
     const sid=String(id||"").trim();
-    if(!sid) return null;
-    let s=Array.isArray(window.salesRecords)?window.salesRecords.find(x=>String(x.id)===sid):null;
-    if(!s && getDB()){
-      const r=await getDB().from("medifella_sales").select("*").eq("id",sid).maybeSingle();
-      if(r.error) throw r.error;
-      s=r.data||null;
-      if(s && Array.isArray(window.salesRecords)){
-        const i=window.salesRecords.findIndex(x=>String(x.id)===sid);
-        if(i>=0) window.salesRecords[i]=s; else window.salesRecords.push(s);
-      }
+    if(!sid)return null;
+    let s=cachedSale(sid);
+    if(s)return s;
+    const db=getDB();
+    if(!db)return null;
+    const r=await db.from("medifella_sales").select("*").eq("id",sid).maybeSingle();
+    if(r.error)throw r.error;
+    s=r.data||null;
+    if(s&&Array.isArray(window.salesRecords)){
+      const i=window.salesRecords.findIndex(x=>String(x.id)===sid);
+      if(i>=0)window.salesRecords[i]=s;else window.salesRecords.push(s);
     }
     return s;
   }
 
-  // Always open the invoice from the authoritative sale row. Works for
-  // Medi Fella, MTS and Dermed rows and does not depend on the rendered table.
-  window.openSaleInvoiceSafe=async function(id,size,type){
+  window.openSaleInvoiceSafe=async function(id,size){
     try{
       const sid=String(id||"").trim();
-      if(!sid){alert("Invoice ID is missing.");return false;}
-      const s=await getSale(sid);
+      const s=cachedSale(sid)||await getSale(sid);
       if(!s){alert("Sale record not found.");return false;}
       window.currentInvoiceId=sid;
-      const saleType=String(s.sale_type||"").trim().toUpperCase();
-      if(saleType==="DERMED" && typeof window.showDermedSaleInvoice==="function"){
+      if(String(s.sale_type||"").toUpperCase()==="DERMED" &&
+         typeof window.showDermedSaleInvoice==="function"){
         window.showDermedSaleInvoice(sid,size||"A4");
       }else if(typeof window.showSaleInvoice==="function"){
         window.showSaleInvoice(sid,size||"A4");
-      }else if(typeof showSaleInvoice==="function"){
-        showSaleInvoice(sid,size||"A4");
       }else{
         alert("Invoice function is not available. Please refresh the Admin Dashboard.");
       }
@@ -11387,18 +11462,19 @@ document.addEventListener("DOMContentLoaded",function(){
   };
   window.openSaleInvoiceRobust=window.openSaleInvoiceSafe;
 
-  // Payment dialog: fetch the sale if it is not currently in salesRecords,
-  // then show a real select box for the payment method.
+  function currentTotals(s){
+    const total=typeof window.saleTotal==="function"?window.saleTotal(s):Number(s?.grand_total||0);
+    const paid=typeof window.salePaid==="function"?window.salePaid(s):Number(s?.paid||0);
+    return {total,paid,due:Math.max(0,total-paid)};
+  }
+
   window.openSalePaymentDialog=async function(id){
     try{
-      const s=await getSale(id);
+      const s=cachedSale(id)||await getSale(id);
       if(!s){alert("Sale record not found.");return false;}
-      const total=typeof window.saleTotal==='function'?window.saleTotal(s):Number(s.grand_total||0);
-      const paid=typeof window.salePaid==='function'?window.salePaid(s):Number(s.paid||0);
-      const balance=Math.max(0,total-paid);
-      if(balance<=0.005){alert("This sale has no remaining balance.");return false;}
+      const t=currentTotals(s);
+      if(t.due<=0.005){alert("This sale has no remaining balance.");return false;}
 
-      // Reuse the existing dialog if present; otherwise create it.
       let modal=E("salePaymentDialog");
       if(!modal){
         modal=document.createElement("div");
@@ -11418,21 +11494,26 @@ document.addEventListener("DOMContentLoaded",function(){
             <option value="Other">Other</option>
           </select>
           <div id="spdError" class="status error hidden"></div>
-          <div class="spd-actions"><button type="button" class="spd-cancel" id="spdCancel">Cancel</button><button type="button" class="spd-confirm" id="spdConfirm">Confirm Payment</button></div>
+          <div class="spd-actions">
+            <button type="button" class="spd-cancel" id="spdCancel">Cancel</button>
+            <button type="button" class="spd-confirm" id="spdConfirm">Confirm Payment</button>
+          </div>
         </div>`;
         document.body.appendChild(modal);
-        modal.addEventListener("click",e=>{if(e.target===modal) modal.classList.remove("show");});
+        modal.addEventListener("click",ev=>{if(ev.target===modal)modal.classList.remove("show");});
         E("spdCancel").onclick=()=>modal.classList.remove("show");
         E("spdConfirm").onclick=submitPayment;
       }
+
       modal.classList.add("show");
       E("spdReference").textContent=String(s.reference_no||s.invoice_no||"Sale");
-      E("spdDue").textContent=`Due: ${money2(balance)}`;
-      E("spdAmount").value=balance.toFixed(2);
-      E("spdMethod").value=String(s.payment_method||"Cash");
+      E("spdDue").textContent=`Due: ${money2(t.due)}`;
+      E("spdAmount").value=t.due.toFixed(2);
+      E("spdMethod").value="Cash";
       E("spdError").classList.add("hidden");
-      setTimeout(()=>E("spdAmount")?.select(),50);
-      window.__activePaymentDialog={id:String(s.id),balance,total,paid};
+      E("spdAmount").focus();
+      E("spdAmount").select();
+      window.__activePaymentDialog={id:String(s.id),total:t.total,paid:t.paid,balance:t.due};
     }catch(err){
       console.error("Open payment dialog:",err);
       alert(err?.message||"Could not open payment window.");
@@ -11441,85 +11522,149 @@ document.addEventListener("DOMContentLoaded",function(){
   };
 
   async function submitPayment(){
-    const ctx=window.__activePaymentDialog;
-    if(!ctx||!getDB())return;
-    const amount=typeof window.parseMoneyInput==='function'?window.parseMoneyInput(E("spdAmount").value):Number(String(E("spdAmount").value).replace(/[$,\s]/g,""));
-    const method=E("spdMethod").value||"Cash";
+    const ctx=window.__activePaymentDialog, db=getDB();
+    if(!ctx){return;}
+    if(!db){
+      E("spdError").textContent="Database connection is not ready. Please refresh and try again.";
+      E("spdError").classList.remove("hidden");
+      return;
+    }
+
+    const raw=String(E("spdAmount").value||"").replace(/[$,\s]/g,"");
+    const amount=Number(raw), method=E("spdMethod").value||"Cash";
     const err=E("spdError");
-    if(!Number.isFinite(amount)||amount<=0){err.textContent="Enter a valid payment amount.";err.classList.remove("hidden");return;}
-    if(amount>ctx.balance+0.005){err.textContent=`Payment cannot be greater than the Due amount of ${money2(ctx.balance)}.`;err.classList.remove("hidden");return;}
-    const btn=E("spdConfirm");btn.disabled=true;btn.textContent="Saving...";
+    if(!Number.isFinite(amount)||amount<=0){
+      err.textContent="Enter a valid payment amount.";err.classList.remove("hidden");return;
+    }
+    if(amount>ctx.balance+0.005){
+      err.textContent=`Payment cannot be greater than the Due amount of ${money2(ctx.balance)}.`;
+      err.classList.remove("hidden");return;
+    }
+
+    const btn=E("spdConfirm");
+    btn.disabled=true;btn.textContent="Saving...";
     try{
       const now=new Date();
-      const pr=await getDB().from("medifella_sale_payments").insert({sale_id:ctx.id,amount,payment_method:method,payment_date:now.toISOString().slice(0,10),note:"Additional payment",created_by:window.adminUser?.id||null});
+      const payment={
+        sale_id:ctx.id,
+        amount,
+        payment_method:method,
+        payment_date:now.toISOString().slice(0,10),
+        note:"Additional payment"
+      };
+      if(window.adminUser?.id)payment.created_by=window.adminUser.id;
+
+      const pr=await db.from("medifella_sale_payments").insert(payment).select("*").single();
       if(pr.error)throw pr.error;
+
       const newPaid=ctx.paid+amount;
-      const status=typeof window.saleStatus==='function'?window.saleStatus(ctx.total,newPaid):(newPaid>=ctx.total-0.005?"Paid":"Partial");
-      const sr=await getDB().from("medifella_sales").update({paid:newPaid,balance:Math.max(0,ctx.total-newPaid),payment_status:status}).eq("id",ctx.id);
+      const status=typeof window.saleStatus==="function"
+        ?window.saleStatus(ctx.total,newPaid)
+        :(newPaid>=ctx.total-0.005?"Paid":"Partial");
+
+      const sr=await db.from("medifella_sales")
+        .update({paid:newPaid,balance:Math.max(0,ctx.total-newPaid),payment_status:status})
+        .eq("id",ctx.id);
       if(sr.error)throw sr.error;
-      E("salePaymentDialog")?.classList.remove("show");
-      window.__activePaymentDialog=null;
-      if(typeof window.loadSales==='function') await window.loadSales();
-      if(typeof window.renderSales==='function') window.renderSales();
-      if(typeof window.renderDermedSales==='function') window.renderDermedSales();
-      if(typeof window.renderMtsSales==='function') window.renderMtsSales();
-    }catch(e){
-      console.error("Record payment error:",e);
-      err.textContent=e?.message||"Could not record payment.";err.classList.remove("hidden");
-    }finally{btn.disabled=false;btn.textContent="Confirm Payment";}
+
+      // Update the in-memory records immediately.
+      if(Array.isArray(window.salePayments)){
+        window.salePayments.unshift(pr.data||{...payment,created_at:now.toISOString()});
+      }
+      if(Array.isArray(window.salesRecords)){
+        const row=window.salesRecords.find(x=>String(x.id)===ctx.id);
+        if(row){
+          row.paid=newPaid;row.balance=Math.max(0,ctx.total-newPaid);row.payment_status=status;
+        }
+      }
+
+      modalClose();
+      if(typeof window.renderSales==="function")window.renderSales();
+      if(typeof window.renderMtsSales==="function")window.renderMtsSales();
+      if(typeof window.renderDermedSales==="function")window.renderDermedSales();
+    }catch(ex){
+      console.error("Record payment error:",ex);
+      err.textContent=ex?.message||"Could not record payment.";
+      err.classList.remove("hidden");
+    }finally{
+      btn.disabled=false;btn.textContent="Confirm Payment";
+    }
   }
 
-  // View Payment opens the modal with useful payment details immediately from
-  // the already-loaded sale row, then refreshes the full payment history in
-  // the background. No blank/loading-only screen first.
-  window.viewPaymentHistory=async function(id){
-    const modal=E("partialPaymentHistoryModal"),body=E("pphBody"),sub=E("pphSubtitle");
-    if(!modal||!body){alert("Payment history window is not available.");return;}
-    let sale=null;
-    try{sale=await getSale(id);}catch(e){console.error(e);}
-    const total=sale?(typeof window.saleTotal==='function'?window.saleTotal(sale):Number(sale.grand_total||0)):0;
-    const paid=sale?(typeof window.salePaid==='function'?window.salePaid(sale):Number(sale.paid||0)):0;
-    const due=Math.max(0,total-paid);
-    const ref=sale?(sale.reference_no||sale.invoice_no||sale.invoice_number||"Invoice"):"Invoice";
-    const customer=sale?(sale.customer_name||sale.student_name||"Customer"):"Customer";
-    sub.textContent=`${ref} · ${customer}`;
-    modal.classList.add("show");modal.setAttribute("aria-hidden","false");
-    body.innerHTML=`<div class="pph-quick">
-      <div><span>Total</span><strong>${money2(total)}</strong></div>
-      <div><span>Paid</span><strong>${money2(paid)}</strong></div>
-      <div><span>Due</span><strong>${money2(due)}</strong></div>
-      <div><span>Latest Method</span><strong>${esc2(sale?.payment_method||"Cash")}</strong></div>
-    </div><p class="muted" style="margin:12px 0 6px">Payment details</p>
-    <div class="table-wrap"><table class="pph-table"><thead><tr><th>#</th><th>Payment Date & Time</th><th>Amount</th><th>Payment Method</th></tr></thead><tbody><tr><td>—</td><td>Loading details…</td><td>${money2(paid)}</td><td>${esc2(sale?.payment_method||"Cash")}</td></tr></tbody></table></div>`;
+  function modalClose(){
+    E("salePaymentDialog")?.classList.remove("show");
+    window.__activePaymentDialog=null;
+  }
 
-    try{
-      const q=await getDB().from("medifella_sale_payments").select("*").eq("sale_id",String(id)).order("created_at",{ascending:true});
-      if(q.error)throw q.error;
-      const rows=Array.isArray(q.data)?q.data:[];
-      if(!rows.length){
-        body.innerHTML+=`<p class="muted" style="margin-top:12px">No payment history records found.</p>`;
-        return;
-      }
-      const totalHistory=rows.reduce((sum,p)=>sum+Number(p.amount||0),0);
-      body.innerHTML=`<div class="pph-quick"><div><span>Total</span><strong>${money2(total)}</strong></div><div><span>Paid</span><strong>${money2(paid)}</strong></div><div><span>Due</span><strong>${money2(due)}</strong></div><div><span>Latest Method</span><strong>${esc2(rows[rows.length-1]?.payment_method||sale?.payment_method||"Cash")}</strong></div></div>
+  // IMPORTANT: this reads the payment cache first, so the user sees the
+  // records immediately. A database refresh happens only afterward.
+  window.viewPaymentHistory=function(id){
+    const modal=E("partialPaymentHistoryModal"),body=E("pphBody"),sub=E("pphSubtitle");
+    if(!modal||!body){alert("Payment history window is not available.");return false;}
+
+    const s=cachedSale(id);
+    const totals=currentTotals(s||{});
+    const rows=(Array.isArray(window.salePayments)?window.salePayments:[])
+      .filter(p=>String(p.sale_id)===String(id))
+      .sort((a,b)=>String(a.created_at||a.payment_date||"").localeCompare(String(b.created_at||b.payment_date||"")));
+
+    const ref=s?(s.reference_no||s.invoice_no||s.invoice_number||"Invoice"):"Invoice";
+    const customer=s?(s.customer_name||s.student_name||"Customer"):"Customer";
+    sub.textContent=`${ref} · ${customer}`;
+
+    const renderRows=(list)=>{
+      const latest=list.length?list[list.length-1]:null;
+      body.innerHTML=`<div class="pph-quick">
+        <div><span>Total</span><strong>${money2(totals.total)}</strong></div>
+        <div><span>Paid</span><strong>${money2(totals.paid)}</strong></div>
+        <div><span>Due</span><strong>${money2(totals.due)}</strong></div>
+        <div><span>Latest Method</span><strong>${esc2(latest?.payment_method||"—")}</strong></div>
+      </div>
       <p class="muted" style="margin:12px 0 6px">Payment details</p>
-      <div class="table-wrap"><table class="pph-table"><thead><tr><th>#</th><th>Payment Date & Time</th><th>Amount</th><th>Payment Method</th></tr></thead><tbody>${rows.map((p,i)=>`<tr><td>${i+1}</td><td>${esc2(typeof window.formatPaymentDateTime==='function'?window.formatPaymentDateTime(p):(p.payment_date||p.created_at||"—"))}</td><td>${money2(p.amount)}</td><td>${esc2(p.payment_method||"—")}</td></tr>`).join("")}</tbody></table></div><div class="pph-total">Total Paid: ${money2(totalHistory)}</div>`;
-    }catch(err){
-      console.error("View Payment:",err);
-      body.innerHTML+=`<p class="error status" style="margin-top:12px">Could not refresh payment history: ${esc2(err?.message||"Unknown error")}</p>`;
+      <div class="table-wrap"><table class="pph-table">
+        <thead><tr><th>#</th><th>Payment Date & Time</th><th>Amount</th><th>Payment Method</th></tr></thead>
+        <tbody>${list.length?list.map((p,i)=>`<tr>
+          <td>${i+1}</td>
+          <td>${esc2(typeof window.formatPaymentDateTime==="function"
+            ?window.formatPaymentDateTime(p):(p.payment_date||p.created_at||"—"))}</td>
+          <td>${money2(p.amount)}</td>
+          <td>${esc2(p.payment_method||"—")}</td>
+        </tr>`).join(""):`<tr><td colspan="4" class="muted">No payment records.</td></tr>`}</tbody>
+      </table></div>
+      <div class="pph-total">Total Paid: ${money2(list.reduce((a,p)=>a+Number(p.amount||0),0))}</div>`;
+    };
+
+    // Show the modal and cached records BEFORE any network request.
+    renderRows(rows);
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden","false");
+
+    // Refresh quietly in the background; never replace the immediate display
+    // with a loading screen.
+    const db=getDB();
+    if(db){
+      db.from("medifella_sale_payments").select("*").eq("sale_id",String(id))
+        .order("created_at",{ascending:true})
+        .then(q=>{
+          if(!q.error&&Array.isArray(q.data)){
+            const all=(Array.isArray(window.salePayments)?window.salePayments:[]).filter(p=>String(p.sale_id)!==String(id));
+            window.salePayments=all.concat(q.data);
+            renderRows(q.data);
+          }
+        }).catch(ex=>console.warn("Payment refresh:",ex));
     }
+    return false;
   };
   window.showPartialPaymentHistory=window.viewPaymentHistory;
 
-  // Make every existing/new View Invoice button use the reliable handler.
   function patchInvoiceButtons(){
-    document.querySelectorAll('button').forEach(btn=>{
-      const oc=btn.getAttribute('onclick')||"";
+    document.querySelectorAll("button").forEach(btn=>{
+      const oc=btn.getAttribute("onclick")||"";
       if(!/openSaleInvoiceSafe|openSaleInvoiceRobust|showSaleInvoice|showDermedSaleInvoice/.test(oc))return;
       const m=oc.match(/(?:openSaleInvoiceSafe|openSaleInvoiceRobust|showSaleInvoice|showDermedSaleInvoice)\(['"]([^'"]+)['"]/);
       if(!m)return;
       const id=m[1];
-      btn.onclick=function(e){e.preventDefault();e.stopPropagation();return window.openSaleInvoiceSafe(id,'A4');};
+      btn.onclick=function(ev){ev.preventDefault();ev.stopPropagation();return window.openSaleInvoiceSafe(id,"A4");};
     });
   }
   patchInvoiceButtons();
