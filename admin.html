@@ -10586,6 +10586,7 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   async function loadCommissionRecords(retry=0){
+    window.reloadCommissionRecords = loadCommissionRecords;
     const box=C("commissionList");
     if(!box)return;
 
@@ -11394,6 +11395,160 @@ document.addEventListener("DOMContentLoaded",function(){
 #saleItemViewV2 .siv2-head{display:flex;justify-content:space-between;align-items:center;gap:15px;margin-bottom:14px}
 #saleItemViewV2 h2{margin:0 0 4px}
 </style>
+
+<script id="final-safe-sale-buttons-v3">
+(function(){
+  "use strict";
+
+  // The application uses a top-level `let salesRecords`, which is intentionally
+  // not a window property. Some later repair code expected window.salesRecords.
+  // Keep both references synchronized without changing the database data.
+  function syncSaleRecords(){
+    try{
+      if(typeof salesRecords !== "undefined" && Array.isArray(salesRecords)){
+        window.salesRecords=salesRecords;
+        return salesRecords;
+      }
+    }catch(e){}
+    return Array.isArray(window.salesRecords)?window.salesRecords:[];
+  }
+
+  function localSale(id){
+    const sid=String(id||"").trim();
+    return syncSaleRecords().find(x=>String(x.id)===sid) || null;
+  }
+
+  async function fetchSale(id){
+    const local=localSale(id);
+    if(local) return local;
+    if(window.sb){
+      const r=await window.sb.from("medifella_sales").select("*").eq("id",String(id)).maybeSingle();
+      if(r.error) throw r.error;
+      if(r.data){
+        try{
+          if(typeof salesRecords!=="undefined" && Array.isArray(salesRecords)){
+            const exists=salesRecords.some(x=>String(x.id)===String(r.data.id));
+            if(!exists) salesRecords.push(r.data);
+            window.salesRecords=salesRecords;
+          }
+        }catch(e){}
+        return r.data;
+      }
+    }
+    return null;
+  }
+
+  window.openSaleInvoiceSafe=async function(id,size,type){
+    try{
+      const sid=String(id||"").trim();
+      if(!sid){alert("Invoice ID is missing.");return false;}
+      const s=await fetchSale(sid);
+      if(!s){alert("Sale record not found.");return false;}
+      window.currentInvoiceId=sid;
+
+      const isDermed=String(s.sale_type||"").toUpperCase()==="DERMED" || String(type||"").toUpperCase()==="DERMED";
+      if(isDermed && typeof window.showDermedSaleInvoice==="function"){
+        window.showDermedSaleInvoice(sid,size||"A4");
+      }else if(typeof window.showSaleInvoice==="function"){
+        window.showSaleInvoice(sid,size||"A4");
+      }else{
+        alert("Invoice function is not available. Please refresh the Admin Dashboard.");
+      }
+    }catch(e){
+      console.error("View Invoice V3:",e);
+      alert(e?.message||"Could not open invoice.");
+    }
+    return false;
+  };
+
+  // Payment buttons use the same record bridge.
+  const originalPayment=window.openSalePaymentDialog;
+  window.openSalePaymentDialog=async function(id){
+    try{
+      const s=await fetchSale(id);
+      if(!s){alert("Sale record not found.");return false;}
+      // Ensure legacy payment code sees the same records array.
+      syncSaleRecords();
+      if(typeof originalPayment==="function") return originalPayment(id);
+      alert("Payment window is not available. Please refresh the Admin Dashboard.");
+    }catch(e){
+      console.error("Payment V3:",e);
+      alert(e?.message||"Could not open payment.");
+    }
+    return false;
+  };
+
+  // Product / service View uses the real local records, not only window.salesRecords.
+  window.showSaleItemDetailsV2=async function(id){
+    try{
+      const s=await fetchSale(id);
+      if(!s){alert("Sale record not found.");return false;}
+
+      const escV=v=>String(v==null?"":v).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+      const moneyV=v=>"$"+Number(v||0).toFixed(2);
+      const arr=v=>{
+        if(Array.isArray(v))return v;
+        if(typeof v==="string"){try{const x=JSON.parse(v);return Array.isArray(x)?x:[]}catch(e){}}
+        return [];
+      };
+
+      let products=arr(s.items);
+      let services=arr(s.service_items||s.services);
+      const items=[
+        ...products.map(x=>({...x,kind:"Product"})),
+        ...services.map(x=>({...x,kind:"Service"}))
+      ];
+
+      let m=document.getElementById("saleItemViewV2");
+      if(!m){
+        m=document.createElement("div");
+        m.id="saleItemViewV2";
+        m.innerHTML=`<div class="siv2-bg"></div><div class="siv2-card">
+          <div class="siv2-head"><div><h2>Product / Service Details</h2><div id="siv2-ref"></div></div>
+          <button type="button" class="light" id="siv2-close">Close</button></div><div id="siv2-body"></div></div>`;
+        document.body.appendChild(m);
+        m.querySelector("#siv2-close").onclick=()=>m.remove();
+        m.querySelector(".siv2-bg").onclick=()=>m.remove();
+      }
+      m.querySelector("#siv2-ref").textContent=String(s.reference_no||s.id||"Sale");
+      const rows=items.map((x,i)=>{
+        const qty=Number(x.quantity??x.qty??1), unit=Number(x.unit_price??x.price??0);
+        const sub=Number(x.subtotal??qty*unit);
+        return `<tr><td>${i+1}</td><td>${escV(x.kind)}</td><td>${escV(x.name||x.product_name||x.service_name||x.description||"—")}</td>
+        <td>${escV(x.product_code||x.service_code||x.id||"—")}</td><td>${qty}</td><td>${moneyV(unit)}</td><td>${moneyV(sub)}</td></tr>`;
+      }).join("");
+      m.querySelector("#siv2-body").innerHTML=items.length?`<div style="overflow:auto"><table class="table" style="width:100%;min-width:720px">
+        <thead><tr><th>No.</th><th>Type</th><th>Product / Service</th><th>Code / ID</th><th>Qty</th><th>Unit Price</th><th>Subtotal</th></tr></thead>
+        <tbody>${rows}</tbody></table></div>`:`<div class="muted" style="padding:16px">No product or service details found.</div>`;
+      m.style.display="flex";
+    }catch(e){
+      console.error("Item View V3:",e);
+      alert(e?.message||"Could not open item details.");
+    }
+    return false;
+  };
+
+  // Synchronize immediately and again after the sale loader completes.
+  syncSaleRecords();
+  let n=0;
+  const timer=setInterval(()=>{
+    syncSaleRecords();
+    if((typeof salesRecords!=="undefined" && Array.isArray(salesRecords) && salesRecords.length) || ++n>30) clearInterval(timer);
+  },500);
+
+  // If the commission section ever remains on the initial static "Loading..."
+  // after authentication, explicitly retry the existing loader. No commission
+  // data or calculation is changed here.
+  let c=0;
+  const ct=setInterval(()=>{
+    const box=document.getElementById("commissionList");
+    if(box && /^(Loading…?|Loading commission records\.\.\.)$/i.test(box.textContent.trim())){
+      if(typeof window.reloadCommissionRecords==="function") window.reloadCommissionRecords();
+    }
+    if(++c>12) clearInterval(ct);
+  },1000);
+})();
+</script>
 </body>
 </html>
 <style id="mts-invoice-edit-products-v8">
