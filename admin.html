@@ -5037,6 +5037,80 @@ async function deleteService(id){
  }
 }
 
+function isMtsListRecord(x){
+ const t=String(x?.sale_type||"").trim().toUpperCase().replace(/[\s_-]+/g,"");
+ const ref=String(x?.reference_no||"").trim().toUpperCase();
+ return t==="MTS" || t==="MTSKOREANBEAUTYPRODUCT" || ref.startsWith("MTS-");
+}
+function renderMtsSales(){
+ const box=$("mtsSalesList");if(!box)return;
+ const q=($("mtsSaleSearch")?.value||"").toLowerCase();
+ const f=($("mtsPaymentFilter")?.value||"all");
+ const rows=salesRecords.filter(x=>{
+   if(!isMtsListRecord(x))return false;
+   const total=saleTotal(x),paid=salePaid(x),status=saleStatus(total,paid);
+   const hay=`${saleRef(x)||""} ${saleCustomer(x)||""} ${saleField(x,["student_phone","phone"],"")} ${JSON.stringify(saleItemsValue(x))}`.toLowerCase();
+   return(f==="all"||status===f)&&hay.includes(q);
+ });
+ box.innerHTML=rows.length?`<div class="table-wrap"><table class="table">
+ <tr><th>Date / Time</th><th>Reference</th><th>Buyer</th><th>Products</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>
+ ${rows.map(x=>{
+   const total=saleTotal(x),paid=salePaid(x),bal=Math.max(0,total-paid),status=saleStatus(total,paid);
+   const badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
+   const dt=saleDateValue(x),time=saleField(x,["sale_time","time"],"");
+   return `<tr>
+     <td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td>
+     <td><strong>${esc(saleRef(x)||"—")}</strong></td>
+     <td>${esc(saleCustomer(x)||"—")}<div class="muted">${esc(saleField(x,["student_phone","phone"],""))}</div></td>
+     <td>${esc(formatSaleItems(saleItemsValue(x)))}</td>
+     <td>${money(total)}</td>
+     <td>${money(paid)}</td>
+     <td>${money(bal)}</td>
+     <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
+     <td><div class="actions">
+       <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.viewPaymentHistory('${attr(x.id)}'); return false;">View Payment</button>`:""}
+       ${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(x.id)}')">Payment</button>`:""}
+     </div></td>
+   </tr>`;
+ }).join("")}</table></div>`:'<p class="muted">No MTS sales found.</p>';
+}
+
+function renderDermedSales(){
+ const box=$("dermedSalesList");if(!box)return;
+ const q=($("dermedSaleSearch")?.value||"").toLowerCase();
+ const f=($("dermedPaymentFilter")?.value||"all");
+ const rows=salesRecords.filter(x=>{
+   if(String(x.sale_type||"").toUpperCase()!=="DERMED") return false;
+   const status=saleStatus(saleTotal(x),salePaid(x));
+   const hay=`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])} ${JSON.stringify(x.service_items||[])}`.toLowerCase();
+   return (f==="all"||status===f) && hay.includes(q);
+ });
+ box.innerHTML=rows.length?`<div class="table-wrap"><table class="table">
+ <tr><th>Date / Time</th><th>Reference</th><th>Buyer</th><th>Products / Services</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>
+ ${rows.map(x=>{
+   const total=saleTotal(x),paid=salePaid(x),bal=Math.max(0,total-paid),status=saleStatus(total,paid);
+   const badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
+   const dt=saleDateValue(x),time=saleField(x,["sale_time","time"],"");
+   const items=[...(x.items||[]).map(i=>i.name),...(x.service_items||[]).map(i=>i.name)].join(", ");
+   return `<tr>
+     <td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td>
+     <td><strong>${esc(x.reference_no||"—")}</strong></td>
+     <td>${esc(x.student_name||"—")}<div class="muted">${esc(x.student_phone||"")}</div></td>
+     <td>${esc(items||"—")}</td>
+     <td>${money(total)}</td>
+     <td>${money(paid)}</td>
+     <td>${money(bal)}</td>
+     <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
+     <td><div class="actions">
+       <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       ${paid>0.005?`<button class="light partial-payment-history-btn" type="button" onclick="window.viewPaymentHistory('${attr(x.id)}'); return false;">View Payment</button>`:""}
+       ${bal>0.005?`<button class="gold" type="button" onclick="recordDermedSalePayment('${attr(x.id)}')">Payment</button>`:""}
+     </div></td>
+   </tr>`;
+ }).join("")}</table></div>`:'<p class="muted">No Dermed sales found.</p>';
+}
+
 async function loadSales(){
  const [sr,pr]=await Promise.all([
    sb.from("medifella_sales").select("*").order("created_at",{ascending:false}),
