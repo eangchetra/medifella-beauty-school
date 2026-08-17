@@ -4341,6 +4341,45 @@ function ensurePaymentEntryModal(){
      const sr=await sb.from("medifella_sales").update({paid:newPaid,balance:Math.max(0,ctx.total-newPaid),payment_status:saleStatus(ctx.total,newPaid)}).eq("id",ctx.id);
      if(sr.error)throw sr.error;
      if(Array.isArray(window.salePayments))window.salePayments.push(pr.data||payment);
+
+     // Dermed: only the customer's FIRST payment can create commission.
+     // If this was the first payment, calculate commission from the amount
+     // just paid. Second/third/etc. payments never create commission.
+     try{
+       const saleRow=(Array.isArray(window.salesRecords)?window.salesRecords:[]).find(x=>String(x.id)===String(ctx.id));
+       const isDermed=String(saleRow?.sale_type||"").trim().toUpperCase()==="DERMED";
+       if(isDermed){
+         const prior=await sb.from("medifella_sale_payments")
+           .select("id")
+           .eq("sale_id",String(ctx.id))
+           .limit(2);
+         // The newly inserted payment is included. Exactly one row means
+         // this click was the customer's first payment.
+         const isFirstPayment=!prior.error && Array.isArray(prior.data) && prior.data.length===1;
+         if(isFirstPayment && typeof window.recordFirstDermedSaleCommission==="function"){
+           const buyerType=String(saleRow.customer_type||"").toLowerCase()==="student" || saleRow.student_id ? "student":"customer";
+           const buyerId=buyerType==="student"?saleRow.student_id:saleRow.customer_id;
+           const buyer=buyerType==="student"
+             ?(Array.isArray(window.students)?window.students:[]).find(x=>String(x.id)===String(buyerId))
+             :(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(buyerId));
+           const staffId=saleRow.sale_staff_id;
+           const staff=(Array.isArray(window.staffInfoRecords)?window.staffInfoRecords:[]).find(x=>String(x.id)===String(staffId));
+           let serviceItems=[];let productItems=[];
+           try{serviceItems=typeof saleRow.service_items==="string"?JSON.parse(saleRow.service_items):saleRow.service_items||[]}catch(_){}
+           try{productItems=typeof saleRow.items==="string"?JSON.parse(saleRow.items):saleRow.items||[]}catch(_){}
+           await window.recordFirstDermedSaleCommission({
+             sale:{...saleRow,paid:newPaid,balance:Math.max(0,ctx.total-newPaid),payment_status:saleStatus(ctx.total,newPaid)},
+             buyer,buyerType,buyerId,staffId,staff,
+             servicesArr:Array.isArray(serviceItems)?serviceItems:[],
+             items:Array.isArray(productItems)?productItems:[],
+             adminId:adminUser?.id
+           });
+         }
+       }
+     }catch(commissionError){
+       // Payment itself remains successful if commission logging fails.
+       console.error("First Dermed payment commission failed:",commissionError);
+     }
      const row=(Array.isArray(window.salesRecords)?window.salesRecords:[]).find(x=>String(x.id)===String(ctx.id));
      if(row){row.paid=newPaid;row.balance=Math.max(0,ctx.total-newPaid);row.payment_status=saleStatus(ctx.total,newPaid)}
      close();
@@ -11036,123 +11075,473 @@ document.addEventListener("DOMContentLoaded",function(){
     return saveCommissionManualCreate();
   }
 
-  window.recordFirstDermedSaleCommission=async function({sale,buyer,buyerType,buyerId,staffId,staff,servicesArr,items,hasProducts,adminId}){
+  window.recordFirstDermedSaleCommission=async function({
+    sale,buyer,buyerType,buyerId,staffId,staff,servicesArr,items,hasProducts,adminId
+}){
+    // ============================================================
+    // DERMED SALE ONLY
+    // Automatically create commission when the Dermed invoice is
+    // created/saved, but ONLY for a NEW CUSTOMER'S FIRST PAYMENT.
+    // Medi Fella Sale and MTS Sale are never touched here.
+    // ============================================================
+    const saleType=String(sale?.sale_type||"").trim().toUpperCase();
+    if(saleType!=="DERMED")return;
+
+    if(!sale?.id || !staffId)return;
+
+    const firstPayment=Number(sale?.paid??sale?.paid_amount??0);
+    if(firstPayment<=0){
+      // Due / no payment = no commission.
+      return;
+    }
+
+    // A "new customer" means this is the customer's FIRST Dermed invoice.
+    // We check the database, not only the browser's current list, so a
+    // refresh cannot accidentally create another commission.
+    let invoiceQuery;
+    if(buyerType==="student"){
+      invoiceQuery=await sb.from("medifella_sales")
+        .select("id,created_at,sale_date")
+        .eq("sale_type","DERMED")
+        .eq("student_id",buyerId)
+        .order("created_at",{ascending:true});
+    }else{
+      invoiceQuery=await sb.from("medifella_sales")
+        .select("id,created_at,sale_date")
+        .eq("sale_type","DERMED")
+        .eq("customer_id",buyerId)
+        .order("created_at",{ascending:true});
+    }
+
+    if(invoiceQuery.error)throw invoiceQuery.error;
+
+    const customerDermedInvoices=invoiceQuery.data||[];
+    if(!customerDermedInvoices.length)return;
+
+    // Only the oldest/first Dermed invoice can receive commission.
+    if(String(customerDermedInvoices[0].id)!==String(sale.id)){
+      console.info("Dermed commission skipped: existing customer, not first Dermed invoice.");
+      return;
+    }
+
+    // Extra protection: if commission already exists for this invoice,
+    // NEVER create it again.
+    const existing=await sb.from("medifella_sale_commissions")
+      .select("id")
+      .eq("sale_id",sale.id)
+      .limit(1);
+
+    if(existing.error)throw existing.error;
+    if(Array.isArray(existing.data)&&existing.data.length){
+      console.info("Dermed commission already exists for this first invoice.");
+      return;
+    }
+
+    // Get the selected Sale Staff's configured rates.
+    const configs=Array.isArray(window.saleStaffConfigs)
+      ?window.saleStaffConfigs:[];
+    const staffCfg=configs
+      .filter(x=>String(x?.staff_id)===String(staffId)&&x.active!==false)
+      .sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")))[0]||null;
+
+    const serviceRate=Number(staffCfg?.service_rate??0);
+    const serviceProductRate=Number(staffCfg?.service_product_rate??0);
+
+    const serviceList=Array.isArray(servicesArr)?servicesArr:[];
+    const productItems=Array.isArray(items)?items:[];
+
+    const normalizedServices=serviceList.map(x=>{
+      const service=serviceRows().find(
+        s=>String(s.id??s.service_id)===String(x.service_id)
+      )||x;
+
+      const type=serviceTypeLabel(service?.service_type);
+      const c=commissionItemCalc({...x,service_type:type});
+
+      return {
+        raw:x,
+        service,
+        type,
+        name:x.name||service?.name||"Service",
+        unit:Math.max(1,Number(c.unit||x.quantity||1)),
+        subtotal:Math.max(0,Number(c.subtotal||0))
+      };
+    });
+
+    // Products never receive commission.
+    const productTotal=productItems.reduce((sum,x)=>{
+      const qty=Math.max(1,Number(x.quantity||x.unit||1));
+      const price=Number(x.unit_price??x.price??0);
+      const discount=Number(x.discount??0);
+      return sum+Math.max(0,qty*price-discount);
+    },0);
+
+    const singleServices=normalizedServices.filter(x=>!isPackageService(x.service));
+    const packageServices=normalizedServices.filter(x=>isPackageService(x.service));
+
+    const singleTotal=singleServices.reduce((sum,x)=>sum+x.subtotal,0);
+    const packageTotal=packageServices.reduce((sum,x)=>sum+x.subtotal,0);
+
+    const invoiceTotal=Number(
+      sale?.grand_total??sale?.total??sale?.subtotal??0
+    );
+
+    const paidInFull=firstPayment>=invoiceTotal-0.005;
+    const commissionDate=String(
+      sale?.sale_date||new Date().toISOString().slice(0,10)
+    );
+
+    const rows=[];
+
+    // ============================================================
+    // CASE 2: FIRST PAYMENT PAID IN FULL
+    // Service -> Sale Staff Service %
+    // Service With Product -> Sale Staff Service With Product %
+    // Product -> 0%
+    // Package -> follows Sale Staff Service With Product %
+    // ============================================================
+    if(paidInFull){
+      for(const x of normalizedServices){
+        if(x.subtotal<=0)continue;
+
+        const rate=x.type==="Service With Product"
+          ?serviceProductRate
+          :isPackageService(x.service)
+            ?serviceProductRate
+            :serviceRate;
+
+        rows.push({
+          commission_date:commissionDate,
+          sale_id:sale.id,
+          staff_id:staffId,
+          staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
+          customer_id:buyerId||null,
+          customer_name:buyer?.name||"",
+          customer_phone:buyer?.phone||"",
+          service_type:
+            (x.type==="Service With Product"||isPackageService(x.service))
+              ?"service_product":"service",
+          service_detail:x.name,
+          service_id:x.raw?.service_id||null,
+          unit:x.unit,
+          unit_price:x.subtotal/x.unit,
+          discount:Number(x.raw?.discount||0),
+          subtotal:x.subtotal,
+          commission_rate:rate,
+          commission_amount:x.subtotal*rate/100,
+          source:"dermed_auto_first_payment"
+        });
+      }
+    }else{
+      // ============================================================
+      // CASE 3: FIRST PAYMENT IS PARTIAL
+      //
+      // First payment is allocated to:
+      //   1. Product
+      //   2. Single services
+      //   3. Remaining amount -> Package services
+      //
+      // Package amount eligible for commission:
+      //   FIRST PAYMENT - subtotal of non-package items covered
+      //
+      // Package uses Service With Product %.
+      // Only this FIRST payment creates commission.
+      // ============================================================
+
+      let remainingPayment=firstPayment;
+
+      // Products have no commission, but their subtotal consumes payment.
+      const productCovered=Math.min(remainingPayment,productTotal);
+      remainingPayment-=productCovered;
+
+      // Single services use their normal configured commission rate.
+      for(const x of singleServices){
+        if(remainingPayment<=0)break;
+
+        const covered=Math.min(x.subtotal,remainingPayment);
+
+        if(covered>0){
+          const rate=x.type==="Service With Product"
+            ?serviceProductRate
+            :serviceRate;
+
+          rows.push({
+            commission_date:commissionDate,
+            sale_id:sale.id,
+            staff_id:staffId,
+            staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
+            customer_id:buyerId||null,
+            customer_name:buyer?.name||"",
+            customer_phone:buyer?.phone||"",
+            service_type:x.type==="Service With Product"
+              ?"service_product":"service",
+            service_detail:x.name,
+            service_id:x.raw?.service_id||null,
+            unit:x.unit,
+            unit_price:x.subtotal/x.unit,
+            discount:Number(x.raw?.discount||0),
+            subtotal:covered,
+            commission_rate:rate,
+            commission_amount:covered*rate/100,
+            source:"dermed_auto_first_payment"
+          });
+
+          remainingPayment-=covered;
+        }
+      }
+
+      // The remaining first-payment amount belongs to package services.
+      // Package commission follows Service With Product %.
+      let packageRemaining=Math.min(remainingPayment,packageTotal);
+
+      for(const x of packageServices){
+        if(packageRemaining<=0)break;
+
+        const covered=Math.min(x.subtotal,packageRemaining);
+
+        if(covered>0){
+          rows.push({
+            commission_date:commissionDate,
+            sale_id:sale.id,
+            staff_id:staffId,
+            staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
+            customer_id:buyerId||null,
+            customer_name:buyer?.name||"",
+            customer_phone:buyer?.phone||"",
+            service_type:"service_product",
+            service_detail:x.name,
+            service_id:x.raw?.service_id||null,
+            unit:x.unit,
+            unit_price:x.subtotal/x.unit,
+            discount:Number(x.raw?.discount||0),
+            subtotal:covered,
+            commission_rate:serviceProductRate,
+            commission_amount:covered*serviceProductRate/100,
+            source:"dermed_auto_first_payment"
+          });
+
+          packageRemaining-=covered;
+        }
+      }
+    }
+
+    // Nothing commissionable in the first payment.
+    if(!rows.length)return;
+
+    // Save automatically as part of creating the Dermed invoice.
+    const insertResult=await sb
+      .from("medifella_sale_commissions")
+      .insert(rows);
+
+    if(insertResult.error)throw insertResult.error;
+
+    // Refresh the Commission List immediately if it is currently open.
+    if(typeof loadCommissionRecords==="function"){
+      try{await loadCommissionRecords();}catch(e){
+        console.warn("Commission list refresh after Dermed invoice:",e);
+      }
+    }
+  };){
     // AUTOMATIC COMMISSION IS DERMED SALE ONLY.
     const saleType=String(sale?.sale_type||"").trim().toUpperCase();
     if(saleType!=="DERMED")return;
 
-    // Commission belongs to the selected Sale Staff, not the Cashier.
     if(!sale?.id||!staffId)return;
+
+    // Commission belongs to the selected Sale Staff.
     const saleStaff=staffRows().find(x=>String(x.id)===String(staffId));
     if(!saleStaff || !isSaleCounterCashierStaff(saleStaff)){
-      console.warn("Commission skipped: selected Sale Staff is not Job Title 'Sale Counter Cashier'.");
+      console.warn("Commission skipped: selected Sale Staff is not a valid configured Sale Staff.");
       return;
     }
 
-    // Only the customer's FIRST Dermed invoice creates automatic commission.
-    let allq;
-    if(buyerType==="student"){
-      allq=await sb.from("medifella_sales").select("id,created_at,sale_date")
-        .eq("sale_type","DERMED").eq("student_id",buyerId).order("created_at",{ascending:true});
-    }else{
-      allq=await sb.from("medifella_sales").select("id,created_at,sale_date")
-        .eq("sale_type","DERMED").eq("customer_id",buyerId).order("created_at",{ascending:true});
-    }
-    if(allq.error)throw allq.error;
-    const matching=allq.data||[];
-    if(!matching.length || String(matching[0].id)!==String(sale.id))return;
-
-    let canUseSourceColumns=true;
-    const del=await sb.from("medifella_sale_commissions").delete()
-      .eq("source_sale_id",sale.id).eq("source","dermed_auto");
-    if(del.error){
-      const e=String(del.error.message||del.error.details||"");
-      if(/source_sale_id|source.*column|column .* does not exist|schema cache/i.test(e)){
-        canUseSourceColumns=false;
-      }else{
-        throw del.error;
-      }
-    }
-
-    const serviceItems=Array.isArray(servicesArr)?servicesArr:[];
-    if(!serviceItems.length)return;
-
-    // Rate is determined separately for EACH service from the selected Sale Staff's
-    // saved Sale Staff Management rates.
-    const staffConfig=window.getCurrentSaleStaffConfig(staffId);
-    if(!staffConfig){
-      console.warn("Dermed commission skipped: selected Sale Staff has no active commission configuration.");
+    // Commission is awarded ONLY on the customer's FIRST payment/invoice.
+    // Later payments must never create another commission.
+    const existing=await sb.from("medifella_sale_commissions")
+      .select("id")
+      .eq("sale_id",sale.id)
+      .limit(1);
+    if(existing.error)throw existing.error;
+    if(Array.isArray(existing.data) && existing.data.length){
+      console.info("Dermed commission already recorded for this invoice; no additional commission.");
       return;
     }
-    const rows=serviceItems.map(x=>{
-      const serviceType=serviceTypeLabel(x.service_type);
-      const rate=serviceType==="Only Service"
-        ? Number(staffConfig.service_rate||0)/100
-        : serviceType==="Service With Product"
-          ? Number(staffConfig.service_product_rate||0)/100
-          : 0;
-      const unit=Math.max(1,num(x.quantity));
-      const price=Math.max(0,num(x.price));
-      const base=unit*price;
-      const discType=x.discount_type||"percent";
-      const discVal=Math.max(0,num(x.discount_value));
-      const discount=discType==="percent"
-        ? Math.min(base,base*discVal/100)
-        : Math.min(base,discVal);
-      const subtotal=Math.max(0,base-discount);
-      const row={
-        commission_date:String(sale.sale_date||todayC()).slice(0,10),
-        staff_id:staffId,
-        staff_name:staff?.name_en||staff?.name_km||staff?.name||"",
-        customer_id:buyerType==="customer"?buyerId:null,
-        student_id:buyerType==="student"?buyerId:null,
-        customer_name:buyer?.name||buyer?.full_name||"",
-        customer_phone:buyer?.phone||"",
-        service_type:serviceType==="Only Service"?"service":"service_product",
-        service_detail:(x.name||"Service")+(x.service_type?` · ${x.service_type}`:""),
-        service_id:x.service_id||null,
-        unit,unit_price:price,discount,subtotal,
-        commission_rate:rate,
-        commission_amount:subtotal*rate
+
+    const saleTotal=Number(sale.grand_total??sale.total??sale.subtotal??0);
+    const firstPayment=Number(sale.paid??sale.paid_amount??0);
+
+    // Case 1: no payment / Due = no commission.
+    if(firstPayment<=0)return;
+
+    const serviceList=Array.isArray(servicesArr)?servicesArr:[];
+    const productItems=Array.isArray(items)?items:[];
+
+    const staffCfg=(Array.isArray(window.saleStaffConfigs)?window.saleStaffConfigs:[])
+      .filter(x=>String(x?.staff_id)===String(staffId) && x.active!==false)
+      .sort((a,b)=>String(b.created_at||"").localeCompare(String(a.created_at||"")))[0]||null;
+
+    const serviceRate=Number(staffCfg?.service_rate??saleStaff?.service_rate??0)/100;
+    const serviceProductRate=Number(
+      staffCfg?.service_product_rate ??
+      saleStaff?.service_product_rate ??
+      0
+    )/100;
+
+    const isPackageService=service=>String(
+      service?.service_payment_type ?? service?.payment_type ?? service?.paymentType ?? "Single"
+    ).trim().toLowerCase()==="package";
+
+    const commissionDate=String(sale.sale_date||new Date().toISOString().slice(0,10));
+    const rows=[];
+
+    // Normalize service lines and calculate their real subtotal.
+    const normalizedServices=serviceList.map(x=>{
+      const service=serviceRows().find(s=>String(s.id??s.service_id)===String(x.service_id))||x;
+      const type=serviceTypeLabel(service?.service_type);
+      const c=commissionItemCalc({...x,service_type:type});
+      return {
+        raw:x,
+        service,
+        type,
+        unit:Math.max(1,Number(c.unit||x.quantity||1)),
+        subtotal:Math.max(0,Number(c.subtotal||0)),
+        rate: type==="Service With Product" ? serviceProductRate : serviceRate,
+        name:x.name||service?.name||"Service"
       };
-      if(canUseSourceColumns){
-        row.source="dermed_auto";
-        row.source_sale_id=sale.id;
-        row.reference_no=sale.reference_no||"";
-        row.created_by=adminId;
-      }
-      return row;
-    }).filter(x=>x.subtotal>0);
+    });
 
-    if(!rows.length)return;
-    await insertCommissionRows(rows);
-  };
+    const productsTotal=productItems.reduce((sum,x)=>{
+      const qty=Math.max(1,Number(x.quantity||x.unit||1));
+      const price=Number(x.unit_price??x.price??0);
+      const discount=Number(x.discount??0);
+      return sum+Math.max(0,(qty*price)-discount);
+    },0);
 
-  async function exportCommissionExcel(){
-    const rows=filteredCommissionRecords();
-    const data=rows.map(x=>({
-      Date:String(x.commission_date||x.created_at||"").slice(0,10),
-      "Staff Name":x.staff_name||"", "Customer Name":x.customer_name||"",
-      "Customer Phone":x.customer_phone||"",
-      "Service Type":serviceTypeLabel(x.service_type==="service_product"?"Service With Product":"Only Service"),
-      "Service Detail":x.service_detail||"",Unit:x.unit??1,
-      "Unit Price":Number(x.unit_price||0),"Discount":Number(x.discount||0),
-      Subtotal:Number(x.subtotal||0),"Commission":Number(x.commission_rate||0),
-      "Subtotal Commission":Number(x.commission_amount||0)
-    }));
-    data.push({Date:"","Staff Name":"","Customer Name":"","Customer Phone":"","Service Type":"","Service Detail":"",
-      Unit:"","Unit Price":"","Discount":"","Subtotal":"","Commission":"Grand Total",
-      "Subtotal Commission":rows.reduce((n,x)=>n+Number(x.commission_amount||0),0)});
-    if(window.XLSX){
-      const ws=XLSX.utils.json_to_sheet(data),wb=XLSX.utils.book_new();
-      XLSX.utils.book_append_sheet(wb,ws,"Commission List");
-      XLSX.writeFile(wb,`Sale_Commission_${todayC()}.xlsx`);
+    // Single services and products are paid first.
+    // Package services are the only lines whose commission is limited by
+    // the first partial payment.
+    const singleServiceTotal=normalizedServices
+      .filter(x=>!isPackageService(x.service))
+      .reduce((sum,x)=>sum+x.subtotal,0);
+
+    const packageServices=normalizedServices.filter(x=>isPackageService(x.service));
+    const packageTotal=packageServices.reduce((sum,x)=>sum+x.subtotal,0);
+
+    // Case 2: Paid in full -> all service/service-with-product commission,
+    // packages follow their Sale Staff commission rate.
+    const paidInFull=firstPayment >= saleTotal-0.005;
+
+    if(paidInFull){
+      normalizedServices.forEach(x=>{
+        if(x.subtotal<=0)return;
+        rows.push({
+          commission_date:commissionDate,
+          sale_id:sale.id,
+          staff_id:staffId,
+          staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
+          customer_id:buyerId||null,
+          customer_name:buyer?.name||"",
+          customer_phone:buyer?.phone||"",
+          service_type:x.type==="Service With Product"?"service_product":"service",
+          service_detail:x.name,
+          service_id:x.raw?.service_id||null,
+          unit:x.unit,
+          unit_price:x.subtotal/x.unit,
+          discount:Number(x.raw?.discount||0),
+          subtotal:x.subtotal,
+          commission_rate:x.rate,
+          commission_amount:x.subtotal*x.rate/100,
+          source:"dermed_auto"
+        });
+      });
     }else{
-      const csv=[Object.keys(data[0]||{}).join(","),...data.map(r=>Object.values(r).map(v=>`"${String(v??"").replace(/"/g,'""')}"`).join(","))].join("\n");
-      const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([csv],{type:"text/csv;charset=utf-8"}));a.download=`Sale_Commission_${todayC()}.csv`;a.click();
-    }
-  }
+      // Case 3: Partial Payment.
+      // Products and all SINGLE services consume their subtotal first.
+      // Whatever remains from the FIRST payment is the amount available for
+      // PACKAGE services. Package commission always uses the
+      // Service With Product commission rate, following the user's rule.
+      const nonPackageCovered=Math.min(
+        firstPayment,
+        productsTotal+singleServiceTotal
+      );
+      const packagePayment=Math.max(
+        0,
+        Math.min(packageTotal, firstPayment-nonPackageCovered)
+      );
 
+      // Single services are fully commissioned when the first payment covers
+      // them. A package never receives a second/third-payment commission.
+      normalizedServices.forEach(x=>{
+        if(x.subtotal<=0 || isPackageService(x.service))return;
+
+        const covered=Math.min(x.subtotal, Math.max(0, firstPayment-productsTotal));
+        if(covered<=0)return;
+
+        rows.push({
+          commission_date:commissionDate,
+          sale_id:sale.id,
+          staff_id:staffId,
+          staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
+          customer_id:buyerId||null,
+          customer_name:buyer?.name||"",
+          customer_phone:buyer?.phone||"",
+          service_type:x.type==="Service With Product"?"service_product":"service",
+          service_detail:x.name,
+          service_id:x.raw?.service_id||null,
+          unit:x.unit,
+          unit_price:x.subtotal/x.unit,
+          discount:Number(x.raw?.discount||0),
+          subtotal:covered,
+          commission_rate:x.rate,
+          commission_amount:covered*x.rate/100,
+          source:"dermed_auto"
+        });
+      });
+
+      // Package commission:
+      // (FIRST payment - subtotal of non-package items) × Service With Product %
+      // and capped at the total package subtotal.
+      if(packagePayment>0){
+        let remaining=packagePayment;
+        for(const x of packageServices){
+          if(remaining<=0)break;
+          const covered=Math.min(x.subtotal,remaining);
+          if(covered>0){
+            rows.push({
+              commission_date:commissionDate,
+              sale_id:sale.id,
+              staff_id:staffId,
+              staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||"",
+              customer_id:buyerId||null,
+              customer_name:buyer?.name||"",
+              customer_phone:buyer?.phone||"",
+              service_type:"service_product",
+              service_detail:x.name,
+              service_id:x.raw?.service_id||null,
+              unit:x.unit,
+              unit_price:x.subtotal/x.unit,
+              discount:Number(x.raw?.discount||0),
+              subtotal:covered,
+              commission_rate:serviceProductRate,
+              commission_amount:covered*serviceProductRate/100,
+              source:"dermed_auto"
+            });
+            remaining-=covered;
+          }
+        }
+      }
+    }
+
+    if(!rows.length){
+      console.info("Dermed first payment did not cover any commissionable service.");
+      return;
+    }
+
+    // Save once. This record is the lock that prevents commission on
+    // subsequent payments.
+    const response=await sb.from("medifella_sale_commissions").insert(rows);
+    if(response.error)throw response.error;
+  };
   function exportCommissionPdf(){
     const rows=filteredCommissionRecords(), total=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
     const J=window.jspdf?.jsPDF;if(!J){window.print();return}
@@ -13547,32 +13936,232 @@ document.addEventListener("DOMContentLoaded",function(){
   function lineSubtotal(x){const q=Math.max(1,N(x.quantity??x.unit??1)),p=N(x.price??x.unit_price),base=q*p;const dt=String(x.discount_type||"percent").toLowerCase(),dv=N(x.discount_value);const d=dt==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);return Math.max(0,base-d)}
 
   window.recordFirstDermedSaleCommission=async function({sale,buyer,buyerType,buyerId,staffId,staff,servicesArr,items,adminId}){
-    if(String(sale?.sale_type||"").trim().toUpperCase()!=="DERMED"||!sale?.id||!staffId)return;
-    const cfg=window.getCurrentSaleStaffConfig(staffId);if(!cfg){console.warn("Commission skipped: no Sale Staff Management record for selected Sale Staff.");return}
-    const del=await sb.from("medifella_sale_commissions").delete().eq("source_sale_id",sale.id).eq("source","dermed_auto");
-    if(del.error&&!/source_sale_id|source.*column|column .* does not exist|schema cache/i.test(String(del.error.message||"")))throw del.error;
-    const productLines=(Array.isArray(items)?items:[]).map(x=>({kind:"product",name:x.name||"Product",product_id:x.product_id||null,service_id:null,service_type:null,payment_type:"Single",subtotal:lineSubtotal(x)})).filter(x=>x.subtotal>0);
-    const serviceLines=(Array.isArray(servicesArr)?servicesArr:[]).map(x=>({kind:"service",name:x.name||"Service",product_id:null,service_id:x.service_id||null,service_type:serviceType(x.service_type),payment_type:paymentType(x),subtotal:lineSubtotal(x)})).filter(x=>x.subtotal>0);
-    const lines=[...productLines,...serviceLines];if(!lines.length)return;
-    const nonPackageTotal=lines.filter(x=>x.kind==="product"||x.payment_type!=="Package").reduce((n,x)=>n+x.subtotal,0);
-    const paidTotal=Math.min(N(sale.paid),N(sale.grand_total||sale.subtotal||0));
-    if(String(sale.payment_status||"")==="Partial"&&paidTotal+0.005<nonPackageTotal){console.warn("Partial Dermed payment is below the required full payment for products/single services; no commission was created.");return}
-    let packagePaid=Math.max(0,paidTotal-nonPackageTotal);const packageTotal=lines.filter(x=>x.kind==="service"&&x.payment_type==="Package").reduce((n,x)=>n+x.subtotal,0);packagePaid=Math.min(packagePaid,packageTotal);
-    const rows=[];
-    for(const x of lines){
-      let base=0,rate=0;
-      if(x.kind==="product"){base=x.subtotal;rate=N(cfg.product_rate)/100}
-      else if(x.payment_type!=="Package"){base=x.subtotal;rate=(x.service_type==="Service With Product"?N(cfg.service_product_rate):N(cfg.service_rate))/100}
-      else{base=Math.min(x.subtotal,packagePaid);packagePaid=Math.max(0,packagePaid-base);rate=(x.service_type==="Service With Product"?N(cfg.service_product_rate):N(cfg.service_rate))/100}
-      const amount=base*rate;if(base<=0||rate<=0)continue;
-      rows.push({commission_date:String(sale.sale_date||today()).slice(0,10),staff_id:staffId,staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||cfg.staff_name||"",customer_id:buyerType==="customer"?buyerId:null,student_id:buyerType==="student"?buyerId:null,customer_name:buyer?.name||buyer?.full_name||"",customer_phone:buyer?.phone||"",service_type:x.kind==="product"?"product":(x.service_type==="Service With Product"?"service_product":"service"),service_detail:x.name,service_id:x.service_id,product_id:x.product_id,unit:1,unit_price:base,discount:0,subtotal:base,commission_rate:rate,commission_amount:amount,source:"dermed_auto",source_sale_id:sale.id,reference_no:sale.reference_no||"",created_by:adminId||null});
+    // DERMED ONLY. Commission is earned from the customer's FIRST payment only.
+    // Later payments never create additional commission.
+    if(String(sale?.sale_type||"").trim().toUpperCase()!=="DERMED" || !sale?.id || !staffId)return;
+
+    const cfg=window.getCurrentSaleStaffConfig(staffId);
+    if(!cfg){
+      console.warn("Commission skipped: no Sale Staff Management record for selected Sale Staff.");
+      return;
     }
+
+    const N=v=>Math.max(0,Number(v)||0);
+    const paymentStatus=String(sale.payment_status||"").trim().toLowerCase();
+    const firstPaid=N(sale.paid);
+
+    // Case 1: Due = no first payment, therefore no commission.
+    if(paymentStatus==="due" || firstPaid<=0.005)return;
+
+    // IMPORTANT: never recreate/replace commission for a later payment.
+    // If a commission already exists for this Dermed invoice, the first
+    // payment has already been commissioned.
+    try{
+      const existing=await sb.from("medifella_sale_commissions")
+        .select("id")
+        .eq("source_sale_id",String(sale.id))
+        .eq("source","dermed_auto")
+        .limit(1);
+      if(!existing.error && Array.isArray(existing.data) && existing.data.length){
+        return;
+      }
+      // If the installation does not have source columns, use reference_no
+      // as a safe duplicate marker when available.
+      if(existing.error && sale.reference_no){
+        const fallback=await sb.from("medifella_sale_commissions")
+          .select("id")
+          .eq("reference_no",String(sale.reference_no))
+          .limit(1);
+        if(!fallback.error && Array.isArray(fallback.data) && fallback.data.length)return;
+      }
+    }catch(e){
+      console.warn("Could not check existing Dermed commission; continuing cautiously:",e);
+    }
+
+    const productLines=(Array.isArray(items)?items:[])
+      .map(x=>({
+        kind:"product",
+        name:x.name||"Product",
+        product_id:x.product_id||null,
+        service_id:null,
+        service_type:null,
+        payment_type:"Single",
+        subtotal:lineSubtotal(x)
+      }))
+      .filter(x=>x.subtotal>0);
+
+    const serviceLines=(Array.isArray(servicesArr)?servicesArr:[])
+      .map(x=>({
+        kind:"service",
+        name:x.name||"Service",
+        product_id:null,
+        service_id:x.service_id||null,
+        service_type:serviceType(x.service_type),
+        payment_type:paymentType(x),
+        subtotal:lineSubtotal(x)
+      }))
+      .filter(x=>x.subtotal>0);
+
+    const lines=[...productLines,...serviceLines];
+    if(!lines.length)return;
+
+    const productTotal=productLines.reduce((n,x)=>n+x.subtotal,0);
+    const singleServices=serviceLines.filter(x=>x.payment_type!=="Package");
+    const packageServices=serviceLines.filter(x=>x.payment_type==="Package");
+    const singleServiceTotal=singleServices.reduce((n,x)=>n+x.subtotal,0);
+    const packageTotal=packageServices.reduce((n,x)=>n+x.subtotal,0);
+
+    // Case 2: Paid = commission ALL services and service-with-product,
+    // including Package services. Products always receive 0% commission.
+    const isFullyPaid=paymentStatus==="paid" || firstPaid>=N(sale.grand_total||sale.subtotal||0)-0.005;
+
+    // Case 3: Partial = products + ALL Single services must be paid first.
+    // Commission the full Single services, then commission only the portion
+    // of Package services covered by the FIRST payment:
+    // (first payment - all product price - all single-service price) × 2%.
+    // Later payments never receive commission.
+    const packagePaid=Math.max(0,Math.min(
+      packageTotal,
+      firstPaid-productTotal-singleServiceTotal
+    ));
+
+    const rows=[];
+
+    for(const x of productLines){
+      // Product commission is always zero.
+      continue;
+    }
+
+    for(const x of singleServices){
+      const rate=x.service_type==="Service With Product"
+        ?N(cfg.service_product_rate)/100
+        :x.service_type==="Only Service"
+          ?N(cfg.service_rate)/100
+          :0;
+      const amount=x.subtotal*rate;
+      if(amount<=0)continue;
+      rows.push({
+        commission_date:String(sale.sale_date||today()).slice(0,10),
+        staff_id:staffId,
+        staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||cfg.staff_name||"",
+        customer_id:buyerType==="customer"?buyerId:null,
+        student_id:buyerType==="student"?buyerId:null,
+        customer_name:buyer?.name||buyer?.full_name||"",
+        customer_phone:buyer?.phone||"",
+        service_type:x.service_type==="Service With Product"?"service_product":"service",
+        service_detail:x.name,
+        service_id:x.service_id,
+        product_id:null,
+        unit:1,
+        unit_price:x.subtotal,
+        discount:0,
+        subtotal:x.subtotal,
+        commission_rate:rate,
+        commission_amount:amount,
+        source:"dermed_auto",
+        source_sale_id:sale.id,
+        reference_no:sale.reference_no||"",
+        created_by:adminId||null
+      });
+    }
+
+    if(packageTotal>0){
+      if(isFullyPaid){
+        // Fully paid first payment: all Package services receive their
+        // configured Service / Service-with-Product commission rate.
+        for(const x of packageServices){
+          const rate=x.service_type==="Service With Product"
+            ?N(cfg.service_product_rate)/100
+            :x.service_type==="Only Service"
+              ?N(cfg.service_rate)/100
+              :0;
+          const amount=x.subtotal*rate;
+          if(amount<=0)continue;
+          rows.push({
+            commission_date:String(sale.sale_date||today()).slice(0,10),
+            staff_id:staffId,
+            staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||cfg.staff_name||"",
+            customer_id:buyerType==="customer"?buyerId:null,
+            student_id:buyerType==="student"?buyerId:null,
+            customer_name:buyer?.name||buyer?.full_name||"",
+            customer_phone:buyer?.phone||"",
+            service_type:x.service_type==="Service With Product"?"service_product":"service",
+            service_detail:x.name,
+            service_id:x.service_id,
+            product_id:null,
+            unit:1,
+            unit_price:x.subtotal,
+            discount:0,
+            subtotal:x.subtotal,
+            commission_rate:rate,
+            commission_amount:amount,
+            source:"dermed_auto",
+            source_sale_id:sale.id,
+            reference_no:sale.reference_no||"",
+            created_by:adminId||null
+          });
+        }
+      }else if(packagePaid>0){
+        // Partial first payment: the package portion of this first payment
+        // gets 2% regardless of the individual package service's configured
+        // rate, matching the requested rule.
+        let remaining=packagePaid;
+        for(const x of packageServices){
+          if(remaining<=0.005)break;
+          const base=Math.min(x.subtotal,remaining);
+          remaining-=base;
+          if(base<=0)continue;
+          const rate=0.02;
+          rows.push({
+            commission_date:String(sale.sale_date||today()).slice(0,10),
+            staff_id:staffId,
+            staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||cfg.staff_name||"",
+            customer_id:buyerType==="customer"?buyerId:null,
+            student_id:buyerType==="student"?buyerId:null,
+            customer_name:buyer?.name||buyer?.full_name||"",
+            customer_phone:buyer?.phone||"",
+            service_type:x.service_type==="Service With Product"?"service_product":"service",
+            service_detail:x.name,
+            service_id:x.service_id,
+            product_id:null,
+            unit:1,
+            unit_price:base,
+            discount:0,
+            subtotal:base,
+            commission_rate:rate,
+            commission_amount:base*rate,
+            source:"dermed_auto",
+            source_sale_id:sale.id,
+            reference_no:sale.reference_no||"",
+            created_by:adminId||null
+          });
+        }
+      }
+    }
+
     if(!rows.length)return;
+
+    // Insert with compatibility fallback for installations where optional
+    // audit/source columns are not present.
     let pending=rows;
-    for(let attempt=0;attempt<8;attempt++){
-      const r=await sb.from("medifella_sale_commissions").insert(pending);if(!r.error)return;
-      const e=String(r.error.message||r.error.details||""),m=e.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']?.*does not exist/i)||e.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i)||e.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
-      if(m&&pending[0]&&Object.prototype.hasOwnProperty.call(pending[0],m[1])){pending=pending.map(x=>{const y={...x};delete y[m[1]];return y});continue}throw r.error;
+    for(let attempt=0;attempt<10;attempt++){
+      const r=await sb.from("medifella_sale_commissions").insert(pending);
+      if(!r.error)return;
+
+      const e=String(r.error.message||r.error.details||"");
+      const m=e.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']?.*does not exist/i)
+        ||e.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i)
+        ||e.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
+
+      if(m&&pending[0]&&Object.prototype.hasOwnProperty.call(pending[0],m[1])){
+        pending=pending.map(x=>{
+          const y={...x};
+          delete y[m[1]];
+          return y;
+        });
+        continue;
+      }
+      throw r.error;
     }
   };
   function bind(){
@@ -13590,6 +14179,7 @@ document.addEventListener("DOMContentLoaded",function(){
 </script>
 
 
+<!-- DERMED FIRST PAYMENT COMMISSION RULES: implemented above; do not modify other sale modules. -->
 <script id="commission-final-repair-single-load">
 (function(){
   "use strict";
