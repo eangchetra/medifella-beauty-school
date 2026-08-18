@@ -10590,55 +10590,73 @@ document.addEventListener("DOMContentLoaded",function(){
     const box=C("commissionList");
     if(!box)return;
 
-    // The commission section can be opened immediately after login. If the
-    // Supabase client/session is not ready yet, retry instead of leaving the
-    // screen permanently stuck on "Loading...".
-    if(typeof sb==="undefined" || !sb){
-      if(retry<10){
+    // Keep the commission list independent from the sale pages.  Wait for
+    // the existing Supabase client, then perform a bounded read so the UI
+    // can never remain on "Loading..." forever.
+    let client=null;
+    try{
+      client=(typeof sb!=="undefined" && sb) ? sb : window.sb;
+    }catch(e){ client=window.sb; }
+
+    if(!client){
+      if(retry<12){
         box.innerHTML='<p class="muted">Connecting to the commission database...</p>';
         setTimeout(()=>loadCommissionRecords(retry+1),500);
       }else{
-        box.innerHTML='<p class="status error">Commission database is not ready. Please refresh the page.</p>';
+        box.innerHTML='<div class="status error">Commission database is not ready. Please refresh the page.</div>';
       }
       return;
     }
 
     box.innerHTML='<p class="muted">Loading commission records...</p>';
 
+    const read=async()=>{
+      // Do not depend on optional ordering columns.  The records themselves
+      // are unchanged; sorting is done locally after the read.
+      return await client.from("medifella_sale_commissions").select("*");
+    };
+
     try{
-      let r=await sb.from("medifella_sale_commissions")
-        .select("*")
-        .order("commission_date",{ascending:false})
-        .order("created_at",{ascending:false});
+      const result=await Promise.race([
+        read(),
+        new Promise((_,reject)=>setTimeout(()=>reject(new Error("Commission database request timed out after 10 seconds.")),10000))
+      ]);
 
-      // If an older table/schema does not support one of the ordering
-      // columns, retry with a simpler query. This does not change any data.
-      if(r.error){
-        console.warn("Commission ordered query:",r.error.message);
-        r=await sb.from("medifella_sale_commissions").select("*");
-      }
-
-      if(r.error){
-        console.error("Commission table read:",r.error);
+      if(result?.error){
+        console.error("Commission table read:",result.error);
         window.commissionRecords=[];
+        const msg=String(result.error.message||result.error.details||"Unknown database error");
         box.innerHTML=`<div class="status error">
-          Could not read the old commission records from Supabase.<br>
-          <strong>${escC(r.error.message||"Unknown database error")}</strong>
+          Could not read the commission list.<br>
+          <strong>${escC(msg)}</strong>
           <div class="muted" style="margin-top:6px">
-            If the message says "row-level security policy", the table needs a
-            SELECT policy for authenticated users. No commission records were deleted.
+            No commission records were deleted or changed. If this is an RLS
+            message, the commission table needs SELECT permission for the
+            logged-in admin account.
           </div>
         </div>`;
         C("commissionGrandTotal").innerHTML="";
         return;
       }
 
-      window.commissionRecords=Array.isArray(r.data)?r.data:[];
+      const data=Array.isArray(result?.data)?result.data:[];
+      // Always retain both automatically-created and manually-created rows.
+      // Sort newest first without relying on a database column existing.
+      data.sort((a,b)=>{
+        const ad=String(a?.commission_date||a?.created_at||"");
+        const bd=String(b?.commission_date||b?.created_at||"");
+        return bd.localeCompare(ad);
+      });
+
+      window.commissionRecords=data;
       renderCommissionList();
     }catch(e){
       console.error("Commission table read exception:",e);
       window.commissionRecords=[];
-      box.innerHTML=`<div class="status error">Could not load commission records: ${escC(e.message||e)}</div>`;
+      box.innerHTML=`<div class="status error">
+        Could not load commission records.<br>
+        <strong>${escC(e?.message||String(e))}</strong>
+      </div>`;
       C("commissionGrandTotal").innerHTML="";
     }
   }
@@ -11542,10 +11560,12 @@ document.addEventListener("DOMContentLoaded",function(){
   let c=0;
   const ct=setInterval(()=>{
     const box=document.getElementById("commissionList");
-    if(box && /^(Loading…?|Loading commission records\.\.\.)$/i.test(box.textContent.trim())){
+    if(box && /^(Loading…?|Loading commission records\.\.\.|Connecting to the commission database\.\.\.)$/i.test(box.textContent.trim())){
       if(typeof window.reloadCommissionRecords==="function") window.reloadCommissionRecords();
     }
-    if(++c>12) clearInterval(ct);
+    // Keep the list reliable for a little longer after authentication/page
+    // navigation, but never alter commission data or calculations.
+    if(++c>30) clearInterval(ct);
   },1000);
 })();
 </script>
