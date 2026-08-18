@@ -10620,6 +10620,12 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function filteredCommissionRecords(){
+    // IMPORTANT: on opening Sale Commission Management, show ALL existing
+    // commission records (old + new). Date/staff filters only take effect
+    // after the user presses the Search button.
+    if(window.__commissionFiltersApplied!==true){
+      return Array.isArray(window.commissionRecords)?window.commissionRecords:[];
+    }
     const staff=C("commissionFilterStaff")?.value||"";
     const from=C("commissionFromDate")?.value||"";
     const to=C("commissionToDate")?.value||"";
@@ -11001,13 +11007,17 @@ document.addEventListener("DOMContentLoaded",function(){
     C("saveSaleCommission")?.addEventListener("click",saveCommissionManual);
     C("clearSaleCommission")?.addEventListener("click",clearCommissionForm);
     C("commissionStaff")?.addEventListener("change",()=>{refreshCommissionStaffRateHint();renderCommissionItems();});
-    C("commissionRefresh")?.addEventListener("click",renderCommissionList);
-    C("commissionFilterStaff")?.addEventListener("change",renderCommissionList);
-    C("commissionFromDate")?.addEventListener("change",renderCommissionList);
-    C("commissionToDate")?.addEventListener("change",renderCommissionList);
+    C("commissionRefresh")?.addEventListener("click",()=>{
+      window.__commissionFiltersApplied=true;
+      renderCommissionList();
+    });
+    C("commissionFilterStaff")?.addEventListener("change",()=>{});
+    C("commissionFromDate")?.addEventListener("change",()=>{});
+    C("commissionToDate")?.addEventListener("change",()=>{});
     C("commissionPdf")?.addEventListener("click",exportCommissionPdf);
     C("commissionExcel")?.addEventListener("click",exportCommissionExcel);
 
+    window.__commissionFiltersApplied=false;
     renderCommissionItems();
     loadCommissionRecords();
     // Guaranteed retry after the page/authentication client has had time to initialize.
@@ -11623,6 +11633,30 @@ document.addEventListener("DOMContentLoaded",function(){
     setTimeout(()=>window.reloadCommissionRecords?.(),1200);
   }
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});else boot();
+})();
+</script>
+
+<script id="commission-initial-show-all-v7">
+(function(){
+  function showAllCommissionRecords(){
+    if(window.__commissionFiltersApplied===true)return;
+    const box=document.getElementById("commissionList");
+    if(!box)return;
+    const rows=Array.isArray(window.commissionRecords)?window.commissionRecords:[];
+    if(!rows.length)return;
+    // The original renderer already knows how to display the complete list.
+    // Calling the global reload hook is unnecessary; trigger a safe click only
+    // after the data is present by clearing accidental date defaults.
+    const from=document.getElementById("commissionFromDate");
+    const to=document.getElementById("commissionToDate");
+    if(from)from.value="";
+    if(to)to.value="";
+  }
+  let n=0;
+  const timer=setInterval(()=>{
+    showAllCommissionRecords();
+    if(++n>20)clearInterval(timer);
+  },500);
 })();
 </script>
 </body>
