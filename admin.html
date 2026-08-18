@@ -10585,37 +10585,73 @@ document.addEventListener("DOMContentLoaded",function(){
     renderCommissionServiceResults();
   }
 
+  let commissionLoadPromise=null;
+  let commissionLoadSeq=0;
+
   async function loadCommissionRecords(retry=0){
     window.reloadCommissionRecords=loadCommissionRecords;
     const box=C("commissionList");
     if(!box)return;
-    const client=window.sb || (typeof sb!=="undefined"?sb:null);
-    if(!client){
-      if(retry<20){
-        box.innerHTML='<p class="muted">Connecting to commission database...</p>';
-        setTimeout(()=>loadCommissionRecords(retry+1),500);
-      }else{
-        box.innerHTML='<div class="status error">Commission database is not ready. Please refresh the page.</div>';
+    if(commissionLoadPromise)return commissionLoadPromise;
+
+    commissionLoadPromise=(async()=>{
+      const client=window.sb || (typeof sb!=="undefined"?sb:null);
+      if(!client){
+        if(retry<20){
+          box.innerHTML='<p class="muted">Connecting to commission database...</p>';
+          await new Promise(resolve=>setTimeout(resolve,500));
+          commissionLoadPromise=null;
+          return loadCommissionRecords(retry+1);
+        }
+        throw new Error("Commission database is not ready. Please refresh the page.");
       }
-      return;
-    }
-    box.innerHTML='<p class="muted">Loading commission records...</p>';
-    try{
-      const r=await client.from("medifella_sale_commissions").select("*");
+
+      const seq=++commissionLoadSeq;
+      box.innerHTML='<p class="muted">Loading commission records...</p>';
+
+      // Never leave the user on "Loading..." forever. A stuck Supabase request
+      // is treated as a real error and can be retried from the Search button.
+      const request=client.from("medifella_sale_commissions")
+        .select("*")
+        .order("created_at",{ascending:false})
+        .limit(5000);
+
+      const timeout=new Promise((_,reject)=>
+        setTimeout(()=>reject(new Error("Commission database request timed out. Please press Search/Refresh once more.")),10000)
+      );
+
+      const r=await Promise.race([request,timeout]);
       if(r.error)throw r.error;
       const rows=Array.isArray(r.data)?r.data:[];
-      rows.sort((a,b)=>String(b.created_at||b.commission_date||"").localeCompare(String(a.created_at||a.commission_date||"")));
+      if(seq!==commissionLoadSeq)return;
+
       window.commissionRecords=rows;
-      // The requirement is to always show old + new records. Do not silently
-      // force a date filter that hides older commissions.
-      if(C("commissionFromDate") && C("commissionFromDate").dataset.autoDefault==="1")C("commissionFromDate").value="";
-      if(C("commissionToDate") && C("commissionToDate").dataset.autoDefault==="1")C("commissionToDate").value="";
+      // Initial view = ALL old + new records. Do not apply the default dates.
+      window.__commissionFiltersApplied=false;
+      if(C("commissionFromDate"))C("commissionFromDate").value="";
+      if(C("commissionToDate"))C("commissionToDate").value="";
       renderCommissionList();
+    })();
+
+    try{
+      return await commissionLoadPromise;
     }catch(e){
       console.error("Commission list load failed",e);
-      window.commissionRecords=[];
-      box.innerHTML=`<div class="status error"><strong>Commission List could not load.</strong><br>${escC(e?.message||String(e))}</div>`;
+      window.commissionRecords=Array.isArray(window.commissionRecords)?window.commissionRecords:[];
+      box.innerHTML=`<div class="status error">
+        <strong>Commission List could not load.</strong><br>
+        ${escC(e?.message||String(e))}
+        <div class="actions" style="margin-top:10px">
+          <button type="button" class="light" id="commissionRetryNow">Retry</button>
+        </div>
+      </div>`;
       if(C("commissionGrandTotal"))C("commissionGrandTotal").innerHTML="";
+      C("commissionRetryNow")?.addEventListener("click",()=>{
+        commissionLoadPromise=null;
+        loadCommissionRecords();
+      },{once:true});
+    }finally{
+      commissionLoadPromise=null;
     }
   }
 
@@ -11007,9 +11043,13 @@ document.addEventListener("DOMContentLoaded",function(){
     C("saveSaleCommission")?.addEventListener("click",saveCommissionManual);
     C("clearSaleCommission")?.addEventListener("click",clearCommissionForm);
     C("commissionStaff")?.addEventListener("change",()=>{refreshCommissionStaffRateHint();renderCommissionItems();});
-    C("commissionRefresh")?.addEventListener("click",()=>{
+    C("commissionRefresh")?.addEventListener("click",async()=>{
       window.__commissionFiltersApplied=true;
-      renderCommissionList();
+      if(!Array.isArray(window.commissionRecords) || window.commissionRecords.length===0){
+        await loadCommissionRecords();
+      }else{
+        renderCommissionList();
+      }
     });
     C("commissionFilterStaff")?.addEventListener("change",()=>{});
     C("commissionFromDate")?.addEventListener("change",()=>{});
@@ -11432,19 +11472,8 @@ document.addEventListener("DOMContentLoaded",function(){
     if((typeof salesRecords!=="undefined" && Array.isArray(salesRecords) && salesRecords.length) || ++n>30) clearInterval(timer);
   },500);
 
-  // If the commission section ever remains on the initial static "Loading..."
-  // after authentication, explicitly retry the existing loader. No commission
-  // data or calculation is changed here.
-  let c=0;
-  const ct=setInterval(()=>{
-    const box=document.getElementById("commissionList");
-    if(box && /^(Loading…?|Loading commission records\.\.\.|Connecting to the commission database\.\.\.)$/i.test(box.textContent.trim())){
-      if(typeof window.reloadCommissionRecords==="function") window.reloadCommissionRecords();
-    }
-    // Keep the list reliable for a little longer after authentication/page
-    // navigation, but never alter commission data or calculations.
-    if(++c>30) clearInterval(ct);
-  },1000);
+  // Do not create repeated overlapping commission SELECT requests here.
+  // loadCommissionRecords() itself has a single-flight guard and a timeout.
 })();
 </script>
 
@@ -11657,6 +11686,30 @@ document.addEventListener("DOMContentLoaded",function(){
     showAllCommissionRecords();
     if(++n>20)clearInterval(timer);
   },500);
+})();
+</script>
+
+<script id="commission-management-v8-final-guard">
+(function(){
+  "use strict";
+  let lastSection=null;
+  function bootCommissionOnce(){
+    const box=document.getElementById("commissionList");
+    if(!box)return;
+    const section=document.getElementById("saleCommission");
+    if(section && section.classList.contains("active") && lastSection!=="saleCommission"){
+      lastSection="saleCommission";
+      const from=document.getElementById("commissionFromDate");
+      const to=document.getElementById("commissionToDate");
+      if(from)from.value="";
+      if(to)to.value="";
+      window.__commissionFiltersApplied=false;
+      if(typeof window.reloadCommissionRecords==="function")window.reloadCommissionRecords();
+    }
+    if(section && !section.classList.contains("active"))lastSection=null;
+  }
+  setInterval(bootCommissionOnce,800);
+  document.addEventListener("visibilitychange",bootCommissionOnce);
 })();
 </script>
 </body>
