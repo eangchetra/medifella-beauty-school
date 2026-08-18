@@ -3704,8 +3704,27 @@ async function loadSales(){
    $("salesList").innerHTML=`<p class="muted">Sales database is not ready yet. Run the Medi Fella Sale SQL setup in Supabase SQL Editor first.</p><p class="error status">${esc(sr.error.message)}</p>`;
    salesRecords=[];salePayments=[];renderSaleStudentOptions();updateSalesMetrics();return;
  }
- salesRecords=sr.data||[];
- salePayments=pr.error?[]:(pr.data||[]);
+ // Keep one row per database sale id. This protects all three sale lists
+ // (Medi Fella / MTS / Dermed) from duplicate rows caused by repeated
+ // loading/rendering or duplicate result rows.
+ const rawSales=Array.isArray(sr.data)?sr.data:[];
+ const seenSaleIds=new Set();
+ salesRecords=rawSales.filter(row=>{
+   const key=String(row?.id||"");
+   if(!key)return true;
+   if(seenSaleIds.has(key))return false;
+   seenSaleIds.add(key);
+   return true;
+ });
+ const rawPayments=pr.error?[]:(Array.isArray(pr.data)?pr.data:[]);
+ const seenPaymentIds=new Set();
+ salePayments=rawPayments.filter(row=>{
+   const key=String(row?.id||"");
+   if(!key)return true;
+   if(seenPaymentIds.has(key))return false;
+   seenPaymentIds.add(key);
+   return true;
+ });
  renderSaleStudentOptions();
  try{renderSales()}catch(e){
    console.error("Medi Fella Sale render error:",e);
@@ -6785,12 +6804,12 @@ function renderMtsSales(){
  const box=$("mtsSalesList");if(!box)return;
  const q=($("mtsSaleSearch")?.value||"").toLowerCase();
  const f=($("mtsPaymentFilter")?.value||"all");
- const rows=salesRecords.filter(x=>{
+ const rows=Array.from(new Map(salesRecords.filter(x=>{
    if(!isMtsListRecord(x))return false;
    const total=saleTotal(x),paid=salePaid(x),status=saleStatus(total,paid);
    const hay=`${saleRef(x)||""} ${saleCustomer(x)||""} ${saleField(x,["student_phone","phone"],"")} ${JSON.stringify(saleItemsValue(x))}`.toLowerCase();
    return(f==="all"||status===f)&&hay.includes(q);
- });
+ }).map(x=>[String(x.id),x])).values());
  box.innerHTML=rows.length?`<div class="table-wrap"><table class="table">
  <tr><th>Date / Time</th><th>Reference</th><th>Buyer</th><th>Products</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>
  ${rows.map(x=>{
@@ -6818,12 +6837,12 @@ function renderDermedSales(){
  const box=$("dermedSalesList");if(!box)return;
  const q=($("dermedSaleSearch")?.value||"").toLowerCase();
  const f=($("dermedPaymentFilter")?.value||"all");
- const rows=salesRecords.filter(x=>{
+ const rows=Array.from(new Map(salesRecords.filter(x=>{
    if(String(x.sale_type||"").toUpperCase()!=="DERMED") return false;
    const status=saleStatus(saleTotal(x),salePaid(x));
    const hay=`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])} ${JSON.stringify(x.service_items||[])}`.toLowerCase();
    return (f==="all"||status===f) && hay.includes(q);
- });
+ }).map(x=>[String(x.id),x])).values());
  box.innerHTML=rows.length?`<div class="table-wrap"><table class="table">
  <tr><th>Date / Time</th><th>Reference</th><th>Buyer</th><th>Products / Services</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>
  ${rows.map(x=>{
