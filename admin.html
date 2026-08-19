@@ -10702,157 +10702,47 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   async function loadCommissionRecords(retry=0){
-    const box=C("commissionList");
-    if(!box)return;
-
-    if(typeof sb==="undefined" || !sb){
-      if(retry<12){
-        box.innerHTML='<p class="muted">Connecting to the commission database...</p>';
-        setTimeout(()=>loadCommissionRecords(retry+1),500);
-      }else{
-        box.innerHTML='<div class="status error">Commission database is not ready. Please refresh the page.</div>';
-      }
-      return;
+  const box=C("commissionList");if(!box)return;
+  if(typeof sb==="undefined"||!sb){
+    if(retry<10){
+      box.innerHTML='<p class="muted">Connecting to commission database...</p>';
+      setTimeout(()=>loadCommissionRecords(retry+1),500);
+    }else{
+      box.innerHTML='<div class="status error">Commission database is not ready. Please refresh.</div>';
     }
-
-    box.innerHTML='<p class="muted">Loading Commission List...</p>';
-
-    try{
-      // First read the commission table. Do not use a date/order column here
-      // because older schemas may not contain them.
-      const cr=await sb.from("medifella_sale_commissions").select("*");
-      if(cr.error){
-        console.warn("Commission table SELECT:",cr.error.message||cr.error);
-      }
-
-      let records=Array.isArray(cr.data)?cr.data:[];
-
-      /*
-       * IMPORTANT FALLBACK:
-       * Existing Dermed sales are the source of automatic commissions.
-       * If the commission table is empty (or SELECT is blocked by RLS and
-       * therefore returns no rows), build the visible Commission List from
-       * the saved Dermed sales instead of showing a blank list.
-       *
-       * This does NOT modify or delete any database data.
-       */
-      if(records.length===0){
-        try{
-          const sr=await sb.from("medifella_sales").select("*");
-          if(!sr.error && Array.isArray(sr.data)){
-            const derived=[];
-            for(const sale of sr.data){
-              if(String(sale?.sale_type||"").trim().toUpperCase()!=="DERMED")continue;
-
-              const staffId=sale.sale_staff_id||"";
-              const staff=(Array.isArray(window.staffInfoRecords)?window.staffInfoRecords:[])
-                .find(x=>String(x.id)===String(staffId));
-              const cfg=typeof window.getCurrentSaleStaffConfig==="function"
-                ? window.getCurrentSaleStaffConfig(staffId)
-                : null;
-
-              let services=[];
-              try{
-                const raw=sale.service_items??sale.services??[];
-                services=typeof raw==="string"?JSON.parse(raw):raw;
-              }catch(_){services=[]}
-              if(!Array.isArray(services))services=[];
-
-              // Some Dermed records may store service lines inside items.
-              if(!services.length){
-                try{
-                  const raw=sale.items??[];
-                  const items=typeof raw==="string"?JSON.parse(raw):raw;
-                  if(Array.isArray(items)){
-                    services=items.filter(x=>{
-                      const t=String(x?.type||x?.service_type||"").toLowerCase();
-                      return t.includes("service");
-                    });
-                  }
-                }catch(_){}
-              }
-
-              const buyerName=sale.student_name||sale.customer_name||"";
-              const buyerPhone=sale.student_phone||sale.customer_phone||"";
-              const date=String(sale.sale_date||sale.created_at||todayC()).slice(0,10);
-
-              for(const x of services){
-                const type=serviceTypeLabel(x?.service_type||x?.type||"Only Service");
-                const unit=Math.max(1,Number(x?.quantity??x?.unit??1)||1);
-                const price=Math.max(0,Number(x?.price??x?.unit_price??0)||0);
-                const base=unit*price;
-                const discType=String(x?.discount_type||"percent").toLowerCase();
-                const discVal=Math.max(0,Number(x?.discount_value??0)||0);
-                const discount=discType==="usd"
-                  ?Math.min(base,discVal)
-                  :Math.min(base,base*discVal/100);
-                const subtotal=Math.max(0,Number(x?.subtotal??(base-discount))||0);
-
-                let rate=0;
-                if(cfg){
-                  rate=type==="Only Service"
-                    ?Number(cfg.service_rate||0)/100
-                    :type==="Service With Product"
-                      ?Number(cfg.service_product_rate||0)/100
-                      :0;
-                }
-
-                // Only include actual service lines with a positive subtotal.
-                if(subtotal<=0)continue;
-
-                derived.push({
-                  id:`derived-${sale.id}-${x.service_id||x.id||derived.length}`,
-                  commission_date:date,
-                  staff_id:staffId,
-                  staff_name:sale.sale_staff_name||staff?.name_en||staff?.name_kh||staff?.name_km||"",
-                  customer_id:sale.customer_id||sale.student_id||null,
-                  customer_name:buyerName,
-                  customer_phone:buyerPhone,
-                  service_type:type==="Service With Product"?"service_product":"service",
-                  service_detail:x.name||x.service_detail||"Service",
-                  service_id:x.service_id||x.id||null,
-                  unit,
-                  unit_price:price,
-                  discount,
-                  subtotal,
-                  commission_rate:rate,
-                  commission_amount:subtotal*rate,
-                  source:"dermed_derived",
-                  source_sale_id:sale.id,
-                  reference_no:sale.reference_no||""
-                });
-              }
-            }
-
-            if(derived.length)records=derived;
-          }
-        }catch(e){
-          console.warn("Could not derive commissions from Dermed sales:",e);
-        }
-      }
-
-      window.commissionRecords=records;
-
-      // Never leave an old filter/date selection hiding all records on load.
-      if(C("commissionFilterStaff"))C("commissionFilterStaff").value="";
-      if(C("commissionFromDate"))C("commissionFromDate").value="";
-      if(C("commissionToDate"))C("commissionToDate").value="";
-
-      renderCommissionList();
-
-      if(!records.length){
-        // Keep the UI informative rather than silently blank.
-        const note=C("commissionList");
-        if(note)note.insertAdjacentHTML("beforeend",
-          '<div class="status">No commission records were found in the commission table or existing Dermed sales.</div>');
-      }
-    }catch(e){
-      console.error("Commission load exception:",e);
-      window.commissionRecords=[];
-      box.innerHTML=`<div class="status error">Could not load Commission List: ${escC(e.message||e)}</div>`;
-      if(C("commissionGrandTotal"))C("commissionGrandTotal").innerHTML="";
-    }
+    return;
   }
+
+  box.innerHTML='<p class="muted">Loading Commission List...</p>';
+  try{
+    const r=await sb.from("medifella_sale_commissions").select("*");
+    if(r.error)throw r.error;
+
+    const raw=Array.isArray(r.data)?r.data:[];
+    const seen=new Set();
+
+    // Manual rows (+ Add Sale Commission) and automatic Dermed rows are
+    // both stored here and displayed together.
+    window.commissionRecords=raw.filter(x=>{
+      const key=JSON.stringify([
+        x.source_sale_id||"",x.source||"manual",x.commission_date||"",
+        x.staff_id||"",x.customer_id||x.student_id||"",x.service_id||"",
+        x.service_detail||"",x.service_type||"",x.unit||1,x.unit_price||0,
+        x.discount||0,x.subtotal||0,x.commission_rate||0,x.commission_amount||0
+      ]);
+      if(seen.has(key))return false;
+      seen.add(key);
+      return true;
+    });
+
+    renderCommissionList();
+  }catch(e){
+    console.error("Commission List load error:",e);
+    window.commissionRecords=[];
+    box.innerHTML=`<div class="status error">Could not load Commission List: ${escC(e.message||e)}</div>`;
+    C("commissionGrandTotal").innerHTML="";
+  }
+}
 
   function filteredCommissionRecords(){
     const staff=C("commissionFilterStaff")?.value||"";
@@ -11183,96 +11073,121 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   window.recordFirstDermedSaleCommission=async function({sale,buyer,buyerType,buyerId,staffId,staff,servicesArr,items,hasProducts,adminId}){
-    // AUTOMATIC COMMISSION IS DERMED SALE ONLY.
-    const saleType=String(sale?.sale_type||"").trim().toUpperCase();
-    if(saleType!=="DERMED")return;
+  if(String(sale?.sale_type||"").trim().toUpperCase()!=="DERMED")return;
+  const saleId=String(sale?.id||"");
+  if(!saleId||!staffId)return;
 
-    // Commission belongs to the selected Sale Staff, not the Cashier.
-    if(!sale?.id||!staffId)return;
-    const saleStaff=staffRows().find(x=>String(x.id)===String(staffId));
-    if(!saleStaff || !isSaleCounterCashierStaff(saleStaff)){
-      console.warn("Commission skipped: selected Sale Staff is not Job Title 'Sale Counter Cashier'.");
-      return;
-    }
+  // Automatic Dermed commission is created only once for the first customer/payment.
+  try{
+    const q=await sb.from("medifella_sale_commissions")
+      .select("id").eq("source_sale_id",saleId).eq("source","dermed_auto").limit(1);
+    if(!q.error && Array.isArray(q.data) && q.data.length)return;
+  }catch(_){}
 
-    // Only the customer's FIRST Dermed invoice creates automatic commission.
-    let allq;
-    if(buyerType==="student"){
-      allq=await sb.from("medifella_sales").select("id,created_at,sale_date")
-        .eq("sale_type","DERMED").eq("student_id",buyerId).order("created_at",{ascending:true});
+  const cfg=typeof window.getCurrentSaleStaffConfig==="function"
+    ?window.getCurrentSaleStaffConfig(staffId):null;
+  if(!cfg)return;
+
+  const serviceLines=(Array.isArray(servicesArr)?servicesArr:[]).map(x=>{
+    const type=serviceType(x?.service_type||x?.type||"Only Service");
+    const payment=paymentType(x);
+    const qty=Math.max(1,N(x?.quantity??x?.unit??1));
+    const price=Math.max(0,N(x?.price??x?.unit_price??0));
+    const base=qty*price;
+    const dt=String(x?.discount_type||"percent").toLowerCase();
+    const dv=Math.max(0,N(x?.discount_value??0));
+    const discount=dt==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);
+    return {...x,service_type:type,payment_type:payment,unit:qty,unit_price:price,
+      discount,subtotal:Math.max(0,N(x?.subtotal??(base-discount)))};
+  }).filter(x=>x.subtotal>0 &&
+    (x.service_type==="Only Service"||x.service_type==="Service With Product"));
+
+  if(!serviceLines.length)return;
+
+  // Product-only lines never earn commission, but they must be fully paid
+  // before any package amount can be treated as commissionable.
+  const products=Array.isArray(items)?items:[];
+  const productTotal=products.reduce((sum,x)=>{
+    const qty=Math.max(1,N(x?.quantity??x?.unit??1));
+    const price=Math.max(0,N(x?.price??x?.unit_price??0));
+    const base=qty*price;
+    const dt=String(x?.discount_type||"percent").toLowerCase();
+    const dv=Math.max(0,N(x?.discount_value??0));
+    const discount=dt==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);
+    return sum+Math.max(0,N(x?.subtotal??(base-discount)));
+  },0);
+
+  // Single service and Single service-with-product must be paid in full.
+  const singleTotal=serviceLines
+    .filter(x=>x.payment_type!=="Package")
+    .reduce((sum,x)=>sum+x.subtotal,0);
+
+  const paid=Math.max(0,N(sale?.paid??sale?.paid_amount??0));
+  const mandatoryTotal=productTotal+singleTotal;
+
+  // Example: 100 single + 100 single-with-product + 100 product = $300
+  // must be covered before package payment can earn commission.
+  if(paid+0.005<mandatoryTotal)return;
+
+  // Remaining payment belongs to package services, in invoice order.
+  let packagePaid=Math.max(0,paid-mandatoryTotal);
+  const rows=[];
+
+  for(const x of serviceLines){
+    let commissionBase=0;
+    if(x.payment_type==="Package"){
+      commissionBase=Math.min(x.subtotal,packagePaid);
+      packagePaid=Math.max(0,packagePaid-commissionBase);
     }else{
-      allq=await sb.from("medifella_sales").select("id,created_at,sale_date")
-        .eq("sale_type","DERMED").eq("customer_id",buyerId).order("created_at",{ascending:true});
+      commissionBase=x.subtotal;
     }
-    if(allq.error)throw allq.error;
-    const matching=allq.data||[];
-    if(!matching.length || String(matching[0].id)!==String(sale.id))return;
+    if(commissionBase<=0)continue;
 
-    let canUseSourceColumns=true;
-    const del=await sb.from("medifella_sale_commissions").delete()
-      .eq("source_sale_id",sale.id).eq("source","dermed_auto");
-    if(del.error){
-      const e=String(del.error.message||del.error.details||"");
-      if(/source_sale_id|source.*column|column .* does not exist|schema cache/i.test(e)){
-        canUseSourceColumns=false;
-      }else{
-        throw del.error;
-      }
-    }
+    // Only Service uses Service rate.
+    // Service With Product uses Service With Product rate.
+    // Product-only has no commission rate.
+    const rate=(x.service_type==="Service With Product"
+      ?N(cfg.service_product_rate)
+      :N(cfg.service_rate))/100;
+    if(rate<=0)continue;
 
-    const serviceItems=Array.isArray(servicesArr)?servicesArr:[];
-    if(!serviceItems.length)return;
+    rows.push({
+      commission_date:String(sale?.sale_date||today()).slice(0,10),
+      staff_id:staffId,
+      staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||cfg.staff_name||"",
+      customer_id:buyerType==="customer"?buyerId:null,
+      student_id:buyerType==="student"?buyerId:null,
+      customer_name:buyer?.name||buyer?.full_name||sale?.customer_name||sale?.student_name||"",
+      customer_phone:buyer?.phone||sale?.customer_phone||sale?.student_phone||"",
+      service_type:x.service_type==="Service With Product"?"service_product":"service",
+      service_detail:x.name||x.service_detail||"Service",
+      service_id:x.service_id||null,
+      unit:x.unit,
+      unit_price:x.unit_price,
+      discount:x.discount,
+      subtotal:commissionBase,
+      commission_rate:rate,
+      commission_amount:commissionBase*rate,
+      source:"dermed_auto",
+      source_sale_id:saleId,
+      reference_no:sale?.reference_no||"",
+      created_by:adminId||null
+    });
+  }
 
-    // Rate is determined separately for EACH service from the selected Sale Staff's
-    // saved Sale Staff Management rates.
-    const staffConfig=window.getCurrentSaleStaffConfig(staffId);
-    if(!staffConfig){
-      console.warn("Dermed commission skipped: selected Sale Staff has no active commission configuration.");
-      return;
-    }
-    const rows=serviceItems.map(x=>{
-      const serviceType=serviceTypeLabel(x.service_type);
-      const rate=serviceType==="Only Service"
-        ? Number(staffConfig.service_rate||0)/100
-        : serviceType==="Service With Product"
-          ? Number(staffConfig.service_product_rate||0)/100
-          : 0;
-      const unit=Math.max(1,num(x.quantity));
-      const price=Math.max(0,num(x.price));
-      const base=unit*price;
-      const discType=x.discount_type||"percent";
-      const discVal=Math.max(0,num(x.discount_value));
-      const discount=discType==="percent"
-        ? Math.min(base,base*discVal/100)
-        : Math.min(base,discVal);
-      const subtotal=Math.max(0,base-discount);
-      const row={
-        commission_date:String(sale.sale_date||todayC()).slice(0,10),
-        staff_id:staffId,
-        staff_name:staff?.name_en||staff?.name_km||staff?.name||"",
-        customer_id:buyerType==="customer"?buyerId:null,
-        student_id:buyerType==="student"?buyerId:null,
-        customer_name:buyer?.name||buyer?.full_name||"",
-        customer_phone:buyer?.phone||"",
-        service_type:serviceType==="Only Service"?"service":"service_product",
-        service_detail:(x.name||"Service")+(x.service_type?` · ${x.service_type}`:""),
-        service_id:x.service_id||null,
-        unit,unit_price:price,discount,subtotal,
-        commission_rate:rate,
-        commission_amount:subtotal*rate
-      };
-      if(canUseSourceColumns){
-        row.source="dermed_auto";
-        row.source_sale_id=sale.id;
-        row.reference_no=sale.reference_no||"";
-        row.created_by=adminId;
-      }
-      return row;
-    }).filter(x=>x.subtotal>0);
+  if(!rows.length)return;
 
-    if(!rows.length)return;
-    await insertCommissionRows(rows);
-  };
+  const ins=await sb.from("medifella_sale_commissions").insert(rows);
+  if(ins.error){
+    // Preserve compatibility with an older commission table schema.
+    if(/source_sale_id|source.*column|column .* does not exist|schema cache/i.test(String(ins.error.message||""))){
+      const legacy=rows.map(({source,source_sale_id,reference_no,created_by,...r})=>r);
+      const retry=await sb.from("medifella_sale_commissions").insert(legacy);
+      if(retry.error)throw retry.error;
+    }else throw ins.error;
+  }
+};
+
 
   async function exportCommissionExcel(){
     const rows=filteredCommissionRecords();
