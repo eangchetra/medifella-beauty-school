@@ -10557,25 +10557,84 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function renderCommissionServiceResults(rows){
-    const input=C("commissionServiceSearch"),box=C("commissionServiceResults");
-    if(!input||!box)return;
-    const q=String(input.value||"").trim();
-    if(!q){box.innerHTML="";box.classList.remove("show");return}
-    const list=(Array.isArray(rows)?rows:commissionServiceSearchRows(q)).slice(0,20);
-    box.innerHTML=list.map(s=>{
-      const sid=s.id??s.service_id??s._commissionKey??s.service_code??s.name;
-      const name=s.name??s.service_name??s.title??"Service";
-      const code=s.service_code??s.code??"";
-      const type=serviceTypeLabel(s.service_type);
-      const rate=commissionRateForService(s)*100;
-      const price=Number(s.price??s.unit_price??0);
-      return `<button type="button" data-commission-service="${escC(sid)}">
-        <div class="service-picker-name">${escC(name)}${code?` · ${escC(code)}`:""}</div>
-        <div class="service-picker-meta">${escC(type)} · $${moneyC(price)} · Commission ${rate}%</div>
-      </button>`;
-    }).join("")||'<div class="muted" style="padding:12px">No matching service found.</div>';
-    box.classList.add("show");
+  const input=C("commissionServiceSearch"),box=C("commissionServiceResults");
+  if(!input||!box)return;
+  const q=String(input.value||"").trim();
+  if(!q){box.innerHTML="";box.classList.remove("show");window.__commissionServiceResultMap={};return}
+
+  const list=(Array.isArray(rows)?rows:commissionServiceSearchRows(q)).slice(0,20);
+  const map={};
+
+  box.innerHTML=list.map((s,i)=>{
+    const sid=String(s.id??s.service_id??s._commissionKey??s.service_code??s.name??i);
+    const key=`commission-result-${i}-${sid}`;
+    map[key]=s;
+    const name=s.name??s.service_name??s.title??"Service";
+    const code=s.service_code??s.code??"";
+    const type=serviceTypeLabel(s.service_type);
+    const rate=commissionRateForService(s)*100;
+    const price=Number(s.price??s.unit_price??0);
+
+    return `<button type="button" data-commission-service-key="${escC(key)}">
+      <div class="service-picker-name">${escC(name)}${code?` · ${escC(code)}`:""}</div>
+      <div class="service-picker-meta">${escC(type)} · $${moneyC(price)} · Commission ${rate}%</div>
+    </button>`;
+  }).join("")||'<div class="muted" style="padding:12px">No matching service found.</div>';
+
+  window.__commissionServiceResultMap=map;
+  box.classList.add("show");
+}
+
+function addCommissionServiceObject(s){
+  if(!s)return false;
+
+  const item={
+    service_id:s.id??s.service_id??null,
+    service_code:s.service_code??s.code??"",
+    name:s.name??s.service_name??s.title??"Service",
+    service_type:serviceTypeLabel(s.service_type),
+    price:Number(s.price??s.unit_price??0),
+    quantity:1,
+    discount:0
+  };
+
+  const duplicate=(window.commissionItems||[]).some(x=>{
+    if(item.service_id && x.service_id)return String(x.service_id)===String(item.service_id);
+    return String(x.service_code||"").toLowerCase()===String(item.service_code||"").toLowerCase()
+      && String(x.name||"").toLowerCase()===String(item.name||"").toLowerCase();
+  });
+
+  if(duplicate){
+    C("commissionStatus").innerHTML='<div class="status error">This service is already added. Choose another service.</div>';
+    return false;
   }
+
+  window.commissionItems=window.commissionItems||[];
+  window.commissionItems.push(item);
+  renderCommissionItems();
+
+  const input=C("commissionServiceSearch"),box=C("commissionServiceResults");
+  if(input){input.value="";input.focus();}
+  if(box){box.innerHTML="";box.classList.remove("show");}
+  window.__commissionServiceResultMap={};
+
+  C("commissionStatus").innerHTML="";
+  return true;
+}
+
+function addCommissionService(id){
+  const key=String(id??"");
+  const mapped=window.__commissionServiceResultMap?.[key];
+  if(mapped)return addCommissionServiceObject(mapped);
+
+  const s=serviceRows().find(x=>String(x.id??x.service_id??x._commissionKey??x.service_code??"")===key)
+    ||(Array.isArray(window.commissionSearchServices)
+      ?window.commissionSearchServices.find(x=>String(x.id??x.service_id??x._commissionKey??x.service_code??x.name??"")===key)
+      :null);
+
+  return addCommissionServiceObject(s);
+}
+
 
   let commissionServiceSearchTimer=null;
   async function searchCommissionServices(){
@@ -11260,15 +11319,16 @@ document.addEventListener("DOMContentLoaded",function(){
       commissionServiceSearchTimer=setTimeout(searchCommissionServices,120);
     });
     C("commissionServiceResults")?.addEventListener("click",e=>{
-      const b=e.target.closest("[data-commission-service]");
-      if(b){
-        addCommissionService(b.dataset.commissionService);
-        renderCommissionServiceResults();
-      }
+      const b=e.target.closest("[data-commission-service-key]");
+      if(!b)return;
+      e.preventDefault();
+      e.stopPropagation();
+      addCommissionService(b.dataset.commissionServiceKey);
     });
     C("commissionAddItem")?.addEventListener("click",()=>{
       C("commissionServiceSearch")?.focus();
-      renderCommissionServiceResults();
+      const q=String(C("commissionServiceSearch")?.value||"").trim();
+      if(q)renderCommissionServiceResults(commissionServiceSearchRows(q));
     });
 
     C("commissionItems")?.addEventListener("click",e=>{
