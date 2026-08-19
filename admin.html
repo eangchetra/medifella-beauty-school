@@ -3,6 +3,7 @@
 <head>
 <meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
 <title>Medi Fella Admin Dashboard</title>
+<!-- Commission display V19: globally suppress exact duplicate automatic Dermed rows. -->
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 <script src="https://cdn.jsdelivr.net/npm/qrcodejs@1.0.0/qrcode.min.js"></script>
 <script src="https://cdn.jsdelivr.net/npm/xlsx@0.18.5/dist/xlsx.full.min.js"></script>
@@ -6761,12 +6762,6 @@ function resetNewInventorySale(type){
  renderSaleProductRows(type);if(type==="dermed")renderDermedCombinedItems();
 }
 async function saveInventorySale(type){
-  // Dermed Sale has its own dedicated saveDermed() implementation below.
-  // The old generic inventory-save path must never create a Dermed invoice.
-  if(String(type||"").toLowerCase()==="dermed"){
-    console.warn("Ignored obsolete generic Dermed save path; using dedicated saveDermed().");
-    return;
-  }
  const buyerType=$(type+"BuyerType").value,buyerId=$(type+"BuyerId").value,staffId=$(type+"SaleStaff").value,items=window[type+"SaleItems"]||[];
  const serviceItems=type==="dermed"?(window.dermedServiceItems||[]):[];
  if(!buyerType||!buyerId){msg($(type+"Status"),"Please select a Student or Customer.",true);return}
@@ -6840,30 +6835,42 @@ function renderMtsSales(){
 }
 
 function dermedExactSaleFingerprint(x){
-  const line=v=>{
-    if(!v||typeof v!=="object")return {};
+  const cleanLine=v=>{
+    if(!v||typeof v!=="object")return v;
     return {
+      name:String(v.name||v.product_name||v.service_name||"").trim(),
       product_id:String(v.product_id||""),
       service_id:String(v.service_id||""),
-      name:String(v.name||v.product_name||v.service_name||"").trim().toLowerCase(),
       quantity:Number(v.quantity??v.qty??1),
       price:Number(v.unit_price??v.price??0),
-      service_payment_type:String(v.service_payment_type||"Single").trim().toLowerCase()
+      discount_type:String(v.discount_type||"percent"),
+      discount_value:Number(v.discount_value??0),
+      service_type:String(v.service_type||""),
+      service_payment_type:String(v.service_payment_type||"Single")
     };
   };
-  const norm=a=>a.map(line).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+  const sortLines=a=>a.map(cleanLine).sort((a,b)=>
+    JSON.stringify(a).localeCompare(JSON.stringify(b))
+  );
   const buyer=String(x?.student_id||x?.customer_id||"");
+  const staff=String(x?.sale_staff_id||"");
+  const cashier=String(x?.cashier_id||"");
   const date=String(x?.sale_date||"").slice(0,10);
-  const minute=String(x?.sale_time||x?.time||"").slice(0,5);
+  // Compare by minute, not seconds, so a duplicate save from the same action
+  // is treated as the same invoice.
+  const time=String(x?.sale_time||x?.time||"").slice(0,5);
   return JSON.stringify({
-    type:"DERMED",
-    buyer,date,minute,
-    total:Number(x?.grand_total??x?.total??0),
-    paid:Number(x?.paid??x?.paid_amount??0),
-    items:norm(Array.isArray(x?.items)?x.items:[]),
-    services:norm(Array.isArray(x?.service_items)?x.service_items:[])
+    type:String(x?.sale_type||"").toUpperCase(),
+    date,time,buyer,staff,cashier,
+    subtotal:Number(x?.subtotal??0),
+    discount:Number(x?.discount??0),
+    total:Number(x?.grand_total??0),
+    paid:Number(x?.paid??0),
+    items:sortLines(Array.isArray(x?.items)?x.items:[]),
+    services:sortLines(Array.isArray(x?.service_items)?x.service_items:[])
   });
 }
+
 
 
 function renderDermedSales(){
@@ -7535,26 +7542,6 @@ document.addEventListener("DOMContentLoaded",function(){
       items:itemPayload,service_items:servicePayload,service_total:servicePayload.reduce((n,x)=>n+Number(x.subtotal||0),0),
       notes:E("dermedSaleNote").value.trim()
     };
-    // Second idempotency guard: the same logical save event is ignored for
-    // 15 seconds even if a second handler fires after the first request finishes.
-    const logicalSaveFingerprint=dermedExactSaleFingerprint({
-      ...payload,
-      sale_date:saleDate,
-      sale_time:saleTime
-    });
-    const previousSave=window.__dermedLogicalSaveGuard;
-    if(!editingId && previousSave &&
-       previousSave.fingerprint===logicalSaveFingerprint &&
-       (Date.now()-previousSave.time)<15000){
-      return;
-    }
-    if(!editingId){
-      window.__dermedLogicalSaveGuard={
-        fingerprint:logicalSaveFingerprint,
-        time:Date.now()
-      };
-    }
-
     const btn=E("saveDermedSale");if(btn)btn.disabled=true;
     try{
       let r;
@@ -7669,7 +7656,6 @@ document.addEventListener("DOMContentLoaded",function(){
 
       const wasEditing=!!editingId;
       const savedReference=(r&&r.data&&r.data.reference_no)||reference;
-      if(!wasEditing)window.__dermedLastSaveSucceeded=true;
       window.editingDermedSaleId=null;
       msg(E("dermedStatus"),`${wasEditing?"Dermed sale updated":(reusedExisting?"Existing identical Dermed invoice kept":"Dermed sale saved")}. Invoice ${savedReference}.`);
       reset();
@@ -7681,12 +7667,6 @@ document.addEventListener("DOMContentLoaded",function(){
     finally{
       if(btn)btn.disabled=false;
       window.__dermedSaveInProgress=false;
-      // Keep a successful logical-save guard briefly; failed saves are allowed
-      // to be tried again immediately.
-      if(window.__dermedLastSaveSucceeded!==true){
-        window.__dermedLogicalSaveGuard=null;
-      }
-      window.__dermedLastSaveSucceeded=false;
     }
   }
 
@@ -13978,16 +13958,23 @@ document.addEventListener("DOMContentLoaded",function(){
       map.get(gk).push(r);
     }
     const groups=[];
+    // IMPORTANT: duplicate automatic Dermed commission rows can belong to
+    // different sale groups when older versions created two invoice IDs.
+    // Suppress exact automatic duplicates GLOBALLY, not separately inside
+    // each sale group. Manual commissions are never deduplicated here.
+    const globalAutoSeen=new Set();
     for(const rs of map.values()){
-      const seen=new Set(),clean=[];
+      const clean=[];
       for(const r of rs){
-        // Automatic Dermed rows can be created twice by older versions when the
-        // source_sale_id column was unavailable. Suppress only exact duplicates.
         const fp=autoRow(r)?fingerprint(r):`id:${r.id||r.created_at||fingerprint(r)}`;
-        if(seen.has(fp))continue;
-        seen.add(fp);clean.push(r);
+        if(autoRow(r)){
+          if(globalAutoSeen.has(fp))continue;
+          globalAutoSeen.add(fp);
+        }
+        if(clean.some(existing=>String(existing.id||'')===String(r.id||'')))continue;
+        clean.push(r);
       }
-      groups.push(clean);
+      if(clean.length)groups.push(clean);
     }
     return groups;
   }
