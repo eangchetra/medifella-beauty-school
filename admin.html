@@ -10706,52 +10706,153 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!box)return;
 
     if(typeof sb==="undefined" || !sb){
-      if(retry<10){
+      if(retry<12){
         box.innerHTML='<p class="muted">Connecting to the commission database...</p>';
         setTimeout(()=>loadCommissionRecords(retry+1),500);
       }else{
-        box.innerHTML='<p class="status error">Commission database is not ready. Please refresh the page.</p>';
+        box.innerHTML='<div class="status error">Commission database is not ready. Please refresh the page.</div>';
       }
       return;
     }
 
-    box.innerHTML='<p class="muted">Loading commission records...</p>';
+    box.innerHTML='<p class="muted">Loading Commission List...</p>';
 
     try{
-      // IMPORTANT: read every row first. Do not let duplicate filtering or
-      // date/staff filters make the Commission List appear empty.
-      let r=await sb.from("medifella_sale_commissions").select("*");
-
-      if(r.error){
-        console.error("Commission SELECT error:",r.error);
-        box.innerHTML=`<div class="status error">
-          Could not load Commission List.<br>
-          <strong>${escC(r.error.message||"Database read error")}</strong>
-        </div>`;
-        window.commissionRecords=[];
-        C("commissionGrandTotal").innerHTML="";
-        return;
+      // First read the commission table. Do not use a date/order column here
+      // because older schemas may not contain them.
+      const cr=await sb.from("medifella_sale_commissions").select("*");
+      if(cr.error){
+        console.warn("Commission table SELECT:",cr.error.message||cr.error);
       }
 
-      const raw=Array.isArray(r.data)?r.data:[];
-      // Keep all actual rows in memory. The visible list removes duplicate
-      // commission rows by batch/sale key, not by hiding the entire list.
-      window.commissionRecords=raw;
+      let records=Array.isArray(cr.data)?cr.data:[];
 
-      // Clear any stale staff/date filters so the full old list is visible.
+      /*
+       * IMPORTANT FALLBACK:
+       * Existing Dermed sales are the source of automatic commissions.
+       * If the commission table is empty (or SELECT is blocked by RLS and
+       * therefore returns no rows), build the visible Commission List from
+       * the saved Dermed sales instead of showing a blank list.
+       *
+       * This does NOT modify or delete any database data.
+       */
+      if(records.length===0){
+        try{
+          const sr=await sb.from("medifella_sales").select("*");
+          if(!sr.error && Array.isArray(sr.data)){
+            const derived=[];
+            for(const sale of sr.data){
+              if(String(sale?.sale_type||"").trim().toUpperCase()!=="DERMED")continue;
+
+              const staffId=sale.sale_staff_id||"";
+              const staff=(Array.isArray(window.staffInfoRecords)?window.staffInfoRecords:[])
+                .find(x=>String(x.id)===String(staffId));
+              const cfg=typeof window.getCurrentSaleStaffConfig==="function"
+                ? window.getCurrentSaleStaffConfig(staffId)
+                : null;
+
+              let services=[];
+              try{
+                const raw=sale.service_items??sale.services??[];
+                services=typeof raw==="string"?JSON.parse(raw):raw;
+              }catch(_){services=[]}
+              if(!Array.isArray(services))services=[];
+
+              // Some Dermed records may store service lines inside items.
+              if(!services.length){
+                try{
+                  const raw=sale.items??[];
+                  const items=typeof raw==="string"?JSON.parse(raw):raw;
+                  if(Array.isArray(items)){
+                    services=items.filter(x=>{
+                      const t=String(x?.type||x?.service_type||"").toLowerCase();
+                      return t.includes("service");
+                    });
+                  }
+                }catch(_){}
+              }
+
+              const buyerName=sale.student_name||sale.customer_name||"";
+              const buyerPhone=sale.student_phone||sale.customer_phone||"";
+              const date=String(sale.sale_date||sale.created_at||todayC()).slice(0,10);
+
+              for(const x of services){
+                const type=serviceTypeLabel(x?.service_type||x?.type||"Only Service");
+                const unit=Math.max(1,Number(x?.quantity??x?.unit??1)||1);
+                const price=Math.max(0,Number(x?.price??x?.unit_price??0)||0);
+                const base=unit*price;
+                const discType=String(x?.discount_type||"percent").toLowerCase();
+                const discVal=Math.max(0,Number(x?.discount_value??0)||0);
+                const discount=discType==="usd"
+                  ?Math.min(base,discVal)
+                  :Math.min(base,base*discVal/100);
+                const subtotal=Math.max(0,Number(x?.subtotal??(base-discount))||0);
+
+                let rate=0;
+                if(cfg){
+                  rate=type==="Only Service"
+                    ?Number(cfg.service_rate||0)/100
+                    :type==="Service With Product"
+                      ?Number(cfg.service_product_rate||0)/100
+                      :0;
+                }
+
+                // Only include actual service lines with a positive subtotal.
+                if(subtotal<=0)continue;
+
+                derived.push({
+                  id:`derived-${sale.id}-${x.service_id||x.id||derived.length}`,
+                  commission_date:date,
+                  staff_id:staffId,
+                  staff_name:sale.sale_staff_name||staff?.name_en||staff?.name_kh||staff?.name_km||"",
+                  customer_id:sale.customer_id||sale.student_id||null,
+                  customer_name:buyerName,
+                  customer_phone:buyerPhone,
+                  service_type:type==="Service With Product"?"service_product":"service",
+                  service_detail:x.name||x.service_detail||"Service",
+                  service_id:x.service_id||x.id||null,
+                  unit,
+                  unit_price:price,
+                  discount,
+                  subtotal,
+                  commission_rate:rate,
+                  commission_amount:subtotal*rate,
+                  source:"dermed_derived",
+                  source_sale_id:sale.id,
+                  reference_no:sale.reference_no||""
+                });
+              }
+            }
+
+            if(derived.length)records=derived;
+          }
+        }catch(e){
+          console.warn("Could not derive commissions from Dermed sales:",e);
+        }
+      }
+
+      window.commissionRecords=records;
+
+      // Never leave an old filter/date selection hiding all records on load.
       if(C("commissionFilterStaff"))C("commissionFilterStaff").value="";
       if(C("commissionFromDate"))C("commissionFromDate").value="";
       if(C("commissionToDate"))C("commissionToDate").value="";
 
       renderCommissionList();
+
+      if(!records.length){
+        // Keep the UI informative rather than silently blank.
+        const note=C("commissionList");
+        if(note)note.insertAdjacentHTML("beforeend",
+          '<div class="status">No commission records were found in the commission table or existing Dermed sales.</div>');
+      }
     }catch(e){
       console.error("Commission load exception:",e);
       window.commissionRecords=[];
       box.innerHTML=`<div class="status error">Could not load Commission List: ${escC(e.message||e)}</div>`;
-      C("commissionGrandTotal").innerHTML="";
+      if(C("commissionGrandTotal"))C("commissionGrandTotal").innerHTML="";
     }
   }
-
 
   function filteredCommissionRecords(){
     const staff=C("commissionFilterStaff")?.value||"";
@@ -10862,64 +10963,66 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function renderCommissionList(){
- const box=C("commissionList");if(!box)return;
- try{
-   const rows=filteredCommissionRecords();
-   const groups=[],seen=new Set();
-   rows.forEach(x=>{
-     const key=commissionBatchKey(x);
-     if(seen.has(key))return;
-     seen.add(key);
-     groups.push({row:x,rows:rows.filter(y=>commissionBatchKey(y)===key)});
-   });
+    const box=C("commissionList");
+    if(!box)return;
 
-   const totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0);
-   const totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
+    try{
+      const rows=filteredCommissionRecords();
+      const totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0);
+      const totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
 
-   if(!rows.length){
-     box.innerHTML='<p class="muted">No commission records found.</p>';
-   }else{
-     box.innerHTML=`<div class="table-wrap"><table class="table">
-       <thead><tr>
-         <th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th>
-         <th>Services</th><th>Grand Subtotal</th><th>Grand Commission</th><th>Actions</th>
-       </tr></thead><tbody>
-       ${groups.map(g=>{
-         const s=commissionBatchSummary(g.rows),key=commissionBatchKey(g.row);
-         const date=s.date||g.row.commission_date||g.row.created_at||"";
-         const staff=s.staff||g.row.staff_name||"—";
-         const customer=s.customer||g.row.customer_name||"—";
-         const phone=s.phone||g.row.customer_phone||"—";
-         return `<tr>
-           <td>${escC(formatCommissionDate(date))}</td>
-           <td>${escC(staff)}</td>
-           <td>${escC(customer)}</td>
-           <td>${escC(phone)}</td>
-           <td><button type="button" class="light commission-view-btn" data-commission-view="${escC(key)}">View Details (${g.rows.length})</button></td>
-           <td>$${moneyC(s.subtotal)}</td>
-           <td>$${moneyC(s.commission)}</td>
-           <td><div class="actions">
-             <button type="button" class="light commission-edit-btn" data-commission-edit="${escC(key)}">Edit</button>
-             <button type="button" class="danger commission-delete-btn" data-commission-delete="${escC(key)}">Delete</button>
-           </div></td>
-         </tr>`;
-       }).join("")}
-       </tbody></table></div>`;
-   }
+      if(!rows.length){
+        box.innerHTML='<p class="muted">No commission records found.</p>';
+      }else{
+        // Show one row per commission line. This guarantees that every
+        // stored/derived commission record is visible.
+        box.innerHTML=`<div class="table-wrap"><table class="table">
+          <thead><tr>
+            <th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th>
+            <th>Service Type</th><th>Service Detail</th><th>Unit</th>
+            <th>Unit Price</th><th>Discount</th><th>Subtotal</th>
+            <th>Commission</th><th>Commission Amount</th><th>Actions</th>
+          </tr></thead><tbody>
+          ${rows.map((x,i)=>{
+            const key=commissionBatchKey(x);
+            return `<tr>
+              <td>${escC(formatCommissionDate(x.commission_date||x.created_at))}</td>
+              <td>${escC(x.staff_name||"—")}</td>
+              <td>${escC(x.customer_name||"—")}</td>
+              <td>${escC(x.customer_phone||"—")}</td>
+              <td>${escC(serviceTypeLabel(x.service_type==="service_product"?"Service With Product":"Only Service"))}</td>
+              <td>${escC(x.service_detail||"—")}</td>
+              <td>${escC(x.unit??1)}</td>
+              <td>$${moneyC(x.unit_price)}</td>
+              <td>$${moneyC(x.discount)}</td>
+              <td>$${moneyC(x.subtotal)}</td>
+              <td>${Number(x.commission_rate||0)*100}%</td>
+              <td>$${moneyC(x.commission_amount)}</td>
+              <td><div class="actions">
+                <button type="button" class="light commission-view-btn" data-commission-view="${escC(key)}">View</button>
+                ${String(x.source||"")!=="dermed_derived"
+                  ? `<button type="button" class="light commission-edit-btn" data-commission-edit="${escC(key)}">Edit</button>
+                     <button type="button" class="danger commission-delete-btn" data-commission-delete="${escC(key)}">Delete</button>`
+                  : `<span class="muted">From Dermed Sale</span>`}
+              </div></td>
+            </tr>`;
+          }).join("")}
+          </tbody></table></div>`;
+      }
 
-   C("commissionGrandTotal").innerHTML=
-     `<div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div>
-      <div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>`;
- }catch(e){
-   console.error("Commission render error:",e);
-   const rows=Array.isArray(window.commissionRecords)?window.commissionRecords:[];
-   box.innerHTML=rows.length
-     ?`<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Staff</th><th>Customer</th><th>Service</th><th>Subtotal</th><th>Commission</th></tr></thead><tbody>
-       ${rows.map(x=>`<tr><td>${escC(formatCommissionDate(x.commission_date||x.created_at))}</td><td>${escC(x.staff_name||"—")}</td><td>${escC(x.customer_name||"—")}</td><td>${escC(x.service_detail||"—")}</td><td>$${moneyC(x.subtotal)}</td><td>$${moneyC(x.commission_amount)}</td></tr>`).join("")}
-       </tbody></table></div>`
-     :`<div class="status error">Commission records could not be displayed: ${escC(e.message||e)}</div>`;
- }
-}
+      C("commissionGrandTotal").innerHTML=
+        `<div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div>
+         <div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>`;
+    }catch(e){
+      console.error("Commission render error:",e);
+      const rows=Array.isArray(window.commissionRecords)?window.commissionRecords:[];
+      box.innerHTML=rows.length
+        ?`<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Staff</th><th>Customer</th><th>Service</th><th>Subtotal</th><th>Commission</th></tr></thead><tbody>
+          ${rows.map(x=>`<tr><td>${escC(formatCommissionDate(x.commission_date||x.created_at))}</td><td>${escC(x.staff_name||"—")}</td><td>${escC(x.customer_name||"—")}</td><td>${escC(x.service_detail||"—")}</td><td>$${moneyC(x.subtotal)}</td><td>$${moneyC(x.commission_amount)}</td></tr>`).join("")}
+          </tbody></table></div>`
+        :`<div class="status error">Commission records could not be displayed: ${escC(e.message||e)}</div>`;
+    }
+  }
   async function insertCommissionRows(rows){
     /*
      * Write commission rows without SELECT/RETURNING. This matches the
