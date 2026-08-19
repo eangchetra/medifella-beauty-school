@@ -2284,6 +2284,10 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
       <input id="saleReference" placeholder="Auto-generate">
     </div>
     <div>
+      <label>Cashier *</label>
+      <select id="saleCashier" required><option value="">Select Cashier</option></select>
+    </div>
+    <div>
       <label>Sale Date &amp; Time — Phnom Penh, Cambodia *</label>
       <input id="saleDateDisplay" type="text" readonly
              placeholder="Automatically added"
@@ -4188,7 +4192,7 @@ function editSaleFromInvoice(id){
  $("salePaymentStatus").value=status;
  $("saleAmountPaidNow").value=paid.toFixed(2);
  $("salePaymentMethod").value="Cash";
- $("saleNote").value=saleField(s,["notes","note"],"")||"";
+ if($("saleCashier")) $("saleCashier").value=String(s.cashier_id||"")||String((staffInfoRecords||[]).find(x=>String(x.name_en||"")===String(s.cashier_name||""))?.id||""); $("saleNote").value=saleField(s,["notes","note"],"")||"";
 
  // Payment fields are locked while editing; Update Invoice keeps the
  // original paid amount and recalculates the new balance.
@@ -4209,7 +4213,7 @@ function resetSaleForm(){
  updateSaleDateTimeDisplay();$("saleReference").value=nextSaleReference();
  $("saleItems").innerHTML="";
  $("saleOverallDiscountType").value="percent";$("saleOverallDiscountValue").value="0";
- $("salePaymentMethod").value="Cash";$("salePaymentStatus").value="Due";$("saleAmountPaidNow").value="0.00";
+ $("salePaymentMethod").value="Cash";if($("saleCashier"))$("saleCashier").value="";$("salePaymentStatus").value="Due";$("saleAmountPaidNow").value="0.00";
  $("saleAmountPaidNow").readOnly=true;$("saleAmountPaidNow").style.background="#f3f7f7";
  $("saleNote").value="";clearMsg($("newSaleStatus"));renderSaleStudentOptions();updateSaleTotals();
 }
@@ -5096,7 +5100,7 @@ async function saveMediFellaSale(){
      return;
    }
 
-   const isEdit=!!editingSaleId;
+   const isEdit=!!editingSaleId; const cashierId=String($("saleCashier")?.value||"").trim(); if(!cashierId){ msg($("newSaleStatus"),"Please select a Cashier before saving the sale.",true); return; } const cashier=(staffInfoRecords||[]).find(x=>String(x.id)===cashierId);
    const saleDateTime=String($("saleDate")?.value||"").trim();
    if(!saleDateTime){
      msg($("newSaleStatus"),"Sale Date & Time is required.",true);
@@ -5171,6 +5175,7 @@ async function saveMediFellaSale(){
      student_id:String(student.id),
      student_name:student.full_name||"",
      student_phone:student.phone||"",
+     cashier_id:cashierId, cashier_name:cashier?.name_en||cashier?.name_kh||cashier?.name||"",
      subtotal,
      discount,
      shipping:0,
@@ -6363,7 +6368,7 @@ function renderInventoryControls(){
    if(oldValue && eligibleStaff.some(x=>String(x.id)===String(oldValue))) el.value=oldValue;
  });
 
- ["mtsCashier","dermedCashier"].forEach(id=>{
+ ["saleCashier","mtsCashier","dermedCashier"].forEach(id=>{
    const el=$(id);
    if(!el)return;
    const oldValue=el.value;
