@@ -3329,14 +3329,13 @@ sb.auth.onAuthStateChange(async (event)=>{
     const account=await getCurrentAccount();
     if(account){
       adminUser=account.user;currentProfile=account.profile;applyAccountPermissions();
-      if(typeof loadCommissionRecords==='function')setTimeout(()=>loadCommissionRecords(),100);
+      if(typeof loadCommissionRecords==='function')setTimeout(()=>loadCommissionRecords(),500);
     }
   }
 });
 async function refreshAll(){
  await Promise.all([loadStudents(),loadCertificates(),loadCourses(),loadPosts(),loadStaff(),loadSales(),
-   loadProducts(),loadStockMovements(),loadStaffInfo(),loadCustomers(),loadServices(),
-   loadCommissionRecords()]);
+   loadProducts(),loadStockMovements(),loadStaffInfo(),loadCustomers(),loadServices()]);
  renderInventoryControls(); renderBuyerControls(); renderServiceControls(); updateMetrics();
 }
 
@@ -10854,102 +10853,58 @@ function addCommissionServiceFromSearchResult(key){
   let __commissionLoadSeq = 0;
 let __commissionLoadedOnce = false;
 
+let __commissionLoadSeq=0;
+
 async function loadCommissionRecords(retry=0){
   const box=C("commissionList");
   if(!box)return;
 
-  const mySeq=++__commissionLoadSeq;
-
-  // On a fresh page the Supabase client exists before the Auth session is
-  // restored. Wait for the session instead of querying the commission table
-  // too early. This is the main reason the list could remain on "Loading".
-  try{
-    let session=null;
-    try{
-      const sr=await sb.auth.getSession();
-      session=sr?.data?.session||null;
-    }catch(_){}
-
-    if(!session){
-      if(retry<12){
-        box.innerHTML='<p class="muted">Connecting to commission database...</p>';
-        setTimeout(()=>loadCommissionRecords(retry+1),500);
-      }else{
-        box.innerHTML='<div class="status error">Your login session is not ready. Please refresh once more or log in again.</div>';
-      }
-      return;
-    }
-  }catch(e){
-    if(retry<12){
-      box.innerHTML='<p class="muted">Connecting to commission database...</p>';
-      setTimeout(()=>loadCommissionRecords(retry+1),500);
-      return;
-    }
-    box.innerHTML=`<div class="status error">${escC(e?.message||"Could not connect to Supabase.")}</div>`;
-    return;
-  }
-
-  // If another newer request already started, don't let this older request
-  // overwrite the newer result with a stale Loading/error state.
-  if(mySeq!==__commissionLoadSeq)return;
-
+  const seq=++__commissionLoadSeq;
   box.innerHTML='<p class="muted">Loading Commission List...</p>';
 
   try{
-    let result=null;
-    let lastError=null;
+    // Query the commission table directly. Do NOT wait on auth.getSession()
+    // here because Safari can leave that promise pending during a hard refresh.
+    if(typeof sb==="undefined"||!sb){
+      throw new Error("Supabase client is not ready yet.");
+    }
 
-    // Some older versions of the commission table do not have created_at.
-    // Therefore never make created_at mandatory for loading the list.
+    let result=null,lastError=null;
+
+    // No required created_at column. Try the simplest query first.
     const queries=[
-      ()=>sb.from("medifella_sale_commissions").select("*").order("created_at",{ascending:false}),
-      ()=>sb.from("medifella_sale_commissions").select("*").order("commission_date",{ascending:false}),
-      ()=>sb.from("medifella_sale_commissions").select("*")
+      ()=>sb.from("medifella_sale_commissions").select("*"),
+      ()=>sb.from("medifella_sale_commissions").select("*").order("commission_date",{ascending:false})
     ];
 
     for(const makeRequest of queries){
       try{
         const request=makeRequest();
         const timeout=new Promise((_,reject)=>setTimeout(
-          ()=>reject(new Error("Commission List request timed out.")),8000
+          ()=>reject(new Error("Commission database request timed out after 6 seconds.")),6000
         ));
         const r=await Promise.race([request,timeout]);
-        if(r && !r.error){
-          result=r;
-          break;
-        }
-        lastError=r?.error||new Error("No response from Supabase.");
-      }catch(err){
-        lastError=err;
-      }
+        if(r && !r.error){result=r;break;}
+        lastError=r?.error||new Error("Commission database returned no data.");
+      }catch(err){lastError=err;}
     }
 
-    if(mySeq!==__commissionLoadSeq)return;
-    if(!result){
-      throw lastError||new Error("Could not load the commission records.");
-    }
+    if(seq!==__commissionLoadSeq)return;
+    if(!result)throw lastError||new Error("Could not load commission records.");
 
     const raw=Array.isArray(result.data)?result.data:[];
 
-    // Sort locally so this works regardless of which fallback query above
-    // succeeded and regardless of whether created_at exists.
+    // Newest commission first. created_at is preferred but not required.
     raw.sort((a,b)=>{
       const ta=Date.parse(a?.created_at||a?.updated_at||a?.commission_date||"")||0;
       const tb=Date.parse(b?.created_at||b?.updated_at||b?.commission_date||"")||0;
       if(tb!==ta)return tb-ta;
-
-      const ia=String(a?.id??"");
-      const ib=String(b?.id??"");
-      if(ia&&ib&&ia!==ib){
-        const na=Number(ia),nb=Number(ib);
-        if(Number.isFinite(na)&&Number.isFinite(nb))return nb-na;
-        return ib.localeCompare(ia);
-      }
+      const ia=Number(a?.id),ib=Number(b?.id);
+      if(Number.isFinite(ia)&&Number.isFinite(ib))return ib-ia;
       return 0;
     });
 
-    // Keep all old and new commission rows. Remove only exact duplicate rows
-    // that may have been loaded twice by an earlier save/refresh race.
+    // Keep all legitimate rows; remove only exact duplicate rows.
     const seen=new Set();
     window.commissionRecords=raw.filter(x=>{
       const key=JSON.stringify([
@@ -10974,23 +10929,21 @@ async function loadCommissionRecords(retry=0){
       return true;
     });
 
-    if(mySeq!==__commissionLoadSeq)return;
+    if(seq!==__commissionLoadSeq)return;
 
-    __commissionLoadedOnce=true;
     renderCommissionList();
 
     if(!raw.length){
       box.innerHTML='<p class="muted">No commission records found in the Supabase commission table.</p>';
     }
-  }catch(e){
-    console.error("Commission List load error:",e);
+  }catch(err){
+    console.error("Commission List load error:",err);
 
-    if(mySeq!==__commissionLoadSeq)return;
+    if(seq!==__commissionLoadSeq)return;
 
-    // Retry a few times on a fresh page because the Auth token/RLS context
-    // can become ready just after the first database request.
-    if(retry<4){
-      box.innerHTML='<p class="muted">Loading Commission List...</p>';
+    if(retry<8){
+      // Wait for the Supabase client/session to finish initializing, then
+      // perform a completely new query.
       setTimeout(()=>loadCommissionRecords(retry+1),700);
       return;
     }
@@ -10998,7 +10951,7 @@ async function loadCommissionRecords(retry=0){
     window.commissionRecords=[];
     box.innerHTML=`<div class="status error">
       <strong>Commission List could not load.</strong><br>
-      ${escC(e?.message||e)}
+      ${escC(err?.message||err)}
     </div>`;
     const gt=C("commissionGrandTotal");
     if(gt)gt.innerHTML="";
@@ -11580,10 +11533,9 @@ async function loadCommissionRecords(retry=0){
     C("commissionExcel")?.addEventListener("click",exportCommissionExcel);
 
     renderCommissionItems();
-    loadCommissionRecords();
-    // One safety retry only; loadCommissionRecords() itself prevents stale
-    // requests from overwriting a newer successful result.
-    setTimeout(()=>loadCommissionRecords(),1500);
+    // Do not block Commission Management initialization. A delayed load gives
+    // the existing Supabase client time to finish initialization after refresh.
+    setTimeout(()=>loadCommissionRecords(),1200);
   }
 
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bindCommission,{once:true});
