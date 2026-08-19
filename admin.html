@@ -10703,13 +10703,8 @@ document.addEventListener("DOMContentLoaded",function(){
 
   async function loadCommissionRecords(retry=0){
     const box=C("commissionList");
-    window.__commissionLoadToken=(window.__commissionLoadToken||0)+1;
-    const loadToken=window.__commissionLoadToken;
     if(!box)return;
 
-    // The commission section can be opened immediately after login. If the
-    // Supabase client/session is not ready yet, retry instead of leaving the
-    // screen permanently stuck on "Loading...".
     if(typeof sb==="undefined" || !sb){
       if(retry<10){
         box.innerHTML='<p class="muted">Connecting to the commission database...</p>';
@@ -10723,58 +10718,40 @@ document.addEventListener("DOMContentLoaded",function(){
     box.innerHTML='<p class="muted">Loading commission records...</p>';
 
     try{
-      let r=await sb.from("medifella_sale_commissions")
-        .select("*")
-        .order("commission_date",{ascending:false})
-        .order("created_at",{ascending:false});
-
-      // If an older table/schema does not support one of the ordering
-      // columns, retry with a simpler query. This does not change any data.
-      if(r.error){
-        console.warn("Commission ordered query:",r.error.message);
-        r=await sb.from("medifella_sale_commissions").select("*");
-      }
+      // IMPORTANT: read every row first. Do not let duplicate filtering or
+      // date/staff filters make the Commission List appear empty.
+      let r=await sb.from("medifella_sale_commissions").select("*");
 
       if(r.error){
-        console.error("Commission table read:",r.error);
-        window.commissionRecords=[];
+        console.error("Commission SELECT error:",r.error);
         box.innerHTML=`<div class="status error">
-          Could not read the old commission records from Supabase.<br>
-          <strong>${escC(r.error.message||"Unknown database error")}</strong>
-          <div class="muted" style="margin-top:6px">
-            If the message says "row-level security policy", the table needs a
-            SELECT policy for authenticated users. No commission records were deleted.
-          </div>
+          Could not load Commission List.<br>
+          <strong>${escC(r.error.message||"Database read error")}</strong>
         </div>`;
+        window.commissionRecords=[];
         C("commissionGrandTotal").innerHTML="";
         return;
       }
 
-      if(loadToken!==window.__commissionLoadToken)return;
       const raw=Array.isArray(r.data)?r.data:[];
-      // Keep the Commission List visible, but remove duplicate commission rows.
-      // Do not use database id because duplicate saves can have different ids.
-      const seenCommission=new Set();
-      window.commissionRecords=raw.filter(x=>{
-        const key=JSON.stringify([
-          x.source_sale_id||"",x.commission_date||"",x.staff_id||"",
-          x.customer_id||"",x.customer_name||"",x.customer_phone||"",
-          x.service_id||"",x.service_detail||"",x.service_type||"",
-          x.unit||"",x.unit_price||"",x.discount||"",x.subtotal||"",
-          x.commission_rate||"",x.commission_amount||"",x.source||""
-        ]);
-        if(seenCommission.has(key))return false;
-        seenCommission.add(key);
-        return true;
-      });
+      // Keep all actual rows in memory. The visible list removes duplicate
+      // commission rows by batch/sale key, not by hiding the entire list.
+      window.commissionRecords=raw;
+
+      // Clear any stale staff/date filters so the full old list is visible.
+      if(C("commissionFilterStaff"))C("commissionFilterStaff").value="";
+      if(C("commissionFromDate"))C("commissionFromDate").value="";
+      if(C("commissionToDate"))C("commissionToDate").value="";
+
       renderCommissionList();
     }catch(e){
-      console.error("Commission table read exception:",e);
+      console.error("Commission load exception:",e);
       window.commissionRecords=[];
-      box.innerHTML=`<div class="status error">Could not load commission records: ${escC(e.message||e)}</div>`;
+      box.innerHTML=`<div class="status error">Could not load Commission List: ${escC(e.message||e)}</div>`;
       C("commissionGrandTotal").innerHTML="";
     }
   }
+
 
   function filteredCommissionRecords(){
     const staff=C("commissionFilterStaff")?.value||"";
@@ -10797,9 +10774,12 @@ document.addEventListener("DOMContentLoaded",function(){
   function commissionBatchKey(x){
     if(x?.source_sale_id)return `sale:${x.source_sale_id}`;
     if(x?.reference_no)return `ref:${x.reference_no}`;
-    if(x?.created_at)return `manual:${x.created_at}`;
-    return `row:${x?.id??""}`;
+    const d=String(x?.commission_date||x?.created_at||"").slice(0,10);
+    const staff=String(x?.staff_id||x?.staff_name||"");
+    const customer=String(x?.customer_id||x?.customer_name||x?.customer_phone||"");
+    return `manual:${d}|${staff}|${customer}`;
   }
+
   function commissionBatchRows(row){
     const key=commissionBatchKey(row);
     return (window.commissionRecords||[]).filter(x=>commissionBatchKey(x)===key);
@@ -10883,14 +10863,62 @@ document.addEventListener("DOMContentLoaded",function(){
 
   function renderCommissionList(){
  const box=C("commissionList");if(!box)return;
- const rows=filteredCommissionRecords();
- const groups=[],seen=new Set();
- rows.forEach(x=>{const key=commissionBatchKey(x);if(seen.has(key))return;seen.add(key);groups.push({row:x,rows:rows.filter(y=>commissionBatchKey(y)===key)});});
- const totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0),totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
- box.innerHTML=groups.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th><th>Services</th><th>Grand Subtotal</th><th>Grand Commission</th><th>Actions</th></tr></thead><tbody>
- ${groups.map(g=>{const s=commissionBatchSummary(g.rows),key=commissionBatchKey(g.row);return `<tr><td>${escC(formatCommissionDate(s.date))}</td><td>${escC(s.staff||g.row.staff_name||"—")}</td><td>${escC(s.customer||g.row.customer_name||"—")}</td><td>${escC(s.phone||g.row.customer_phone||"—")}</td><td><button type="button" class="light commission-view-btn" data-commission-view="${escC(key)}">View Details (${s.count||g.rows.length})</button></td><td>$${moneyC(s.subtotal)}</td><td>$${moneyC(s.commission)}</td><td><div class="actions"><button type="button" class="light commission-edit-btn" data-commission-edit="${escC(key)}">Edit</button><button type="button" class="danger commission-delete-btn" data-commission-delete="${escC(key)}">Delete</button></div></td></tr>`}).join("")}
- </tbody></table></div>`:'<p class="muted">No commission records found.</p>';
- C("commissionGrandTotal").innerHTML=`<div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div><div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>`;
+ try{
+   const rows=filteredCommissionRecords();
+   const groups=[],seen=new Set();
+   rows.forEach(x=>{
+     const key=commissionBatchKey(x);
+     if(seen.has(key))return;
+     seen.add(key);
+     groups.push({row:x,rows:rows.filter(y=>commissionBatchKey(y)===key)});
+   });
+
+   const totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0);
+   const totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
+
+   if(!rows.length){
+     box.innerHTML='<p class="muted">No commission records found.</p>';
+   }else{
+     box.innerHTML=`<div class="table-wrap"><table class="table">
+       <thead><tr>
+         <th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th>
+         <th>Services</th><th>Grand Subtotal</th><th>Grand Commission</th><th>Actions</th>
+       </tr></thead><tbody>
+       ${groups.map(g=>{
+         const s=commissionBatchSummary(g.rows),key=commissionBatchKey(g.row);
+         const date=s.date||g.row.commission_date||g.row.created_at||"";
+         const staff=s.staff||g.row.staff_name||"—";
+         const customer=s.customer||g.row.customer_name||"—";
+         const phone=s.phone||g.row.customer_phone||"—";
+         return `<tr>
+           <td>${escC(formatCommissionDate(date))}</td>
+           <td>${escC(staff)}</td>
+           <td>${escC(customer)}</td>
+           <td>${escC(phone)}</td>
+           <td><button type="button" class="light commission-view-btn" data-commission-view="${escC(key)}">View Details (${g.rows.length})</button></td>
+           <td>$${moneyC(s.subtotal)}</td>
+           <td>$${moneyC(s.commission)}</td>
+           <td><div class="actions">
+             <button type="button" class="light commission-edit-btn" data-commission-edit="${escC(key)}">Edit</button>
+             <button type="button" class="danger commission-delete-btn" data-commission-delete="${escC(key)}">Delete</button>
+           </div></td>
+         </tr>`;
+       }).join("")}
+       </tbody></table></div>`;
+   }
+
+   C("commissionGrandTotal").innerHTML=
+     `<div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div>
+      <div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>`;
+ }catch(e){
+   console.error("Commission render error:",e);
+   const rows=Array.isArray(window.commissionRecords)?window.commissionRecords:[];
+   box.innerHTML=rows.length
+     ?`<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Staff</th><th>Customer</th><th>Service</th><th>Subtotal</th><th>Commission</th></tr></thead><tbody>
+       ${rows.map(x=>`<tr><td>${escC(formatCommissionDate(x.commission_date||x.created_at))}</td><td>${escC(x.staff_name||"—")}</td><td>${escC(x.customer_name||"—")}</td><td>${escC(x.service_detail||"—")}</td><td>$${moneyC(x.subtotal)}</td><td>$${moneyC(x.commission_amount)}</td></tr>`).join("")}
+       </tbody></table></div>`
+     :`<div class="status error">Commission records could not be displayed: ${escC(e.message||e)}</div>`;
+ }
 }
   async function insertCommissionRows(rows){
     /*
