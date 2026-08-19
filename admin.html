@@ -4272,6 +4272,40 @@ function formatSaleItems(v){
  return String(v);
 }
 
+
+function showSaleItemsDetails(id){
+ const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
+ let items=saleItemsValue(s)||[],services=s.service_items||[];
+ if(typeof items==="string"){try{items=JSON.parse(items)}catch(e){items=[]}}
+ if(typeof services==="string"){try{services=JSON.parse(services)}catch(e){services=[]}}
+ if(!Array.isArray(items))items=[];if(!Array.isArray(services))services=[];
+ const all=[...items.map(x=>({...x,_kind:"Product"})),...services.map(x=>({...x,_kind:"Service"}))];
+ let o=$("saleItemsDetailsOverlay");
+ if(!o){o=document.createElement("div");o.id="saleItemsDetailsOverlay";o.className="commission-modal-overlay";document.body.appendChild(o);}
+ o.innerHTML=`<div class="commission-modal">
+ <div class="commission-modal-head"><div><h2 style="margin:0">Sale Items Details</h2><div class="muted">${esc(saleRef(s)||"")} · ${esc(saleCustomer(s)||"")}</div></div><button type="button" class="light" onclick="$('saleItemsDetailsOverlay')?.classList.remove('show')">×</button></div>
+ <div class="table-wrap"><table class="table"><thead><tr><th>Type</th><th>Item / Service</th><th>Unit</th><th>Unit Price</th><th>Discount</th><th>Subtotal</th></tr></thead><tbody>
+ ${all.length?all.map(x=>{const qty=Number(x.quantity??x.unit??1)||1,price=Number(x.price??x.unit_price??0)||0,discount=Number(x.discount??x.discount_value??0)||0,subtotal=Number(x.subtotal??(price*qty-discount))||0;return `<tr><td>${esc(x._kind)}</td><td>${esc(x.name||x.service_name||x.title||x.service_detail||"—")}</td><td>${esc(qty)}</td><td>${money(price)}</td><td>${money(discount)}</td><td>${money(subtotal)}</td></tr>`}).join(""):`<tr><td colspan="6" class="muted">No item details found.</td></tr>`}
+ </tbody></table></div></div>`;
+ o.classList.add("show");
+}
+
+async function showSalePaymentDetails(id){
+ const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
+ let payments=[];
+ try{const r=await sb.from("medifella_sale_payments").select("*").eq("sale_id",String(id)).order("created_at",{ascending:false});if(!r.error)payments=Array.isArray(r.data)?r.data:[]}catch(e){}
+ const total=saleTotal(s),paid=salePaid(s),due=Math.max(0,total-paid);
+ let o=$("salePaymentDetailsOverlay");
+ if(!o){o=document.createElement("div");o.id="salePaymentDetailsOverlay";o.className="commission-modal-overlay";document.body.appendChild(o);}
+ o.innerHTML=`<div class="commission-modal">
+ <div class="commission-modal-head"><div><h2 style="margin:0">Payment Details</h2><div class="muted">${esc(saleRef(s)||"")} · ${esc(saleCustomer(s)||"")}</div></div><button type="button" class="light" onclick="$('salePaymentDetailsOverlay')?.classList.remove('show')">×</button></div>
+ <div class="commission-detail-info"><div><strong>Total:</strong> ${money(total)}</div><div><strong>Paid:</strong> ${money(paid)}</div><div><strong>Due:</strong> ${money(due)}</div></div>
+ <div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Amount</th><th>Payment Method</th><th>Note</th></tr></thead><tbody>
+ ${payments.length?payments.map(p=>`<tr><td>${esc(String(p.payment_date||p.created_at||"").slice(0,10))}</td><td>${money(Number(p.amount||0))}</td><td>${esc(p.payment_method||"—")}</td><td>${esc(p.note||"")}</td></tr>`).join(""):`<tr><td colspan="4" class="muted">No payment history found.</td></tr>`}
+ </tbody></table></div></div>`;
+ o.classList.add("show");
+}
+
 function renderSales(){
  const q=$("salesSearch").value.trim().toLowerCase(),f=$("salesPaymentFilter").value;
  const rows=salesRecords.filter(s=>{
@@ -4288,7 +4322,7 @@ function renderSales(){
  $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date / Time</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{
    const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
    const dt=saleDateValue(s),time=saleField(s,["sale_time","time"],"");
-   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td>${esc(formatSaleItems(saleItemsValue(s)))}</td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button>${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
+   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td><button class="light" type="button" onclick="showSaleItemsDetails('${attr(s.id)}');return false;">View Details</button></td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button><button class="light" type="button" onclick="showSalePaymentDetails('${attr(s.id)}');return false;">View Payment</button>${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
  }).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
  updateSalesMetrics();
 }
@@ -6808,13 +6842,13 @@ function renderMtsSales(){
      <td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td>
      <td><strong>${esc(saleRef(x)||"—")}</strong></td>
      <td>${esc(saleCustomer(x)||"—")}<div class="muted">${esc(saleField(x,["student_phone","phone"],""))}</div></td>
-     <td>${esc(formatSaleItems(saleItemsValue(x)))}</td>
+     <td><button class="light" type="button" onclick="showSaleItemsDetails('${attr(x.id)}');return false;">View Details</button></td>
      <td>${money(total)}</td>
      <td>${money(paid)}</td>
      <td>${money(bal)}</td>
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
-       <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button><button class="light" type="button" onclick="showSalePaymentDetails('${attr(x.id)}');return false;">View Payment</button>
        ${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -6877,13 +6911,13 @@ function renderDermedSales(){
      <td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td>
      <td><strong>${esc(x.reference_no||"—")}</strong></td>
      <td>${esc(x.student_name||"—")}<div class="muted">${esc(x.student_phone||"")}</div></td>
-     <td>${esc(items||"—")}</td>
+     <td><button class="light" type="button" onclick="showSaleItemsDetails('${attr(x.id)}');return false;">View Details</button></td>
      <td>${money(total)}</td>
      <td>${money(paid)}</td>
      <td>${money(bal)}</td>
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
-       <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button><button class="light" type="button" onclick="showSalePaymentDetails('${attr(x.id)}');return false;">View Payment</button>
        ${bal>0.005?`<button class="gold" type="button" onclick="recordDermedSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -10848,16 +10882,16 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function renderCommissionList(){
-    const box=C("commissionList");if(!box)return;
-    const rows=filteredCommissionRecords(), totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0), totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
-    const groups=[],seen=new Set();
-    rows.forEach(x=>{const key=commissionBatchKey(x);if(seen.has(key))return;seen.add(key);groups.push({row:x,rows:rows.filter(y=>commissionBatchKey(y)===key)});});
-    box.innerHTML=groups.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th><th>Services</th><th>Grand Subtotal</th><th>Grand Commission</th><th>Actions</th></tr></thead><tbody>
-      ${groups.map(g=>{const s=commissionBatchSummary(g.rows),key=commissionBatchKey(g.row);return `<tr><td>${escC(formatCommissionDate(s.date))}</td><td>${escC(s.staff)}</td><td>${escC(s.customer)}</td><td>${escC(s.phone)}</td><td><button type="button" class="light commission-view-btn" data-commission-view="${escC(key)}">View Details (${s.count})</button></td><td>$${moneyC(s.subtotal)}</td><td>$${moneyC(s.commission)}</td><td><div class="actions"><button type="button" class="light commission-edit-btn" data-commission-edit="${escC(key)}">Edit</button><button type="button" class="danger commission-delete-btn" data-commission-delete="${escC(key)}">Delete</button></div></td></tr>`;}).join("")}
-    </tbody></table></div>`:'<p class="muted">No commission records found.</p>';
-    C("commissionGrandTotal").innerHTML=`<div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div><div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>`;
-  }
-
+ const box=C("commissionList");if(!box)return;
+ const rows=filteredCommissionRecords();
+ const groups=[],seen=new Set();
+ rows.forEach(x=>{const key=commissionBatchKey(x);if(seen.has(key))return;seen.add(key);groups.push({row:x,rows:rows.filter(y=>commissionBatchKey(y)===key)});});
+ const totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0),totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
+ box.innerHTML=groups.length?`<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th><th>Services</th><th>Grand Subtotal</th><th>Grand Commission</th><th>Actions</th></tr></thead><tbody>
+ ${groups.map(g=>{const s=commissionBatchSummary(g.rows),key=commissionBatchKey(g.row);return `<tr><td>${escC(formatCommissionDate(s.date))}</td><td>${escC(s.staff||g.row.staff_name||"—")}</td><td>${escC(s.customer||g.row.customer_name||"—")}</td><td>${escC(s.phone||g.row.customer_phone||"—")}</td><td><button type="button" class="light commission-view-btn" data-commission-view="${escC(key)}">View Details (${s.count||g.rows.length})</button></td><td>$${moneyC(s.subtotal)}</td><td>$${moneyC(s.commission)}</td><td><div class="actions"><button type="button" class="light commission-edit-btn" data-commission-edit="${escC(key)}">Edit</button><button type="button" class="danger commission-delete-btn" data-commission-delete="${escC(key)}">Delete</button></div></td></tr>`}).join("")}
+ </tbody></table></div>`:'<p class="muted">No commission records found.</p>';
+ C("commissionGrandTotal").innerHTML=`<div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div><div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>`;
+}
   async function insertCommissionRows(rows){
     /*
      * Write commission rows without SELECT/RETURNING. This matches the
