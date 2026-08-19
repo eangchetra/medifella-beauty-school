@@ -10804,54 +10804,91 @@ function addCommissionServiceFromSearchResult(key){
   }
 
   async function loadCommissionRecords(retry=0){
-  const box=C("commissionList");if(!box)return;
+  const box=C("commissionList");
+  if(!box)return;
+
+  // Wait for the already-created Supabase client, but never forever.
   if(typeof sb==="undefined"||!sb){
-    if(retry<10){
+    if(retry<12){
       box.innerHTML='<p class="muted">Connecting to commission database...</p>';
       setTimeout(()=>loadCommissionRecords(retry+1),500);
     }else{
-      box.innerHTML='<div class="status error">Commission database is not ready. Please refresh.</div>';
+      box.innerHTML='<div class="status error">Supabase is not connected. Please refresh and try again.</div>';
     }
     return;
   }
 
   box.innerHTML='<p class="muted">Loading Commission List...</p>';
+
   try{
-    const r=await sb.from("medifella_sale_commissions").select("*");
-    if(r.error)throw r.error;
+    const request=sb.from("medifella_sale_commissions").select("*").order("commission_date",{ascending:false});
+    const timeout=new Promise((_,reject)=>setTimeout(
+      ()=>reject(new Error("Commission List request timed out after 5 seconds.")),5000
+    ));
+    const result=await Promise.race([request,timeout]);
 
-    const raw=Array.isArray(r.data)?r.data:[];
+    if(!result || result.error)throw (result?.error||new Error("No response from Supabase."));
+    const raw=Array.isArray(result.data)?result.data:[];
+
+    // Keep BOTH manual (+ Add Sale Commission) and automatic Dermed rows.
+    // Remove only exact duplicates; different service rows remain available
+    // to the batch "View" details.
     const seen=new Set();
-
-    // Manual rows (+ Add Sale Commission) and automatic Dermed rows are
-    // both stored here and displayed together.
     window.commissionRecords=raw.filter(x=>{
       const key=JSON.stringify([
-        x.source_sale_id||"",x.source||"manual",x.commission_date||"",
-        x.staff_id||"",x.customer_id||x.student_id||"",x.service_id||"",
-        x.service_detail||"",x.service_type||"",x.unit||1,x.unit_price||0,
-        x.discount||0,x.subtotal||0,x.commission_rate||0,x.commission_amount||0
+        x.id??"",
+        x.source_sale_id??"",
+        x.source??"manual",
+        x.commission_date??"",
+        x.staff_id??"",
+        x.customer_id??x.student_id??"",
+        x.service_id??"",
+        x.service_detail??"",
+        x.service_type??"",
+        x.unit??1,
+        x.unit_price??0,
+        x.discount??0,
+        x.subtotal??0,
+        x.commission_rate??0,
+        x.commission_amount??0
       ]);
       if(seen.has(key))return false;
       seen.add(key);
       return true;
     });
 
+    // If rows exist, render them immediately. If empty, say so clearly.
     renderCommissionList();
+
+    if(!raw.length){
+      box.innerHTML='<p class="muted">No commission records found in the Supabase commission table.</p>';
+    }
   }catch(e){
     console.error("Commission List load error:",e);
     window.commissionRecords=[];
-    box.innerHTML=`<div class="status error">Could not load Commission List: ${escC(e.message||e)}</div>`;
-    C("commissionGrandTotal").innerHTML="";
+    box.innerHTML=`<div class="status error">
+      <strong>Commission List could not load.</strong><br>${escC(e?.message||e)}
+    </div>`;
+    const gt=C("commissionGrandTotal");
+    if(gt)gt.innerHTML="";
   }
 }
 
   function filteredCommissionRecords(){
     const staff=C("commissionFilterStaff")?.value||"";
-    const from=C("commissionFromDate")?.value||"";
-    const to=C("commissionToDate")?.value||"";
+    const fromRaw=C("commissionFromDate")?.value||"";
+    const toRaw=C("commissionToDate")?.value||"";
+    const normDate=v=>{
+      const s=String(v||"").trim();
+      let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+      if(m)return `${m[1]}-${m[2]}-${m[3]}`;
+      m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})/);
+      if(m)return `${m[3]}-${m[2]}-${m[1]}`;
+      return s.slice(0,10);
+    };
+    const from=normDate(fromRaw),to=normDate(toRaw);
     return (window.commissionRecords||[]).filter(x=>{
-      const d=String(x.commission_date||x.created_at||"").slice(0,10);
+      const d=normDate(x.commission_date||x.created_at||"");
       return (!staff||String(x.staff_id)===String(staff))
         &&(!from||d>=from)&&(!to||d<=to);
     });
