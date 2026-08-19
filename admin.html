@@ -13885,9 +13885,9 @@ document.addEventListener("DOMContentLoaded",function(){
       if(!sale)return;
       const id=String(sale.id);
       const itemCell=cells[3];
-      if(itemCell && !itemCell.querySelector('.sale-item-view-v10')){
-        const b=document.createElement('button');b.type='button';b.className='light sale-item-view-v10';b.textContent='View';b.dataset.saleId=id;b.style.cssText='margin-top:5px;padding:4px 9px;font-size:12px';b.onclick=()=>showSaleItemDetails(id);itemCell.appendChild(b);
-      }
+      /* Product / Service View is already rendered by the sale-list
+         renderer using data-instant-item-v15. Do not add a second View
+         button here. The old v10 button was the non-working duplicate. */
       const actionCell=cells[cells.length-1];
       if(actionCell && !actionCell.querySelector('.sale-payment-history-v10')){
         const b=document.createElement('button');b.type='button';b.className='light sale-payment-history-v10';b.textContent='View Payment';b.dataset.saleId=id;b.style.cssText='margin-left:4px';b.onclick=()=>showSalePayments(id);actionCell.querySelector('.actions')?.prepend(b);
