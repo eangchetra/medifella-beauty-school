@@ -3419,45 +3419,16 @@ $("newStudentPhoto").onchange=()=>{
 function setupStudentDobInput(){
   const el=$("newStudentDob");
   if(!el)return;
-
   el.addEventListener("input",function(){
-    const raw=this.value||"";
-    const digits=raw.replace(/\D/g,"").slice(0,8);
-
-    let d=digits.slice(0,2);
-    let m=digits.slice(2,4);
-    const y=digits.slice(4,8);
-
-    // Day: only 01-31. Reject a second digit that would make it >31.
-    if(d.length===2 && (Number(d)<1 || Number(d)>31)){
-      d=d.slice(0,1);
-    }
-
-    // Month: only 01-12. Reject a second digit that would make it >12.
-    if(m.length===2 && (Number(m)<1 || Number(m)>12)){
-      m=m.slice(0,1);
-    }
-
-    let value=d;
-    if(d.length===2){
-      value+="/"+m;
-      if(m.length===2)value+="/"+y;
-    }else if(d.length===1 && digits.length>1){
-      value=d;
-    }
-
-    this.value=value;
-  });
-
-  // Prevent characters other than digits and the separators.
-  el.addEventListener("keydown",function(e){
-    const allowed=["Backspace","Delete","ArrowLeft","ArrowRight","Tab","Home","End"];
-    if(allowed.includes(e.key))return;
-    if(e.key==="/")return;
-    if(!/^\d$/.test(e.key))e.preventDefault();
+    let digits=String(this.value||"").replace(/\D/g,"").slice(0,8);
+    let d=digits.slice(0,2), m=digits.slice(2,4), y=digits.slice(4,8);
+    if(d.length===2 && (Number(d)<1 || Number(d)>31)) d=d.slice(0,1);
+    if(m.length===2 && (Number(m)<1 || Number(m)>12)) m=m.slice(0,1);
+    let v=d;
+    if(d.length===2){ v+="/"+m; if(m.length===2)v+="/"+y; }
+    this.value=v;
   });
 }
-
 setupStudentDobInput();
 
 function studentDobToIso(value){
@@ -3496,7 +3467,7 @@ $("saveNewStudent").onclick=async()=>{
     msg($("newStudentStatus"),"Please fill all required fields: English Name, Khmer Name, Phone Number, Gender, and Date of Birth.",true);return;
   }
   if(!/^\d{2}\/\d{2}\/\d{4}$/.test(dobInput) || !dob){
-    msg($("newStudentStatus"),"Date of Birth must be entered as DD/MM/YYYY. Day must be 01-31, month 01-12, and year must contain 4 numbers.",true);return;
+    msg($("newStudentStatus"),"Date of Birth must be entered as DD/MM/YYYY. Day 01-31, month 01-12, year 4 numbers.",true);return;
   }
   if(!/^\d{7,}$/.test(phone)){
     msg($("newStudentStatus"),"Phone number must contain at least 7 digits (for example 086454353).",true);return;
@@ -6854,14 +6825,16 @@ function renderDermedSales(){
  const box=$("dermedSalesList");if(!box)return;
  const q=($("dermedSaleSearch")?.value||"").toLowerCase();
  const f=($("dermedPaymentFilter")?.value||"all");
- // Prevent the Dermed Sale screen from showing the same invoice twice.
- // We keep the newest database row for each invoice/reference number.
- const seenRefs=new Set();
- const rows=salesRecords.filter(x=>{
-   if(String(x.sale_type||"").toUpperCase()!=="DERMED") return false;
-   const ref=String(x.reference_no||x.id||"").trim();
-   if(ref && seenRefs.has(ref)) return false;
-   if(ref) seenRefs.add(ref);
+ const candidates=salesRecords
+   .filter(x=>String(x.sale_type||"").toUpperCase()==="DERMED")
+   .slice()
+   .sort((a,b)=>String(b.created_at||b.updated_at||b.sale_date||"").localeCompare(String(a.created_at||a.updated_at||a.sale_date||"")));
+ const latestByReference=new Map();
+ candidates.forEach(x=>{
+   const key=String(x.reference_no||x.id||"").trim();
+   if(!latestByReference.has(key))latestByReference.set(key,x);
+ });
+ const rows=[...latestByReference.values()].filter(x=>{
    const status=saleStatus(saleTotal(x),salePaid(x));
    const hay=`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])} ${JSON.stringify(x.service_items||[])}`.toLowerCase();
    return (f==="all"||status===f) && hay.includes(q);
@@ -13126,225 +13099,6 @@ document.addEventListener("DOMContentLoaded",function(){
 
 
 <!-- ACTUAL SALE COMMISSION SERVICE SEARCH REPAIR - 2026-08-17 -->
-<script id="sale-commission-actual-service-search-repair-v1">
-(function(){
-  "use strict";
-
-  function E(id){return document.getElementById(id);}
-  function esc(v){
-    return String(v??"").replace(/[&<>"']/g,function(c){
-      return {"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c];
-    });
-  }
-  function money(v){
-    const n=Number(v||0);
-    return n.toFixed(2);
-  }
-  function typeLabel(v){
-    const t=String(v||"").trim().toLowerCase();
-    if(t.includes("only service")) return "Only Service";
-    if(t.includes("with product") || t.includes("service with product")) return "Service With Product";
-    return String(v||"Service");
-  }
-  function rateFor(s){
-    return typeLabel(s?.service_type)==="Only Service" ? 0.03 : 0.02;
-  }
-  function services(){
-    const a=Array.isArray(window.services)?window.services:[];
-    const b=Array.isArray(window.commissionSearchServices)?window.commissionSearchServices:[];
-    const out=[],seen=new Set();
-    a.concat(b).forEach(s=>{
-      if(!s)return;
-      const id=String(s.id??s.service_id??"");
-      const key=id || String(s.service_code??s.code??s.name??"");
-      if(seen.has(key))return;
-      seen.add(key);out.push(s);
-    });
-    return out;
-  }
-  function matches(s,q){
-    const needle=String(q||"").trim().toLowerCase();
-    if(!needle)return false;
-    return [
-      s.id,s.service_id,s.service_code,s.code,s.name,s.service_name,
-      s.title,s.service_type,s.type
-    ].map(v=>String(v??"").toLowerCase()).join(" ").includes(needle);
-  }
-  function renderResults(rows){
-    const input=E("commissionServiceSearch"),box=E("commissionServiceResults");
-    if(!input||!box)return;
-    const q=String(input.value||"").trim();
-    if(!q){box.innerHTML="";box.classList.remove("show");return;}
-
-    const list=(rows||[]).slice(0,20);
-    box.innerHTML=list.length ? list.map((s,i)=>{
-      const id=String(s.id??s.service_id??"");
-      const name=s.name??s.service_name??s.title??"Service";
-      const code=s.service_code??s.code??"";
-      const type=typeLabel(s.service_type);
-      const price=Number(s.price??s.unit_price??0);
-      return `<button type="button" data-repair-commission-service="${esc(id)}"
-        data-repair-service-index="${i}">
-        <div class="service-picker-name">${esc(name)}${code ? " · "+esc(code) : ""}</div>
-        <div class="service-picker-meta">${esc(type)} · $${money(price)} · Commission ${rateFor(s)*100}%</div>
-      </button>`;
-    }).join("") : '<div class="muted" style="padding:12px">No matching service found.</div>';
-    box.classList.add("show");
-  }
-
-  function renderItems(){
-    const body=E("commissionItems");
-    if(!body)return;
-    const items=Array.isArray(window.commissionItems)?window.commissionItems:[];
-    body.innerHTML=items.length ? items.map((x,i)=>{
-      const unit=Math.max(1,Number(x.quantity||1));
-      const price=Math.max(0,Number(x.price||0));
-      const discount=Math.max(0,Number(x.discount||0));
-      const subtotal=Math.max(0,unit*price-discount);
-      const rate=rateFor(x);
-      return `<tr data-repair-commission-index="${i}">
-        <td><div class="commission-service-name">${esc(x.name||"Service")}</div>
-            <div class="commission-service-code">${esc(x.service_code||"")}</div></td>
-        <td><span class="commission-type-badge">${esc(typeLabel(x.service_type))}</span></td>
-        <td><input class="commission-item-unit" type="number" min="1" step="1" value="${unit}"></td>
-        <td><input class="commission-item-price" type="number" min="0" step="0.01" value="${price.toFixed(2)}"></td>
-        <td><input class="commission-item-discount" type="number" min="0" step="0.01" value="${discount?discount:""}" placeholder="0"></td>
-        <td><span class="commission-subtotal">$${money(subtotal)}</span></td>
-        <td><span class="commission-rate-badge">${rate*100}%</span></td>
-        <td><span class="commission-amount">$${money(subtotal*rate)}</span></td>
-        <td><button class="danger commission-remove-btn" type="button" data-repair-remove-commission="${i}">×</button></td>
-      </tr>`;
-    }).join("") : '<tr><td colspan="9" class="muted">No services added. Search and click a service above.</td></tr>';
-
-    body.querySelectorAll("[data-repair-commission-index]").forEach(tr=>{
-      const i=Number(tr.dataset.repairCommissionIndex),x=window.commissionItems[i];
-      if(!x)return;
-      const unit=tr.querySelector(".commission-item-unit");
-      const price=tr.querySelector(".commission-item-price");
-      const discount=tr.querySelector(".commission-item-discount");
-      [unit,price,discount].forEach(el=>el?.addEventListener("input",function(){
-        x.quantity=Math.max(1,Number(unit.value||1));
-        x.price=Math.max(0,Number(price.value||0));
-        x.discount=Math.max(0,Number(discount.value||0));
-        renderItems();
-      }));
-    });
-    updateTotals();
-  }
-
-  function updateTotals(){
-    const items=Array.isArray(window.commissionItems)?window.commissionItems:[];
-    let subtotal=0,commission=0;
-    items.forEach(x=>{
-      const q=Math.max(1,Number(x.quantity||1));
-      const p=Math.max(0,Number(x.price||0));
-      const d=Math.max(0,Number(x.discount||0));
-      const sub=Math.max(0,q*p-d);
-      subtotal+=sub; commission+=sub*rateFor(x);
-    });
-    if(E("commissionFormSubtotal"))E("commissionFormSubtotal").textContent="$"+money(subtotal);
-    if(E("commissionFormCommission"))E("commissionFormCommission").textContent="$"+money(commission);
-  }
-
-  async function search(q){
-    q=String(q||"").trim();
-    if(!q){renderResults([]);return;}
-    let rows=services().filter(s=>matches(s,q));
-
-    // Always query the actual Service List when the local cache has no match.
-    if(!rows.length && typeof sb!=="undefined"){
-      try{
-        const r=await sb.from("medifella_services")
-          .select("id,service_code,name,service_type,price,created_at")
-          .order("created_at",{ascending:false})
-          .limit(1000);
-        if(!r.error && Array.isArray(r.data)){
-          const current=Array.isArray(window.services)?window.services.slice():[];
-          r.data.forEach(s=>{
-            const idx=current.findIndex(x=>String(x.id??x.service_id??"")===String(s.id));
-            if(idx>=0)current[idx]=s; else current.push(s);
-          });
-          window.services=current;
-          rows=r.data.filter(s=>matches(s,q));
-        }
-      }catch(err){console.warn("Actual commission service search:",err);}
-    }
-    const input=E("commissionServiceSearch");
-    if(!input || String(input.value||"").trim()!==q)return;
-    renderResults(rows);
-  }
-
-  function addService(s){
-    if(!s)return;
-    const id=s.id??s.service_id??null;
-    const item={
-      service_id:id,
-      service_code:s.service_code??s.code??"",
-      name:s.name??s.service_name??s.title??"Service",
-      service_type:typeLabel(s.service_type),
-      price:Number(s.price??s.unit_price??0),
-      quantity:1,
-      discount:0
-    };
-    window.commissionItems=Array.isArray(window.commissionItems)?window.commissionItems:[];
-    const duplicate=window.commissionItems.some(x=>String(x.service_id||"")===String(item.service_id||""));
-    if(duplicate){
-      const st=E("commissionStatus");
-      if(st)st.innerHTML='<div class="status error">This service is already added. Choose another service.</div>';
-      return;
-    }
-    window.commissionItems.push(item);
-    renderItems();
-    const input=E("commissionServiceSearch"),box=E("commissionServiceResults");
-    if(input){input.value="";input.focus();}
-    if(box){box.innerHTML="";box.classList.remove("show");}
-  }
-
-  function bind(){
-    const input=E("commissionServiceSearch"),box=E("commissionServiceResults"),items=E("commissionItems");
-    if(!input||!box||!items)return;
-
-    let timer=null;
-    input.addEventListener("input",function(e){
-      e.stopImmediatePropagation();
-      clearTimeout(timer);
-      timer=setTimeout(()=>search(input.value),120);
-    },true);
-
-    box.addEventListener("click",function(e){
-      const b=e.target.closest("[data-repair-commission-service]");
-      if(!b)return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      const id=String(b.dataset.repairCommissionService||"");
-      const rows=services();
-      let s=rows.find(x=>String(x.id??x.service_id??"")===id);
-      if(!s){
-        const index=Number(b.dataset.repairServiceIndex);
-        const shown=rows.filter(x=>matches(x,input.value||"")).slice(0,20);
-        s=shown[index];
-      }
-      addService(s);
-    },true);
-
-    items.addEventListener("click",function(e){
-      const b=e.target.closest("[data-repair-remove-commission]");
-      if(!b)return;
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      const i=Number(b.dataset.repairRemoveCommission);
-      window.commissionItems.splice(i,1);
-      renderItems();
-    },true);
-
-    // If an existing working list is already loaded, synchronize immediately.
-    if(Array.isArray(window.commissionItems))renderItems();
-  }
-
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind,{once:true});
-  else bind();
-})();
-</script>
 
 <script id="sale-staff-management-v1">
 (function(){
