@@ -6834,7 +6834,34 @@ function renderDermedSales(){
    const key=String(x.reference_no||x.id||"").trim();
    if(!latestByReference.has(key))latestByReference.set(key,x);
  });
- const rows=[...latestByReference.values()].filter(x=>{
+
+ // A repeated Save click can create two invoices with different reference
+ // numbers but identical sale contents/time. Treat that as one displayed sale.
+ const latestBySaleFingerprint=new Map();
+ [...latestByReference.values()].forEach(x=>{
+   let items=x.items||[], services=x.service_items||[];
+   if(typeof items==="string"){try{items=JSON.parse(items)}catch(e){items=[]}}
+   if(typeof services==="string"){try{services=JSON.parse(services)}catch(e){services=[]}}
+   const normalizeLines=arr=>(Array.isArray(arr)?arr:[]).map(v=>({
+     id:v.product_id||v.service_id||v.id||"",
+     name:v.name||v.service_name||"",
+     qty:Number(v.quantity??1),
+     price:Number(v.price??v.unit_price??0),
+     discountType:v.discount_type||"percent",
+     discountValue:Number(v.discount_value??0)
+   })).sort((a,b)=>JSON.stringify(a).localeCompare(JSON.stringify(b)));
+   const fingerprint=JSON.stringify({
+     date:String(x.sale_date||"").slice(0,10),
+     time:String(x.sale_time||"").slice(0,8),
+     buyer:x.student_id||x.customer_id||x.student_phone||x.student_name||"",
+     total:Number(x.grand_total??x.total??saleTotal(x)||0),
+     paid:Number(x.paid||0),
+     items:normalizeLines(items),
+     services:normalizeLines(services)
+   });
+   if(!latestBySaleFingerprint.has(fingerprint))latestBySaleFingerprint.set(fingerprint,x);
+ });
+ const rows=[...latestBySaleFingerprint.values()].filter(x=>{
    const status=saleStatus(saleTotal(x),salePaid(x));
    const hay=`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])} ${JSON.stringify(x.service_items||[])}`.toLowerCase();
    return (f==="all"||status===f) && hay.includes(q);
@@ -7426,7 +7453,8 @@ document.addEventListener("DOMContentLoaded",function(){
 
   window.editingDermedSaleId = window.editingDermedSaleId || null;
 
-  async function saveDermed(){
+  async async function saveDermed(){
+    if(window.__dermedSaveInProgress)return;
     const buyerType=E("dermedBuyerType")?.value,buyerId=E("dermedBuyerId")?.value,staffId=E("dermedSaleStaff")?.value,cashierId=E("dermedCashier")?.value;
     const c=calc(), items=pItems(), servicesArr=sItems();
     if(!buyerType||!buyerId){msg(E("dermedStatus"),"Please select a Student or Customer.",true);return}
@@ -7449,6 +7477,9 @@ document.addEventListener("DOMContentLoaded",function(){
       const hasNonPackage=items.length>0 || servicesArr.some(x=>String(x.service_payment_type||"Single").toLowerCase()!=="package");
       if(hasNonPackage){msg(E("dermedStatus"),"Products and Single services must be paid at the time of sale. Due is allowed only for Package services.",true);return}
     }
+    if(window.__dermedSaveInProgress)return;
+    window.__dermedSaveInProgress=true;
+
     const buyer=buyerType==="student"?students.find(x=>String(x.id)===String(buyerId)):customers.find(x=>String(x.id)===String(buyerId));
     const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
     const now=phTime();
@@ -7556,11 +7587,16 @@ document.addEventListener("DOMContentLoaded",function(){
       if(typeof loadStockMovements==="function")await loadStockMovements();
       if(typeof showSaleInvoice==="function")showSaleInvoice(r.data.id);
     }catch(e){console.error(e);msg(E("dermedStatus"),e.message||"Could not save Dermed sale.",true)}
-    finally{if(btn)btn.disabled=false}
+    finally{
+      if(btn)btn.disabled=false;
+      window.__dermedSaveInProgress=false;
+    }
   }
 
   function bind(){
+    if(window.__dermedSaleBound)return;
     if(!E("dermedItems"))return;
+    window.__dermedSaleBound=true;
     renderItems();
     E("dermedPaymentStatus")?.addEventListener("change",paymentDefaults);
     E("dermedAmountPaidNow")?.addEventListener("input",updateTotals);
@@ -10633,6 +10669,8 @@ document.addEventListener("DOMContentLoaded",function(){
 
   async function loadCommissionRecords(retry=0){
     const box=C("commissionList");
+    window.__commissionLoadToken=(window.__commissionLoadToken||0)+1;
+    const loadToken=window.__commissionLoadToken;
     if(!box)return;
 
     // The commission section can be opened immediately after login. If the
@@ -10678,7 +10716,23 @@ document.addEventListener("DOMContentLoaded",function(){
         return;
       }
 
-      window.commissionRecords=Array.isArray(r.data)?r.data:[];
+      if(loadToken!==window.__commissionLoadToken)return;
+      const raw=Array.isArray(r.data)?r.data:[];
+      // Keep the Commission List visible, but remove duplicate commission rows.
+      // Do not use database id because duplicate saves can have different ids.
+      const seenCommission=new Set();
+      window.commissionRecords=raw.filter(x=>{
+        const key=JSON.stringify([
+          x.source_sale_id||"",x.commission_date||"",x.staff_id||"",
+          x.customer_id||"",x.customer_name||"",x.customer_phone||"",
+          x.service_id||"",x.service_detail||"",x.service_type||"",
+          x.unit||"",x.unit_price||"",x.discount||"",x.subtotal||"",
+          x.commission_rate||"",x.commission_amount||"",x.source||""
+        ]);
+        if(seenCommission.has(key))return false;
+        seenCommission.add(key);
+        return true;
+      });
       renderCommissionList();
     }catch(e){
       console.error("Commission table read exception:",e);
@@ -11103,6 +11157,8 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   function bindCommission(){
+    if(window.__saleCommissionBound)return;
+    window.__saleCommissionBound=true;
     if(C("commissionDate") && !C("commissionDate").value)C("commissionDate").value=todayC();
     window.commissionItems=window.commissionItems||[];
     populateCommissionStaff();
