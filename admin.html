@@ -10821,7 +10821,7 @@ function addCommissionServiceFromSearchResult(key){
   box.innerHTML='<p class="muted">Loading Commission List...</p>';
 
   try{
-    const request=sb.from("medifella_sale_commissions").select("*").order("commission_date",{ascending:false});
+    const request=sb.from("medifella_sale_commissions").select("*").order("created_at",{ascending:false});
     const timeout=new Promise((_,reject)=>setTimeout(
       ()=>reject(new Error("Commission List request timed out after 5 seconds.")),5000
     ));
@@ -10829,6 +10829,21 @@ function addCommissionServiceFromSearchResult(key){
 
     if(!result || result.error)throw (result?.error||new Error("No response from Supabase."));
     const raw=Array.isArray(result.data)?result.data:[];
+    // Newest commission must always appear at the TOP.
+    // Prefer created_at; fall back to commission_date and finally row id.
+    raw.sort((a,b)=>{
+      const ta=Date.parse(a?.created_at||a?.updated_at||a?.commission_date||"")||0;
+      const tb=Date.parse(b?.created_at||b?.updated_at||b?.commission_date||"")||0;
+      if(tb!==ta)return tb-ta;
+      const ia=String(a?.id??"");
+      const ib=String(b?.id??"");
+      if(ia&&ib && ia!==ib){
+        const na=Number(ia), nb=Number(ib);
+        if(Number.isFinite(na)&&Number.isFinite(nb))return nb-na;
+        return ib.localeCompare(ia);
+      }
+      return 0;
+    });
 
     // Keep BOTH manual (+ Add Sale Commission) and automatic Dermed rows.
     // Remove only exact duplicates; different service rows remain available
@@ -10858,6 +10873,14 @@ function addCommissionServiceFromSearchResult(key){
     });
 
     // If rows exist, render them immediately. If empty, say so clearly.
+    window.commissionRecords.sort((a,b)=>{
+      const ta=Date.parse(a?.created_at||a?.updated_at||a?.commission_date||"")||0;
+      const tb=Date.parse(b?.created_at||b?.updated_at||b?.commission_date||"")||0;
+      if(tb!==ta)return tb-ta;
+      const ia=Number(a?.id), ib=Number(b?.id);
+      if(Number.isFinite(ia)&&Number.isFinite(ib))return ib-ia;
+      return 0;
+    });
     renderCommissionList();
 
     if(!raw.length){
