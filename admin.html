@@ -10866,10 +10866,12 @@ function addCommissionServiceFromSearchResult(key){
 
   function commissionBatchKey(x){
     if(x?.source_sale_id)return `sale:${x.source_sale_id}`;
+    if(x?.commission_batch_id)return `batch:${x.commission_batch_id}`;
+    if(x?.batch_id)return `batch:${x.batch_id}`;
     if(x?.reference_no)return `ref:${x.reference_no}`;
     const d=String(x?.commission_date||x?.created_at||"").slice(0,10);
     const staff=String(x?.staff_id||x?.staff_name||"");
-    const customer=String(x?.customer_id||x?.customer_name||x?.customer_phone||"");
+    const customer=String(x?.customer_id||x?.student_id||x?.customer_name||x?.customer_phone||"");
     return `manual:${d}|${staff}|${customer}`;
   }
 
@@ -10955,66 +10957,69 @@ function addCommissionServiceFromSearchResult(key){
   }
 
   function renderCommissionList(){
-    const box=C("commissionList");
-    if(!box)return;
+  const box=C("commissionList");
+  if(!box)return;
 
-    try{
-      const rows=filteredCommissionRecords();
-      const totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0);
-      const totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
+  try{
+    const rows=filteredCommissionRecords();
+    const groups=[];
+    const byKey=new Map();
 
-      if(!rows.length){
-        box.innerHTML='<p class="muted">No commission records found.</p>';
-      }else{
-        // Show one row per commission line. This guarantees that every
-        // stored/derived commission record is visible.
-        box.innerHTML=`<div class="table-wrap"><table class="table">
-          <thead><tr>
-            <th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th>
-            <th>Service Type</th><th>Service Detail</th><th>Unit</th>
-            <th>Unit Price</th><th>Discount</th><th>Subtotal</th>
-            <th>Commission</th><th>Commission Amount</th><th>Actions</th>
-          </tr></thead><tbody>
-          ${rows.map((x,i)=>{
-            const key=commissionBatchKey(x);
-            return `<tr>
-              <td>${escC(formatCommissionDate(x.commission_date||x.created_at))}</td>
-              <td>${escC(x.staff_name||"—")}</td>
-              <td>${escC(x.customer_name||"—")}</td>
-              <td>${escC(x.customer_phone||"—")}</td>
-              <td>${escC(serviceTypeLabel(x.service_type==="service_product"?"Service With Product":"Only Service"))}</td>
-              <td>${escC(x.service_detail||"—")}</td>
-              <td>${escC(x.unit??1)}</td>
-              <td>$${moneyC(x.unit_price)}</td>
-              <td>$${moneyC(x.discount)}</td>
-              <td>$${moneyC(x.subtotal)}</td>
-              <td>${Number(x.commission_rate||0)*100}%</td>
-              <td>$${moneyC(x.commission_amount)}</td>
-              <td><div class="actions">
-                <button type="button" class="light commission-view-btn" data-commission-view="${escC(key)}">View</button>
-                ${String(x.source||"")!=="dermed_derived"
-                  ? `<button type="button" class="light commission-edit-btn" data-commission-edit="${escC(key)}">Edit</button>
-                     <button type="button" class="danger commission-delete-btn" data-commission-delete="${escC(key)}">Delete</button>`
-                  : `<span class="muted">From Dermed Sale</span>`}
-              </div></td>
-            </tr>`;
-          }).join("")}
-          </tbody></table></div>`;
+    rows.forEach(x=>{
+      const key=commissionBatchKey(x);
+      if(!byKey.has(key)){
+        const g={key,rows:[]};
+        byKey.set(key,g);
+        groups.push(g);
       }
+      byKey.get(key).rows.push(x);
+    });
 
-      C("commissionGrandTotal").innerHTML=
-        `<div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div>
-         <div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>`;
-    }catch(e){
-      console.error("Commission render error:",e);
-      const rows=Array.isArray(window.commissionRecords)?window.commissionRecords:[];
-      box.innerHTML=rows.length
-        ?`<div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Staff</th><th>Customer</th><th>Service</th><th>Subtotal</th><th>Commission</th></tr></thead><tbody>
-          ${rows.map(x=>`<tr><td>${escC(formatCommissionDate(x.commission_date||x.created_at))}</td><td>${escC(x.staff_name||"—")}</td><td>${escC(x.customer_name||"—")}</td><td>${escC(x.service_detail||"—")}</td><td>$${moneyC(x.subtotal)}</td><td>$${moneyC(x.commission_amount)}</td></tr>`).join("")}
-          </tbody></table></div>`
-        :`<div class="status error">Commission records could not be displayed: ${escC(e.message||e)}</div>`;
+    const totalSubtotal=rows.reduce((n,x)=>n+Number(x.subtotal||0),0);
+    const totalCommission=rows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
+
+    if(!groups.length){
+      box.innerHTML='<p class="muted">No commission records found.</p>';
+    }else{
+      box.innerHTML=`<div class="table-wrap"><table class="table">
+        <thead><tr>
+          <th>Date</th><th>Staff Name</th><th>Customer Name</th><th>Customer Phone</th>
+          <th>Service Type</th><th>Service Detail</th><th>Grand Subtotal</th><th>Grand Commission</th><th>Actions</th>
+        </tr></thead><tbody>
+        ${groups.map(g=>{
+          const s=commissionBatchSummary(g.rows);
+          const first=g.rows[0]||{};
+          const types=[...new Set(g.rows.map(x=>serviceTypeLabel(x.service_type==="service_product"?"Service With Product":"Only Service")))];
+          const typeLabel=types.length===1?types[0]:"Multiple Services";
+          return `<tr>
+            <td>${escC(formatCommissionDate(s.date))}</td>
+            <td>${escC(s.staff||"—")}</td>
+            <td>${escC(s.customer||"—")}</td>
+            <td>${escC(s.phone||"—")}</td>
+            <td>${escC(typeLabel)}</td>
+            <td><button type="button" class="light commission-view-btn" data-commission-view="${escC(g.key)}">View</button></td>
+            <td>$${moneyC(s.subtotal)}</td>
+            <td>$${moneyC(s.commission)}</td>
+            <td><div class="actions">
+              ${String(first.source||"")!=="dermed_auto"
+                ? `<button type="button" class="light commission-edit-btn" data-commission-edit="${escC(g.key)}">Edit</button>
+                   <button type="button" class="danger commission-delete-btn" data-commission-delete="${escC(g.key)}">Delete</button>`
+                : '<span class="muted">From Dermed Sale</span>'}
+            </div></td>
+          </tr>`;
+        }).join("")}
+        </tbody></table></div>`;
     }
+
+    C("commissionGrandTotal").innerHTML=
+      `<div><span>Grand Total Subtotal</span><strong>$${moneyC(totalSubtotal)}</strong></div>
+       <div><span>Grand Total Commission</span><strong>$${moneyC(totalCommission)}</strong></div>`;
+  }catch(e){
+    console.error("Commission render error:",e);
+    box.innerHTML=`<div class="status error">Commission records could not be displayed: ${escC(e.message||e)}</div>`;
+    C("commissionGrandTotal").innerHTML="";
   }
+}
   async function insertCommissionRows(rows){
     /*
      * Write commission rows without SELECT/RETURNING. This matches the
