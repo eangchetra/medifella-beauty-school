@@ -6821,7 +6821,7 @@ function renderMtsSales(){
      <td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td>
      <td><strong>${esc(saleRef(x)||"—")}</strong></td>
      <td>${esc(saleCustomer(x)||"—")}<div class="muted">${esc(saleField(x,["student_phone","phone"],""))}</div></td>
-     <td>${esc(formatSaleItems(saleItemsValue(x)))}</td>
+     <td><button class="light" type="button" data-instant-item-v15 data-sale-id="${attr(x.id)}">View</button></td>
      <td>${money(total)}</td>
      <td>${money(paid)}</td>
      <td>${money(bal)}</td>
