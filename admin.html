@@ -4320,7 +4320,7 @@ function renderSales(){
  $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date / Time</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{
    const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
    const dt=saleDateValue(s),time=saleField(s,["sale_time","time"],"");
-   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td><button class="light sale-item-view-btn" type="button" data-instant-item-v15 data-sale-id="${attr(s.id)}">View</button></td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button>${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
+   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td><button class="light sale-item-view-btn" type="button" data-instant-item-v15 data-sale-id="${attr(s.id)}">View</button></td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">Invoice</button>${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
  }).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
  updateSalesMetrics();
 }
@@ -6846,7 +6846,7 @@ function renderMtsSales(){
      <td>${money(bal)}</td>
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
-       <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">Invoice</button>
        ${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -6926,7 +6926,7 @@ function renderDermedSales(){
      <td>${money(bal)}</td>
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
-       <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button>
+       <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">Invoice</button>
        ${bal>0.005?`<button class="gold" type="button" onclick="recordDermedSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -14136,3 +14136,104 @@ document.addEventListener("DOMContentLoaded",function(){
   else installCommissionPatch();
 })();
 </script>
+
+<!-- V22 SAFE PATCH: Student DOB selector only + single View label per sale row.
+     Keeps the original hidden DOB field IDs/DB format so all existing save/edit
+     logic continues to use YYYY-MM-DD without changing other fields/pages. -->
+<style id="v22-student-dob-selector">
+.v22-dob-wrap{display:grid;grid-template-columns:90px minmax(120px,1.2fr) minmax(110px,1fr);gap:8px;align-items:end}
+.v22-dob-wrap select,.v22-dob-wrap input{width:100%;box-sizing:border-box}
+.v22-dob-year{min-width:0}
+.v22-dob-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
+@media(max-width:600px){.v22-dob-wrap{grid-template-columns:78px minmax(100px,1fr) minmax(95px,1fr)}}
+</style>
+<script id="v22-student-dob-selector-script">
+(function(){
+  'use strict';
+  const currentYear=new Date().getFullYear();
+  const months=[
+    ['01','January'],['02','February'],['03','March'],['04','April'],['05','May'],['06','June'],
+    ['07','July'],['08','August'],['09','September'],['10','October'],['11','November'],['12','December']
+  ];
+  function pad(n){return String(n).padStart(2,'0')}
+  function daysInMonth(y,m){return new Date(Number(y)||currentYear,Number(m)||1,0).getDate()}
+  function parseDate(v){
+    const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m?{y:m[1],m:m[2],d:m[3]}:{y:'',m:'',d:''};
+  }
+  function sync(hidden,day,month,year){
+    const d=String(day.value||''), mo=String(month.value||''), y=String(year.value||'').trim();
+    if(d&&mo&&/^\d{4}$/.test(y)){
+      const max=daysInMonth(y,mo);
+      const dd=Math.min(Number(d),max);
+      day.value=pad(dd);
+      hidden.value=`${y}-${mo}-${pad(dd)}`;
+    }else{
+      hidden.value='';
+    }
+  }
+  function fillFromHidden(hidden,day,month,year){
+    const x=parseDate(hidden.value);
+    day.value=x.d;month.value=x.m;year.value=x.y;
+    if(x.y&&x.m) refreshDays(day,x.y,x.m,x.d);
+  }
+  function refreshDays(day,year,month,selected){
+    const max=daysInMonth(year,month), old=String(selected||day.value||'');
+    day.innerHTML='<option value="">Day</option>'+Array.from({length:max},(_,i)=>{
+      const v=pad(i+1);return `<option value="${v}">${i+1}</option>`;
+    }).join('');
+    if(old && Number(old)<=max) day.value=pad(Number(old));
+  }
+  function makeSelector(id){
+    const hidden=document.getElementById(id);
+    if(!hidden || hidden.dataset.v22Dob==='1')return null;
+    const wrap=document.createElement('div');wrap.className='v22-dob-wrap';
+    const day=document.createElement('select');day.setAttribute('aria-label','Day');day.title='Day';
+    const month=document.createElement('select');month.setAttribute('aria-label','Month');month.title='Month';
+    const year=document.createElement('input');year.type='number';year.inputMode='numeric';year.className='v22-dob-year';year.min='1900';year.max=String(currentYear);year.placeholder='Year';year.setAttribute('aria-label','Year');year.title='Year';
+    day.innerHTML='<option value="">Day</option>';
+    month.innerHTML='<option value="">Month</option>'+months.map(([v,n])=>`<option value="${v}">${n}</option>`).join('');
+    const label=document.createElement('div');label.className='muted';label.style.cssText='font-size:12px;margin-top:4px;grid-column:1/-1';label.textContent='Day / Month / Year';
+    wrap.append(day,month,year,label);
+    hidden.classList.add('v22-dob-hidden');
+    hidden.removeAttribute('required');
+    hidden.parentNode.insertBefore(wrap,hidden);
+    hidden.dataset.v22Dob='1';
+    function changed(){
+      if(year.value && month.value){
+        const old=day.value;refreshDays(day,year.value,month.value,old);
+      }
+      sync(hidden,day,month,year);
+    }
+    day.addEventListener('change',changed);month.addEventListener('change',changed);year.addEventListener('input',changed);year.addEventListener('change',changed);
+    fillFromHidden(hidden,day,month,year);
+    hidden.__v22={day,month,year,fill:()=>fillFromHidden(hidden,day,month,year),sync:()=>sync(hidden,day,month,year)};
+    return hidden.__v22;
+  }
+  function init(){
+    makeSelector('newStudentDob');
+    makeSelector('editStudentDob');
+    // Keep the separate "new student from Sale" form unchanged because the
+    // request is limited to Student Registration and other pages/fields.
+    if(typeof window.editStudent==='function'&&!window.editStudent.__v22Wrapped){
+      const old=window.editStudent;
+      const wrapped=function(){const r=old.apply(this,arguments);setTimeout(()=>document.getElementById('editStudentDob')?.__v22?.fill(),0);return r};
+      wrapped.__v22Wrapped=true;window.editStudent=wrapped;
+    }
+    if(typeof window.resetNewStudentForm==='function'&&!window.resetNewStudentForm.__v22Wrapped){
+      const old=window.resetNewStudentForm;
+      const wrapped=function(){const r=old.apply(this,arguments);const h=document.getElementById('newStudentDob');if(h?.__v22){h.value='';h.__v22.fill()}return r};
+      wrapped.__v22Wrapped=true;window.resetNewStudentForm=wrapped;
+    }
+    // Existing inline handlers call the original functions directly, so also
+    // refresh the edit selector when the edit card becomes visible.
+    const editCard=document.getElementById('studentEditCard');
+    if(editCard && !editCard.dataset.v22Observer){
+      editCard.dataset.v22Observer='1';
+      new MutationObserver(()=>document.getElementById('editStudentDob')?.__v22?.fill()).observe(editCard,{attributes:true,attributeFilter:['class']});
+    }
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
+})();
+</script>
+
