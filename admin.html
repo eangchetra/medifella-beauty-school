@@ -6854,7 +6854,7 @@ function renderDermedSales(){
      date:String(x.sale_date||"").slice(0,10),
      time:String(x.sale_time||"").slice(0,8),
      buyer:x.student_id||x.customer_id||x.student_phone||x.student_name||"",
-     total:Number(x.grand_total??x.total??saleTotal(x)||0),
+     total:Number((x.grand_total??x.total??saleTotal(x))||0),
      paid:Number(x.paid||0),
      items:normalizeLines(items),
      services:normalizeLines(services)
