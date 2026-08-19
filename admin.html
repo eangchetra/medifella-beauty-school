@@ -7434,6 +7434,10 @@ document.addEventListener("DOMContentLoaded",function(){
   window.editingDermedSaleId = window.editingDermedSaleId || null;
 
   async function saveDermed(){
+    // HARD LOCK: one click / one invoice. Prevent duplicate inserts caused by
+    // duplicate event bindings or rapid double-clicks.
+    if(window.__dermedSaveInProgress===true)return;
+    window.__dermedSaveInProgress=true;
     const buyerType=E("dermedBuyerType")?.value,buyerId=E("dermedBuyerId")?.value,staffId=E("dermedSaleStaff")?.value,cashierId=E("dermedCashier")?.value;
     const c=calc(), items=pItems(), servicesArr=sItems();
     if(!buyerType||!buyerId){msg(E("dermedStatus"),"Please select a Student or Customer.",true);return}
@@ -7563,11 +7567,16 @@ document.addEventListener("DOMContentLoaded",function(){
       if(typeof loadStockMovements==="function")await loadStockMovements();
       if(typeof showSaleInvoice==="function")showSaleInvoice(r.data.id);
     }catch(e){console.error(e);msg(E("dermedStatus"),e.message||"Could not save Dermed sale.",true)}
-    finally{if(btn)btn.disabled=false}
+    finally{
+      if(btn)btn.disabled=false;
+      window.__dermedSaveInProgress=false;
+    }
   }
 
   function bind(){
     if(!E("dermedItems"))return;
+    if(window.__dermedSaleBound===true)return;
+    window.__dermedSaleBound=true;
     renderItems();
     ["dermedOverallDiscountValue"].forEach(id=>E(id)?.addEventListener("input",updateTotals));
     E("dermedOverallDiscountType")?.addEventListener("change",updateTotals);
