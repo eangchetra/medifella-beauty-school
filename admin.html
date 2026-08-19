@@ -11460,7 +11460,14 @@ document.addEventListener("DOMContentLoaded",function(){
     if(item){
       e.preventDefault();
       e.stopPropagation();
-      showSaleItemDetailsV15(item.getAttribute("data-sale-id"));
+      // Use the working V10 fresh-record detail viewer.
+      // The V15 viewer only reads the in-memory sale object and can show
+      // "No product or service details found" when that cache is stale.
+      if(typeof window.showSaleItemDetails === "function") {
+        window.showSaleItemDetails(item.getAttribute("data-sale-id"));
+      } else {
+        showSaleItemDetailsV15(item.getAttribute("data-sale-id"));
+      }
     }
   },true);
 })();
