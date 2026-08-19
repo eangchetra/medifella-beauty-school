@@ -2183,7 +2183,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
       </div>
       <div>
         <label>Date of Birth *</label>
-        <input id="newStudentDob" type="date" required>
+        <input id="newStudentDob" type="text" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/YYYY" maxlength="10" required>
       </div>
     </div>
 
@@ -2236,7 +2236,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </div>
 <div class="row">
 <div><label>Gender</label><select id="editStudentGender"><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
-<div><label>Date of Birth</label><input id="editStudentDob" type="date"></div>
+<div><label>Date of Birth</label><input id="editStudentDob" type="text" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/YYYY" maxlength="10"></div>
 </div>
 <div class="row">
 <div><label>Student ID</label><input id="editStudentStudentId" readonly></div>
@@ -3132,7 +3132,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <label id="staffConfirmLabel">Confirm Password</label>
 <input id="staffPasswordConfirm" type="password" autocomplete="new-password" placeholder="Repeat password">
 
-<div id="staffPermissionBox"><label style="margin-top:16px">Permissions</label><div style="display:grid;gap:10px;margin-top:10px">
+<div style="display:flex;gap:8px;align-items:center;margin-bottom:8px"><button type="button" class="light" onclick="setAllStaffPermissions(true)">Select All Functions</button><button type="button" class="light" onclick="setAllStaffPermissions(false)">Clear All</button></div><div id="staffPermissionBox"><label style="margin-top:16px">Permissions</label><div style="display:grid;gap:10px;margin-top:10px">
 <label style="font-weight:400"><input id="permDashboard" type="checkbox"> View Dashboard</label>
 <label style="font-weight:400"><input id="permStudents" type="checkbox"> Student Registration</label>
 <label style="font-weight:400"><input id="permSales" type="checkbox"> Medi Fella Sale</label>
@@ -3159,7 +3159,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
 <div class="card">
 <h2>Accounts</h2>
-<p class="muted">Admins have full access. Staff only see the sections selected for them.</p>
+<p class="muted">Admins have full access. Staff receive the same normal functions and controls as Admin inside every section selected for them.</p>
 <div id="staffList">Loading...</div>
 </div>
 </div>
@@ -3241,7 +3241,12 @@ async function getCurrentAccount(){
 function applyAccountPermissions(){
   const role=String(currentProfile?.role||"").toLowerCase();
   const permissions=normalizeStaffPermissions(currentProfile?.permissions);
+  // Admins have every permission. Staff get full normal functionality inside
+  // every section explicitly selected for their account. There are no extra
+  // read-only restrictions for staff within an allowed section.
   const allowed=key=>role==="admin" || permissions[key]===true;
+  window.mediFellaSectionAllowed=allowed;
+  window.mediFellaIsAdmin=()=>role==="admin";
   document.querySelectorAll(".nav").forEach(btn=>{
     btn.classList.toggle("hidden",!allowed(btn.dataset.section));
   });
@@ -3354,6 +3359,9 @@ $("forgotBtn").onclick=async()=>{
 };
 $("logoutBtn").onclick=async()=>{await sb.auth.signOut();location.reload()};
 document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{
+ const role=String(currentProfile?.role||"").toLowerCase();
+ const permissions=normalizeStaffPermissions(currentProfile?.permissions);
+ if(role!=="admin" && permissions[b.dataset.section]!==true)return;
  document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
  b.classList.add("active");
  document.querySelectorAll(".section").forEach(s=>s.classList.remove("active"));
@@ -3387,6 +3395,22 @@ async function refreshAll(){
  renderInventoryControls(); renderBuyerControls(); renderServiceControls(); updateMetrics();
 }
 
+function normalizeStudentDobInput(value){
+  const v=String(value||"").trim();
+  if(!v)return null;
+  const m=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(!m)throw new Error("Date of Birth must be entered as DD/MM/YYYY. Example: 15/08/1995");
+  const d=Number(m[1]),mo=Number(m[2]),y=Number(m[3]);
+  const dt=new Date(Date.UTC(y,mo-1,d));
+  if(dt.getUTCFullYear()!==y || dt.getUTCMonth()!==mo-1 || dt.getUTCDate()!==d)throw new Error("Please enter a valid Date of Birth in DD/MM/YYYY format.");
+  return `${String(y).padStart(4,"0")}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+}
+function formatStudentDob(value){
+  const v=String(value||"").trim();
+  const m=v.match(/^(\d{4})-(\d{2})-(\d{2})/);
+  return m?`${m[3]}/${m[2]}/${m[1]}`:v;
+}
+
 async function loadStudents(){
  const {data,error}=await sb.from("students").select("*").order("created_at",{ascending:false});
  if(error){$("studentList").textContent=error.message;return} students=data||[];renderStudents();
@@ -3404,7 +3428,7 @@ function renderStudents(){
 <td>${esc(s.full_name_km||"—")}</td>
 <td>${esc(s.phone||"—")}</td>
 <td>${esc(s.gender||"—")}</td>
-<td>${esc(s.date_of_birth||"—")}</td>
+<td>${esc(formatStudentDob(s.date_of_birth)||"—")}</td>
 <td>${esc(s.course||"—")}</td>
 <td><span class="badge ${esc(s.status||"pending")}">${esc(s.status||"pending")}</span></td>
 <td><div class="actions"><button class="gold" onclick="setStudent('${attr(s.id)}','verified')">Approve</button><button class="light" onclick="setStudent('${attr(s.id)}','pending')">Pending</button><button class="danger" onclick="setStudent('${attr(s.id)}','rejected')">Reject</button><button class="light" onclick="editStudent('${attr(s.id)}')">Edit</button><button class="gold" onclick="startSaleForStudent('${attr(s.id)}')">+ Sale</button></div></td>
@@ -3422,7 +3446,7 @@ function editStudent(id){
  $("editStudentEmail").value=s.email||"";
  $("editStudentPhone").value=s.phone||"";
  $("editStudentGender").value=s.gender||"";
- $("editStudentDob").value=s.date_of_birth||"";
+ $("editStudentDob").value=formatStudentDob(s.date_of_birth||"");
  $("editStudentStudentId").value=s.student_id||"";
  $("editStudentAddress").value=s.address||"";
  $("editStudentPhoto").value="";
@@ -3480,7 +3504,7 @@ $("saveNewStudent").onclick=async()=>{
   const phone=$("newStudentPhone").value.trim();
 
   const gender=$("newStudentGender").value;
-  const dob=$("newStudentDob").value;
+  const dob=normalizeStudentDobInput($("newStudentDob").value);
   const photoFile=$("newStudentPhoto").files[0];
 
   if(!fullName||!fullNameKm||!phone||!gender||!dob){
@@ -3632,7 +3656,7 @@ $("saveStudentEdit").onclick=async()=>{
    email:$("editStudentEmail").value.trim(),
    phone:$("editStudentPhone").value.trim(),
    gender:$("editStudentGender").value,
-   date_of_birth:$("editStudentDob").value||null,
+   date_of_birth:normalizeStudentDobInput($("editStudentDob").value),
    student_id:$("editStudentStudentId").value.trim(),
    address:$("editStudentAddress").value.trim()
  };
@@ -5953,6 +5977,10 @@ function getStaffPermissionsFromForm(){
   STAFF_PERMISSION_KEYS.forEach(([key,id])=>permissions[key]=$(id).checked);
   return permissions;
 }
+function setAllStaffPermissions(checked){
+  STAFF_PERMISSION_KEYS.forEach(([,id])=>{const el=$(id);if(el)el.checked=!!checked;});
+}
+window.setAllStaffPermissions=setAllStaffPermissions;
 function setStaffPermissionsForm(permissions){
   const p=normalizeStaffPermissions(permissions);
   STAFF_PERMISSION_KEYS.forEach(([key,id])=>$(id).checked=!!p[key]);
@@ -14149,107 +14177,31 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
-<!-- V22 SAFE PATCH: Student DOB selector only + single View label per sale row.
-     Keeps the original hidden DOB field IDs/DB format so all existing save/edit
-     logic continues to use YYYY-MM-DD without changing other fields/pages. -->
-<style id="v22-student-dob-selector">
-.v22-dob-wrap{display:grid;grid-template-columns:90px minmax(120px,1.2fr) minmax(110px,1fr);gap:8px;align-items:end}
-.v22-dob-wrap select,.v22-dob-wrap input{width:100%;box-sizing:border-box}
-.v22-dob-year{min-width:0}
-.v22-dob-hidden{position:absolute!important;width:1px!important;height:1px!important;padding:0!important;margin:-1px!important;overflow:hidden!important;clip:rect(0,0,0,0)!important;white-space:nowrap!important;border:0!important}
-@media(max-width:600px){.v22-dob-wrap{grid-template-columns:78px minmax(100px,1fr) minmax(95px,1fr)}}
+<!-- V27 SAFE PATCH: Student Registration DOB is manually typed as DD/MM/YYYY.
+     Only the Student Registration/Edit Student DOB fields are changed. Other
+     DOB fields and all other existing functionality remain unchanged. -->
+<style id="v27-student-dob-manual">
+#newStudentDob,#editStudentDob{font-variant-numeric:tabular-nums;letter-spacing:.02em}
 </style>
-<script id="v22-student-dob-selector-script">
+<script id="v27-student-dob-manual-script">
 (function(){
   'use strict';
-  const currentYear=new Date().getFullYear();
-  const months=[
-    ['01','January'],['02','February'],['03','March'],['04','April'],['05','May'],['06','June'],
-    ['07','July'],['08','August'],['09','September'],['10','October'],['11','November'],['12','December']
-  ];
-  function pad(n){return String(n).padStart(2,'0')}
-  function daysInMonth(y,m){return new Date(Number(y)||currentYear,Number(m)||1,0).getDate()}
-  function parseDate(v){
-    const m=String(v||'').match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    return m?{y:m[1],m:m[2],d:m[3]}:{y:'',m:'',d:''};
-  }
-  function sync(hidden,day,month,year){
-    const d=String(day.value||''), mo=String(month.value||''), y=String(year.value||'').trim();
-    if(d&&mo&&/^\d{4}$/.test(y)){
-      const max=daysInMonth(y,mo);
-      const dd=Math.min(Number(d),max);
-      day.value=pad(dd);
-      hidden.value=`${y}-${mo}-${pad(dd)}`;
-    }else{
-      hidden.value='';
-    }
-  }
-  function fillFromHidden(hidden,day,month,year){
-    const x=parseDate(hidden.value);
-    day.value=x.d;month.value=x.m;year.value=x.y;
-    if(x.y&&x.m) refreshDays(day,x.y,x.m,x.d);
-  }
-  function refreshDays(day,year,month,selected){
-    const max=daysInMonth(year,month), old=String(selected||day.value||'');
-    day.innerHTML='<option value="">Day</option>'+Array.from({length:max},(_,i)=>{
-      const v=pad(i+1);return `<option value="${v}">${i+1}</option>`;
-    }).join('');
-    if(old && Number(old)<=max) day.value=pad(Number(old));
-  }
-  function makeSelector(id){
-    const hidden=document.getElementById(id);
-    if(!hidden || hidden.dataset.v22Dob==='1')return null;
-    const wrap=document.createElement('div');wrap.className='v22-dob-wrap';
-    const day=document.createElement('select');day.setAttribute('aria-label','Day');day.title='Day';
-    const month=document.createElement('select');month.setAttribute('aria-label','Month');month.title='Month';
-    const year=document.createElement('input');year.type='number';year.inputMode='numeric';year.className='v22-dob-year';year.min='1900';year.max=String(currentYear);year.placeholder='Year';year.setAttribute('aria-label','Year');year.title='Year';
-    day.innerHTML='<option value="">Day</option>';
-    month.innerHTML='<option value="">Month</option>'+months.map(([v,n])=>`<option value="${v}">${n}</option>`).join('');
-    const label=document.createElement('div');label.className='muted';label.style.cssText='font-size:12px;margin-top:4px;grid-column:1/-1';label.textContent='Day / Month / Year';
-    wrap.append(day,month,year,label);
-    hidden.classList.add('v22-dob-hidden');
-    hidden.removeAttribute('required');
-    hidden.parentNode.insertBefore(wrap,hidden);
-    hidden.dataset.v22Dob='1';
-    function changed(){
-      if(year.value && month.value){
-        const old=day.value;refreshDays(day,year.value,month.value,old);
-      }
-      sync(hidden,day,month,year);
-    }
-    day.addEventListener('change',changed);month.addEventListener('change',changed);year.addEventListener('input',changed);year.addEventListener('change',changed);
-    fillFromHidden(hidden,day,month,year);
-    hidden.__v22={day,month,year,fill:()=>fillFromHidden(hidden,day,month,year),sync:()=>sync(hidden,day,month,year)};
-    return hidden.__v22;
+  function formatField(id){
+    const el=document.getElementById(id);
+    if(!el)return;
+    el.type='text';
+    el.inputMode='numeric';
+    el.autocomplete='bday';
+    el.placeholder='DD/MM/YYYY';
+    el.maxLength=10;
   }
   function init(){
-    makeSelector('newStudentDob');
-    makeSelector('editStudentDob');
-    // Keep the separate "new student from Sale" form unchanged because the
-    // request is limited to Student Registration and other pages/fields.
-    if(typeof window.editStudent==='function'&&!window.editStudent.__v22Wrapped){
-      const old=window.editStudent;
-      const wrapped=function(){const r=old.apply(this,arguments);setTimeout(()=>document.getElementById('editStudentDob')?.__v22?.fill(),0);return r};
-      wrapped.__v22Wrapped=true;window.editStudent=wrapped;
-    }
-    if(typeof window.resetNewStudentForm==='function'&&!window.resetNewStudentForm.__v22Wrapped){
-      const old=window.resetNewStudentForm;
-      const wrapped=function(){const r=old.apply(this,arguments);const h=document.getElementById('newStudentDob');if(h?.__v22){h.value='';h.__v22.fill()}return r};
-      wrapped.__v22Wrapped=true;window.resetNewStudentForm=wrapped;
-    }
-    // Existing inline handlers call the original functions directly, so also
-    // refresh the edit selector when the edit card becomes visible.
-    const editCard=document.getElementById('studentEditCard');
-    if(editCard && !editCard.dataset.v22Observer){
-      editCard.dataset.v22Observer='1';
-      new MutationObserver(()=>document.getElementById('editStudentDob')?.__v22?.fill()).observe(editCard,{attributes:true,attributeFilter:['class']});
-    }
+    formatField('newStudentDob');
+    formatField('editStudentDob');
   }
   if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',init,{once:true});else init();
 })();
 </script>
-
-
 
 <style id="commission-add-sale-toggle-v26">
   #saleCommission .commission-entry-card > h2{
