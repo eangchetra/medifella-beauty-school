@@ -6854,8 +6854,14 @@ function renderDermedSales(){
  const box=$("dermedSalesList");if(!box)return;
  const q=($("dermedSaleSearch")?.value||"").toLowerCase();
  const f=($("dermedPaymentFilter")?.value||"all");
+ // Prevent the Dermed Sale screen from showing the same invoice twice.
+ // We keep the newest database row for each invoice/reference number.
+ const seenRefs=new Set();
  const rows=salesRecords.filter(x=>{
    if(String(x.sale_type||"").toUpperCase()!=="DERMED") return false;
+   const ref=String(x.reference_no||x.id||"").trim();
+   if(ref && seenRefs.has(ref)) return false;
+   if(ref) seenRefs.add(ref);
    const status=saleStatus(saleTotal(x),salePaid(x));
    const hay=`${x.reference_no||""} ${x.student_name||""} ${x.student_phone||""} ${JSON.stringify(x.items||[])} ${JSON.stringify(x.service_items||[])}`.toLowerCase();
    return (f==="all"||status===f) && hay.includes(q);
