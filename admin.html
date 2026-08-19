@@ -2060,6 +2060,25 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .commission-modal-total{display:flex;justify-content:flex-end;gap:28px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:12px;padding-top:14px;color:var(--teal)}
 @media(max-width:800px){.commission-detail-info{grid-template-columns:1fr 1fr}.commission-modal-overlay{padding:8px}.commission-modal{padding:14px;margin:5px auto}}
 </style>
+
+<style id="sale-item-view-size-v21">
+/* One Product/Service View button per sale row.
+   Sized to match the larger View button requested by the user. */
+.sale-item-view-btn{
+  min-width:64px !important;
+  min-height:38px !important;
+  padding:9px 16px !important;
+  font-size:15px !important;
+  font-weight:600 !important;
+  line-height:1.15 !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  white-space:nowrap !important;
+  box-sizing:border-box !important;
+}
+</style>
+
 </head>
 <body>
 
@@ -4301,7 +4320,7 @@ function renderSales(){
  $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date / Time</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{
    const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
    const dt=saleDateValue(s),time=saleField(s,["sale_time","time"],"");
-   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td><button class="light" type="button" data-instant-item-v15 data-sale-id="${attr(s.id)}">View</button></td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button>${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
+   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td><button class="light sale-item-view-btn" type="button" data-instant-item-v15 data-sale-id="${attr(s.id)}">View</button></td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button>${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
  }).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
  updateSalesMetrics();
 }
@@ -6821,7 +6840,7 @@ function renderMtsSales(){
      <td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td>
      <td><strong>${esc(saleRef(x)||"—")}</strong></td>
      <td>${esc(saleCustomer(x)||"—")}<div class="muted">${esc(saleField(x,["student_phone","phone"],""))}</div></td>
-     <td><button class="light" type="button" data-instant-item-v15 data-sale-id="${attr(x.id)}">View</button></td>
+     <td><button class="light sale-item-view-btn" type="button" data-instant-item-v15 data-sale-id="${attr(x.id)}">View</button></td>
      <td>${money(total)}</td>
      <td>${money(paid)}</td>
      <td>${money(bal)}</td>
@@ -6901,7 +6920,7 @@ function renderDermedSales(){
      <td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td>
      <td><strong>${esc(x.reference_no||"—")}</strong></td>
      <td>${esc(x.student_name||"—")}<div class="muted">${esc(x.student_phone||"")}</div></td>
-     <td><button class="light" type="button" data-instant-item-v15 data-sale-id="${attr(x.id)}">View</button></td>
+     <td><button class="light sale-item-view-btn" type="button" data-instant-item-v15 data-sale-id="${attr(x.id)}">View</button></td>
      <td>${money(total)}</td>
      <td>${money(paid)}</td>
      <td>${money(bal)}</td>
