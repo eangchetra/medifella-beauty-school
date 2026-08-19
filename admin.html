@@ -11724,6 +11724,132 @@ async function loadCommissionRecords(retry=0){
   },true);
 })();
 </script>
+
+<script id="dermed-calculation-final-fix">
+(function(){
+  "use strict";
+
+  function el(id){return document.getElementById(id);}
+  function n(v){
+    const x=Number(String(v??"").replace(/[$,\s]/g,""));
+    return Number.isFinite(x)&&x>=0?x:0;
+  }
+  function money(v){
+    return typeof window.money==="function"
+      ?window.money(v)
+      :"$"+n(v).toFixed(2);
+  }
+  function discount(base,type,value){
+    const v=n(value);
+    return String(type||"percent").toLowerCase()==="usd"
+      ?Math.min(base,v)
+      :Math.min(base,base*v/100);
+  }
+
+  function recalcDermedUI(){
+    const products=Array.isArray(window.dermedSaleItems)?window.dermedSaleItems:[];
+    const services=Array.isArray(window.dermedServiceItems)?window.dermedServiceItems:[];
+
+    let subtotal=0;
+
+    products.forEach(x=>{
+      const base=n(x.price)*Math.max(1,n(x.quantity));
+      subtotal+=Math.max(0,base-discount(base,x.discount_type,x.discount_value));
+    });
+
+    services.forEach(x=>{
+      const base=n(x.price)*Math.max(1,n(x.quantity));
+      subtotal+=Math.max(0,base-discount(base,x.discount_type,x.discount_value));
+    });
+
+    const status=el("dermedPaymentStatus")?.value||"Paid";
+    const paid=status==="Paid"
+      ?subtotal
+      :status==="Due"
+        ?0
+        :Math.min(subtotal,n(el("dermedAmountPaidNow")?.value));
+
+    const due=Math.max(0,subtotal-paid);
+
+    if(el("dermedItemsSubtotal"))el("dermedItemsSubtotal").textContent=money(subtotal);
+    if(el("dermedSummarySubtotal"))el("dermedSummarySubtotal").textContent=money(subtotal);
+    if(el("dermedInitialTotal"))el("dermedInitialTotal").textContent=money(subtotal);
+    if(el("dermedPaidBalanceDisplay"))el("dermedPaidBalanceDisplay").textContent=money(paid);
+    if(el("dermedDueDisplay"))el("dermedDueDisplay").textContent=money(due);
+    if(el("dermedGrandTotalDue"))el("dermedGrandTotalDue").textContent=money(due);
+
+    const amount=el("dermedAmountPaidNow");
+    if(amount){
+      if(status==="Paid"){
+        amount.value=subtotal.toFixed(2);
+        amount.readOnly=true;
+      }else if(status==="Due"){
+        amount.value="0.00";
+        amount.readOnly=true;
+      }else{
+        amount.readOnly=false;
+        if(n(amount.value)>subtotal)amount.value=subtotal.toFixed(2);
+      }
+    }
+
+    return {subtotal,paid,due};
+  }
+
+  window.recalculateDermedSaleTotals=recalcDermedUI;
+
+  function bind(){
+    const input=el("dermedItemSearch");
+    const box=el("dermedItemResults");
+
+    if(input && input.dataset.finalCalcBound!=="1"){
+      input.dataset.finalCalcBound="1";
+      input.addEventListener("input",()=>setTimeout(recalcDermedUI,0));
+    }
+
+    if(box && box.dataset.finalCalcBound!=="1"){
+      box.dataset.finalCalcBound="1";
+      box.addEventListener("click",function(e){
+        const product=e.target.closest("[data-latest-product-id],[data-final-dermed-product]");
+        if(product){
+          setTimeout(recalcDermedUI,20);
+        }
+      },true);
+    }
+
+    // Recalculate when quantity, price, discount, payment status or amount changes.
+    const root=el("dermedItems");
+    if(root && root.dataset.finalCalcBound!=="1"){
+      root.dataset.finalCalcBound="1";
+      root.addEventListener("input",()=>setTimeout(recalcDermedUI,0),true);
+      root.addEventListener("change",()=>setTimeout(recalcDermedUI,0),true);
+    }
+
+    ["dermedPaymentStatus","dermedAmountPaidNow","dermedPaymentMethod"].forEach(id=>{
+      const x=el(id);
+      if(x && x.dataset.finalCalcBound!=="1"){
+        x.dataset.finalCalcBound="1";
+        x.addEventListener("input",recalcDermedUI);
+        x.addEventListener("change",recalcDermedUI);
+      }
+    });
+
+    setTimeout(recalcDermedUI,50);
+  }
+
+  function start(){
+    bind();
+    setTimeout(bind,300);
+    setTimeout(bind,1000);
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",start,{once:true});
+  }else{
+    start();
+  }
+})();
+</script>
+
 </body>
 </html>
 <style id="mts-invoice-edit-products-v8">
