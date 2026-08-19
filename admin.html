@@ -14033,7 +14033,7 @@ document.addEventListener("DOMContentLoaded",function(){
         <td>${esc(first.staff_name||"")}</td>
         <td>${esc(first.customer_name||"")}</td>
         <td>${esc(first.customer_phone||"")}</td>
-        <td><button type="button" class="light commission-view-btn" data-commission-view="${esc(key)}">View Details (${serviceCount})</button><div class="muted" style="margin-top:3px">${services}</div></td>
+        <td><button type="button" class="light commission-view-btn" data-commission-view="${esc(key)}">View Details (${serviceCount})</button></td>
         <td>$${money(sub)}</td>
         <td>$${money(com)}</td>
         <td><div class="actions"><button type="button" class="light commission-edit-btn" data-commission-edit="${esc(key)}">Edit</button><button type="button" class="danger commission-delete-btn" data-commission-delete="${esc(key)}">Delete</button></div></td>
@@ -14249,3 +14249,50 @@ document.addEventListener("DOMContentLoaded",function(){
 })();
 </script>
 
+
+
+<style id="commission-add-sale-toggle-v26">
+  #saleCommission .commission-entry-card > h2{
+    cursor:pointer;
+    user-select:none;
+    display:flex;
+    align-items:center;
+    justify-content:space-between;
+    gap:10px;
+  }
+  #saleCommission .commission-entry-card > h2::after{
+    content:"";
+    font-size:14px;
+    opacity:.7;
+  }
+  #saleCommission .commission-entry-card.is-collapsed > h2::after{content:"+";}
+  #saleCommission .commission-entry-card:not(.is-collapsed) > h2::after{content:"−";}
+  #saleCommission .commission-entry-card.is-collapsed > :not(h2){display:none !important;}
+</style>
+<script id="commission-add-sale-toggle-v26">
+(function(){
+  "use strict";
+  function bindCommissionToggle(){
+    const card=document.querySelector("#saleCommission .commission-entry-card");
+    const heading=card?.querySelector(":scope > h2");
+    if(!card || !heading || heading.dataset.v26Bound==="1") return;
+    heading.dataset.v26Bound="1";
+    heading.setAttribute("role","button");
+    heading.setAttribute("tabindex","0");
+    heading.setAttribute("aria-expanded","false");
+    function setOpen(open){
+      card.classList.toggle("is-collapsed",!open);
+      heading.setAttribute("aria-expanded",open?"true":"false");
+    }
+    setOpen(false);
+    heading.addEventListener("click",function(e){e.preventDefault();setOpen(card.classList.contains("is-collapsed"));});
+    heading.addEventListener("keydown",function(e){
+      if(e.key==="Enter" || e.key===" "){e.preventDefault();setOpen(card.classList.contains("is-collapsed"));}
+    });
+  }
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",bindCommissionToggle,{once:true});
+  else bindCommissionToggle();
+  setTimeout(bindCommissionToggle,300);
+  setTimeout(bindCommissionToggle,1000);
+})();
+</script>
