@@ -2145,7 +2145,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
       </div>
       <div>
         <label>Date of Birth *</label>
-        <input id="newStudentDob" type="text" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/YYYY" maxlength="10" pattern="\d{2}/\d{2}/\d{4}" required>
+        <input id="newStudentDob" type="text" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/YYYY" maxlength="10" required>
       </div>
     </div>
 
@@ -2198,7 +2198,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </div>
 <div class="row">
 <div><label>Gender</label><select id="editStudentGender"><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
-<div><label>Date of Birth</label><input id="editStudentDob" type="text" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/YYYY" maxlength="10" pattern="\d{2}/\d{2}/\d{4}"></div>
+<div><label>Date of Birth</label><input id="editStudentDob" type="date"></div>
 </div>
 <div class="row">
 <div><label>Student ID</label><input id="editStudentStudentId" readonly></div>
@@ -2388,7 +2388,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     </div>
     <div class="row">
       <div><label>Gender</label><select id="saleNewStudentGender"><option value="">Select gender</option><option value="Male">Male</option><option value="Female">Female</option><option value="Other">Other</option></select></div>
-      <div><label>Date of Birth</label><input id="saleNewStudentDob" type="text" inputmode="numeric" autocomplete="bday" placeholder="DD/MM/YYYY" maxlength="10" pattern="\d{2}/\d{2}/\d{4}"></div>
+      <div><label>Date of Birth</label><input id="saleNewStudentDob" type="date"></div>
     </div>
     <div class="row">
       <div><label>Student ID</label><input id="saleNewStudentStudentId" placeholder="Automatically generated" readonly></div>
@@ -3366,40 +3366,6 @@ function renderStudents(){
 }
 $("studentSearch").oninput=renderStudents;$("studentFilter").onchange=renderStudents;$("studentRefresh").onclick=loadStudents;
 async function setStudent(id,status){const{error}=await sb.from("students").update({status,verified:status==="verified"}).eq("id",id);if(error)msg($("studentStatus"),error.message,true);else{msg($("studentStatus"),"Student updated.");await loadStudents();updateMetrics()}}
-function formatStudentDobField(el){
-  if(!el)return;
-  let v=String(el.value||"").replace(/[^\d]/g,"").slice(0,8);
-  if(v.length>4)v=v.slice(0,2)+"/"+v.slice(2,4)+"/"+v.slice(4);
-  else if(v.length>2)v=v.slice(0,2)+"/"+v.slice(2);
-  el.value=v;
-}
-
-function studentDobToIso(value){
-  const v=String(value||"").trim();
-  if(!v)return "";
-  if(/^\d{4}-\d{2}-\d{2}$/.test(v))return v;
-  const m=v.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-  if(!m)return "";
-  const d=Number(m[1]), mo=Number(m[2]), y=Number(m[3]);
-  const dt=new Date(y,mo-1,d);
-  if(dt.getFullYear()!==y || dt.getMonth()!==mo-1 || dt.getDate()!==d)return "";
-  return `${y}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
-}
-
-function studentDobToDisplay(value){
-  const v=String(value||"").trim();
-  if(!v)return "";
-  const iso=studentDobToIso(v);
-  if(!iso)return v;
-  const [y,m,d]=iso.split("-");
-  return `${d}/${m}/${y}`;
-}
-
-["newStudentDob","editStudentDob","saleNewStudentDob"].forEach(id=>{
-  const el=$(id);
-  if(el)el.addEventListener("input",()=>formatStudentDobField(el));
-});
-
 function editStudent(id){
  const s=students.find(x=>x.id===id);
  if(!s)return;
@@ -3409,7 +3375,7 @@ function editStudent(id){
  $("editStudentEmail").value=s.email||"";
  $("editStudentPhone").value=s.phone||"";
  $("editStudentGender").value=s.gender||"";
- $("editStudentDob").value=studentDobToDisplay(s.date_of_birth||"");
+ $("editStudentDob").value=s.date_of_birth||"";
  $("editStudentStudentId").value=s.student_id||"";
  $("editStudentAddress").value=s.address||"";
  $("editStudentPhoto").value="";
@@ -3449,6 +3415,25 @@ $("newStudentPhoto").onchange=()=>{
   $("newStudentPhotoPreview").innerHTML=`<div>Selected photo:</div><img src="${attr(url)}" alt="" style="width:90px;height:120px;object-fit:cover;border-radius:8px;margin-top:6px">`;
 };
 
+function formatNewStudentDob(){
+  const el=$("newStudentDob");
+  if(!el)return;
+  let v=String(el.value||"").replace(/\D/g,"").slice(0,8);
+  if(v.length>4)v=v.slice(0,2)+"/"+v.slice(2,4)+"/"+v.slice(4);
+  else if(v.length>2)v=v.slice(0,2)+"/"+v.slice(2);
+  el.value=v;
+}
+$("newStudentDob")?.addEventListener("input",formatNewStudentDob);
+
+function newStudentDobToIso(value){
+  const m=String(value||"").trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+  if(!m)return "";
+  const d=Number(m[1]), mo=Number(m[2]), y=Number(m[3]);
+  const dt=new Date(y,mo-1,d);
+  if(dt.getFullYear()!==y || dt.getMonth()!==mo-1 || dt.getDate()!==d)return "";
+  return `${y}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+}
+
 async function nextStudentId(){
   const year=new Date().getFullYear();
   const {data,error}=await sb.from("students").select("student_id").like("student_id",`MFS-${year}-%`);
@@ -3468,7 +3453,7 @@ $("saveNewStudent").onclick=async()=>{
 
   const gender=$("newStudentGender").value;
   const dobInput=$("newStudentDob").value.trim();
-  const dob=studentDobToIso(dobInput);
+  const dob=newStudentDobToIso(dobInput);
   const photoFile=$("newStudentPhoto").files[0];
 
   if(!fullName||!fullNameKm||!phone||!gender||!dob){
@@ -3537,16 +3522,11 @@ $("saveSaleNewStudent").onclick=async()=>{
   const phone=$("saleNewStudentPhone").value.trim();
   const email=$("saleNewStudentEmail").value.trim();
   const gender=$("saleNewStudentGender").value;
-  const dobInput=$("saleNewStudentDob").value.trim();
-  const dob=studentDobToIso(dobInput);
+  const dob=$("saleNewStudentDob").value;
   const address=$("saleNewStudentAddress").value.trim();
 
   if(!fullName||!fullNameKm||!phone){
     msg($("saleNewStudentStatus"),"Please fill English Name, Khmer Name and Phone Number.",true);
-    return;
-  }
-  if(dobInput && (!/^\d{2}\/\d{2}\/\d{4}$/.test(dobInput) || !dob)){
-    msg($("saleNewStudentStatus"),"Date of Birth must be entered as DD/MM/YYYY (for example 17/08/1998).",true);
     return;
   }
   if(!/^\d{7,}$/.test(phone)){
@@ -3628,14 +3608,10 @@ $("saveStudentEdit").onclick=async()=>{
    email:$("editStudentEmail").value.trim(),
    phone:$("editStudentPhone").value.trim(),
    gender:$("editStudentGender").value,
-   date_of_birth:studentDobToIso($("editStudentDob").value.trim())||null,
+   date_of_birth:$("editStudentDob").value||null,
    student_id:$("editStudentStudentId").value.trim(),
    address:$("editStudentAddress").value.trim()
  };
- const editDobInput=$("editStudentDob").value.trim();
- if(editDobInput && (!/^\d{2}\/\d{2}\/\d{4}$/.test(editDobInput) || !studentDobToIso(editDobInput))){
-   msg($("editStudentStatus"),"Date of Birth must be entered as DD/MM/YYYY (for example 17/08/1998).",true);return;
- }
  if(photoFile && !["image/jpeg","image/png","image/webp"].includes(photoFile.type)){
    msg($("editStudentStatus"),"Student photo must be JPG, PNG, or WEBP.",true);return;
  }
