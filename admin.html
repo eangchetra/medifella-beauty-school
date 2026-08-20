@@ -2041,6 +2041,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .commission-modal-total{display:flex;justify-content:flex-end;gap:28px;flex-wrap:wrap;border-top:1px solid var(--line);margin-top:12px;padding-top:14px;color:var(--teal)}
 @media(max-width:800px){.commission-detail-info{grid-template-columns:1fr 1fr}.commission-modal-overlay{padding:8px}.commission-modal{padding:14px;margin:5px auto}}
 </style>
+<meta name="dermed-appointment-fix" content="schema-safe-v2"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
 </head>
 <body>
 
@@ -9826,9 +9827,23 @@ document.addEventListener("DOMContentLoaded",function(){
     }
   }
   async function insertAppointment(row){
-    const {data,error}=await sb.from("medifella_appointments").insert(row).select("*").single();
-    if(error)throw error;
-    return data;
+    // Compatibility with the current medifella_appointments schema.
+    // Some older versions of this page used customer_source, but that column
+    // does not exist in the current table. Never send it to Supabase.
+    const clean=Object.assign({},row);
+    delete clean.customer_source;
+    delete clean.customerSource;
+    let result=await sb.from("medifella_appointments").insert(clean).select("*").single();
+    // If an older cached handler somehow adds customer_source, retry once
+    // with that unsupported field removed.
+    if(result.error && /customer_source/i.test(String(result.error.message||""))){
+      const retry=Object.assign({},clean);
+      delete retry.customer_source;
+      delete retry.customerSource;
+      result=await sb.from("medifella_appointments").insert(retry).select("*").single();
+    }
+    if(result.error)throw result.error;
+    return result.data;
   }
   async function updateAppointmentDb(id,changes){
     const {data,error}=await sb.from("medifella_appointments")
@@ -9936,7 +9951,6 @@ document.addEventListener("DOMContentLoaded",function(){
       customer_name:data.name,
       customer_phone:data.phone,
       customer_code:data.code,
-      customer_source:data.source,
       customer_type:customerType(),
       date,time,
       note:String(A("appointmentNote")?.value||"").trim(),
@@ -10210,7 +10224,7 @@ document.addEventListener("DOMContentLoaded",function(){
       const date=A("appointmentDate").value,time=A("appointmentTime").value;
       if(!date||!time){showStatus("Please select date and time.",true);return}
       const data=appointmentCustomer(c,customerSource);
-      updateAppointment(editId,{customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,customer_source:data.source,customer_type:customerType(),date,time,note:String(A("appointmentNote")?.value||"").trim()});
+      updateAppointment(editId,{customer_id:data.id,customer_name:data.name,customer_phone:data.phone,customer_code:data.code,customer_type:customerType(),date,time,note:String(A("appointmentNote")?.value||"").trim()});
       showStatus("Appointment updated successfully.",false);
       A("saveAppointment").textContent="Save Appointment";
       delete A("saveAppointment").dataset.editId;
@@ -15574,7 +15588,6 @@ async function loadCommissionRecords(retry=0){
       customer_name:data.name,
       customer_phone:data.phone,
       customer_code:data.code,
-      customer_source:source,
       customer_type:E("dermedAppointmentCustomerType")?.value||"Old Customer",
       date,time,note,status:"pending",
       created_at:new Date().toISOString(),
@@ -15586,9 +15599,8 @@ async function loadCommissionRecords(retry=0){
     if(status)status.textContent="Saving appointment...";
 
     try{
-      // Use the same Supabase appointment table as Appointment Management.
-      const r=await sb.from("medifella_appointments").insert(row).select("*").single();
-      if(r.error)throw r.error;
+      // Use the same schema-safe writer as Appointment Management.
+      const r=await insertAppointment(row);
 
       // Refresh Appointment Management data if available.
       if(typeof window.refreshAppointments==="function"){
@@ -15705,6 +15717,21 @@ async function loadCommissionRecords(retry=0){
 <style id="dermed-list-add-appointment-style">
 .dermed-list-add-appointment{margin-left:6px;white-space:nowrap}
 </style>
+<script id="dermed-appointment-save-compat">
+(function(){
+  "use strict";
+  // Existing database schema does not have medifella_appointments.customer_source.
+  // Keep the selected customer/student ID and save only fields supported by the
+  // current appointment schema. This wrapper also retries once if an older
+  // browser-cached handler still sends customer_source.
+  window._dermedAppointmentSaveCompat = async function(payload){
+    const clean = Object.assign({}, payload);
+    delete clean.customer_source;
+    delete clean.customerSource;
+    return clean;
+  };
+})();
+</script>
 <script id="dermed-list-add-appointment-final">
 (function(){
   "use strict";
