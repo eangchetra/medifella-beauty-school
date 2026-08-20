@@ -11962,7 +11962,13 @@ async function loadCommissionRecords(retry=0){
         service_id:x.service_id||null,
         unit:Math.max(1,N(x.quantity??x.unit??1)),
         unit_price:N(x.price??x.unit_price),
-        discount:N(x.discount??x.discount_amount),
+        // Store the actual discount used by the Dermed sale.
+        // USD discount is per unit, so lineTotal() already applies it
+        // quantity times. The Commission List must show that same discount.
+        discount:Math.max(0,
+          Math.max(1,N(x.quantity??x.unit??1))*Math.max(0,N(x.price??x.unit_price??0))
+          -lineTotal(x)
+        ),
         subtotal:base,
         commission_rate:rate,
         commission_amount:base*rate,
@@ -11994,7 +12000,12 @@ async function loadCommissionRecords(retry=0){
         service_id:x.service_id||null,
         unit:Math.max(1,N(x.quantity??x.unit??1)),
         unit_price:N(x.price??x.unit_price),
-        discount:N(x.discount??x.discount_amount),
+        // Keep the Commission List discount consistent with the Dermed
+        // Sale calculation, including USD discount-per-unit.
+        discount:Math.max(0,
+          Math.max(1,N(x.quantity??x.unit??1))*Math.max(0,N(x.price??x.unit_price??0))
+          -lineTotal(x)
+        ),
         subtotal:base,
         commission_rate:rate,
         commission_amount:base*rate,
@@ -14791,20 +14802,59 @@ async function loadCommissionRecords(retry=0){
 (function(){
   "use strict";
 
-  function wrap(){
+  function num(v){
+    const n=Number(String(v??"").replace(/[$,\s]/g,""));
+    return Number.isFinite(n)?n:0;
+  }
+
+  function lineTotal(x){
+    const qty=Math.max(1,num(x?.quantity??x?.unit??1));
+    const price=Math.max(0,num(x?.price??x?.unit_price??0));
+    const base=qty*price;
+    const dv=Math.max(0,num(x?.discount_value));
+    const dt=String(x?.discount_type||"percent").toLowerCase();
+    const discount=dt==="usd"
+      ?Math.min(base,dv*qty)
+      :Math.min(base,base*dv/100);
+    return Math.max(0,base-discount);
+  }
+
+  function serviceType(x){
+    const s=String(x?.service_type||x?.type||"").toLowerCase();
+    return s.includes("with product")||s.includes("service_product")
+      ?"Service With Product":"Only Service";
+  }
+
+  function paymentType(x){
+    return String(x?.service_payment_type||"Single").toLowerCase()==="package"
+      ?"Package":"Single";
+  }
+
+  function install(){
     const original=window.recordFirstDermedSaleCommission;
     if(typeof original!=="function") return false;
-    if(original.__packageCombinedWrapped) return true;
+    if(original.__firstPaymentPackageFixed) return true;
 
-    async function combined(args){
+    async function fixed(args){
       try{
-        // Verify first invoice + first payment before allowing the existing
-        // commission calculation to run.
-        const sale=args?.sale, buyerType=args?.buyerType, buyerId=args?.buyerId;
-        if(!sale?.id || !buyerId) return;
+        const sale=args?.sale;
+        const buyerType=args?.buyerType;
+        const buyerId=args?.buyerId;
 
+        if(!sale?.id || !buyerId || !args?.staffId) return;
+
+        // Prevent duplicate commission for this invoice.
+        const sameInvoice=await sb.from("medifella_sale_commissions")
+          .select("id")
+          .eq("source_sale_id",String(sale.id))
+          .eq("source","dermed_auto")
+          .limit(1);
+
+        if(!sameInvoice.error && sameInvoice.data?.length) return;
+
+        // Customer's FIRST Dermed invoice only.
         let q=sb.from("medifella_sales")
-          .select("id,created_at")
+          .select("id,created_at,sale_date,paid")
           .eq("sale_type","DERMED");
 
         q=buyerType==="student"
@@ -14817,8 +14867,8 @@ async function loadCommissionRecords(retry=0){
         const sales=Array.isArray(history.data)?history.data:[];
         if(sales.length && String(sales[0].id)!==String(sale.id)) return;
 
-        // Any existing automatic commission means the first-payment
-        // commission has already been issued.
+        // If this customer already has an automatic commission, the
+        // first-payment commission was already issued.
         let cq=sb.from("medifella_sale_commissions")
           .select("id")
           .eq("source","dermed_auto");
@@ -14830,78 +14880,47 @@ async function loadCommissionRecords(retry=0){
         const prior=await cq.limit(1);
         if(prior.error || prior.data?.length) return;
 
-        // IMPORTANT:
-        // We call the original calculator only for the first payment.
-        // The original calculator may create separate package rows, so after
-        // it returns we do not duplicate them. Package combining is handled
-        // by a dedicated combined insert below instead.
-        //
-        // To keep the existing service-rate logic, calculate the package
-        // amount here and create ONE combined package row, while letting the
-        // original function handle single-service rows would create duplicate
-        // package rows. Therefore we cannot call original when packages exist.
         const services=Array.isArray(args?.servicesArr)?args.servicesArr:[];
-        const packages=services.filter(x=>
-          String(x?.service_payment_type||"Single").toLowerCase()==="package"
-        );
+        const packages=services.filter(x=>paymentType(x)==="Package");
 
+        // If there are no packages, preserve the original working
+        // calculation for single/service-with-product.
         if(!packages.length){
           return await original(args);
         }
 
-        const num=v=>{
-          const n=Number(String(v??"").replace(/[$,\s]/g,""));
-          return Number.isFinite(n)?n:0;
-        };
-
-        const line=x=>{
-          const qty=Math.max(1,num(x?.quantity??x?.unit??1));
-          const price=Math.max(0,num(x?.price??x?.unit_price));
-          const base=qty*price;
-          const dv=Math.max(0,num(x?.discount_value));
-          const dt=String(x?.discount_type||"percent").toLowerCase();
-          return Math.max(0,base-(dt==="usd"?Math.min(base,dv*qty):Math.min(base,base*dv/100)));
-        };
-
-        const products=Array.isArray(args?.items)?args.items:[];
-        const singles=services.filter(x=>
-          String(x?.service_payment_type||"Single").toLowerCase()!=="package"
-        );
-
-        const productTotal=products.reduce((s,x)=>s+line(x),0);
-        const singleTotal=singles.reduce((s,x)=>s+line(x),0);
-        const packageTotal=packages.reduce((s,x)=>s+line(x),0);
-
+        /*
+          IMPORTANT FIX:
+          The Dermed save code stores the current payment in sale.paid.
+          Therefore the FIRST payment is read from sale.paid, not from
+          first_payment_amount / amount_paid_now fields that may not exist.
+        */
         const firstPayment=Math.max(0,num(
-          sale?.first_payment_amount ??
-          sale?.paid_amount_first_payment ??
-          sale?.initial_payment ??
-          sale?.amount_paid_now ??
-          sale?.paid_now ??
-          0
+          sale?.paid
+          ??sale?.first_payment_amount
+          ??sale?.paid_amount_first_payment
+          ??sale?.initial_payment
+          ??sale?.amount_paid_now
+          ??sale?.paid_now
+          ??0
         ));
+
         if(firstPayment<=0) return;
 
-        const packagePaid=Math.min(
-          Math.max(0,firstPayment-productTotal-singleTotal),
-          packageTotal
-        );
-        if(packagePaid<=0){
-          // No package portion was paid; use original for eligible singles.
-          return await original(args);
-        }
+        const products=Array.isArray(args?.items)?args.items:[];
+        const singles=services.filter(x=>paymentType(x)!=="Package");
+
+        const productTotal=products.reduce((s,x)=>s+lineTotal(x),0);
+        const singleTotal=singles.reduce((s,x)=>s+lineTotal(x),0);
+        const packageTotal=packages.reduce((s,x)=>s+lineTotal(x),0);
+
+        // Product and Single Service must be paid first.
+        let singleBudget=Math.max(0,firstPayment-productTotal);
 
         const cfg=typeof window.getCurrentSaleStaffConfig==="function"
           ?window.getCurrentSaleStaffConfig(args.staffId):null;
         if(!cfg) return;
 
-        const firstPackage=packages.find(x=>line(x)>0);
-        const st=String(firstPackage?.service_type||firstPackage?.type||"").toLowerCase();
-        const withProduct=st.includes("with product")||st.includes("service_product");
-        const rate=(withProduct?num(cfg.service_product_rate):num(cfg.service_rate))/100;
-        if(rate<=0) return;
-
-        const names=packages.filter(x=>line(x)>0).map(x=>x.name||"Package Service");
         const common={
           commission_date:String(sale?.sale_date||new Date().toISOString()).slice(0,10),
           staff_id:args.staffId,
@@ -14910,88 +14929,144 @@ async function loadCommissionRecords(retry=0){
           student_id:buyerType==="student"?buyerId:null,
           customer_name:args.buyer?.name||args.buyer?.full_name||sale?.customer_name||sale?.student_name||"",
           customer_phone:args.buyer?.phone||sale?.customer_phone||sale?.student_phone||"",
-          service_type:withProduct?"service_product":"service",
-          service_detail:names.join(" + "),
-          service_id:null,
-          unit:1,
-          unit_price:packagePaid,
-          discount:0,
-          subtotal:packagePaid,
-          commission_rate:rate,
-          commission_amount:packagePaid*rate,
           source:"dermed_auto",
           source_sale_id:String(sale.id),
           reference_no:sale?.reference_no||"",
           created_by:args.adminId||null
         };
 
-        // Insert the combined package row. Then separately calculate singles
-        // using the original calculator is unsafe because it may also insert
-        // another package row. Instead, calculate eligible singles here.
-        const singleRows=[];
-        let budget=Math.max(0,firstPayment-productTotal);
+        const rows=[];
+
+        // Single services are separate and only earn commission when fully paid.
         for(const x of singles){
-          const base=line(x);
-          const covered=Math.min(base,budget);
-          budget=Math.max(0,budget-covered);
-          if(base<=0 || covered+0.005<base) continue;
+          const base=lineTotal(x);
+          if(base<=0) continue;
 
-          const sx=String(x?.service_type||x?.type||"").toLowerCase();
-          const swp=sx.includes("with product")||sx.includes("service_product");
-          const sr=(swp?num(cfg.service_product_rate):num(cfg.service_rate))/100;
-          if(sr<=0)continue;
+          const covered=Math.min(base,singleBudget);
+          singleBudget=Math.max(0,singleBudget-covered);
 
-          singleRows.push({...common,
+          if(covered+0.005<base) continue;
+
+          const swp=serviceType(x)==="Service With Product";
+          const rate=(swp?num(cfg.service_product_rate):num(cfg.service_rate))/100;
+          if(rate<=0) continue;
+
+          rows.push({
+            ...common,
             service_type:swp?"service_product":"service",
             service_detail:x.name||"Service",
             service_id:x.service_id||null,
             unit:Math.max(1,num(x.quantity??x.unit??1)),
             unit_price:num(x.price??x.unit_price),
+            discount:Math.max(0,
+              Math.max(1,num(x.quantity??x.unit??1))*Math.max(0,num(x.price??x.unit_price??0))
+              -base
+            ),
             subtotal:base,
-            commission_rate:sr,
-            commission_amount:base*sr
+            commission_rate:rate,
+            commission_amount:base*rate
           });
         }
 
-        const rows=[...singleRows,common];
+        // Remaining first-payment amount goes to packages.
+        const packageBudget=Math.min(
+          Math.max(0,firstPayment-productTotal-singleTotal),
+          packageTotal
+        );
 
-        // Save as one commission batch.
+        if(packageBudget>0){
+          let remaining=packageBudget;
+          let combined=0;
+          const names=[];
+
+          for(const x of packages){
+            const base=lineTotal(x);
+            if(base<=0) continue;
+
+            const covered=Math.min(base,remaining);
+            remaining=Math.max(0,remaining-covered);
+
+            if(covered>0){
+              combined+=covered;
+              names.push(x.name||"Package Service");
+            }
+
+            if(remaining<=0) break;
+          }
+
+          if(combined>0){
+            // All packages are one combined commission row.
+            // Use the package rate selected for the package services.
+            const firstPackage=packages.find(x=>lineTotal(x)>0);
+            const swp=firstPackage?serviceType(firstPackage)==="Service With Product":false;
+            const rate=(swp?num(cfg.service_product_rate):num(cfg.service_rate))/100;
+
+            if(rate>0){
+              rows.push({
+                ...common,
+                service_type:swp?"service_product":"service",
+                service_detail:names.join(" + "),
+                service_id:null,
+                unit:1,
+                unit_price:combined,
+                discount:0,
+                subtotal:combined,
+                commission_rate:rate,
+                commission_amount:combined*rate
+              });
+            }
+          }
+        }
+
+        if(!rows.length) return;
+
+        // Insert once. Handle optional/missing columns without abandoning the
+        // commission record.
         let pending=rows;
         for(let attempt=0;attempt<8;attempt++){
           const r=await sb.from("medifella_sale_commissions").insert(pending);
-          if(!r.error)return;
+          if(!r.error) return;
 
           const e=String(r.error.message||r.error.details||"");
           const mm=e.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']?.*does not exist/i)
             ||e.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i)
             ||e.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
 
-          if(mm&&Object.prototype.hasOwnProperty.call(pending[0],mm[1])){
-            pending=pending.map(row=>{const c={...row};delete c[mm[1]];return c;});
+          if(mm && Object.prototype.hasOwnProperty.call(pending[0],mm[1])){
+            pending=pending.map(row=>{
+              const copy={...row};
+              delete copy[mm[1]];
+              return copy;
+            });
             continue;
           }
+
+          console.error("Dermed commission insert failed:",r.error);
           return;
         }
       }catch(err){
-        console.error("Combined package commission:",err);
+        console.error("Dermed first-payment commission:",err);
       }
     }
 
-    combined.__packageCombinedWrapped=true;
-    window.recordFirstDermedSaleCommission=combined;
+    fixed.__firstPaymentPackageFixed=true;
+    window.recordFirstDermedSaleCommission=fixed;
     return true;
   }
 
   function boot(){
-    if(wrap())return;
-    setTimeout(wrap,300);
-    setTimeout(wrap,800);
-    setTimeout(wrap,1500);
-    setTimeout(wrap,2500);
+    if(install()) return;
+    setTimeout(install,300);
+    setTimeout(install,800);
+    setTimeout(install,1500);
+    setTimeout(install,2500);
   }
 
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});
-  else boot();
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",boot,{once:true});
+  }else{
+    boot();
+  }
 })();
 </script>
 </body>
