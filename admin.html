@@ -7170,27 +7170,124 @@ async function recordDermedSalePayment(id){
  const s=salesRecords.find(x=>String(x.id)===String(id)&&String(x.sale_type||"").toUpperCase()==="DERMED");
  if(!s){alert("Dermed sale not found.");return;}
  const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
- if(balance<=0.005){return;}
- const raw=prompt(`Due for ${saleRef(s)} is ${money(balance)}.\nEnter additional payment amount:`,String(balance));
- if(raw===null)return;
- const amount=parseMoneyInput(raw);
- if(amount<=0||amount>balance+0.005){alert("Enter a valid payment amount not greater than the Due amount.");return;}
- const method=prompt("Payment method (Cash / ABA / Bank Transfer / Card / Other):","Cash")||"Cash";
- try{
-   const paymentDate=new Date();
-   const{error:pe}=await sb.from("medifella_sale_payments").insert({
-     sale_id:String(id),amount,payment_method:method,
-     payment_date:paymentDate.toISOString().slice(0,10),
-     note:"Additional Dermed Sale payment",created_by:adminUser.id
-   });
-   if(pe)throw pe;
-   const newPaid=paid+amount;
-   const{error:se}=await sb.from("medifella_sales").update({
-     paid:newPaid,balance:Math.max(0,total-newPaid),payment_status:saleStatus(total,newPaid)
-   }).eq("id",id).eq("sale_type","DERMED");
-   if(se)throw se;
-   await loadSales();
- }catch(e){alert(e.message||"Could not record Dermed Sale payment.");}
+ if(balance<=0.005){alert("This invoice has no remaining Due amount.");return;}
+
+ let o=$("dermedPaymentOverlay");
+ if(!o){
+   o=document.createElement("div");
+   o.id="dermedPaymentOverlay";
+   o.className="commission-modal-overlay";
+   document.body.appendChild(o);
+ }
+ const now=new Date();
+ const localDate=now.toISOString().slice(0,10);
+ const localTime=now.toTimeString().slice(0,5);
+
+ o.innerHTML=`<div class="commission-modal" style="max-width:520px">
+   <div class="commission-modal-head">
+     <div>
+       <h2 style="margin:0">Add Payment</h2>
+       <div class="muted">Dermed Sale · ${esc(saleRef(s)||"")} · ${esc(saleCustomer(s)||"")}</div>
+     </div>
+     <button type="button" class="light" id="dermedPaymentClose">×</button>
+   </div>
+   <div class="commission-detail-info" style="margin-bottom:14px">
+     <div><strong>Total:</strong> ${money(total)}</div>
+     <div><strong>Already Paid:</strong> ${money(paid)}</div>
+     <div><strong>Due:</strong> ${money(balance)}</div>
+   </div>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+     <label style="display:block">
+       <strong>Payment Amount *</strong>
+       <input id="dermedPaymentAmount" type="number" min="0.01" max="${balance.toFixed(2)}" step="0.01"
+              value="${balance.toFixed(2)}" style="width:100%;box-sizing:border-box;margin-top:6px">
+     </label>
+     <label style="display:block">
+       <strong>Payment Method *</strong>
+       <select id="dermedPaymentMethod" style="width:100%;box-sizing:border-box;margin-top:6px">
+         <option value="Cash">Cash</option>
+         <option value="ABA">ABA</option>
+         <option value="Bank Transfer">Bank Transfer</option>
+         <option value="Card">Card</option>
+         <option value="Other">Other</option>
+       </select>
+     </label>
+     <label style="display:block">
+       <strong>Payment Date *</strong>
+       <input id="dermedPaymentDate" type="date" value="${localDate}" style="width:100%;box-sizing:border-box;margin-top:6px">
+     </label>
+     <label style="display:block">
+       <strong>Payment Time *</strong>
+       <input id="dermedPaymentTime" type="time" value="${localTime}" style="width:100%;box-sizing:border-box;margin-top:6px">
+     </label>
+   </div>
+   <label style="display:block;margin-top:12px">
+     <strong>Note</strong>
+     <input id="dermedPaymentNote" type="text" value="Additional Dermed Sale payment"
+            style="width:100%;box-sizing:border-box;margin-top:6px">
+   </label>
+   <div id="dermedPaymentError" class="error" style="display:none;margin-top:12px"></div>
+   <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+     <button type="button" class="light" id="dermedPaymentCancel">Cancel</button>
+     <button type="button" class="gold" id="dermedPaymentSave">Save Payment</button>
+   </div>
+ </div>`;
+ o.classList.add("show");
+ o.setAttribute("aria-hidden","false");
+
+ const close=()=>{o.classList.remove("show");o.setAttribute("aria-hidden","true");};
+ $("dermedPaymentClose").onclick=close;
+ $("dermedPaymentCancel").onclick=close;
+
+ $("dermedPaymentSave").onclick=async()=>{
+   const amount=parseMoneyInput($("dermedPaymentAmount").value);
+   const method=String($("dermedPaymentMethod").value||"Cash").trim()||"Cash";
+   const date=String($("dermedPaymentDate").value||"");
+   const time=String($("dermedPaymentTime").value||"");
+   const note=String($("dermedPaymentNote").value||"").trim();
+   const err=$("dermedPaymentError");
+   const showErr=msg=>{err.textContent=msg;err.style.display="block";};
+
+   if(amount<=0){showErr("Enter a valid payment amount.");return;}
+   if(amount>balance+0.005){showErr(`Payment cannot be greater than the Due amount of ${money(balance)}.`);return;}
+   if(!date||!time){showErr("Please select the payment date and time.");return;}
+
+   const paymentTimestamp=new Date(`${date}T${time}:00`);
+   if(Number.isNaN(paymentTimestamp.getTime())){showErr("Invalid payment date or time.");return;}
+
+   const btn=$("dermedPaymentSave");
+   btn.disabled=true; btn.textContent="Saving...";
+
+   try{
+     const payload={
+       sale_id:String(id),
+       amount,
+       payment_method:method,
+       payment_date:date,
+       note:note||"Additional Dermed Sale payment",
+       created_by:adminUser.id,
+       created_at:paymentTimestamp.toISOString()
+     };
+     const{error:pe}=await sb.from("medifella_sale_payments").insert(payload);
+     if(pe)throw pe;
+
+     const newPaid=paid+amount;
+     const{error:se}=await sb.from("medifella_sales").update({
+       paid:newPaid,
+       balance:Math.max(0,total-newPaid),
+       payment_status:saleStatus(total,newPaid)
+     }).eq("id",id).eq("sale_type","DERMED");
+     if(se)throw se;
+
+     close();
+     await loadSales();
+     await showSalePaymentDetails(id);
+   }catch(e){
+     console.error("Dermed payment save error:",e);
+     showErr(e?.message||"Could not record Dermed Sale payment.");
+     btn.disabled=false; btn.textContent="Save Payment";
+   }
+ };
 }
 
 function showDermedSaleInvoice(id,size="A4"){
@@ -9951,6 +10048,9 @@ document.addEventListener("DOMContentLoaded",function(){
     if(result.error)throw result.error;
     return result.data;
   }
+  // Make the shared appointment writer available to the Dermed Sale
+  // appointment modal, which is initialized in a separate script scope.
+  window.insertAppointment = insertAppointment;
   async function updateAppointmentDb(id,changes){
     const {data,error}=await sb.from("medifella_appointments")
       .update(changes)
@@ -15705,8 +15805,9 @@ async function loadCommissionRecords(retry=0){
     if(status)status.textContent="Saving appointment...";
 
     try{
+      if(typeof window.insertAppointment!=="function") throw new Error("Appointment save function is not available. Please refresh the page and try again.");
       // Use the same schema-safe writer as Appointment Management.
-      const r=await insertAppointment(row);
+      const r=await window.insertAppointment(row);
 
       // Refresh Appointment Management data if available.
       if(typeof window.refreshAppointments==="function"){
