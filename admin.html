@@ -4313,8 +4313,8 @@ async function showSalePaymentDetails(id){
  o.innerHTML=`<div class="commission-modal">
  <div class="commission-modal-head"><div><h2 style="margin:0">Payment Details</h2><div class="muted">${esc(saleRef(s)||"")} · ${esc(saleCustomer(s)||"")}</div></div><button type="button" class="light" onclick="$('salePaymentDetailsOverlay')?.classList.remove('show')">×</button></div>
  <div class="commission-detail-info"><div><strong>Total:</strong> ${money(total)}</div><div><strong>Paid:</strong> ${money(paid)}</div><div><strong>Due:</strong> ${money(due)}</div></div>
- <div class="table-wrap"><table class="table"><thead><tr><th>Date</th><th>Amount</th><th>Payment Method</th><th>Note</th></tr></thead><tbody>
- ${payments.length?payments.map(p=>`<tr><td>${esc(String(p.payment_date||p.created_at||"").slice(0,10))}</td><td>${money(Number(p.amount||0))}</td><td>${esc(p.payment_method||"—")}</td><td>${esc(p.note||"")}</td></tr>`).join(""):`<tr><td colspan="4" class="muted">No payment history found.</td></tr>`}
+ <div class="table-wrap"><table class="table"><thead><tr><th>Date / Time</th><th>Amount</th><th>Payment Method</th><th>Note</th></tr></thead><tbody>
+ ${payments.length?payments.map(p=>{const ts=String(p.created_at||"");const date=String(p.payment_date||ts||"").slice(0,10);let time="";if(ts){const d=new Date(ts);if(!Number.isNaN(d.getTime()))time=d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});}return `<tr><td>${esc(date)}${time?`<div class="muted">${esc(time)}</div>`:""}</td><td>${money(Number(p.amount||0))}</td><td>${esc(p.payment_method||"—")}</td><td>${esc(p.note||"")}</td></tr>`}).join(""):`<tr><td colspan="4" class="muted">No payment history found.</td></tr>`}
  </tbody></table></div></div>`;
  o.classList.add("show");
 }
@@ -4359,26 +4359,132 @@ function updateSalesMetrics(){
 async function recordSalePayment(id){
  const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
  const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
- const raw=prompt(`Due for ${saleRef(s)} is ${money(balance)}.\nEnter additional payment amount:`,String(balance));
- if(raw===null)return;
- const amount=parseMoneyInput(raw);
- if(amount<=0||amount>balance+0.005){alert("Enter a valid payment amount not greater than the Due amount.");return}
- const method=prompt("Payment method (Cash / ABA / Bank Transfer / Card / Other):","Cash")||"Cash";
- try{
-   const paymentDate=new Date();
-   const{error:pe}=await sb.from("medifella_sale_payments").insert({
-     sale_id:String(id),amount,payment_method:method,
-     payment_date:paymentDate.toISOString().slice(0,10),
-     note:"Additional payment",created_by:adminUser.id
-   });
-   if(pe)throw pe;
-   const newPaid=paid+amount;
-   const{error:se}=await sb.from("medifella_sales").update({
-     paid:newPaid,balance:Math.max(0,total-newPaid),payment_status:saleStatus(total,newPaid)
-   }).eq("id",id);
-   if(se)throw se;
-   await loadSales();
- }catch(e){alert(e.message||"Could not record payment.")}
+ if(balance<=0.005){alert("This invoice has no remaining Due amount.");return}
+
+ // Use a proper payment box instead of browser prompts.
+ let o=$("dermedPaymentOverlay");
+ if(!o){
+   o=document.createElement("div");
+   o.id="dermedPaymentOverlay";
+   o.className="commission-modal-overlay";
+   document.body.appendChild(o);
+ }
+ const now=new Date();
+ const localDate=now.toISOString().slice(0,10);
+ const localTime=now.toTimeString().slice(0,5);
+
+ o.innerHTML=`<div class="commission-modal" style="max-width:520px">
+   <div class="commission-modal-head">
+     <div>
+       <h2 style="margin:0">Add Payment</h2>
+       <div class="muted">${esc(saleRef(s)||"")} · ${esc(saleCustomer(s)||"")}</div>
+     </div>
+     <button type="button" class="light" id="dermedPaymentClose">×</button>
+   </div>
+   <div class="commission-detail-info" style="margin-bottom:14px">
+     <div><strong>Total:</strong> ${money(total)}</div>
+     <div><strong>Already Paid:</strong> ${money(paid)}</div>
+     <div><strong>Due:</strong> ${money(balance)}</div>
+   </div>
+   <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+     <label style="display:block">
+       <strong>Payment Amount *</strong>
+       <input id="dermedPaymentAmount" type="number" min="0.01" max="${balance.toFixed(2)}" step="0.01"
+              value="${balance.toFixed(2)}" style="width:100%;box-sizing:border-box;margin-top:6px">
+     </label>
+     <label style="display:block">
+       <strong>Payment Method *</strong>
+       <select id="dermedPaymentMethod" style="width:100%;box-sizing:border-box;margin-top:6px">
+         <option value="Cash">Cash</option>
+         <option value="ABA">ABA</option>
+         <option value="Bank Transfer">Bank Transfer</option>
+         <option value="Card">Card</option>
+         <option value="Other">Other</option>
+       </select>
+     </label>
+     <label style="display:block">
+       <strong>Payment Date</strong>
+       <input id="dermedPaymentDate" type="date" value="${localDate}" style="width:100%;box-sizing:border-box;margin-top:6px">
+     </label>
+     <label style="display:block">
+       <strong>Payment Time</strong>
+       <input id="dermedPaymentTime" type="time" value="${localTime}" style="width:100%;box-sizing:border-box;margin-top:6px">
+     </label>
+   </div>
+   <label style="display:block;margin-top:12px">
+     <strong>Note</strong>
+     <input id="dermedPaymentNote" type="text" value="Additional payment"
+            style="width:100%;box-sizing:border-box;margin-top:6px">
+   </label>
+   <div id="dermedPaymentError" class="error" style="display:none;margin-top:12px"></div>
+   <div style="display:flex;justify-content:flex-end;gap:8px;margin-top:16px">
+     <button type="button" class="light" id="dermedPaymentCancel">Cancel</button>
+     <button type="button" class="gold" id="dermedPaymentSave">Save Payment</button>
+   </div>
+ </div>`;
+ o.classList.add("show");
+
+ const close=()=>o.classList.remove("show");
+ $("dermedPaymentClose").onclick=close;
+ $("dermedPaymentCancel").onclick=close;
+
+ $("dermedPaymentSave").onclick=async()=>{
+   const amount=parseMoneyInput($("dermedPaymentAmount").value);
+   const method=String($("dermedPaymentMethod").value||"Cash").trim()||"Cash";
+   const date=String($("dermedPaymentDate").value||localDate);
+   const time=String($("dermedPaymentTime").value||localTime);
+   const note=String($("dermedPaymentNote").value||"Additional payment").trim();
+   const err=$("dermedPaymentError");
+   const showErr=(msg)=>{err.textContent=msg;err.style.display="block";};
+
+   if(amount<=0){showErr("Enter a valid payment amount.");return}
+   if(amount>balance+0.005){showErr(`Payment cannot be greater than the Due amount of ${money(balance)}.`);return}
+   if(!date){showErr("Please select the payment date.");return}
+   if(!time){showErr("Please select the payment time.");return}
+
+   const saveBtn=$("dermedPaymentSave");
+   saveBtn.disabled=true;
+   saveBtn.textContent="Saving...";
+
+   try{
+     // Store both a date and an exact timestamp. created_at is also written
+     // explicitly so the payment history can show the real payment date/time.
+     const paymentTimestamp=new Date(`${date}T${time}:00`);
+     if(Number.isNaN(paymentTimestamp.getTime())) throw new Error("Invalid payment date/time.");
+
+     const paymentPayload={
+       sale_id:String(id),
+       amount,
+       payment_method:method,
+       payment_date:date,
+       note:note||"Additional payment",
+       created_by:adminUser.id,
+       created_at:paymentTimestamp.toISOString()
+     };
+
+     const{error:pe}=await sb.from("medifella_sale_payments").insert(paymentPayload);
+     if(pe)throw pe;
+
+     const newPaid=paid+amount;
+     const{error:se}=await sb.from("medifella_sales").update({
+       paid:newPaid,
+       balance:Math.max(0,total-newPaid),
+       payment_status:saleStatus(total,newPaid)
+     }).eq("id",id);
+     if(se)throw se;
+
+     close();
+     await loadSales();
+     // Open the updated payment history so the saved amount/method/date/time
+     // can be checked immediately.
+     await showSalePaymentDetails(id);
+   }catch(e){
+     console.error("Dermed payment save error:",e);
+     showErr(e?.message||"Could not record payment.");
+     saveBtn.disabled=false;
+     saveBtn.textContent="Save Payment";
+   }
+ };
 }
 
 function showSaleInvoice(id,size="A4"){
