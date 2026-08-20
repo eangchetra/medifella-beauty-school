@@ -4481,15 +4481,18 @@ async function deleteAutomaticCommissionForSale(saleId){
 }
 
 async function rebuildAutomaticCommissionForSale(saleId){
- const sale=salesRecords.find(x=>String(x.id)===String(saleId));
- if(!sale || String(sale.sale_type||"").toUpperCase()!=="DERMED")return;
-
- // Get the old commission rows first: their staff_id is the authoritative
- // commission staff for this invoice.
  const oldRows=await getAutomaticCommissionRowsForSale(saleId);
  if(!oldRows.length)return;
 
- const staffId=oldRows[0].staff_id||sale.staff_id||sale.sale_staff_id||sale.sale_staff_id;
+ // IMPORTANT: fetch the current invoice from the database. After editing the
+ // first payment, salesRecords may still contain the old paid amount.
+ const fresh=await sb.from("medifella_sales").select("*").eq("id",String(saleId)).maybeSingle();
+ if(fresh.error)throw fresh.error;
+ const sale=fresh.data;
+ if(!sale || String(sale.sale_type||"").toUpperCase()!=="DERMED")return;
+
+ // Keep the original commission staff.
+ const staffId=oldRows[0].staff_id||sale.staff_id||sale.sale_staff_id;
  if(!staffId)return;
 
  let items=saleItemsValue(sale)||[];
@@ -4510,16 +4513,15 @@ async function rebuildAutomaticCommissionForSale(saleId){
    buyer=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(buyerId));
  }
 
- let staff=null;
  const cfg=typeof window.getCurrentSaleStaffConfig==="function"
    ?window.getCurrentSaleStaffConfig(staffId):null;
  if(!cfg)return;
 
  const staffRows=Array.isArray(window.saleStaffConfigs)?window.saleStaffConfigs:[];
- staff=staffRows.find(x=>String(x.id)===String(staffId))||{};
+ const staff=staffRows.find(x=>String(x.id)===String(staffId))||{};
 
- // Delete the old automatic rows first, then use the exact same commission
- // engine as the original Dermed Sale save flow.
+ // Delete only the old automatic commission for this invoice, then rebuild
+ // from the newly edited FIRST payment amount.
  await deleteAutomaticCommissionForSale(saleId);
 
  if(typeof window.recordFirstDermedSaleCommission==="function"){
@@ -4544,14 +4546,25 @@ async function syncSalePaidAfterPaymentChange(saleId){
  const payments=await getSalePaymentsForCrud(saleId);
  const newPaid=payments.reduce((sum,p)=>sum+Math.max(0,Number(p.amount||0)),0);
  const total=saleTotal(sale);
+ const newBalance=Math.max(0,total-newPaid);
+ const newStatus=saleStatus(total,newPaid);
 
  const r=await sb.from("medifella_sales").update({
    paid:newPaid,
-   balance:Math.max(0,total-newPaid),
-   payment_status:saleStatus(total,newPaid)
+   balance:newBalance,
+   payment_status:newStatus
  }).eq("id",String(saleId));
 
  if(r.error)throw r.error;
+
+ // Keep the local sale synchronized immediately. This is critical because
+ // commission rebuilds and UI calculations may read salesRecords before the
+ // next loadSales() completes.
+ sale.paid=newPaid;
+ sale.paid_amount=newPaid;
+ sale.balance=newBalance;
+ sale.payment_status=newStatus;
+
  return {sale,newPaid,total};
 }
 
@@ -4626,8 +4639,7 @@ async function editSalePayment(paymentId,saleId){
      if(first){
        const existing=await getAutomaticCommissionRowsForSale(saleId);
        if(existing.length){
-         // Rebuild using the exact current first payment amount and the same
-         // original Dermed commission engine.
+         // Rebuild from the freshly saved invoice/payment amount.
          await rebuildAutomaticCommissionForSale(saleId);
        }
      }
