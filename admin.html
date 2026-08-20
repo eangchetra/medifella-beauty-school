@@ -2795,7 +2795,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div class="product-tabs" role="tablist" aria-label="Product Management">
 <button type="button" class="product-tab active" data-product-tab="productListPanel">Product List</button>
 <button type="button" class="product-tab" data-product-tab="stockHistoryPanel">Stock History</button>
-
+<button type="button" class="product-tab" data-product-tab="stockReportPanel">Stock Report</button>
 </div>
 
 <div id="productListPanel" class="product-panel card" style="margin-top:12px">
@@ -2827,13 +2827,23 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div id="stockReportPanel" class="product-panel card hidden" style="margin-top:12px">
 <h2>Stock Report</h2>
 <div class="toolbar">
-<input id="stockReportSearch" placeholder="Search Product ID or Product Name">
+<select id="stockReportType">
+<option value="out">Out of Stock Report</option>
+<option value="alert">Alert Report (10 or less)</option>
+<option value="daily">Daily Report</option>
+<option value="weekly">Weekly Report</option>
+<option value="monthly">Monthly Report</option>
+<option value="yearly">Yearly Report</option>
+</select>
+<label style="display:flex;align-items:center;gap:6px">From <input id="stockReportFromDate" type="date"></label>
+<label style="display:flex;align-items:center;gap:6px">To <input id="stockReportToDate" type="date"></label>
 <button id="stockReportRefresh" class="light">Refresh</button>
 <button id="stockReportExcel" class="light">Download Excel</button>
 <button id="stockReportPdf" class="light">Download PDF</button>
 </div>
 <div id="stockReportList">Loading...</div>
 </div>
+
 
 </section>
 
@@ -7035,9 +7045,7 @@ function productStock(pid){
 async function loadProducts(){
  const {data,error}=await sb.from("medifella_products").select("*").order("created_at",{ascending:false});
  if(error){products=[]; if($("productList"))$("productList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Product Management SQL setup.</p>`;return}
- products=data||[]; window.products=products;
- // Stock movements are loaded separately. Render again after they arrive.
- renderProductList();
+ products=data||[]; window.products=products; renderProductList();
 }
 async function loadStockMovements(){
   try{
@@ -7056,8 +7064,7 @@ async function loadStockMovements(){
 
     window.stockMovements=stockMovements;
     rebuildDermedSearchStockCacheIfAvailable();
-    // Product List must refresh after stock data arrives so In Stock is visible.
-    if(typeof window.renderProductList==="function") window.renderProductList();
+    renderProductList();
     renderStockList();
     renderStockReport();
   }catch(e){
@@ -7514,6 +7521,7 @@ $("saveProduct").onclick=async()=>{
  if(id)r=await sb.from("medifella_products").update(payload).eq("id",id);else{payload.product_code=genId("P",products,"product_code");r=await sb.from("medifella_products").insert(payload)}
  if(r.error)throw r.error;msg($("productStatus"),id?"Product updated.":"Product added.");clearProductForm();await loadProducts()}catch(e){msg($("productStatus"),e.message,true)}
 };
+function clearProductForm(){$("productEditId").value="";$("productName").value="";$("productCost").value="";$("productPrice").value="";$("productSource").value="Korean";$("productSourceOther").value="";$("productSource").dispatchEvent(new Event("change"))}
 function editProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p)return;$("productEditId").value=p.id;$("productName").value=p.name||"";$("productCost").value=p.cost??"";$("productPrice").value=p.price??"";$("productSource").value=p.source||"Korean";$("productSourceOther").value=p.source_other||"";$("productSource").dispatchEvent(new Event("change"));$("products").scrollIntoView({behavior:"smooth"})}
 async function deleteProduct(id){if(!confirm("Delete this product? Its stock history will also be deleted. Continue?"))return;const r=await sb.from("medifella_products").delete().eq("id",id);if(r.error){alert("Delete failed: "+r.error.message);return}await loadProducts();await loadStockMovements();}
 $("clearProduct").onclick=clearProductForm;
@@ -13045,11 +13053,8 @@ async function loadCommissionRecords(retry=0){
   // Replace the product list renderer so Current Stock is always visible.
   window.renderProductList=function(){
     if(!P("productList")) return;
-
     const q=(P("productSearch")?.value||"").trim().toLowerCase();
     const products=Array.isArray(window.products)?window.products:[];
-    const movements=Array.isArray(window.stockMovements)?window.stockMovements:[];
-
     const rows=products
       .filter(p=>(`${p.product_code||""} ${p.name||""}`).toLowerCase().includes(q))
       .filter(p=>{
@@ -13059,52 +13064,31 @@ async function loadCommissionRecords(retry=0){
         return (!from||s>=from)&&(!to||s<=to);
       });
 
-    function currentStock(productId){
-      return movements.reduce((total,m)=>{
-        if(String(m.product_id)!==String(productId)) return total;
-
-        let qty=Math.abs(Number(m.quantity||0));
-        if(!Number.isFinite(qty)) qty=0;
-
-        const type=String(
-          m.movement_type||m.type||m.movement||""
-        ).trim().toLowerCase().replace(/[\s-]+/g,"_");
-
-        if(["stock_in","stockin","in","add","purchase","received","receive"].includes(type)){
-          return total+qty;
-        }
-
-        if(["sale","stock_out","stockout","out","sold","deduct","deduction"].includes(type)){
-          return total-qty;
-        }
-
-        // Older records can have a signed quantity with an unknown movement
-        // type. Respect the sign instead of silently hiding the stock.
-        const raw=Number(m.quantity);
-        return Number.isFinite(raw) ? total+raw : total;
-      },0);
-    }
-
     const admin=isAdminProductUser();
-
     P("productList").innerHTML=rows.length
       ? `<div class="table-wrap"><table class="table" id="productListTable">
-          <thead><tr>
+          <tr>
             <th>Product ID</th>
             <th>Product Name</th>
-            <th>In Stock</th>
+            <th>Current Stock</th>
             ${admin ? "<th>Cost</th>" : ""}
             <th>Price</th>
             <th>Source</th>
             <th>Action</th>
-          </tr></thead>
-          <tbody>
+          </tr>
           ${rows.map(p=>{
-            const stock=currentStock(p.id);
+            const stock=(Array.isArray(window.stockMovements)?window.stockMovements:[]).reduce((total,m)=>{
+              if(String(m.product_id)!==String(p.id)) return total;
+              const q=Math.max(0,Number(m.quantity||0));
+              const type=String(m.movement_type||"").trim().toLowerCase();
+              if(type==="stock_in"||type==="stockin"||type==="in") return total+q;
+              if(type==="sale"||type==="stock_out"||type==="stockout"||type==="out") return total-q;
+              return total;
+            },0);
             return `<tr>
               <td>${escP(p.product_code)}</td>
               <td>${escP(p.name)}</td>
-              <td><strong>${Math.max(0,stock)}</strong></td>
+              <td><strong>${stock}</strong></td>
               ${admin ? `<td>${moneyP(p.cost)}</td>` : ""}
               <td>${moneyP(p.price)}</td>
               <td>${escP(typeof window.sourceLabel==="function"?window.sourceLabel(p):(p.source||""))}</td>
@@ -13114,10 +13098,9 @@ async function loadCommissionRecords(retry=0){
               </div></td>
             </tr>`;
           }).join("")}
-          </tbody>
         </table></div>`
       : '<p class="muted">No products found.</p>';
-  };;
+  };
 
   // Staff can edit product name/price/source, but cannot view or change cost.
   window.editProduct=function(id){
@@ -13130,10 +13113,6 @@ async function loadCommissionRecords(retry=0){
     P("productSource").value=p.source||"Korean";
     P("productSourceOther").value=p.source_other||"";
     P("productSource")?.dispatchEvent(new Event("change"));
-
-    // Initial stock is only for a newly created product; editing a product
-    // must not alter its existing inventory movements.
-    if(P("productInitialStockWrap")) P("productInitialStockWrap").style.opacity="0.55";
 
     if(isAdminProductUser()){
       P("productCost").value=p.cost??"";
@@ -13155,6 +13134,8 @@ async function loadCommissionRecords(retry=0){
       const price=Number(P("productPrice")?.value||0);
       const source=P("productSource")?.value||"Korean";
       const source_other=(P("productSourceOther")?.value||"").trim();
+
+      if(!name || price<0){
         window.msg?.(P("productStatus"),"Please fill Product Name and Price.",true);
         return;
       }
@@ -13183,41 +13164,18 @@ async function loadCommissionRecords(retry=0){
         }
 
         let r;
-        let createdProduct=null;
         if(id){
-          // Editing a product must never change its existing stock.
           r=await window.sb.from("medifella_products").update(payload).eq("id",id);
         }else{
           const existing=Array.isArray(window.products)?window.products:[];
           let max=0;
           existing.forEach(x=>{const m=String(x.product_code||"").match(/^P(\d+)$/i);if(m)max=Math.max(max,Number(m[1]));});
           payload.product_code="P"+String(max+1).padStart(4,"0");
-          r=await window.sb.from("medifella_products").insert(payload).select().single();
-          createdProduct=r.data||null;
+          r=await window.sb.from("medifella_products").insert(payload);
         }
         if(r.error) throw r.error;
 
-        // When a brand-new product is created with an initial stock amount,
-        // create the corresponding stock-in movement so Product List shows
-        // the correct Current Stock. Editing an existing product does not
-        // create another stock movement.
-          const movement={
-            product_id:createdProduct.id,
-            movement_type:"stock_in",
-            staff_id:null,
-            staff_name:"Admin",
-            stock_time:(typeof phTime==="function"?phTime():new Date().toISOString()),
-            created_by:(window.adminUser?.id||null),
-            notes:"Initial Stock"
-          };
-          const mr=await window.sb.from("medifella_inventory_movements").insert(movement);
-          if(mr.error){
-            // Roll back the newly created product if its initial stock could
-            // not be recorded, preventing a product with a misleading stock.
-            await window.sb.from("medifella_products").delete().eq("id",createdProduct.id);
-            throw mr.error;
-          }
-        }
+        window.msg?.(P("productStatus"),id?"Product updated.":"Product added.");
         if(typeof window.clearProductForm==="function") window.clearProductForm();
         if(typeof window.loadProducts==="function") await window.loadProducts();
         productRoleUI();
@@ -18421,29 +18379,111 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 })();
 </script>
 
-
-<script id="product-initial-stock-ui-v1">
-(function(){
-  const P=id=>document.getElementById(id);
-  function resetInitialStock(){
-    if(input){input.value="0";input.disabled=false;}
-    if(wrap)wrap.style.opacity="1";
-  }
-  const originalClear=window.clearProductForm;
-  if(typeof originalClear==="function" && !window.__initialStockClearPatched){
-    window.__initialStockClearPatched=true;
-    window.clearProductForm=function(){
-      const r=originalClear.apply(this,arguments);
-      resetInitialStock();
-      return r;
-    };
-  }
-  if(input) input.addEventListener("input",()=>{
-    if(Number(input.value)<0)input.value="0";
-  });
-  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",resetInitialStock,{once:true});
-  else resetInitialStock();
-})();
-</script>
 </body>
 </html>
+
+/* V37 PRODUCT LIST STOCK DISPLAY FINAL */
+
+/* V37 PRODUCT LIST STOCK DISPLAY FINAL */
+(function(){
+  "use strict";
+  function E(id){return document.getElementById(id);}
+  function render(){
+    const box=E("productList");
+    if(!box)return;
+
+    const all=Array.isArray(window.products)
+      ?window.products
+      :(typeof products!=="undefined"&&Array.isArray(products)?products:[]);
+    const q=(E("productSearch")?.value||"").trim().toLowerCase();
+    const from=E("productFromDate")?.value||"";
+    const to=E("productToDate")?.value||"";
+
+    const rows=all.filter(function(p){
+      const text=(`${p.product_code||""} ${p.name||""}`).toLowerCase();
+      if(q && !text.includes(q))return false;
+      const d=String(p.created_at||"").slice(0,10);
+      if(from && d<from)return false;
+      if(to && d>to)return false;
+      return true;
+    });
+
+    let admin=false;
+    try{
+      admin=typeof isAdminProductUser==="function"
+        ?isAdminProductUser()
+        :String(window.currentUserRole||window.userRole||"").toLowerCase()==="admin";
+    }catch(_){}
+
+    function stock(id){
+      try{
+        if(typeof productStock==="function")return Math.max(0,Number(productStock(id))||0);
+      }catch(_){}
+      const moves=Array.isArray(window.stockMovements)?window.stockMovements:[];
+      return Math.max(0,moves.reduce(function(total,m){
+        if(String(m.product_id)!==String(id))return total;
+        const qty=Math.max(0,Number(m.quantity||0));
+        const type=String(m.movement_type||"").trim().toLowerCase();
+        if(["stock_in","stockin","in"].includes(type))return total+qty;
+        if(["sale","stock_out","stockout","out"].includes(type))return total-qty;
+        return total;
+      },0));
+    }
+
+    box.innerHTML=rows.length
+      ? `<div class="table-wrap"><table class="table" id="productListTable">
+          <tr>
+            <th>Product ID</th>
+            <th>Product Name</th>
+            <th>In Stock</th>
+            ${admin?"<th>Cost</th>":""}
+            <th>Price</th>
+            <th>Source</th>
+            <th>Action</th>
+          </tr>
+          ${rows.map(function(p){
+            const s=stock(p.id);
+            return `<tr>
+              <td>${typeof esc==="function"?esc(p.product_code):String(p.product_code||"")}</td>
+              <td>${typeof esc==="function"?esc(p.name):String(p.name||"")}</td>
+              <td><strong>${s}</strong></td>
+              ${admin?`<td>${typeof money==="function"?money(p.cost):String(p.cost??"")}</td>`:""}
+              <td>${typeof money==="function"?money(p.price):String(p.price??"")}</td>
+              <td>${typeof sourceLabel==="function"?esc(sourceLabel(p)):esc(p.source||"")}</td>
+              <td><div class="actions">
+                <button type="button" class="light" onclick="editProduct('${String(p.id).replace(/'/g,"\\'")}')">Edit</button>
+                <button type="button" class="danger" onclick="deleteProduct('${String(p.id).replace(/'/g,"\\'")}')">Delete</button>
+              </div></td>
+            </tr>`;
+          }).join("")}
+        </table></div>`
+      : '<p class="muted">No products found.</p>';
+  }
+
+  window.renderProductList=render;
+
+  function install(){
+    const s=E("productSearch");
+    const from=E("productFromDate");
+    const to=E("productToDate");
+    const refresh=E("productRefresh");
+    [s,from,to].forEach(function(el){
+      if(!el || el.dataset.stockVisibleSearchBound==="1")return;
+      el.dataset.stockVisibleSearchBound="1";
+      el.addEventListener(el===s?"input":"change",render);
+    });
+    if(refresh && refresh.dataset.stockVisibleBound!=="1"){
+      refresh.dataset.stockVisibleBound="1";
+      refresh.addEventListener("click",render);
+    }
+    render();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else install();
+
+  // Stock movements may load after products. Refresh after the existing
+  // async loaders finish without changing their behavior.
+  [300,800,1500,3000].forEach(function(ms){setTimeout(render,ms);});
+})();
