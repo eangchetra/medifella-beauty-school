@@ -8452,55 +8452,144 @@ document.addEventListener("DOMContentLoaded",function(){
     };
     const btn=E("saveDermedSale");if(btn)btn.disabled=true;
     try{
-      let r;
-      if(editingId){
-        let upd=await sb.from("medifella_sales").update(payload).eq("id",editingId).eq("sale_type","DERMED").select().single();
-        if(upd.error && /sale_time|column .* does not exist/i.test(upd.error.message||"")){
-          const p2={...payload};delete p2.sale_time;
-          upd=await sb.from("medifella_sales").update(p2).eq("id",editingId).eq("sale_type","DERMED").select().single();
-        }
-        if(upd.error)throw upd.error;
-        r=upd;
-      }else{
-        // Reference numbers must remain unique even when salesRecords is stale
-        // (for example, another browser/admin created the previous invoice).
-        let attempt=0;
-        let candidateRef=reference;
-        while(attempt<12){
-          const insertPayload={...payload,reference_no:candidateRef,created_by:adminUser.id};
-          r=await sb.from("medifella_sales").insert(insertPayload).select().single();
+      let savedId = editingId ? String(editingId) : null;
+      let savedReference = reference;
 
-          if(r.error && /sale_time|column .* does not exist/i.test(r.error.message||"")){
-            const p2={...insertPayload};delete p2.sale_time;
-            r=await sb.from("medifella_sales").insert(p2).select().single();
-          }
+      /*
+       * STAFF FIX V32:
+       * Do NOT use .select().single() after INSERT/UPDATE.
+       * Staff can be allowed to INSERT/UPDATE medifella_sales while the
+       * corresponding SELECT/RETURNING is restricted by RLS. The old code
+       * treated that SELECT restriction as a failed invoice save.
+       */
+      let dataPayload={...payload};
 
-          if(!r.error)break;
+      // created_by is optional. Use the authenticated Supabase user ID when
+      // available, for both Admin and Staff.
+      if(adminUser?.id && !editingId)dataPayload.created_by=adminUser.id;
 
-          const errText=String(r.error.message||r.error.details||"");
-          if(/duplicate key value violates unique constraint.*medifella_sales_reference_no_key|reference_no.*already exists|duplicate key/i.test(errText)){
+      for(let attempt=0;attempt<12;attempt++){
+        let response;
+
+        if(editingId){
+          response=await sb.from("medifella_sales")
+            .update(dataPayload)
+            .eq("id",String(editingId))
+            .eq("sale_type","DERMED");
+        }else{
+          let candidateRef=savedReference;
+          dataPayload.reference_no=candidateRef;
+          response=await sb.from("medifella_sales").insert(dataPayload);
+
+          if(response.error){
+            const errText=String(response.error.message||response.error.details||"");
             const m=String(candidateRef).match(/^(DERMED-\d{4}-)(\d+)$/);
-            if(!m)throw r.error;
-            candidateRef=m[1]+String(Number(m[2])+1).padStart(4,"0");
-            attempt++;
-            continue;
+            if(m && /duplicate key value violates unique constraint.*medifella_sales_reference_no_key|reference_no.*already exists|duplicate key/i.test(errText)){
+              savedReference=m[1]+String(Number(m[2])+1).padStart(4,"0");
+              attempt++;
+              continue;
+            }
           }
-          throw r.error;
         }
-        if(r.error)throw r.error;
-        if(paid>0){
-          const pr=await sb.from("medifella_sale_payments").insert({sale_id:String(r.data.id),amount:paid,payment_method:E("dermedPaymentMethod").value,payment_date:now.slice(0,10),note:status==="Partial"?"Partial Payment":"Paid in Full",created_by:adminUser.id});
-          if(pr.error)throw pr.error;
-          }
-        const movements=items.map(x=>({product_id:x.product_id,movement_type:"sale",quantity:Math.max(1,num(x.quantity)),staff_id:staffId,staff_name:staff?.name_en||"",stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));
-        if(movements.length){const mr=await sb.from("medifella_inventory_movements").insert(movements);if(mr.error)throw mr.error}
+
+        if(!response.error)break;
+
+        const errorText=String(response.error.message||response.error.details||"");
+
+        // Retry when this installation does not have an optional column.
+        const columnMatch=
+          errorText.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']? (?:of relation .* )?does not exist/i) ||
+          errorText.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i) ||
+          errorText.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
+
+        if(columnMatch && Object.prototype.hasOwnProperty.call(dataPayload,columnMatch[1])){
+          delete dataPayload[columnMatch[1]];
+          continue;
+        }
+
+        throw response.error;
       }
+
+      /*
+       * Reload from the normal sales query. This gets the real UUID after
+       * INSERT without relying on INSERT ... RETURNING.
+       */
+      await loadSales();
+
+      if(editingId){
+        const updated=salesRecords.find(x=>String(x.id)===String(editingId));
+        if(!updated)throw new Error("Dermed invoice was updated but could not be reloaded.");
+        savedId=String(updated.id);
+        savedReference=updated.reference_no||savedReference;
+      }else{
+        const created=salesRecords.find(x=>String(x.reference_no||"")===String(savedReference));
+        if(!created)throw new Error("Dermed invoice was saved but could not be found after saving.");
+        savedId=String(created.id);
+      }
+
+      /*
+       * Payment history is supplemental. Do not make the invoice fail if
+       * Staff has permission to create the sale but the payment-history table
+       * has a stricter RLS policy.
+       */
+      if(!editingId && paid>0 && savedId){
+        try{
+          const paymentPayload={
+            sale_id:savedId,
+            amount:paid,
+            payment_method:E("dermedPaymentMethod").value,
+            payment_date:now.slice(0,10),
+            note:status==="Partial"?"Partial Payment":"Paid in Full"
+          };
+          if(adminUser?.id)paymentPayload.created_by=adminUser.id;
+
+          let pr=await sb.from("medifella_sale_payments").insert(paymentPayload);
+          if(pr.error){
+            console.warn("Dermed payment history was not saved:",pr.error.message);
+          }
+        }catch(paymentError){
+          console.warn("Dermed payment history was not saved:",paymentError);
+        }
+      }
+
+      /*
+       * Inventory movement is also supplemental to the invoice. A permitted
+       * Staff user must not lose the invoice merely because movement logging
+       * is blocked by a separate RLS policy.
+       */
+      if(!editingId && items.length && savedId){
+        try{
+          const movements=items.map(x=>({
+            product_id:x.product_id,
+            movement_type:"sale",
+            quantity:Math.max(1,num(x.quantity)),
+            staff_id:staffId,
+            staff_name:staff?.name_en||"",
+            stock_time:now,
+            created_by:adminUser?.id||null,
+            sale_id:savedId,
+            notes:code
+          }));
+          if(movements.length){
+            const mr=await sb.from("medifella_inventory_movements").insert(movements);
+            if(mr.error)console.warn("Dermed inventory movement was not saved:",mr.error.message);
+          }
+        }catch(movementError){
+          console.warn("Dermed inventory movement was not saved:",movementError);
+        }
+      }
+
       // Create commission only when a new Dermed sale is created.
       // Editing an old invoice never changes the commission already recorded for that sale.
-      if(r?.data?.id && !editingId){
+      if(savedId && !editingId){
         try{
+          const savedSale=salesRecords.find(x=>String(x.id)===String(savedId))||{
+            ...payload,
+            id:savedId,
+            reference_no:savedReference
+          };
           await recordFirstDermedSaleCommission({
-            sale:r.data,
+            sale:savedSale,
             buyer,
             buyerType,
             buyerId,
@@ -8509,7 +8598,7 @@ document.addEventListener("DOMContentLoaded",function(){
             servicesArr,
             items,
             hasProducts:items.length>0,
-            adminId:adminUser.id
+            adminId:adminUser?.id||null
           });
         }catch(commissionError){
           console.error("Commission recording failed:",commissionError);
@@ -8518,14 +8607,13 @@ document.addEventListener("DOMContentLoaded",function(){
       }
 
       const wasEditing=!!editingId;
-      const savedReference=(r&&r.data&&r.data.reference_no)||reference;
       window.editingDermedSaleId=null;
       msg(E("dermedStatus"),`${wasEditing?"Dermed sale updated":"Dermed sale saved"}. Invoice ${savedReference}.`);
       reset();
       if(typeof loadSales==="function")await loadSales();
       if(typeof renderDermedSales==="function")renderDermedSales();
       if(typeof loadStockMovements==="function")await loadStockMovements();
-      if(typeof showSaleInvoice==="function")showSaleInvoice(r.data.id);
+      if(typeof showSaleInvoice==="function")showSaleInvoice(savedId);
     }catch(e){console.error(e);msg(E("dermedStatus"),e.message||"Could not save Dermed sale.",true)}
     finally{
       if(btn)btn.disabled=false;
@@ -17798,6 +17886,75 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   // Re-apply after section/profile rendering. This does not grant permissions;
   // it only keeps the UI synchronized with the Admin-selected permissions.
   setInterval(apply,3000);
+})();
+</script>
+
+
+<script id="staff-dermed-create-invoice-v32">
+(function(){
+  "use strict";
+
+  function allowed(){
+    try{
+      const role=String(
+        (typeof currentProfile!=="undefined" ? currentProfile?.role : "") || ""
+      ).trim().toLowerCase();
+
+      if(role==="admin" || role==="administrator" || role==="super_admin")return true;
+      if(role!=="staff")return false;
+
+      let p={};
+      if(typeof normalizeStaffPermissions==="function"){
+        p=normalizeStaffPermissions(currentProfile?.permissions)||{};
+      }else{
+        p=currentProfile?.permissions||{};
+      }
+      return p.dermedSale===true;
+    }catch(e){
+      return false;
+    }
+  }
+
+  function apply(){
+    const section=document.getElementById("dermedSale");
+    if(!section)return;
+
+    const ok=allowed();
+
+    // Do not override module visibility; only make the normal Dermed form
+    // controls usable once the module itself is permitted.
+    const form=section.querySelector("#dermedSaleFormCard");
+    const save=document.getElementById("saveDermedSale");
+    const staff=document.getElementById("dermedSaleStaff");
+    const cashier=document.getElementById("dermedCashier");
+
+    if(ok){
+      if(save){
+        save.disabled=false;
+        save.removeAttribute("aria-disabled");
+      }
+      [staff,cashier].forEach(function(el){
+        if(el){
+          el.disabled=false;
+          el.removeAttribute("readonly");
+        }
+      });
+    }
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",function(){
+      apply();
+      setTimeout(apply,500);
+      setTimeout(apply,1500);
+      setTimeout(apply,3000);
+    },{once:true});
+  }else{
+    apply();
+    setTimeout(apply,500);
+    setTimeout(apply,1500);
+    setTimeout(apply,3000);
+  }
 })();
 </script>
 
