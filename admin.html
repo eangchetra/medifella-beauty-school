@@ -4421,7 +4421,7 @@ async function showSalePaymentDetails(id){
  </tr></thead><tbody>
  ${payments.length?payments.map(p=>{
    const ts=String(p.created_at||"");
-   const date=String(p.payment_date||ts||"").slice(0,10);
+   const date=window.formatPaymentDateV16(p.payment_date||ts||"");
    let time="";
    if(ts){const d=new Date(ts);if(!Number.isNaN(d.getTime()))time=d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});}
    const isFirst=String(p.id)===firstId;
@@ -16429,6 +16429,92 @@ async function loadCommissionRecords(retry=0){
     e.stopImmediatePropagation();
     openFromList(btn);
   },true);
+})();
+</script>
+
+<style id="commission-input-v15-style">
+.commission-date-display{min-width:125px}
+</style>
+<script id="commission-input-v15">
+(function(){
+  "use strict";
+
+  function displayDate(v){
+    var s=String(v||"").trim().slice(0,10);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
+      var p=s.split("-");
+      return p[2]+"/"+p[1]+"/"+p[0];
+    }
+    return s;
+  }
+
+  function today(){
+    var d=new Date();
+    return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear();
+  }
+
+  function fix(){
+    var els=document.querySelectorAll("input,select");
+    for(var i=0;i<els.length;i++){
+      var el=els[i];
+      var text=((el.id||"")+" "+(el.name||"")+" "+(el.className||"")+" "+((el.closest("td,th,form")||{}).textContent||"")).toLowerCase();
+
+      if(text.indexOf("commission")<0) continue;
+
+      if(text.indexOf("unit")>=0 || text.indexOf("price")>=0 || text.indexOf("discount")>=0){
+        el.removeAttribute("min");
+        el.removeAttribute("max");
+        el.removeAttribute("step");
+        el.setAttribute("inputmode","decimal");
+      }
+
+      if(text.indexOf("date")>=0){
+        if(el.type==="date"){
+          var old=el.value;
+          el.type="text";
+          el.classList.add("commission-date-display");
+          el.placeholder="dd/mm/yyyy";
+          el.maxLength=10;
+          el.value=old?displayDate(old):today();
+        }else{
+          el.classList.add("commission-date-display");
+          el.placeholder="dd/mm/yyyy";
+          el.maxLength=10;
+          if(!el.value) el.value=today();
+          else el.value=displayDate(el.value);
+        }
+      }
+    }
+  }
+
+  window.fixCommissionInputsV15=fix;
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",fix);
+  }else{
+    fix();
+  }
+  setTimeout(fix,300);
+  setTimeout(fix,1000);
+  setTimeout(fix,2000);
+})();
+</script>
+
+<script id="payment-date-format-v16">
+(function(){
+  "use strict";
+  window.formatPaymentDateV16=function(v){
+    if(!v)return "";
+    var s=String(v).slice(0,10);
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
+      var p=s.split("-");
+      return p[2]+"/"+p[1]+"/"+p[0].slice(2);
+    }
+    if(/^\d{2}\/\d{2}\/\d{4}$/.test(s)){
+      var q=s.split("/");
+      return q[0]+"/"+q[1]+"/"+q[2].slice(2);
+    }
+    return s;
+  };
 })();
 </script>
 </body>
