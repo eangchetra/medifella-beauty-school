@@ -8469,8 +8469,8 @@ document.addEventListener("DOMContentLoaded",function(){
         let attempt=0;
         let candidateRef=reference;
         while(attempt<12){
-          const insertPayload={...payload,reference_no:candidateRef,created_by:adminUser.id};
-          r=await sb.from("medifella_sales").insert(insertPayload).select().single();
+          const insertPayload={...payload,reference_no:candidateRef,created_by:(adminUser?.id||currentProfile?.id||null)};
+          r=await sb.from("medifella_sales").insert(insertPayload);
 
           if(r.error && /sale_time|column .* does not exist/i.test(r.error.message||"")){
             const p2={...insertPayload};delete p2.sale_time;
@@ -18215,6 +18215,33 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     setTimeout(apply,1000);
     setTimeout(apply,2500);
   }
+})();
+</script>
+
+
+<script id="dermed-staff-rls-diagnostic-v35">
+(function(){
+  const oldSave=window.saveDermed;
+  if(typeof oldSave!=="function" || oldSave.__v35Wrapped)return;
+  async function wrapped(){
+    try{
+      return await oldSave.apply(this,arguments);
+    }catch(e){
+      const msg=String(e?.message||"");
+      if(/row-level security|RLS|policy/i.test(msg)){
+        const box=document.getElementById("dermedStatus");
+        if(box){
+          box.innerHTML =
+            '<div class="status error"><strong>Dermed Sale is blocked by Supabase RLS.</strong><br>' +
+            'The Staff account has Dermed Sale permission, but the database policy does not yet allow this Staff account to INSERT into medifella_sales. ' +
+            'Apply the V35 RLS policy SQL provided with this update.</div>';
+        }
+      }
+      throw e;
+    }
+  }
+  wrapped.__v35Wrapped=true;
+  window.saveDermed=wrapped;
 })();
 </script>
 
