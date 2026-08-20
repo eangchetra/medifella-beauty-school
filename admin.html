@@ -2103,6 +2103,11 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="payment-edit-delete-v14">
+#salePaymentDetailsOverlay .actions{display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+#salePaymentDetailsOverlay .danger{border:1px solid #d66;background:#fff}
+</style>
 </head>
 <body>
 
@@ -4385,17 +4390,289 @@ function showSaleItemsDetails(id){
 async function showSalePaymentDetails(id){
  const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
  let payments=[];
- try{const r=await sb.from("medifella_sale_payments").select("*").eq("sale_id",String(id)).order("created_at",{ascending:false});if(!r.error)payments=Array.isArray(r.data)?r.data:[]}catch(e){}
+ try{
+   const r=await sb.from("medifella_sale_payments")
+     .select("*").eq("sale_id",String(id)).order("created_at",{ascending:true});
+   if(!r.error)payments=Array.isArray(r.data)?r.data:[];
+ }catch(e){}
+
  const total=saleTotal(s),paid=salePaid(s),due=Math.max(0,total-paid);
  let o=$("salePaymentDetailsOverlay");
- if(!o){o=document.createElement("div");o.id="salePaymentDetailsOverlay";o.className="commission-modal-overlay";document.body.appendChild(o);}
+ if(!o){
+   o=document.createElement("div");
+   o.id="salePaymentDetailsOverlay";
+   o.className="commission-modal-overlay";
+   document.body.appendChild(o);
+ }
+
+ const firstId=payments.length?String(payments[0].id):"";
  o.innerHTML=`<div class="commission-modal">
- <div class="commission-modal-head"><div><h2 style="margin:0">Payment Details</h2><div class="muted">${esc(saleRef(s)||"")} · ${esc(saleCustomer(s)||"")}</div></div><button type="button" class="light" onclick="$('salePaymentDetailsOverlay')?.classList.remove('show')">×</button></div>
- <div class="commission-detail-info"><div><strong>Total:</strong> ${money(total)}</div><div><strong>Paid:</strong> ${money(paid)}</div><div><strong>Due:</strong> ${money(due)}</div></div>
- <div class="table-wrap"><table class="table"><thead><tr><th>Date / Time</th><th>Amount</th><th>Payment Method</th><th>Note</th></tr></thead><tbody>
- ${payments.length?payments.map(p=>{const ts=String(p.created_at||"");const date=String(p.payment_date||ts||"").slice(0,10);let time="";if(ts){const d=new Date(ts);if(!Number.isNaN(d.getTime()))time=d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});}return `<tr><td>${esc(date)}${time?`<div class="muted">${esc(time)}</div>`:""}</td><td>${money(Number(p.amount||0))}</td><td>${esc(p.payment_method||"—")}</td><td>${esc(p.note||"")}</td></tr>`}).join(""):`<tr><td colspan="4" class="muted">No payment history found.</td></tr>`}
- </tbody></table></div></div>`;
+ <div class="commission-modal-head">
+   <div><h2 style="margin:0">Payment Details</h2><div class="muted">${esc(saleRef(s)||"")} · ${esc(saleCustomer(s)||"")}</div></div>
+   <button type="button" class="light" onclick="$('salePaymentDetailsOverlay')?.classList.remove('show')">×</button>
+ </div>
+ <div class="commission-detail-info">
+   <div><strong>Total:</strong> ${money(total)}</div>
+   <div><strong>Paid:</strong> ${money(paid)}</div>
+   <div><strong>Due:</strong> ${money(due)}</div>
+ </div>
+ <div class="table-wrap"><table class="table"><thead><tr>
+   <th>Date / Time</th><th>Amount</th><th>Payment Method</th><th>Note</th><th>Actions</th>
+ </tr></thead><tbody>
+ ${payments.length?payments.map(p=>{
+   const ts=String(p.created_at||"");
+   const date=String(p.payment_date||ts||"").slice(0,10);
+   let time="";
+   if(ts){const d=new Date(ts);if(!Number.isNaN(d.getTime()))time=d.toLocaleTimeString([], {hour:"2-digit",minute:"2-digit"});}
+   const isFirst=String(p.id)===firstId;
+   return `<tr>
+     <td>${esc(date)}${time?`<div class="muted">${esc(time)}</div>`:""}</td>
+     <td><strong>${money(Number(p.amount||0))}</strong></td>
+     <td>${esc(p.payment_method||"—")}</td>
+     <td>${esc(p.note||"")}</td>
+     <td><div class="actions">
+       <button class="light" type="button" onclick="editSalePayment('${attr(p.id)}','${attr(id)}');return false;">Edit</button>
+       <button class="danger" type="button" onclick="deleteSalePayment('${attr(p.id)}','${attr(id)}',${isFirst?'true':'false'});return false;">Delete</button>
+     </div></td>
+   </tr>`;
+ }).join(""):`<tr><td colspan="5" class="muted">No payment history found.</td></tr>`}
+ </tbody></table></div>
+ ${payments.length?`<div class="muted" style="margin-top:10px">The first payment is the only payment linked to the automatic commission. Editing it recalculates that commission; deleting it removes that commission. Later payments do not create or change commission.</div>`:""}
+ </div>`;
  o.classList.add("show");
+}
+
+function paymentLocalDateTime(p){
+ const ts=String(p?.created_at||"");
+ let date=String(p?.payment_date||"").slice(0,10);
+ let time="";
+ if(ts){
+   const d=new Date(ts);
+   if(!Number.isNaN(d.getTime())){
+     if(!date)date=d.toISOString().slice(0,10);
+     time=d.toTimeString().slice(0,5);
+   }
+ }
+ return {date:date||new Date().toISOString().slice(0,10),time:time||new Date().toTimeString().slice(0,5)};
+}
+
+async function getSalePaymentsForCrud(saleId){
+ const r=await sb.from("medifella_sale_payments")
+   .select("*").eq("sale_id",String(saleId)).order("created_at",{ascending:true});
+ if(r.error)throw r.error;
+ return Array.isArray(r.data)?r.data:[];
+}
+
+async function getAutomaticCommissionRowsForSale(saleId){
+ const r=await sb.from("medifella_sale_commissions")
+   .select("*")
+   .eq("source_sale_id",String(saleId))
+   .eq("source","dermed_auto");
+ if(r.error)throw r.error;
+ return Array.isArray(r.data)?r.data:[];
+}
+
+async function deleteAutomaticCommissionForSale(saleId){
+ const r=await sb.from("medifella_sale_commissions")
+   .delete()
+   .eq("source_sale_id",String(saleId))
+   .eq("source","dermed_auto");
+ if(r.error)throw r.error;
+}
+
+async function rebuildAutomaticCommissionForSale(saleId){
+ const sale=salesRecords.find(x=>String(x.id)===String(saleId));
+ if(!sale || String(sale.sale_type||"").toUpperCase()!=="DERMED")return;
+
+ // Get the old commission rows first: their staff_id is the authoritative
+ // commission staff for this invoice.
+ const oldRows=await getAutomaticCommissionRowsForSale(saleId);
+ if(!oldRows.length)return;
+
+ const staffId=oldRows[0].staff_id||sale.staff_id||sale.sale_staff_id||sale.sale_staff_id;
+ if(!staffId)return;
+
+ let items=saleItemsValue(sale)||[];
+ let services=sale.service_items||[];
+ if(typeof items==="string"){try{items=JSON.parse(items)}catch(_){items=[]}}
+ if(typeof services==="string"){try{services=JSON.parse(services)}catch(_){services=[]}}
+ if(!Array.isArray(items))items=[];
+ if(!Array.isArray(services))services=[];
+
+ const buyerType=sale.student_id?"student":"customer";
+ const buyerId=sale.student_id||sale.customer_id;
+ if(!buyerId)return;
+
+ let buyer=null;
+ if(buyerType==="student"){
+   buyer=(Array.isArray(window.students)?window.students:[]).find(x=>String(x.id)===String(buyerId));
+ }else{
+   buyer=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(buyerId));
+ }
+
+ let staff=null;
+ const cfg=typeof window.getCurrentSaleStaffConfig==="function"
+   ?window.getCurrentSaleStaffConfig(staffId):null;
+ if(!cfg)return;
+
+ const staffRows=Array.isArray(window.saleStaffConfigs)?window.saleStaffConfigs:[];
+ staff=staffRows.find(x=>String(x.id)===String(staffId))||{};
+
+ // Delete the old automatic rows first, then use the exact same commission
+ // engine as the original Dermed Sale save flow.
+ await deleteAutomaticCommissionForSale(saleId);
+
+ if(typeof window.recordFirstDermedSaleCommission==="function"){
+   await window.recordFirstDermedSaleCommission({
+     sale,
+     buyer,
+     buyerType,
+     buyerId,
+     staffId,
+     staff,
+     servicesArr:services,
+     items,
+     adminId:adminUser?.id||null
+   });
+ }
+}
+
+async function syncSalePaidAfterPaymentChange(saleId){
+ const sale=salesRecords.find(x=>String(x.id)===String(saleId));
+ if(!sale)throw new Error("Sale not found.");
+
+ const payments=await getSalePaymentsForCrud(saleId);
+ const newPaid=payments.reduce((sum,p)=>sum+Math.max(0,Number(p.amount||0)),0);
+ const total=saleTotal(sale);
+
+ const r=await sb.from("medifella_sales").update({
+   paid:newPaid,
+   balance:Math.max(0,total-newPaid),
+   payment_status:saleStatus(total,newPaid)
+ }).eq("id",String(saleId));
+
+ if(r.error)throw r.error;
+ return {sale,newPaid,total};
+}
+
+async function editSalePayment(paymentId,saleId){
+ const payments=await getSalePaymentsForCrud(saleId);
+ const idx=payments.findIndex(p=>String(p.id)===String(paymentId));
+ if(idx<0){alert("Payment not found.");return;}
+ const p=payments[idx];
+ const first=idx===0;
+ const dt=paymentLocalDateTime(p);
+
+ let o=$("salePaymentEditOverlay");
+ if(!o){
+   o=document.createElement("div");
+   o.id="salePaymentEditOverlay";
+   o.className="commission-modal-overlay";
+   document.body.appendChild(o);
+ }
+
+ o.innerHTML=`<div class="commission-modal" style="max-width:600px">
+ <div class="commission-modal-head"><div><h2 style="margin:0">Edit Payment</h2><div class="muted">${esc(saleRef(salesRecords.find(x=>String(x.id)===String(saleId)))||"")}</div></div>
+ <button type="button" class="light" id="salePaymentEditClose">×</button></div>
+ <div class="muted" style="margin-bottom:12px">${first?"This is the FIRST payment. Its automatic commission will be recalculated after saving.":"This is a later payment. Commission will not be changed."}</div>
+ <div style="display:grid;grid-template-columns:1fr 1fr;gap:12px">
+  <label><strong>Amount *</strong><input id="salePaymentEditAmount" type="number" min="0.01" step="0.01" value="${Number(p.amount||0).toFixed(2)}" style="width:100%;box-sizing:border-box"></label>
+  <label><strong>Payment Method *</strong><select id="salePaymentEditMethod" style="width:100%;box-sizing:border-box">
+   ${["Cash","ABA","Bank Transfer","Card","Other"].map(m=>`<option value="${esc(m)}" ${String(p.payment_method||"Cash")===m?"selected":""}>${esc(m)}</option>`).join("")}
+  </select></label>
+  <label><strong>Payment Date *</strong><input id="salePaymentEditDate" type="date" value="${attr(dt.date)}" style="width:100%;box-sizing:border-box"></label>
+  <label><strong>Payment Time *</strong><input id="salePaymentEditTime" type="time" value="${attr(dt.time)}" style="width:100%;box-sizing:border-box"></label>
+ </div>
+ <label style="display:block;margin-top:12px"><strong>Note</strong><input id="salePaymentEditNote" type="text" value="${attr(p.note||"")}" style="width:100%;box-sizing:border-box"></label>
+ <div id="salePaymentEditError" class="error" style="display:none;margin-top:12px"></div>
+ <div class="actions" style="justify-content:flex-end;margin-top:16px">
+  <button class="light" type="button" id="salePaymentEditCancel">Cancel</button>
+  <button class="gold" type="button" id="salePaymentEditSave">Save Change</button>
+ </div>
+ </div>`;
+ o.classList.add("show");
+
+ const close=()=>o.classList.remove("show");
+ $("salePaymentEditClose").onclick=close;
+ $("salePaymentEditCancel").onclick=close;
+
+ $("salePaymentEditSave").onclick=async()=>{
+   const amount=Math.max(0,Number($("salePaymentEditAmount").value||0));
+   const method=$("salePaymentEditMethod").value||"Cash";
+   const date=$("salePaymentEditDate").value;
+   const time=$("salePaymentEditTime").value;
+   const note=$("salePaymentEditNote").value||"";
+   const err=$("salePaymentEditError");
+   const btn=$("salePaymentEditSave");
+   if(amount<=0){err.textContent="Payment amount must be greater than 0.";err.style.display="block";return;}
+   if(!date||!time){err.textContent="Please select payment date and time.";err.style.display="block";return;}
+
+   btn.disabled=true;btn.textContent="Saving...";
+   try{
+     const ts=new Date(`${date}T${time}:00`);
+     if(Number.isNaN(ts.getTime()))throw new Error("Invalid payment date/time.");
+
+     const r=await sb.from("medifella_sale_payments").update({
+       amount,
+       payment_method:method,
+       payment_date:date,
+       note,
+       created_at:ts.toISOString()
+     }).eq("id",String(paymentId));
+     if(r.error)throw r.error;
+
+     await syncSalePaidAfterPaymentChange(saleId);
+
+     if(first){
+       const existing=await getAutomaticCommissionRowsForSale(saleId);
+       if(existing.length){
+         // Rebuild using the exact current first payment amount and the same
+         // original Dermed commission engine.
+         await rebuildAutomaticCommissionForSale(saleId);
+       }
+     }
+
+     close();
+     await loadSales();
+     await showSalePaymentDetails(saleId);
+   }catch(e){
+     console.error("Edit payment:",e);
+     err.textContent=e?.message||"Could not edit payment.";
+     err.style.display="block";
+     btn.disabled=false;btn.textContent="Save Change";
+   }
+ };
+}
+
+async function deleteSalePayment(paymentId,saleId,isFirstFlag){
+ const payments=await getSalePaymentsForCrud(saleId);
+ const idx=payments.findIndex(p=>String(p.id)===String(paymentId));
+ if(idx<0){alert("Payment not found.");return;}
+ const isFirst=idx===0;
+ const p=payments[idx];
+
+ const commissionRows=await getAutomaticCommissionRowsForSale(saleId);
+ const commissionEffect=isFirst&&commissionRows.length
+   ?"\n\nThis is the FIRST payment, so its automatic commission will also be deleted."
+   :"";
+
+ if(!confirm(`Delete payment of ${money(Number(p.amount||0))}?${commissionEffect}`))return;
+
+ try{
+   const r=await sb.from("medifella_sale_payments").delete().eq("id",String(paymentId));
+   if(r.error)throw r.error;
+
+   if(isFirst && commissionRows.length){
+     await deleteAutomaticCommissionForSale(saleId);
+   }
+
+   await syncSalePaidAfterPaymentChange(saleId);
+   await loadSales();
+   await showSalePaymentDetails(saleId);
+ }catch(e){
+   console.error("Delete payment:",e);
+   alert(e?.message||"Could not delete payment.");
+ }
 }
 
 function renderSales(){
