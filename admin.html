@@ -11720,7 +11720,9 @@ async function loadCommissionRecords(retry=0){
     const base=q*p;
     const dt=String(x?.discount_type||"percent").toLowerCase();
     const dv=N(x?.discount_value);
-    const d=dt==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);
+    const d=dt==="usd"
+      ?Math.min(base,Math.max(0,dv)*qty)
+      :Math.min(base,base*dv/100);
     return Math.max(0,base-d);
   }
   function serviceType(x){
@@ -14780,101 +14782,83 @@ async function loadCommissionRecords(retry=0){
 })();
 </script>
 
-<script id="discount-amount-final-fix">
+<script id="fix-usd-discount-per-unit">
 (function(){
   "use strict";
 
-  const num=v=>{
-    const n=Number(String(v??"").replace(/[$,\s]/g,""));
-    return Number.isFinite(n)&&n>=0?n:0;
-  };
-
-  function bindDermed(){
-    const body=document.getElementById("dermedItems");
-    if(!body || body.dataset.discountAmountBound==="1") return;
-    body.dataset.discountAmountBound="1";
-
-    body.addEventListener("change",function(e){
-      const select=e.target.closest("select");
-      if(!select || !/discount.*type|dtype/i.test(select.className+" "+[...select.attributes].map(a=>a.name+"="+a.value).join(" "))) return;
-
-      const row=select.closest("tr");
-      if(!row) return;
-      const input=row.querySelector(
-        'input[class*="discount"][class*="value"], input[data-dermed-discount-value], input[type="text"]'
-      );
-      if(input){
-        input.disabled=false;
-        input.readOnly=false;
-        input.removeAttribute("min");
-        input.inputMode="decimal";
-        input.type="text";
-        input.focus();
-      }
-    },true);
-
-    body.addEventListener("input",function(e){
-      const input=e.target;
-      if(!input || !/discount.*value/i.test(input.className+" "+[...input.attributes].map(a=>a.name+"="+a.value).join(" "))) return;
-      input.value=input.value.replace(/[^\d.]/g,"").replace(/(\..*)\./g,"$1");
-    },true);
+  function num(v){
+    const n=Number(String(v==null?"":v).replace(/[$,\s]/g,""));
+    return Number.isFinite(n)?n:0;
   }
 
-  function bindMts(){
-    const body=document.getElementById("mtsItems");
-    if(!body || body.dataset.discountAmountBound==="1") return;
-    body.dataset.discountAmountBound="1";
+  function fixRows(){
+    const root=document.querySelector("#dermedSaleSection")
+      ||document.querySelector("[data-sale-type='dermed']")
+      ||document;
 
-    body.addEventListener("change",function(e){
-      const select=e.target.closest("select");
-      if(!select || !/dtype|discount.*type/i.test(select.className+" "+[...select.attributes].map(a=>a.name+"="+a.value).join(" "))) return;
+    const rows=root.querySelectorAll("tr");
+    rows.forEach(function(row){
+      const selects=row.querySelectorAll("select");
+      const inputs=row.querySelectorAll("input");
+      if(!inputs.length)return;
 
-      const row=select.closest("tr");
-      if(!row) return;
-      const input=row.querySelector('input[data-mts-final-dvalue], input[type="text"]');
-      if(input){
-        input.disabled=false;
-        input.readOnly=false;
-        input.type="text";
-        input.inputMode="decimal";
-        input.focus();
-      }
-    },true);
+      let qtyInput=null, priceInput=null, discountInput=null;
+      inputs.forEach(function(i){
+        const ph=String(i.placeholder||"").toLowerCase();
+        const name=String(i.name||"").toLowerCase();
+        const cls=String(i.className||"").toLowerCase();
 
-    body.addEventListener("input",function(e){
-      const input=e.target;
-      if(!input || !/dvalue|discount.*value/i.test(input.className+" "+[...input.attributes].map(a=>a.name+"="+a.value).join(" "))) return;
-      input.value=input.value.replace(/[^\d.]/g,"").replace(/(\..*)\./g,"$1");
-    },true);
-  }
-
-  function bindOverall(){
-    ["mtsOverallDiscountType","mtsOverallDiscountValue",
-     "dermedOverallDiscountType","dermedOverallDiscountValue"].forEach(id=>{
-      const x=document.getElementById(id);
-      if(!x || x.dataset.discountAmountBound==="1") return;
-      x.dataset.discountAmountBound="1";
-      x.disabled=false;
-      x.readOnly=false;
-      x.addEventListener("input",function(){
-        if(x.tagName==="INPUT") x.value=x.value.replace(/[^\d.]/g,"").replace(/(\..*)\./g,"$1");
+        if(!qtyInput && (name.includes("qty")||ph.includes("qty")||cls.includes("quantity")))
+          qtyInput=i;
+        if(!priceInput && (name.includes("price")||ph.includes("price")||cls.includes("price")))
+          priceInput=i;
+        if(!discountInput && (name.includes("discount")||ph.includes("discount")||cls.includes("discount")))
+          discountInput=i;
       });
+
+      if(!qtyInput||!priceInput||!discountInput||!selects.length)return;
+
+      const mode=String(selects[0].value||"").toLowerCase();
+      if(mode!=="usd" && mode!=="amount" && mode!=="$")return;
+
+      const qty=Math.max(1,num(qtyInput.value)||1);
+      const price=Math.max(0,num(priceInput.value));
+      const discount=Math.max(0,num(discountInput.value));
+
+      // USD discount is PER UNIT:
+      // 6 × $80 with $20/unit discount = 6 × ($80-$20) = $360.
+      const subtotal=Math.max(0,qty*(price-discount));
+
+      // Update the visible subtotal in this row when it is a plain text cell.
+      const cells=row.querySelectorAll("td");
+      if(cells.length){
+        for(let i=cells.length-1;i>=0;i--){
+          const cell=cells[i];
+          const txt=String(cell.textContent||"").trim();
+          if(txt.includes("$")){
+            cell.textContent="$"+subtotal.toFixed(2);
+            break;
+          }
+        }
+      }
+
+      // Trigger the app's normal recalculation without changing its other logic.
+      discountInput.dispatchEvent(new Event("input",{bubbles:true}));
     });
   }
 
-  function run(){
-    bindDermed();
-    bindMts();
-    bindOverall();
-  }
+  // This is only a safety layer; the underlying commission calculation above
+  // is already corrected.
+  document.addEventListener("input",function(e){
+    if(e.target && e.target.matches("input,select")) setTimeout(fixRows,0);
+  },true);
+  document.addEventListener("change",function(e){
+    if(e.target && e.target.matches("input,select")) setTimeout(fixRows,0);
+  },true);
 
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",run,{once:true});
-  }else run();
-
-  setTimeout(run,300);
-  setTimeout(run,800);
-  setTimeout(run,1500);
+  setTimeout(fixRows,500);
+  setTimeout(fixRows,1200);
+  setTimeout(fixRows,2500);
 })();
 </script>
 </body>
