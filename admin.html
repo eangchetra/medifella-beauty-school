@@ -2642,7 +2642,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <section id="products" class="section">
 <h1>Product Management</h1>
 <div class="two">
-<div class="card">
+<div id="productCreateCard" class="card">
 <h2>Add New Product</h2>
 <input type="hidden" id="productEditId">
 <label>Product Name *</label><input id="productName" placeholder="Product name">
@@ -3202,6 +3202,11 @@ function applyAccountPermissions(){
   $("adminRole").innerHTML=role==="admin"
     ? '<span class="badge verified">Administrator</span>'
     : '<span class="badge pending">Staff</span>';
+  // Product creation is available only to administrator accounts.
+  // Staff may still use the rest of Product Management according to their permissions.
+  if($("productCreateCard")){
+    $("productCreateCard").classList.toggle("hidden", role!=="admin");
+  }
   if($("saleForm") && !$("saleForm").classList.contains("hidden")){
     updateSaleDateTimeDisplay(); $("saleReference").value=nextSaleReference();
   }
