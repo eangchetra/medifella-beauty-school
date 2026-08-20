@@ -4832,6 +4832,27 @@ function showSaleInvoice(id,size="A4"){
   <button type="button" class="mf-action-btn" onclick="closeInvoicePreview()">✕ Close</button>
 </div>
  </div>`;
+  /* V13: Apply brand color directly to the ACTUAL rendered invoice
+     table header. This is deliberately done after invoice HTML is generated
+     so later dashboard CSS cannot turn the row back to white. */
+  (function applyInvoiceBrandHeader(){
+    const root=document.querySelector("#invoicePrint .mf-invoice");
+    if(!root)return;
+
+    const saleType=String(root.getAttribute("data-sale-type")||"").trim().toUpperCase();
+    let brandColor="#46C3D9"; // Medi Fella
+    if(saleType==="DERMED") brandColor="#C9901E";
+    else if(saleType==="MTS") brandColor="#F8F601";
+
+    root.querySelectorAll(".mf-invoice-table thead tr th").forEach(th=>{
+      th.style.setProperty("background-color",brandColor,"important");
+      th.style.setProperty("background",brandColor,"important");
+      th.style.setProperty("color","#000000","important");
+      th.style.setProperty("-webkit-print-color-adjust","exact","important");
+      th.style.setProperty("print-color-adjust","exact","important");
+    });
+  })();
+
  $("invoiceOverlay").classList.add("show");
 }
 
@@ -4993,6 +5014,13 @@ function openPrintFromCanvas(canvas,paper,sale){
    #paper{width:${paper.widthMm}mm!important;height:${paper.heightMm}mm!important}
  }
 #invoicePrint .mf-invoice .mf-invoice-table thead tr th{
+  color:#000000 !important;
+}
+#invoicePrint .mf-invoice[data-sale-type="MEDIFELLA"] .mf-invoice-table thead tr th,
+#invoicePrint .mf-invoice[data-sale-type="MEDI FELLA"] .mf-invoice-table thead tr th,
+#invoicePrint .mf-invoice[data-sale-type="MEDIFELLA SALE"] .mf-invoice-table thead tr th{
+  background:#46C3D9 !important;
+  background-color:#46C3D9 !important;
   color:#000000 !important;
 }
 </style>
