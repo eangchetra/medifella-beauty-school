@@ -4432,7 +4432,7 @@ async function showSalePaymentDetails(id){
      <td>${esc(p.note||"")}</td>
      <td><div class="actions">
        <button class="light" type="button" onclick="editSalePayment('${attr(p.id)}','${attr(id)}');return false;">Edit</button>
-       <button class="danger" type="button" onclick="deleteSalePayment('${attr(p.id)}','${attr(id)}',${isFirst?'true':'false'});return false;">Delete</button>
+       <button class="danger" type="button" onclick="deleteSalePayment('${attr(p.id)}','${attr(id)}',${isFirst?'true':'false'});return false;"><span class="delete-label-v19">Delete</span></button>
      </div></td>
    </tr>`;
  }).join(""):`<tr><td colspan="5" class="muted">No payment history found.</td></tr>`}
@@ -5582,6 +5582,46 @@ async function printInvoice(id,size="A4"){
 #salePaymentDetailsOverlay button.danger::before,
 #salePaymentDetailsOverlay button.danger::after{
   content:none !important;
+}
+</style>
+
+<style id="delete-text-force-visible-v19">
+#salePaymentDetailsOverlay .actions button.danger{
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:72px !important;
+  min-width:72px !important;
+  height:34px !important;
+  min-height:34px !important;
+  padding:0 10px !important;
+  margin:0 !important;
+  box-sizing:border-box !important;
+  overflow:visible !important;
+  text-indent:0 !important;
+  font-size:13px !important;
+  line-height:1 !important;
+  font-family:Arial,sans-serif !important;
+  font-weight:700 !important;
+  color:#ffffff !important;
+  background:#d00000 !important;
+  border:1px solid #a80000 !important;
+  border-radius:6px !important;
+  opacity:1 !important;
+  visibility:visible !important;
+}
+#salePaymentDetailsOverlay .actions button.danger .delete-label-v19{
+  display:inline !important;
+  visibility:visible !important;
+  opacity:1 !important;
+  color:#ffffff !important;
+  background:transparent !important;
+  font-size:13px !important;
+  line-height:1 !important;
+  font-weight:700 !important;
+  font-family:Arial,sans-serif !important;
+  white-space:nowrap !important;
+  text-indent:0 !important;
 }
 </style>
 </head>
