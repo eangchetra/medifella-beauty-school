@@ -11860,58 +11860,143 @@ async function loadCommissionRecords(retry=0){
 
   window.recordFirstDermedSaleCommission=async function({sale,buyer,buyerType,buyerId,staffId,staff,servicesArr,items,adminId}){
     if(String(sale?.sale_type||"").trim().toUpperCase()!=="DERMED"||!sale?.id||!staffId)return;
-    const cfg=typeof window.getCurrentSaleStaffConfig==="function"?window.getCurrentSaleStaffConfig(staffId):null;
-    if(!cfg)return;
+
+    // STRICT RULE: automatic commission is allowed ONLY for the customer's
+    // first Dermed invoice. A second/subsequent Dermed invoice must never
+    // create another automatic commission.
+    if(!buyerId)return;
+    let historyQuery;
+    if(buyerType==="student"){
+      historyQuery=await sb.from("medifella_sales")
+        .select("id,created_at,sale_date")
+        .eq("sale_type","DERMED")
+        .eq("student_id",buyerId)
+        .order("created_at",{ascending:true});
+    }else{
+      historyQuery=await sb.from("medifella_sales")
+        .select("id,created_at,sale_date")
+        .eq("sale_type","DERMED")
+        .eq("customer_id",buyerId)
+        .order("created_at",{ascending:true});
+    }
+    if(historyQuery.error) throw historyQuery.error;
+    const history=Array.isArray(historyQuery.data)?historyQuery.data:[];
+    if(!history.length)return;
+
+    // Only the earliest Dermed sale for this customer/student may generate
+    // automatic commission.
+    const firstSaleId=String(history[0].id);
+    if(firstSaleId!==String(sale.id)){
+      console.info("Dermed commission skipped: customer already has an earlier Dermed invoice.");
+      return;
+    }
+
+    // Extra protection: if a commission already exists for this customer
+    // from any earlier Dermed automatic record, do not create another one.
     try{
-      const q=await sb.from("medifella_sale_commissions").select("id").eq("source_sale_id",String(sale.id)).eq("source","dermed_auto").limit(1);
-      if(!q.error&&Array.isArray(q.data)&&q.data.length)return;
+      let prior;
+      if(buyerType==="student"){
+        prior=await sb.from("medifella_sale_commissions")
+          .select("id,source_sale_id,student_id,created_at")
+          .eq("student_id",buyerId)
+          .eq("source","dermed_auto")
+          .limit(1);
+      }else{
+        prior=await sb.from("medifella_sale_commissions")
+          .select("id,source_sale_id,customer_id,created_at")
+          .eq("customer_id",buyerId)
+          .eq("source","dermed_auto")
+          .limit(1);
+      }
+      if(!prior.error && Array.isArray(prior.data) && prior.data.length){
+        console.info("Dermed commission skipped: automatic commission already exists for this customer.");
+        return;
+      }
     }catch(_){}
-    const products=Array.isArray(items)?items:[],services=Array.isArray(servicesArr)?servicesArr:[];
+
+    const cfg=typeof window.getCurrentSaleStaffConfig==="function"
+      ?window.getCurrentSaleStaffConfig(staffId):null;
+    if(!cfg)return;
+
+    const products=Array.isArray(items)?items:[];
+    const services=Array.isArray(servicesArr)?servicesArr:[];
     const productTotal=products.reduce((s,x)=>s+lineTotal(x),0);
     const singles=services.filter(x=>paymentType(x)==="Single");
     const packages=services.filter(x=>paymentType(x)==="Package");
     const singleTotal=singles.reduce((s,x)=>s+lineTotal(x),0);
     const packageTotal=packages.reduce((s,x)=>s+lineTotal(x),0);
-    const paid=Math.max(0,Math.min(N(sale?.paid??sale?.paid_amount??0),N(sale?.grand_total??sale?.subtotal??0)));
+    const paid=Math.max(0,Math.min(
+      N(sale?.paid??sale?.paid_amount??0),
+      N(sale?.grand_total??sale?.subtotal??0)
+    ));
     const mandatory=productTotal+singleTotal;
+
+    // Products + all Single services must be fully paid first.
     if(paid+0.005<mandatory)return;
+
     let packagePaid=Math.min(Math.max(0,paid-mandatory),packageTotal);
     const rows=[];
 
     for(const x of singles){
-      const base=lineTotal(x),type=serviceType(x),rate=(type==="Service With Product"?N(cfg.service_product_rate):N(cfg.service_rate))/100;
+      const base=lineTotal(x);
+      const type=serviceType(x);
+      const rate=(type==="Service With Product"
+        ?N(cfg.service_product_rate)
+        :N(cfg.service_rate))/100;
       if(base<=0||rate<=0)continue;
       rows.push({
-        commission_date:String(sale?.sale_date||"").slice(0,10),staff_id:staffId,
+        commission_date:String(sale?.sale_date||"").slice(0,10),
+        staff_id:staffId,
         staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||cfg.staff_name||"",
-        customer_id:buyerType==="customer"?buyerId:null,student_id:buyerType==="student"?buyerId:null,
+        customer_id:buyerType==="customer"?buyerId:null,
+        student_id:buyerType==="student"?buyerId:null,
         customer_name:buyer?.name||buyer?.full_name||sale?.customer_name||sale?.student_name||"",
         customer_phone:buyer?.phone||sale?.customer_phone||sale?.student_phone||"",
         service_type:type==="Service With Product"?"service_product":"service",
-        service_detail:x.name||"Service",service_id:x.service_id||null,
-        unit:Math.max(1,N(x.quantity??x.unit??1)),unit_price:N(x.price??x.unit_price),
-        discount:N(x.discount??x.discount_amount),subtotal:base,commission_rate:rate,
-        commission_amount:base*rate,source:"dermed_auto",source_sale_id:String(sale.id),
-        reference_no:sale?.reference_no||"",created_by:adminId||null
+        service_detail:x.name||"Service",
+        service_id:x.service_id||null,
+        unit:Math.max(1,N(x.quantity??x.unit??1)),
+        unit_price:N(x.price??x.unit_price),
+        discount:N(x.discount??x.discount_amount),
+        subtotal:base,
+        commission_rate:rate,
+        commission_amount:base*rate,
+        source:"dermed_auto",
+        source_sale_id:String(sale.id),
+        reference_no:sale?.reference_no||"",
+        created_by:adminId||null
       });
     }
 
     for(const x of packages){
-      const base=Math.min(lineTotal(x),packagePaid);packagePaid=Math.max(0,packagePaid-base);
-      const type=serviceType(x),rate=(type==="Service With Product"?N(cfg.service_product_rate):N(cfg.service_rate))/100;
+      const base=Math.min(lineTotal(x),packagePaid);
+      packagePaid=Math.max(0,packagePaid-base);
+      const type=serviceType(x);
+      const rate=(type==="Service With Product"
+        ?N(cfg.service_product_rate)
+        :N(cfg.service_rate))/100;
       if(base<=0||rate<=0)continue;
       rows.push({
-        commission_date:String(sale?.sale_date||"").slice(0,10),staff_id:staffId,
+        commission_date:String(sale?.sale_date||"").slice(0,10),
+        staff_id:staffId,
         staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||cfg.staff_name||"",
-        customer_id:buyerType==="customer"?buyerId:null,student_id:buyerType==="student"?buyerId:null,
+        customer_id:buyerType==="customer"?buyerId:null,
+        student_id:buyerType==="student"?buyerId:null,
         customer_name:buyer?.name||buyer?.full_name||sale?.customer_name||sale?.student_name||"",
         customer_phone:buyer?.phone||sale?.customer_phone||sale?.student_phone||"",
         service_type:type==="Service With Product"?"service_product":"service",
-        service_detail:x.name||"Service",service_id:x.service_id||null,
-        unit:Math.max(1,N(x.quantity??x.unit??1)),unit_price:N(x.price??x.unit_price),
-        discount:N(x.discount??x.discount_amount),subtotal:base,commission_rate:rate,
-        commission_amount:base*rate,source:"dermed_auto",source_sale_id:String(sale.id),
-        reference_no:sale?.reference_no||"",created_by:adminId||null
+        service_detail:x.name||"Service",
+        service_id:x.service_id||null,
+        unit:Math.max(1,N(x.quantity??x.unit??1)),
+        unit_price:N(x.price??x.unit_price),
+        discount:N(x.discount??x.discount_amount),
+        subtotal:base,
+        commission_rate:rate,
+        commission_amount:base*rate,
+        source:"dermed_auto",
+        source_sale_id:String(sale.id),
+        reference_no:sale?.reference_no||"",
+        created_by:adminId||null
       });
     }
 
@@ -11921,9 +12006,11 @@ async function loadCommissionRecords(retry=0){
       const r=await sb.from("medifella_sale_commissions").insert(pending);
       if(!r.error)return;
       const e=String(r.error.message||r.error.details||"");
-      const m=e.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']?.*does not exist/i)||e.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i)||e.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
-      if(m&&Object.prototype.hasOwnProperty.call(pending[0],m[1])){
-        pending=pending.map(row=>{const copy={...row};delete copy[m[1]];return copy});
+      const cm=e.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']?.*does not exist/i)
+        ||e.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i)
+        ||e.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
+      if(cm&&Object.prototype.hasOwnProperty.call(pending[0],cm[1])){
+        pending=pending.map(row=>{const copy={...row};delete copy[cm[1]];return copy});
         continue;
       }
       throw r.error;
@@ -14589,6 +14676,107 @@ async function loadCommissionRecords(retry=0){
   setTimeout(run,800);
   setTimeout(run,1500);
   setTimeout(run,2500);
+})();
+</script>
+
+<script id="dermed-first-payment-only-final">
+(function(){
+  "use strict";
+
+  function wrapCommission(){
+    const original=window.recordFirstDermedSaleCommission;
+    if(typeof original!=="function") return false;
+    if(original.__firstPaymentOnlyWrapped) return true;
+
+    async function firstPaymentOnly(args){
+      try{
+        const sale=args&&args.sale;
+        const buyerType=args&&args.buyerType;
+        const buyerId=args&&args.buyerId;
+
+        if(!sale || !sale.id) return;
+
+        // 1. Never create a second automatic commission for the same invoice.
+        const sameInvoice=await sb.from("medifella_sale_commissions")
+          .select("id")
+          .eq("source_sale_id",String(sale.id))
+          .eq("source","dermed_auto")
+          .limit(1);
+
+        if(!sameInvoice.error && Array.isArray(sameInvoice.data) && sameInvoice.data.length){
+          return;
+        }
+
+        // 2. Find all previous Dermed invoices for this customer/student.
+        // The first invoice is the only invoice that can ever receive
+        // automatic commission.
+        let q=sb.from("medifella_sales")
+          .select("id,created_at,sale_date")
+          .eq("sale_type","DERMED");
+
+        if(buyerType==="student"){
+          q=q.eq("student_id",String(buyerId));
+        }else{
+          q=q.eq("customer_id",String(buyerId));
+        }
+
+        const history=await q.order("created_at",{ascending:true});
+
+        // If we cannot verify the history, do NOT risk giving duplicate
+        // commission.
+        if(history.error) return;
+
+        const sales=Array.isArray(history.data)?history.data:[];
+
+        if(sales.length && String(sales[0].id)!==String(sale.id)){
+          return;
+        }
+
+        // 3. If this customer already has any automatic commission, the
+        // one-time first-payment commission was already issued.
+        let cq=sb.from("medifella_sale_commissions")
+          .select("id")
+          .eq("source","dermed_auto");
+
+        if(buyerType==="student"){
+          cq=cq.eq("student_id",String(buyerId));
+        }else{
+          cq=cq.eq("customer_id",String(buyerId));
+        }
+
+        const prior=await cq.limit(1);
+
+        if(prior.error) return;
+        if(Array.isArray(prior.data) && prior.data.length) return;
+
+        // 4. This is the customer's first invoice and there is no previous
+        // automatic commission. The original function calculates commission
+        // using the payment made when this invoice was created.
+        return await original(args);
+      }catch(err){
+        console.error("First-payment-only commission guard:",err);
+        return;
+      }
+    }
+
+    firstPaymentOnly.__firstPaymentOnlyWrapped=true;
+    window.recordFirstDermedSaleCommission=firstPaymentOnly;
+    return true;
+  }
+
+  function boot(){
+    if(wrapCommission()) return;
+    setTimeout(wrapCommission,300);
+    setTimeout(wrapCommission,800);
+    setTimeout(wrapCommission,1500);
+    setTimeout(wrapCommission,2500);
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",boot,{once:true});
+  }else{
+    boot();
+  }
 })();
 </script>
 </body>
