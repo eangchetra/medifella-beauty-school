@@ -4432,7 +4432,7 @@ async function showSalePaymentDetails(id){
      <td>${esc(p.note||"")}</td>
      <td><div class="actions">
        <button class="light" type="button" onclick="editSalePayment('${attr(p.id)}','${attr(id)}');return false;">Edit</button>
-       <button class="danger" type="button" onclick="deleteSalePayment('${attr(p.id)}','${attr(id)}',${isFirst?'true':'false'});return false;"><span class="delete-label-v19">Delete</span></button>
+       <button type="button" class="payment-delete-direct-v21" data-delete-label="Delete" onclick="deleteSalePayment('${attr(p.id)}','${attr(id)}',${isFirst?'true':'false'});return false;"><span>Delete</span></button>
      </div></td>
    </tr>`;
  }).join(""):`<tr><td colspan="5" class="muted">No payment history found.</td></tr>`}
@@ -5368,6 +5368,29 @@ function openPrintFromCanvas(canvas,paper,sale){
   setTimeout(applyAdminReportVisibility,2000);
 });
 <\/script>
+
+<script id="payment-delete-direct-v21-script">
+(function(){
+"use strict";
+function fixPaymentDeleteButtons(){
+ var root=document.getElementById("salePaymentDetailsOverlay");
+ if(!root)return;
+ root.querySelectorAll("button").forEach(function(btn){
+  var onclick=btn.getAttribute("onclick")||"";
+  var label=(btn.textContent||"").trim().toLowerCase();
+  if(onclick.indexOf("deleteSalePayment")>=0 || label==="delete"){
+   btn.className="payment-delete-direct-v21";
+   btn.innerHTML="<span>Delete</span>";
+   btn.type="button";
+  }
+ });
+}
+window.fixPaymentDeleteButtonsV21=fixPaymentDeleteButtons;
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",fixPaymentDeleteButtons);
+else fixPaymentDeleteButtons();
+new MutationObserver(fixPaymentDeleteButtons).observe(document.body,{childList:true,subtree:true});
+})();
+</script>
 </body>
 
 </html>`;
@@ -5622,6 +5645,65 @@ async function printInvoice(id,size="A4"){
   font-family:Arial,sans-serif !important;
   white-space:nowrap !important;
   text-indent:0 !important;
+}
+</style>
+
+<style id="payment-delete-btn-v20-style">
+#salePaymentDetailsOverlay .payment-delete-btn-v20{
+  all:unset !important;
+  box-sizing:border-box !important;
+  display:inline-flex !important;
+  align-items:center !important;
+  justify-content:center !important;
+  width:76px !important;
+  min-width:76px !important;
+  height:34px !important;
+  min-height:34px !important;
+  padding:0 10px !important;
+  margin:0 !important;
+  border:1px solid #b00000 !important;
+  border-radius:6px !important;
+  background:#d00000 !important;
+  color:#ffffff !important;
+  font-family:Arial,sans-serif !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  line-height:34px !important;
+  text-align:center !important;
+  white-space:nowrap !important;
+  overflow:visible !important;
+  opacity:1 !important;
+  visibility:visible !important;
+  cursor:pointer !important;
+  -webkit-appearance:none !important;
+  appearance:none !important;
+}
+#salePaymentDetailsOverlay .payment-delete-btn-v20:hover{
+  background:#a80000 !important;
+  color:#ffffff !important;
+}
+</style>
+
+<style id="payment-delete-direct-v21">
+html body #salePaymentDetailsOverlay button.payment-delete-direct-v21{
+display:flex!important;align-items:center!important;justify-content:center!important;
+visibility:visible!important;opacity:1!important;overflow:visible!important;
+width:82px!important;min-width:82px!important;height:36px!important;min-height:36px!important;
+padding:0!important;margin:0!important;box-sizing:border-box!important;
+background:#d00000!important;background-image:none!important;
+border:2px solid #a00000!important;border-radius:6px!important;
+color:#fff!important;-webkit-text-fill-color:#fff!important;
+font-family:Arial,Helvetica,sans-serif!important;font-size:14px!important;
+font-weight:700!important;line-height:36px!important;text-align:center!important;
+text-indent:0!important;white-space:nowrap!important;text-shadow:none!important;
+}
+html body #salePaymentDetailsOverlay button.payment-delete-direct-v21 span{
+display:block!important;visibility:visible!important;opacity:1!important;
+position:static!important;width:auto!important;height:auto!important;
+padding:0!important;margin:0!important;background:transparent!important;
+color:#fff!important;-webkit-text-fill-color:#fff!important;
+font:700 14px/36px Arial,Helvetica,sans-serif!important;
+white-space:nowrap!important;
 }
 </style>
 </head>
