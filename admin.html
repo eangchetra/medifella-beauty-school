@@ -6318,7 +6318,7 @@ function genId(prefix,rows,field="code"){
 function sourceLabel(p){return p.source==="Others"?(p.source_other||"Others"):String(p.source||"")}
 function productStock(pid){
   const rows=Array.isArray(stockMovements)?stockMovements:[];
-  return rows.filter(m=>String(m.product_id)===String(pid)).reduce((total,m)=>{
+  const total=rows.filter(m=>String(m.product_id)===String(pid)).reduce((total,m)=>{
     const q=Math.max(0,Number(m.quantity||0));
     const type=String(m.movement_type||"").trim().toLowerCase();
     if(type==="stock_in" || type==="stockin" || type==="in") return total+q;
@@ -6326,6 +6326,8 @@ function productStock(pid){
     // Unknown movement types must NOT silently reduce stock.
     return total;
   },0);
+  // Available stock can never be negative.
+  return Math.max(0,total);
 }
 async function loadProducts(){
  const {data,error}=await sb.from("medifella_products").select("*").order("created_at",{ascending:false});
@@ -11922,29 +11924,26 @@ async function loadCommissionRecords(retry=0){
   "use strict";
 
   function isAdminProductUser(){
-    // Admin is determined from the real logged-in Supabase profile first.
-    // The specific owner/admin email is also recognized as Admin so the
-    // Product Cost and Stock Report cannot disappear when currentProfile
-    // has not finished synchronizing after login.
-    const role = String(window.currentProfile?.role || "").trim().toLowerCase();
+    // IMPORTANT: currentProfile/adminUser are lexical variables in the main
+    // admin.html script (declared with let), not window properties.
+    // Read those real variables directly so the Product page receives the
+    // same Admin role as the rest of the dashboard.
+    const role = String(
+      (typeof currentProfile !== "undefined" ? currentProfile?.role : "") || ""
+    ).trim().toLowerCase();
+
     if(role === "admin") return true;
 
+    // Fallback only for the owner account. This prevents a timing issue
+    // immediately after login, but does not grant Staff accounts Admin UI.
     const email = String(
-      window.currentUserEmail ||
-      window.userEmail ||
-      window.currentUser?.email ||
-      window.adminUser?.email ||
+      (typeof adminUser !== "undefined" ? adminUser?.email : "") ||
       localStorage.getItem("userEmail") ||
       localStorage.getItem("email") ||
       ""
     ).trim().toLowerCase();
 
-    if(email === "eang.chetraafs@gmail.com") return true;
-
-    const username = String(window.currentProfile?.username || "").trim().toLowerCase();
-    if(username === "eang.chetraafs@gmail.com") return true;
-
-    return false;
+    return email === "eang.chetraafs@gmail.com";
   }
   function P(id){ return document.getElementById(id); }
   function escP(v){
@@ -14322,27 +14321,259 @@ async function loadCommissionRecords(retry=0){
 })();
 </script>
 
-<script id="final-admin-product-cost-report-visibility">
+<script id="final-admin-product-cost-report-visibility-v2">
 (function(){
   "use strict";
+
   function force(){
     try{
       if(typeof window.__forceProductAdminVisibility==="function"){
         window.__forceProductAdminVisibility();
       }
     }catch(_){}
+
+    // The product-role patch and the main dashboard use the same lexical
+    // currentProfile variable. If the account is Admin, force the two UI
+    // elements visible after all normal permission/render cycles.
+    try{
+      const role=String(
+        (typeof currentProfile!=="undefined" ? currentProfile?.role : "") || ""
+      ).trim().toLowerCase();
+      const email=String(
+        (typeof adminUser!=="undefined" ? adminUser?.email : "") || ""
+      ).trim().toLowerCase();
+
+      if(role==="admin" || email==="eang.chetraafs@gmail.com"){
+        const tab=document.querySelector('[data-product-tab="stockReportPanel"]');
+        const panel=document.getElementById("stockReportPanel");
+        if(tab){
+          tab.classList.remove("hidden");
+          tab.style.display="";
+          tab.disabled=false;
+          tab.setAttribute("aria-hidden","false");
+        }
+        if(panel){
+          panel.classList.remove("hidden");
+          panel.style.display="";
+          panel.setAttribute("aria-hidden","false");
+        }
+
+        const cost=document.getElementById("productCost");
+        if(cost){
+          cost.disabled=false;
+          cost.setAttribute("aria-hidden","false");
+          cost.parentElement?.classList.remove("hidden");
+          cost.closest(".row")?.classList.remove("hidden");
+          const label=cost.previousElementSibling;
+          if(label?.tagName==="LABEL") label.classList.remove("hidden");
+        }
+
+        if(typeof window.renderProductList==="function"){
+          window.renderProductList();
+        }
+      }
+    }catch(_){}
   }
+
   if(document.readyState==="loading"){
     document.addEventListener("DOMContentLoaded",function(){
       setTimeout(force,100);
-      setTimeout(force,800);
-      setTimeout(force,2000);
+      setTimeout(force,700);
+      setTimeout(force,1500);
+      setTimeout(force,3000);
     });
   }else{
     setTimeout(force,100);
-    setTimeout(force,800);
-    setTimeout(force,2000);
+    setTimeout(force,700);
+    setTimeout(force,1500);
+    setTimeout(force,3000);
   }
+})();
+</script>
+
+<script id="final-stock-zero-protection-v3">
+(function(){
+  "use strict";
+
+  function E(id){ return document.getElementById(id); }
+
+  function stock(pid){
+    try{
+      return Math.max(0, Number(
+        typeof productStock==="function" ? productStock(pid) : 0
+      ) || 0);
+    }catch(_){ return 0; }
+  }
+
+  function showStockError(id,name,available){
+    const box=E(id);
+    const msg=`${name||"Product"} is out of stock. Available stock: ${available}.`;
+    if(box && typeof window.msg==="function"){
+      window.msg(box,msg,true);
+    }else{
+      alert(msg);
+    }
+  }
+
+  // Block adding an out-of-stock product to any product sale.
+  function wrapAddSaleProduct(){
+    if(typeof window.addSaleProduct!=="function") return;
+    if(window.__stockZeroAddWrapped==="1") return;
+
+    const original=window.addSaleProduct;
+    window.__stockZeroAddWrapped="1";
+
+    window.addSaleProduct=function(type,pid){
+      const t=String(type||"").toLowerCase();
+      if(t==="mts" || t==="dermed"){
+        const available=stock(pid);
+        if(available<=0){
+          showStockError(
+            t==="mts" ? "mtsStatus" : "dermedStatus",
+            "This product",
+            available
+          );
+          return false;
+        }
+      }
+      return original.apply(this,arguments);
+    };
+  }
+
+  // The Dermed search has a direct handler that can bypass addSaleProduct.
+  function wrapDermedDirectAdd(){
+    if(typeof window.__addDermedProductFromSearch!=="function") return;
+    if(window.__stockZeroDermedDirectWrapped==="1") return;
+
+    const original=window.__addDermedProductFromSearch;
+    window.__stockZeroDermedDirectWrapped="1";
+
+    window.__addDermedProductFromSearch=function(pid){
+      const available=stock(pid);
+      if(available<=0){
+        showStockError("dermedStatus","This product",available);
+        return false;
+      }
+      return original.apply(this,arguments);
+    };
+  }
+
+  // Validate the complete invoice immediately before saving. This protects
+  // against stock becoming zero after an item was already added to the table.
+  function validateSaleStock(type){
+    const t=String(type||"").toLowerCase();
+
+    if(t==="dermed"){
+      const items=Array.isArray(window.dermedSaleItems)?window.dermedSaleItems:[];
+      for(const x of items){
+        const available=stock(x.product_id);
+        const qty=Math.max(0,Number(x.quantity)||0);
+        if(available<=0 || qty>available){
+          showStockError(
+            "dermedStatus",
+            x.name||"Product",
+            available
+          );
+          return false;
+        }
+      }
+    }
+
+    if(t==="mts"){
+      const items=Array.isArray(window.mtsSaleItems)?window.mtsSaleItems:[];
+      for(const x of items){
+        const available=stock(x.product_id);
+        const qty=Math.max(0,Number(x.quantity)||0);
+        if(available<=0 || qty>available){
+          showStockError(
+            "mtsStatus",
+            x.name||"Product",
+            available
+          );
+          return false;
+        }
+      }
+    }
+
+    return true;
+  }
+
+  // Capture save clicks before the existing save handlers.
+  function bindSaveGuard(){
+    if(document.documentElement.dataset.stockZeroSaveGuard==="1") return;
+    document.documentElement.dataset.stockZeroSaveGuard="1";
+
+    document.addEventListener("click",function(e){
+      const btn=e.target.closest && e.target.closest("#saveMtsSale,#saveDermedSale");
+      if(!btn) return;
+
+      const type=btn.id==="saveMtsSale"?"mts":"dermed";
+      if(!validateSaleStock(type)){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+      }
+    },true);
+  }
+
+  // Also clamp quantity inputs whenever a user changes them.
+  function bindQuantityGuard(){
+    if(document.documentElement.dataset.stockZeroQtyGuard==="1") return;
+    document.documentElement.dataset.stockZeroQtyGuard="1";
+
+    document.addEventListener("input",function(e){
+      const el=e.target;
+      if(!el || !el.classList) return;
+
+      const isDermed=el.closest && el.closest("#dermedItems");
+      const isMts=el.closest && el.closest("#mtsItems");
+      if(!isDermed && !isMts) return;
+      if(!el.classList.contains("dermed-qty") &&
+         !el.classList.contains("mts-qty") &&
+         !el.classList.contains("sale-item-qty")) return;
+
+      const row=el.closest("tr");
+      if(!row) return;
+
+      const pid =
+        row.dataset.productId ||
+        row.querySelector("[data-product-id]")?.dataset.productId ||
+        row.querySelector(".product-id")?.value ||
+        row.querySelector(".mts-product-id")?.value ||
+        row.querySelector(".sale-product-id")?.value;
+
+      if(!pid) return;
+
+      const available=stock(pid);
+      let qty=Math.max(0,parseInt(el.value,10)||0);
+
+      if(available<=0){
+        qty=0;
+        el.value="0";
+      }else if(qty>available){
+        qty=available;
+        el.value=String(available);
+      }
+    },true);
+  }
+
+  function run(){
+    wrapAddSaleProduct();
+    wrapDermedDirectAdd();
+    bindSaveGuard();
+    bindQuantityGuard();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",run,{once:true});
+  }else{
+    run();
+  }
+
+  // Some sale handlers are installed later in this large single-file dashboard.
+  setTimeout(run,300);
+  setTimeout(run,800);
+  setTimeout(run,1500);
+  setTimeout(run,2500);
 })();
 </script>
 </body>
