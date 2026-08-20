@@ -9051,8 +9051,7 @@ document.addEventListener("DOMContentLoaded",function(){
   async function saveMtsFinal(){
     const buyerType=E("mtsBuyerType")?.value;
     const buyerId=E("mtsBuyerId")?.value;
-    const staffId=E("mtsSaleStaff")?.value;
-    const items=window.mtsSaleItems||[];
+    const staffId=E("mtsSaleStaff")?.value;     const cashierId=E("mtsCashier")?.value||"";     const items=window.mtsSaleItems||[];
 
     if(!buyerType||!buyerId){
       msg(E("mtsStatus"),"Please select a Student or Customer.",true); return;
