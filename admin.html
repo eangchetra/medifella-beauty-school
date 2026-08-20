@@ -2270,8 +2270,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
   <div class="sale-table-wrap">
     <table class="sale-entry-table">
-      <thead>
-        <tr>
+      <thead>\n     <tr style="background:${invoiceBrand.color};color:#FFFFFF"
           <th style="width:45%">Course / Product</th>
           <th style="width:10%">Qty</th>
           <th style="width:15%">Unit Price (USD)</th>
@@ -4626,9 +4625,10 @@ function showSaleInvoice(id,size="A4"){
          ? esc(String(discount).trim())
          : `${esc(String(discount).trim())}%`
      );
+     const descTextColor = isDermedSale ? "#111111" : "#FFFFFF";
      return `<tr>
        <td>${i+1}</td>
-       <td style="text-align:left">${esc(x.name||"")}${String(x.type||"").toLowerCase()==="service" ? `<div class="muted" style="font-size:8px">Service</div>` : ""}</td>
+       <td style="text-align:left;font-weight:600;padding:4px 6px">${esc(x.name||"")}${String(x.type||"").toLowerCase()==="service" ? `<div class="muted" style="font-size:8px">Service</div>` : ""}</td>
        <td>${esc(qty)}</td>
        <td>${usd(x.unit_price)}</td>
        <td>${discountText}</td>
