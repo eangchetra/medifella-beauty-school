@@ -7149,15 +7149,14 @@ function renderProductList(){
  $("productList").innerHTML=rows.length?`
  <div class="table-wrap"><table class="table" id="productListTable">
   <tr>
-   <th>Product ID</th><th>Product Name</th><th>In Stock</th>
-   ${isAdmin?"<th>Cost</th>":""}
+   <th>Product ID</th><th>Product Name</th><th>In Stock</th><th>Cost</th>
    <th>Price</th><th>Source</th><th>Action</th>
   </tr>
   ${rows.map(p=>`<tr>
    <td>${esc(p.product_code)}</td>
    <td>${esc(p.name)}</td>
    <td><strong>${getStock(p.id)}</strong></td>
-   ${isAdmin?`<td>${p.cost!==null&&p.cost!==undefined&&p.cost!==""?money(p.cost):"—"}</td>`:""}
+   <td>${p.cost!==null&&p.cost!==undefined&&p.cost!==""?money(p.cost):"—"}</td>
    <td>${money(p.price)}</td>
    <td>${esc(sourceLabel(p))}</td>
    <td><div class="actions">
