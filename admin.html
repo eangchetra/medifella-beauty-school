@@ -17084,5 +17084,156 @@ else install();
 setInterval(forceStaffFullAccess,2500);
 })();
 </script>
+
+<script id="commission-existing-record-repair-v25">
+(function(){
+"use strict";
+
+function n(v){
+  var x=Number(String(v==null?"":v).replace(/[$,\s]/g,""));
+  return Number.isFinite(x)?Math.max(0,x):0;
+}
+
+function firstPaymentForSale(saleId){
+  return sb.from("medifella_sale_payments")
+    .select("id,amount,payment_date,created_at")
+    .eq("sale_id",String(saleId))
+    .order("payment_date",{ascending:true})
+    .order("created_at",{ascending:true})
+    .limit(1);
+}
+
+function itemTotal(x){
+  var qty=Math.max(1,n(x?.quantity??x?.qty??x?.unit??1));
+  var price=n(x?.price??x?.unit_price??0);
+  return Math.max(0,qty*price);
+}
+
+function serviceTotal(x){
+  var qty=Math.max(1,n(x?.quantity??x?.qty??x?.unit??1));
+  var price=n(x?.price??x?.unit_price??0);
+  var base=qty*price;
+  var dv=n(x?.discount_value);
+  var dt=String(x?.discount_type||"percent").toLowerCase();
+  var discount=dt==="usd"?Math.min(base,dv*qty):Math.min(base,base*dv/100);
+  return Math.max(0,base-discount);
+}
+
+function isPackage(x){
+  var t=String(x?.service_payment_type||x?.payment_type||x?.type||"").toLowerCase();
+  return !!x?.is_package || !!x?.package_id || t==="package";
+}
+
+function serviceRate(x,cfg){
+  var t=String(x?.service_type||x?.type||"").toLowerCase();
+  return (t.includes("with product")||t.includes("service_product")
+    ?n(cfg?.service_product_rate):n(cfg?.service_rate))/100;
+}
+
+async function repairExistingCommissionV25(row){
+  if(String(row?.source||"").toLowerCase()!=="dermed_auto")return false;
+  if(!row?.source_sale_id)return false;
+
+  var saleQ=await sb.from("medifella_sales").select("*").eq("id",String(row.source_sale_id)).maybeSingle();
+  if(saleQ.error||!saleQ.data)return false;
+  var sale=saleQ.data;
+  if(String(sale.sale_type||"").toUpperCase()!=="DERMED")return false;
+
+  var payQ=await firstPaymentForSale(sale.id);
+  if(payQ.error||!payQ.data?.[0])return false;
+  var firstPayment=n(payQ.data[0].amount);
+  if(firstPayment<=0)return false;
+
+  var staffId=row.staff_id||sale.staff_id||sale.sale_staff_id;
+  if(!staffId)return false;
+  var cfg=typeof window.getCurrentSaleStaffConfig==="function"
+    ?window.getCurrentSaleStaffConfig(staffId):null;
+  if(!cfg)return false;
+
+  var items=sale.items||sale.products||sale.sale_items||[];
+  var services=sale.services||sale.service_items||[];
+  if(typeof items==="string"){try{items=JSON.parse(items)}catch(_){items=[]}}
+  if(typeof services==="string"){try{services=JSON.parse(services)}catch(_){services=[]}}
+  if(!Array.isArray(items))items=[];
+  if(!Array.isArray(services))services=[];
+
+  var productAmount=items.reduce(function(s,x){return s+itemTotal(x)},0);
+  var singles=services.filter(function(x){return !isPackage(x)});
+  var packages=services.filter(function(x){return isPackage(x)});
+
+  var singleTotal=singles.reduce(function(s,x){return s+serviceTotal(x)},0);
+  var packageGross=packages.reduce(function(s,x){return s+serviceTotal(x)},0);
+  var packageBase=Math.min(
+    Math.max(0,firstPayment-productAmount-singleTotal),
+    packageGross
+  );
+
+  var singleCommission=singles.reduce(function(s,x){
+    var base=serviceTotal(x);
+    var rate=serviceRate(x,cfg);
+    return s+(base*rate);
+  },0);
+
+  var packageRate=packages.length?serviceRate(packages[0],cfg):0;
+  var totalCommission=singleCommission+(packageBase*packageRate);
+
+  // Update the EXISTING commission row instead of inserting another record.
+  // Keep the old row's ID and metadata intact.
+  var update={
+    subtotal:packageBase,
+    unit_price:packageBase,
+    commission_rate:packageRate*100,
+    commission_amount:totalCommission,
+    service_detail:packages.length
+      ?packages.map(function(x){return x.name||x.package_name||"Package"}).join(" + ")
+      :"",
+    updated_at:new Date().toISOString()
+  };
+
+  // The commission table's single row represents the combined package + service
+  // commission in this legacy record, so subtotal/commission amount are updated
+  // to the new first-payment rule.
+  var u=await sb.from("medifella_sale_commissions")
+    .update(update)
+    .eq("id",String(row.id));
+  if(u.error){
+    // Retry without optional updated_at if the schema doesn't have it.
+    delete update.updated_at;
+    u=await sb.from("medifella_sale_commissions")
+      .update(update).eq("id",String(row.id));
+  }
+  return !u.error;
+}
+
+async function repairExistingCommissionRecordsV25(){
+  if(typeof sb==="undefined")return;
+  try{
+    var q=await sb.from("medifella_sale_commissions")
+      .select("*")
+      .eq("source","dermed_auto");
+    if(q.error||!Array.isArray(q.data))return;
+
+    for(var i=0;i<q.data.length;i++){
+      try{await repairExistingCommissionV25(q.data[i]);}
+      catch(e){console.error("Commission repair row",q.data[i]?.id,e);}
+    }
+
+    if(typeof loadCommissionList==="function"){
+      try{await loadCommissionList();}catch(_){}
+    }else if(typeof renderCommissionList==="function"){
+      try{await renderCommissionList();}catch(_){}
+    }
+  }catch(e){
+    console.error("Commission V25 repair:",e);
+  }
+}
+
+window.repairExistingCommissionRecordsV25=repairExistingCommissionRecordsV25;
+
+// Run once after authentication/data loading has had time to initialize.
+setTimeout(repairExistingCommissionRecordsV25,1800);
+setTimeout(repairExistingCommissionRecordsV25,5000);
+})();
+</script>
 </body>
 </html>
