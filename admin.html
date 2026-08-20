@@ -10140,7 +10140,11 @@ document.addEventListener("DOMContentLoaded",function(){
   function sortAppointments(list){
     return list.slice().sort((a,b)=>{
       const aa=`${a.date||""} ${a.time||""}`,bb=`${b.date||""} ${b.time||""}`;
-      return aa.localeCompare(bb);
+      const dateCompare=bb.localeCompare(aa);
+      if(dateCompare!==0) return dateCompare;
+      const ca=String(a.created_at||a.createdAt||a.id||"");
+      const cb=String(b.created_at||b.createdAt||b.id||"");
+      return cb.localeCompare(ca);
     });
   }
   function isActive(a){return a.status!=="cancelled"}
