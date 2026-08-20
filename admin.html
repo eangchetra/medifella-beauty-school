@@ -2646,6 +2646,17 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </div>
 </section>
 
+<style id="appointment-add-customer-style">
+  #appointmentAddCustomer{
+    height:46px;
+    padding:10px 14px;
+    font-weight:800;
+  }
+  @media(max-width:650px){
+    #appointmentAddCustomer{min-width:0!important;width:auto}
+  }
+</style>
+
 <section id="appointments" class="section">
   <div class="appointment-titlebar">
     <div>
@@ -2662,9 +2673,14 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
         <label>Customer Phone Number / Name / ID *</label>
         <div style="display:flex;gap:8px;align-items:flex-start">
           <div style="flex:1;position:relative">
-            <input id="appointmentCustomerSearch" autocomplete="off" placeholder="Search Student or Customer">
-            <input id="appointmentCustomerId" type="hidden"><input id="appointmentCustomerSource" type="hidden" value="customer">
-            <div id="appointmentCustomerResults" class="appointment-results"></div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div style="flex:1;position:relative">
+                <input id="appointmentCustomerSearch" autocomplete="off" placeholder="Search Student or Customer">
+                <input id="appointmentCustomerId" type="hidden"><input id="appointmentCustomerSource" type="hidden" value="customer">
+                <div id="appointmentCustomerResults" class="appointment-results"></div>
+              </div>
+              <button id="appointmentAddCustomer" class="gold" type="button" style="white-space:nowrap;min-width:145px">+ Add Customer</button>
+            </div>
           </div>
           <div style="width:180px">
             <select id="appointmentCustomerType" title="Customer type">
@@ -2779,7 +2795,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div class="product-tabs" role="tablist" aria-label="Product Management">
 <button type="button" class="product-tab active" data-product-tab="productListPanel">Product List</button>
 <button type="button" class="product-tab" data-product-tab="stockHistoryPanel">Stock History</button>
-<button type="button" class="product-tab" data-product-tab="stockReportPanel">Stock Report</button>
+
 </div>
 
 <div id="productListPanel" class="product-panel card" style="margin-top:12px">
@@ -2808,25 +2824,6 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div id="stockList">Loading...</div>
 </div>
 
-<div id="stockReportPanel" class="product-panel card hidden" style="margin-top:12px">
-<h2>Stock Report</h2>
-<div class="toolbar">
-<select id="stockReportType">
-<option value="out">Out of Stock Report</option>
-<option value="alert">Alert Report (10 or less)</option>
-<option value="daily">Daily Report</option>
-<option value="weekly">Weekly Report</option>
-<option value="monthly">Monthly Report</option>
-<option value="yearly">Yearly Report</option>
-</select>
-<label style="display:flex;align-items:center;gap:6px">From <input id="stockReportFromDate" type="date"></label>
-<label style="display:flex;align-items:center;gap:6px">To <input id="stockReportToDate" type="date"></label>
-<button id="stockReportRefresh" class="light">Refresh</button>
-<button id="stockReportExcel" class="light">Download Excel</button>
-<button id="stockReportPdf" class="light">Download PDF</button>
-</div>
-<div id="stockReportList">Loading...</div>
-</div>
 </section>
 
 <section id="staffManagement" class="section">
@@ -7503,7 +7500,6 @@ $("saveProduct").onclick=async()=>{
  if(id)r=await sb.from("medifella_products").update(payload).eq("id",id);else{payload.product_code=genId("P",products,"product_code");r=await sb.from("medifella_products").insert(payload)}
  if(r.error)throw r.error;msg($("productStatus"),id?"Product updated.":"Product added.");clearProductForm();await loadProducts()}catch(e){msg($("productStatus"),e.message,true)}
 };
-function clearProductForm(){$("productEditId").value="";$("productName").value="";$("productCost").value="";$("productPrice").value="";$("productSource").value="Korean";$("productSourceOther").value="";$("productSource").dispatchEvent(new Event("change"))}
 function editProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p)return;$("productEditId").value=p.id;$("productName").value=p.name||"";$("productCost").value=p.cost??"";$("productPrice").value=p.price??"";$("productSource").value=p.source||"Korean";$("productSourceOther").value=p.source_other||"";$("productSource").dispatchEvent(new Event("change"));$("products").scrollIntoView({behavior:"smooth"})}
 async function deleteProduct(id){if(!confirm("Delete this product? Its stock history will also be deleted. Continue?"))return;const r=await sb.from("medifella_products").delete().eq("id",id);if(r.error){alert("Delete failed: "+r.error.message);return}await loadProducts();await loadStockMovements();}
 $("clearProduct").onclick=clearProductForm;
@@ -8057,14 +8053,19 @@ $("mtsSalesRefresh").onclick=loadSales;$("dermedSalesRefresh").onclick=loadSales
 $("stockTimeDisplay").value=phTime().replace("T"," ");$("stockTime").value=phTime();if($("stockReportDate"))$("stockReportDate").value=new Date().toISOString().slice(0,10);setAutoTime("mtsSaleTime");setAutoTime("dermedSaleTime");
 
 let saleCustomerTargetType="dermed";
+let appointmentCustomerAddMode=false;
 function openSaleCustomerForm(type){
- saleCustomerTargetType=type||"dermed";
+ appointmentCustomerAddMode=(type==="appointment");
+ saleCustomerTargetType=appointmentCustomerAddMode?"dermed":(type||"dermed");
  $("saleCustomerName").value="";
  $("saleCustomerPhone").value="";
  $("saleCustomerStatus").textContent="";
+ const title=$("saleCustomerModal")?.querySelector("h2");
+ if(title) title.textContent=appointmentCustomerAddMode?"Add New Customer for Appointment":"Add New Customer";
  $("saleCustomerModal").style.display="flex";
  setTimeout(()=>$("saleCustomerName").focus(),50);
 }
+
 function closeSaleCustomerForm(){ $("saleCustomerModal").style.display="none"; }
 async function saveSaleCustomer(){
   const name = $("saleCustomerName").value.trim();
@@ -8096,7 +8097,7 @@ async function saveSaleCustomer(){
     // Reload the authoritative Customer List from Supabase.
     await loadCustomers();
 
-    // Find the newly-created customer and select it in this sale.
+    // Find the newly-created customer from the refreshed Customer List.
     const savedCustomer = customers.find(x =>
       String(x.name||"").trim() === name &&
       String(x.phone||"").trim() === phone
@@ -8104,7 +8105,19 @@ async function saveSaleCustomer(){
       String(x.customer_code||"").trim() === customerCode
     );
 
-    if(savedCustomer && typeof chooseBuyer === "function"){
+    if(appointmentCustomerAddMode){
+      // Appointment: immediately select the newly-created customer in the
+      // appointment customer picker, so the user can save the appointment
+      // without searching for the customer again.
+      if(savedCustomer){
+        if($("appointmentCustomerId")) $("appointmentCustomerId").value=String(savedCustomer.id||"");
+        if($("appointmentCustomerSource")) $("appointmentCustomerSource").value="customer";
+        if($("appointmentCustomerSearch")) $("appointmentCustomerSearch").value=savedCustomer.name||name;
+        if($("appointmentCustomerHint")) $("appointmentCustomerHint").textContent=`Selected: ${savedCustomer.name||name} · ${savedCustomer.customer_code||customerCode||"No ID"} · ${savedCustomer.phone||phone||"No phone"}`;
+        if($("appointmentCustomerType")) $("appointmentCustomerType").value="New Customer";
+        if($("appointmentCustomerResults")) $("appointmentCustomerResults").classList.remove("show");
+      }
+    }else if(savedCustomer && typeof chooseBuyer === "function"){
       chooseBuyer(saleCustomerTargetType, "customer", savedCustomer.id);
     }else if(savedCustomer){
       if($("dermedBuyerSearch")) $("dermedBuyerSearch").value=savedCustomer.name||name;
@@ -8113,6 +8126,7 @@ async function saveSaleCustomer(){
     }
 
     closeSaleCustomerForm();
+    appointmentCustomerAddMode=false;
   }catch(e){
     console.error("Dermed Sale customer save error:",e);
     status.textContent = "Could not save customer: " + (e.message || "Unknown error");
@@ -8123,13 +8137,17 @@ async function saveSaleCustomer(){
 }
 $("mtsNewCustomer").onclick=()=>openSaleCustomerForm("mts");
 $("dermedNewCustomer").onclick=()=>openSaleCustomerForm("dermed");
+$("appointmentAddCustomer").onclick=()=>openSaleCustomerForm("appointment");
 
 // Delegated handlers are required because the modal is inserted later in the HTML.
 document.addEventListener("click", function(e){
-  const newCustomerBtn = e.target.closest && e.target.closest("#dermedNewCustomer, #mtsNewCustomer");
+  const newCustomerBtn = e.target.closest && e.target.closest("#dermedNewCustomer, #mtsNewCustomer, #appointmentAddCustomer");
   if(newCustomerBtn){
     e.preventDefault();
-    openSaleCustomerForm(newCustomerBtn.id === "mtsNewCustomer" ? "mts" : "dermed");
+    openSaleCustomerForm(
+      newCustomerBtn.id === "mtsNewCustomer" ? "mts" :
+      newCustomerBtn.id === "appointmentAddCustomer" ? "appointment" : "dermed"
+    );
     return;
   }
 
@@ -13074,6 +13092,10 @@ async function loadCommissionRecords(retry=0){
     P("productSourceOther").value=p.source_other||"";
     P("productSource")?.dispatchEvent(new Event("change"));
 
+    // Initial stock is only for a newly created product; editing a product
+    // must not alter its existing inventory movements.
+    if(P("productInitialStockWrap")) P("productInitialStockWrap").style.opacity="0.55";
+
     if(isAdminProductUser()){
       P("productCost").value=p.cost??"";
     }else{
@@ -13094,8 +13116,6 @@ async function loadCommissionRecords(retry=0){
       const price=Number(P("productPrice")?.value||0);
       const source=P("productSource")?.value||"Korean";
       const source_other=(P("productSourceOther")?.value||"").trim();
-
-      if(!name || price<0){
         window.msg?.(P("productStatus"),"Please fill Product Name and Price.",true);
         return;
       }
@@ -13124,18 +13144,41 @@ async function loadCommissionRecords(retry=0){
         }
 
         let r;
+        let createdProduct=null;
         if(id){
+          // Editing a product must never change its existing stock.
           r=await window.sb.from("medifella_products").update(payload).eq("id",id);
         }else{
           const existing=Array.isArray(window.products)?window.products:[];
           let max=0;
           existing.forEach(x=>{const m=String(x.product_code||"").match(/^P(\d+)$/i);if(m)max=Math.max(max,Number(m[1]));});
           payload.product_code="P"+String(max+1).padStart(4,"0");
-          r=await window.sb.from("medifella_products").insert(payload);
+          r=await window.sb.from("medifella_products").insert(payload).select().single();
+          createdProduct=r.data||null;
         }
         if(r.error) throw r.error;
 
-        window.msg?.(P("productStatus"),id?"Product updated.":"Product added.");
+        // When a brand-new product is created with an initial stock amount,
+        // create the corresponding stock-in movement so Product List shows
+        // the correct Current Stock. Editing an existing product does not
+        // create another stock movement.
+          const movement={
+            product_id:createdProduct.id,
+            movement_type:"stock_in",
+            staff_id:null,
+            staff_name:"Admin",
+            stock_time:(typeof phTime==="function"?phTime():new Date().toISOString()),
+            created_by:(window.adminUser?.id||null),
+            notes:"Initial Stock"
+          };
+          const mr=await window.sb.from("medifella_inventory_movements").insert(movement);
+          if(mr.error){
+            // Roll back the newly created product if its initial stock could
+            // not be recorded, preventing a product with a misleading stock.
+            await window.sb.from("medifella_products").delete().eq("id",createdProduct.id);
+            throw mr.error;
+          }
+        }
         if(typeof window.clearProductForm==="function") window.clearProductForm();
         if(typeof window.loadProducts==="function") await window.loadProducts();
         productRoleUI();
@@ -18339,5 +18382,29 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 })();
 </script>
 
+
+<script id="product-initial-stock-ui-v1">
+(function(){
+  const P=id=>document.getElementById(id);
+  function resetInitialStock(){
+    if(input){input.value="0";input.disabled=false;}
+    if(wrap)wrap.style.opacity="1";
+  }
+  const originalClear=window.clearProductForm;
+  if(typeof originalClear==="function" && !window.__initialStockClearPatched){
+    window.__initialStockClearPatched=true;
+    window.clearProductForm=function(){
+      const r=originalClear.apply(this,arguments);
+      resetInitialStock();
+      return r;
+    };
+  }
+  if(input) input.addEventListener("input",()=>{
+    if(Number(input.value)<0)input.value="0";
+  });
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",resetInitialStock,{once:true});
+  else resetInitialStock();
+})();
+</script>
 </body>
 </html>
