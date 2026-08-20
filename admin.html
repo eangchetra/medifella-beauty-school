@@ -2824,6 +2824,17 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div id="stockList">Loading...</div>
 </div>
 
+<div id="stockReportPanel" class="product-panel card hidden" style="margin-top:12px">
+<h2>Stock Report</h2>
+<div class="toolbar">
+<input id="stockReportSearch" placeholder="Search Product ID or Product Name">
+<button id="stockReportRefresh" class="light">Refresh</button>
+<button id="stockReportExcel" class="light">Download Excel</button>
+<button id="stockReportPdf" class="light">Download PDF</button>
+</div>
+<div id="stockReportList">Loading...</div>
+</div>
+
 </section>
 
 <section id="staffManagement" class="section">
@@ -7024,7 +7035,9 @@ function productStock(pid){
 async function loadProducts(){
  const {data,error}=await sb.from("medifella_products").select("*").order("created_at",{ascending:false});
  if(error){products=[]; if($("productList"))$("productList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Product Management SQL setup.</p>`;return}
- products=data||[]; window.products=products; renderProductList();
+ products=data||[]; window.products=products;
+ // Stock movements are loaded separately. Render again after they arrive.
+ renderProductList();
 }
 async function loadStockMovements(){
   try{
@@ -7043,7 +7056,8 @@ async function loadStockMovements(){
 
     window.stockMovements=stockMovements;
     rebuildDermedSearchStockCacheIfAvailable();
-    renderProductList();
+    // Product List must refresh after stock data arrives so In Stock is visible.
+    if(typeof window.renderProductList==="function") window.renderProductList();
     renderStockList();
     renderStockReport();
   }catch(e){
@@ -13031,8 +13045,11 @@ async function loadCommissionRecords(retry=0){
   // Replace the product list renderer so Current Stock is always visible.
   window.renderProductList=function(){
     if(!P("productList")) return;
+
     const q=(P("productSearch")?.value||"").trim().toLowerCase();
     const products=Array.isArray(window.products)?window.products:[];
+    const movements=Array.isArray(window.stockMovements)?window.stockMovements:[];
+
     const rows=products
       .filter(p=>(`${p.product_code||""} ${p.name||""}`).toLowerCase().includes(q))
       .filter(p=>{
@@ -13042,31 +13059,52 @@ async function loadCommissionRecords(retry=0){
         return (!from||s>=from)&&(!to||s<=to);
       });
 
+    function currentStock(productId){
+      return movements.reduce((total,m)=>{
+        if(String(m.product_id)!==String(productId)) return total;
+
+        let qty=Math.abs(Number(m.quantity||0));
+        if(!Number.isFinite(qty)) qty=0;
+
+        const type=String(
+          m.movement_type||m.type||m.movement||""
+        ).trim().toLowerCase().replace(/[\s-]+/g,"_");
+
+        if(["stock_in","stockin","in","add","purchase","received","receive"].includes(type)){
+          return total+qty;
+        }
+
+        if(["sale","stock_out","stockout","out","sold","deduct","deduction"].includes(type)){
+          return total-qty;
+        }
+
+        // Older records can have a signed quantity with an unknown movement
+        // type. Respect the sign instead of silently hiding the stock.
+        const raw=Number(m.quantity);
+        return Number.isFinite(raw) ? total+raw : total;
+      },0);
+    }
+
     const admin=isAdminProductUser();
+
     P("productList").innerHTML=rows.length
       ? `<div class="table-wrap"><table class="table" id="productListTable">
-          <tr>
+          <thead><tr>
             <th>Product ID</th>
             <th>Product Name</th>
-            <th>Current Stock</th>
+            <th>In Stock</th>
             ${admin ? "<th>Cost</th>" : ""}
             <th>Price</th>
             <th>Source</th>
             <th>Action</th>
-          </tr>
+          </tr></thead>
+          <tbody>
           ${rows.map(p=>{
-            const stock=(Array.isArray(window.stockMovements)?window.stockMovements:[]).reduce((total,m)=>{
-              if(String(m.product_id)!==String(p.id)) return total;
-              const q=Math.max(0,Number(m.quantity||0));
-              const type=String(m.movement_type||"").trim().toLowerCase();
-              if(type==="stock_in"||type==="stockin"||type==="in") return total+q;
-              if(type==="sale"||type==="stock_out"||type==="stockout"||type==="out") return total-q;
-              return total;
-            },0);
+            const stock=currentStock(p.id);
             return `<tr>
               <td>${escP(p.product_code)}</td>
               <td>${escP(p.name)}</td>
-              <td><strong>${stock}</strong></td>
+              <td><strong>${Math.max(0,stock)}</strong></td>
               ${admin ? `<td>${moneyP(p.cost)}</td>` : ""}
               <td>${moneyP(p.price)}</td>
               <td>${escP(typeof window.sourceLabel==="function"?window.sourceLabel(p):(p.source||""))}</td>
@@ -13076,9 +13114,10 @@ async function loadCommissionRecords(retry=0){
               </div></td>
             </tr>`;
           }).join("")}
+          </tbody>
         </table></div>`
       : '<p class="muted">No products found.</p>';
-  };
+  };;
 
   // Staff can edit product name/price/source, but cannot view or change cost.
   window.editProduct=function(id){
