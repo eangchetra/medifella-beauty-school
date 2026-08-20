@@ -5562,6 +5562,28 @@ async function printInvoice(id,size="A4"){
   color:#000000 !important;
 }
 </style>
+
+<style id="delete-button-visible-v18">
+/* Make the View Payment Delete label clearly visible */
+#salePaymentDetailsOverlay button.danger{
+  color:#D00000 !important;
+  background:#FFFFFF !important;
+  border:1px solid #D00000 !important;
+  font-size:13px !important;
+  font-weight:700 !important;
+  line-height:1.2 !important;
+  min-width:68px !important;
+  min-height:32px !important;
+  padding:6px 12px !important;
+  opacity:1 !important;
+  visibility:visible !important;
+  text-indent:0 !important;
+}
+#salePaymentDetailsOverlay button.danger::before,
+#salePaymentDetailsOverlay button.danger::after{
+  content:none !important;
+}
+</style>
 </head>
 <body>
 <div id="paper"><img src="${img}" alt="Invoice"></div>
@@ -16515,6 +16537,65 @@ async function loadCommissionRecords(retry=0){
     }
     return s;
   };
+})();
+</script>
+
+<style id="appointment-date-v17">.appointment-date-display{min-width:120px}</style>
+<script id="appointment-date-v17">
+(function(){
+"use strict";
+function display(v){
+ var s=String(v||"").slice(0,10);
+ if(/^\d{4}-\d{2}-\d{2}$/.test(s)){var p=s.split("-");return p[2]+"/"+p[1]+"/"+p[0].slice(2);}
+ return s;
+}
+function today(){
+ var d=new Date();
+ return String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+String(d.getFullYear()).slice(2);
+}
+function fix(){
+ document.querySelectorAll("input").forEach(function(el){
+  var c=((el.id||"")+" "+(el.name||"")+" "+(el.className||"")+" "+((el.closest("td,th,form,.modal")||{}).textContent||"")).toLowerCase();
+  if(c.indexOf("appointment")<0 || c.indexOf("date")<0)return;
+  if(el.dataset.appDateV17==="1")return;
+  var old=el.value;
+  el.dataset.appDateV17="1";
+  el.type="text";
+  el.placeholder="dd/mm/yy";
+  el.maxLength=8;
+  el.classList.add("appointment-date-display");
+  el.value=old?display(old):today();
+ });
+}
+window.fixAppointmentDateV17=fix;
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",fix);
+else fix();
+new MutationObserver(fix).observe(document.body,{childList:true,subtree:true});
+})();
+</script>
+
+<script id="mts-invoice-fallback-v17">
+(function(){
+"use strict";
+document.addEventListener("click",function(e){
+ var b=e.target.closest("button");
+ if(!b)return;
+ var label=(b.textContent||"").trim().toLowerCase();
+ if(label.indexOf("generate invoice")<0 && label.indexOf("create invoice")<0)return;
+
+ var section=b.closest("#mtsSale,#mtsSaleSection,[data-sale-type='MTS'],.mts-sale");
+ if(!section)return;
+
+ var id=b.dataset.saleId||b.dataset.id||b.getAttribute("data-sale-id")||b.getAttribute("data-id");
+ if(!id)return;
+
+ if(typeof window.showSaleInvoice==="function"){
+  e.preventDefault();
+  e.stopImmediatePropagation();
+  try{window.showSaleInvoice(id,"A4");}
+  catch(err){console.error("MTS invoice:",err);}
+ }
+},true);
 })();
 </script>
 </body>
