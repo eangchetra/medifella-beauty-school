@@ -6542,7 +6542,7 @@ function renderMtsStableTable(){
    const p=Math.max(0,Number(x.price)||0);
    const base=q*p;
    const dv=Math.max(0,Number(x.discount_value)||0);
-   const damt=x.discount_type==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);
+   const damt=x.discount_type==="usd"?Math.min(base,Math.max(0,dv)*q):Math.min(base,base*dv/100);
    const line=Math.max(0,base-damt);
    const stock=typeof productStock==="function"?Number(productStock(x.product_id)):999999;
    const max=Math.max(q,stock);
@@ -6599,7 +6599,7 @@ function updateMtsStableTotals(){
  arr.forEach(x=>{
    const q=Math.max(1,Number(x.quantity)||1),p=Math.max(0,Number(x.price)||0),base=q*p;
    const dv=Math.max(0,Number(x.discount_value)||0);
-   const d=x.discount_type==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);
+   const d=x.discount_type==="usd"?Math.min(base,Math.max(0,dv)*q):Math.min(base,base*dv/100);
    sub+=Math.max(0,base-d);
  });
  const ov=Number(String($("mtsOverallDiscountValue")?.value||"0").replace(/[$,\s]/g,""));
@@ -9067,7 +9067,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const base=q*p;
     const type=x.discount_type==="usd"?"usd":"percent";
     const dv=num(x.discount_value);
-    const d=type==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);
+    const d=type==="usd"?Math.min(base,Math.max(0,dv)*q):Math.min(base,base*dv/100);
     return {q,p,base,dv,d,total:Math.max(0,base-d)};
   }
   function calcMtsFinal(){
@@ -9646,7 +9646,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const normalized=items.map(x=>{
       const q=Math.max(1,Number(x.quantity)||1),p=Math.max(0,Number(x.price)||0),base=q*p;
       const typ=x.discount_type==="usd"?"usd":"percent",dv=Math.max(0,Number(x.discount_value)||0);
-      const d=typ==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);
+      const d=typ==="usd"?Math.min(base,Math.max(0,dv)*q):Math.min(base,base*dv/100);
       const line=Math.max(0,base-d);subtotal+=line;
       return {...x,quantity:q,price:p,unit_price:p,discount_type:typ,discount_value:dv,discount_amount:d,subtotal:line};
     });
@@ -11032,8 +11032,8 @@ async function loadCommissionRecords(retry=0){
 
     // No required created_at column. Try the simplest query first.
     const queries=[
-      ()=>sb.from("medifella_sale_commissions").select("*").order("commission_date",{ascending:false}),
-      ()=>sb.from("medifella_sale_commissions").select("*")
+      ()=>sb.from("medifella_sale_commissions").select("*"),
+      ()=>sb.from("medifella_sale_commissions").select("*").order("commission_date",{ascending:false})
     ];
 
     for(const makeRequest of queries){
@@ -11266,82 +11266,15 @@ async function loadCommissionRecords(retry=0){
     const first=rows[0]||{};
     return {date:first.commission_date||first.created_at||"",staff:first.staff_name||"",customer:first.customer_name||"",phone:first.customer_phone||"",subtotal:rows.reduce((n,x)=>n+Number(x.subtotal||0),0),commission:rows.reduce((n,x)=>n+Number(x.commission_amount||0),0),count:rows.length};
   }
-  async function renderCommissionDetails(row){
-    let rows=commissionBatchRows(row);
-
-    // Legacy support: if older commission rows were saved separately,
-    // inspect the source Dermed invoice only when View is clicked and combine
-    // the rows whose source services are marked as Package.
-    try{
-      const saleId=row?.source_sale_id;
-      if(saleId && rows.length>1){
-        const sr=await sb.from("medifella_sales")
-          .select("id,service_items")
-          .eq("id",String(saleId))
-          .maybeSingle();
-
-        if(!sr.error && sr.data){
-          let serviceItems=sr.data.service_items;
-          if(typeof serviceItems==="string"){
-            try{serviceItems=JSON.parse(serviceItems)}catch(_){serviceItems=[]}
-          }
-          if(!Array.isArray(serviceItems))serviceItems=[];
-
-          const packageIds=new Set(serviceItems
-            .filter(x=>String(x?.service_payment_type||"Single").toLowerCase()==="package")
-            .map(x=>String(x?.service_id||x?.id||""))
-            .filter(Boolean));
-
-          const packageRows=rows.filter(x=>packageIds.has(String(x?.service_id||"")));
-          if(packageRows.length>1){
-            const combinedSubtotal=packageRows.reduce((n,x)=>n+Number(x.subtotal||0),0);
-            const combinedCommission=packageRows.reduce((n,x)=>n+Number(x.commission_amount||0),0);
-            const names=packageRows.map(x=>x.service_detail||"Package Service").filter(Boolean);
-            const combined={
-              ...packageRows[0],
-              service_payment_type:"Package",
-              service_detail:names.join(" + "),
-              service_id:null,
-              unit:1,
-              unit_price:combinedSubtotal,
-              discount:0,
-              subtotal:combinedSubtotal,
-              commission_rate:combinedSubtotal?combinedCommission/combinedSubtotal:0,
-              commission_amount:combinedCommission
-            };
-            const firstIndex=rows.findIndex(x=>packageRows.includes(x));
-            rows=rows.filter(x=>!packageRows.includes(x));
-            rows.splice(firstIndex<0?rows.length:firstIndex,0,combined);
-          }
-        }
-      }
-    }catch(err){
-      console.warn("Legacy package detail combine failed:",err);
-    }
-
-    const firstRow=rows[0]||{};
-    const s={
-      date:firstRow.commission_date||firstRow.created_at||"",
-      staff:firstRow.staff_name||"",
-      customer:firstRow.customer_name||"",
-      phone:firstRow.customer_phone||"",
-      subtotal:rows.reduce((n,x)=>n+Number(x.subtotal||0),0),
-      commission:rows.reduce((n,x)=>n+Number(x.commission_amount||0),0),
-      count:rows.length
-    };
-
+  function renderCommissionDetails(row){
+    const rows=commissionBatchRows(row), s=commissionBatchSummary(rows);
     let o=C("commissionDetailsOverlay");
-    if(!o){
-      o=document.createElement("div");
-      o.id="commissionDetailsOverlay";
-      o.className="commission-modal-overlay";
-      document.body.appendChild(o);
-    }
+    if(!o){o=document.createElement("div");o.id="commissionDetailsOverlay";o.className="commission-modal-overlay";document.body.appendChild(o);}
     o.innerHTML=`<div class="commission-modal">
       <div class="commission-modal-head"><div><h2 style="margin:0">Sale Commission Details</h2><div class="muted">${escC(formatCommissionDate(s.date))} · ${escC(s.staff)} · ${escC(s.customer)}</div></div><button type="button" class="light" data-close-commission-modal>×</button></div>
       <div class="commission-detail-info"><div><strong>Customer:</strong> ${escC(s.customer)}</div><div><strong>Phone:</strong> ${escC(s.phone)}</div><div><strong>Staff:</strong> ${escC(s.staff)}</div><div><strong>Services:</strong> ${s.count}</div></div>
       <div class="table-wrap"><table class="table"><thead><tr><th>Service Detail</th><th>Service Type</th><th>Unit</th><th>Unit Price</th><th>Discount</th><th>Subtotal</th><th>Commission</th><th>Subtotal Commission</th></tr></thead><tbody>
-      ${rows.map(x=>`<tr><td>${escC(x.service_detail||"")}</td><td>${escC(serviceTypeLabel(x.service_type==="service_product"?"Service With Product":"Only Service"))}</td><td>${escC(x.unit??1)}</td><td>$${moneyC(x.unit_price)}</td><td>$${moneyC(x.discount)}</td><td>$${moneyC(x.subtotal)}</td><td>${(Number(x.commission_rate||0)*100).toFixed(2).replace(/\.00$/,"")}%</td><td>$${moneyC(x.commission_amount)}</td></tr>`).join("")}
+      ${rows.map(x=>`<tr><td>${escC(x.service_detail||"")}</td><td>${escC(serviceTypeLabel(x.service_type==="service_product"?"Service With Product":"Only Service"))}</td><td>${escC(x.unit??1)}</td><td>$${moneyC(x.unit_price)}</td><td>$${moneyC(x.discount)}</td><td>$${moneyC(x.subtotal)}</td><td>${Number(x.commission_rate||0)*100}%</td><td>$${moneyC(x.commission_amount)}</td></tr>`).join("")}
       </tbody></table></div><div class="commission-modal-total"><strong>Grand Total Subtotal: $${moneyC(s.subtotal)}</strong><strong>Grand Total Commission: $${moneyC(s.commission)}</strong></div>
     </div>`;
     o.classList.add("show");
@@ -11791,7 +11724,7 @@ async function loadCommissionRecords(retry=0){
     const dt=String(x?.discount_type||"percent").toLowerCase();
     const dv=N(x?.discount_value);
     const d=dt==="usd"
-      ?Math.min(base,Math.max(0,dv)*qty)
+      ?Math.min(base,Math.max(0,dv)*q)
       :Math.min(base,base*dv/100);
     return Math.max(0,base-d);
   }
@@ -11924,7 +11857,7 @@ async function loadCommissionRecords(retry=0){
   const lineTotal=x=>{
     const q=Math.max(1,N(x?.quantity??x?.unit??1)),p=Math.max(0,N(x?.price??x?.unit_price??0)),base=q*p;
     const dt=String(x?.discount_type||"percent").toLowerCase(),dv=N(x?.discount_value);
-    const d=dt==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);
+    const d=dt==="usd"?Math.min(base,Math.max(0,dv)*q):Math.min(base,base*dv/100);
     return Math.max(0,base-d);
   };
   const serviceType=x=>{const s=String(x?.service_type||x?.type||"").toLowerCase();return s.includes("with product")||s.includes("service_product")?"Service With Product":"Only Service"};
@@ -12040,61 +11973,36 @@ async function loadCommissionRecords(retry=0){
       });
     }
 
-
-    // COMBINED PACKAGE RULE:
-    // All package services covered by the FIRST payment are combined into
-    // ONE commission row. Package 1 + Package 2 + Package 3 = one subtotal,
-    // then the applicable package commission rate is applied once.
-    if(packagePaid>0 && packages.length){
-      let combinedPackageSubtotal=0;
-      const packageNames=[];
-      let packageRate=0;
-      let packageType="Only Service";
-
-      for(const x of packages){
-        const available=lineTotal(x);
-        const covered=Math.min(available,packagePaid);
-        packagePaid=Math.max(0,packagePaid-covered);
-        if(covered<=0)continue;
-
-        combinedPackageSubtotal+=covered;
-        packageNames.push(x.name||"Package Service");
-
-        if(!packageRate){
-          packageType=serviceType(x);
-          packageRate=(packageType==="Service With Product"
-            ?N(cfg.service_product_rate)
-            :N(cfg.service_rate))/100;
-        }
-
-        if(packagePaid<=0)break;
-      }
-
-      if(combinedPackageSubtotal>0 && packageRate>0){
-        rows.push({
-          commission_date:String(sale?.sale_date||"").slice(0,10),
-          staff_id:staffId,
-          staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||cfg.staff_name||"",
-          customer_id:buyerType==="customer"?buyerId:null,
-          student_id:buyerType==="student"?buyerId:null,
-          customer_name:buyer?.name||buyer?.full_name||sale?.customer_name||sale?.student_name||"",
-          customer_phone:buyer?.phone||sale?.customer_phone||sale?.student_phone||"",
-          service_type:packageType==="Service With Product"?"service_product":"service",
-          service_payment_type:"Package",
-          service_detail:packageNames.join(" + "),
-          service_id:null,
-          unit:1,
-          unit_price:combinedPackageSubtotal,
-          discount:0,
-          subtotal:combinedPackageSubtotal,
-          commission_rate:packageRate,
-          commission_amount:combinedPackageSubtotal*packageRate,
-          source:"dermed_auto",
-          source_sale_id:String(sale.id),
-          reference_no:sale?.reference_no||"",
-          created_by:adminId||null
-        });
-      }
+    for(const x of packages){
+      const base=Math.min(lineTotal(x),packagePaid);
+      packagePaid=Math.max(0,packagePaid-base);
+      const type=serviceType(x);
+      const rate=(type==="Service With Product"
+        ?N(cfg.service_product_rate)
+        :N(cfg.service_rate))/100;
+      if(base<=0||rate<=0)continue;
+      rows.push({
+        commission_date:String(sale?.sale_date||"").slice(0,10),
+        staff_id:staffId,
+        staff_name:staff?.name_en||staff?.name_kh||staff?.name_km||staff?.name||cfg.staff_name||"",
+        customer_id:buyerType==="customer"?buyerId:null,
+        student_id:buyerType==="student"?buyerId:null,
+        customer_name:buyer?.name||buyer?.full_name||sale?.customer_name||sale?.student_name||"",
+        customer_phone:buyer?.phone||sale?.customer_phone||sale?.student_phone||"",
+        service_type:type==="Service With Product"?"service_product":"service",
+        service_detail:x.name||"Service",
+        service_id:x.service_id||null,
+        unit:Math.max(1,N(x.quantity??x.unit??1)),
+        unit_price:N(x.price??x.unit_price),
+        discount:N(x.discount??x.discount_amount),
+        subtotal:base,
+        commission_rate:rate,
+        commission_amount:base*rate,
+        source:"dermed_auto",
+        source_sale_id:String(sale.id),
+        reference_no:sale?.reference_no||"",
+        created_by:adminId||null
+      });
     }
 
     if(!rows.length)return;
@@ -13696,7 +13604,7 @@ async function loadCommissionRecords(retry=0){
       const base=q*p;
       const dv=N(x.discount_value);
       const d=x.discount_type==="usd"
-        ?Math.min(base,dv)
+        ?Math.min(base,Math.max(0,dv)*q)
         :Math.min(base,base*dv/100);
       sub+=Math.max(0,base-d);
     });
@@ -14339,7 +14247,7 @@ async function loadCommissionRecords(retry=0){
   window.getCurrentSaleStaffConfig=function(staffId){return latestConfigs().find(x=>String(x.staff_id)===String(staffId))||null};
   function serviceType(t){const s=String(t||"").toLowerCase();return s.includes("with product")||s.includes("service_product")?"Service With Product":"Only Service"}
   function paymentType(x){return String(x?.service_payment_type||"Single").toLowerCase()==="package"?"Package":"Single"}
-  function lineSubtotal(x){const q=Math.max(1,N(x.quantity??x.unit??1)),p=N(x.price??x.unit_price),base=q*p;const dt=String(x.discount_type||"percent").toLowerCase(),dv=N(x.discount_value);const d=dt==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);return Math.max(0,base-d)}
+  function lineSubtotal(x){const q=Math.max(1,N(x.quantity??x.unit??1)),p=N(x.price??x.unit_price),base=q*p;const dt=String(x.discount_type||"percent").toLowerCase(),dv=N(x.discount_value);const d=dt==="usd"?Math.min(base,Math.max(0,dv)*q):Math.min(base,base*dv/100);return Math.max(0,base-d)}
 
   function bind(){
     if(E("saleStaffConfigDate")&&!E("saleStaffConfigDate").value)E("saleStaffConfigDate").value=today();fillStaffSelect();
@@ -14960,13 +14868,208 @@ async function loadCommissionRecords(retry=0){
 <script id="package-commission-combine-final">
 (function(){
   "use strict";
-  function mark(){
-    if(typeof window.recordFirstDermedSaleCommission==="function"){
-      window.recordFirstDermedSaleCommission.__packageCombinedFinal=true;
+
+  function wrap(){
+    const original=window.recordFirstDermedSaleCommission;
+    if(typeof original!=="function") return false;
+    if(original.__packageCombinedWrapped) return true;
+
+    async function combined(args){
+      try{
+        // Verify first invoice + first payment before allowing the existing
+        // commission calculation to run.
+        const sale=args?.sale, buyerType=args?.buyerType, buyerId=args?.buyerId;
+        if(!sale?.id || !buyerId) return;
+
+        let q=sb.from("medifella_sales")
+          .select("id,created_at")
+          .eq("sale_type","DERMED");
+
+        q=buyerType==="student"
+          ?q.eq("student_id",String(buyerId))
+          :q.eq("customer_id",String(buyerId));
+
+        const history=await q.order("created_at",{ascending:true});
+        if(history.error) return;
+
+        const sales=Array.isArray(history.data)?history.data:[];
+        if(sales.length && String(sales[0].id)!==String(sale.id)) return;
+
+        // Any existing automatic commission means the first-payment
+        // commission has already been issued.
+        let cq=sb.from("medifella_sale_commissions")
+          .select("id")
+          .eq("source","dermed_auto");
+
+        cq=buyerType==="student"
+          ?cq.eq("student_id",String(buyerId))
+          :cq.eq("customer_id",String(buyerId));
+
+        const prior=await cq.limit(1);
+        if(prior.error || prior.data?.length) return;
+
+        // IMPORTANT:
+        // We call the original calculator only for the first payment.
+        // The original calculator may create separate package rows, so after
+        // it returns we do not duplicate them. Package combining is handled
+        // by a dedicated combined insert below instead.
+        //
+        // To keep the existing service-rate logic, calculate the package
+        // amount here and create ONE combined package row, while letting the
+        // original function handle single-service rows would create duplicate
+        // package rows. Therefore we cannot call original when packages exist.
+        const services=Array.isArray(args?.servicesArr)?args.servicesArr:[];
+        const packages=services.filter(x=>
+          String(x?.service_payment_type||"Single").toLowerCase()==="package"
+        );
+
+        if(!packages.length){
+          return await original(args);
+        }
+
+        const num=v=>{
+          const n=Number(String(v??"").replace(/[$,\s]/g,""));
+          return Number.isFinite(n)?n:0;
+        };
+
+        const line=x=>{
+          const qty=Math.max(1,num(x?.quantity??x?.unit??1));
+          const price=Math.max(0,num(x?.price??x?.unit_price));
+          const base=qty*price;
+          const dv=Math.max(0,num(x?.discount_value));
+          const dt=String(x?.discount_type||"percent").toLowerCase();
+          return Math.max(0,base-(dt==="usd"?Math.min(base,dv*qty):Math.min(base,base*dv/100)));
+        };
+
+        const products=Array.isArray(args?.items)?args.items:[];
+        const singles=services.filter(x=>
+          String(x?.service_payment_type||"Single").toLowerCase()!=="package"
+        );
+
+        const productTotal=products.reduce((s,x)=>s+line(x),0);
+        const singleTotal=singles.reduce((s,x)=>s+line(x),0);
+        const packageTotal=packages.reduce((s,x)=>s+line(x),0);
+
+        const firstPayment=Math.max(0,num(
+          sale?.first_payment_amount ??
+          sale?.paid_amount_first_payment ??
+          sale?.initial_payment ??
+          sale?.amount_paid_now ??
+          sale?.paid_now ??
+          0
+        ));
+        if(firstPayment<=0) return;
+
+        const packagePaid=Math.min(
+          Math.max(0,firstPayment-productTotal-singleTotal),
+          packageTotal
+        );
+        if(packagePaid<=0){
+          // No package portion was paid; use original for eligible singles.
+          return await original(args);
+        }
+
+        const cfg=typeof window.getCurrentSaleStaffConfig==="function"
+          ?window.getCurrentSaleStaffConfig(args.staffId):null;
+        if(!cfg) return;
+
+        const firstPackage=packages.find(x=>line(x)>0);
+        const st=String(firstPackage?.service_type||firstPackage?.type||"").toLowerCase();
+        const withProduct=st.includes("with product")||st.includes("service_product");
+        const rate=(withProduct?num(cfg.service_product_rate):num(cfg.service_rate))/100;
+        if(rate<=0) return;
+
+        const names=packages.filter(x=>line(x)>0).map(x=>x.name||"Package Service");
+        const common={
+          commission_date:String(sale?.sale_date||new Date().toISOString()).slice(0,10),
+          staff_id:args.staffId,
+          staff_name:args.staff?.name_en||args.staff?.name_kh||args.staff?.name_km||args.staff?.name||cfg.staff_name||"",
+          customer_id:buyerType==="customer"?buyerId:null,
+          student_id:buyerType==="student"?buyerId:null,
+          customer_name:args.buyer?.name||args.buyer?.full_name||sale?.customer_name||sale?.student_name||"",
+          customer_phone:args.buyer?.phone||sale?.customer_phone||sale?.student_phone||"",
+          service_type:withProduct?"service_product":"service",
+          service_detail:names.join(" + "),
+          service_id:null,
+          unit:1,
+          unit_price:packagePaid,
+          discount:0,
+          subtotal:packagePaid,
+          commission_rate:rate,
+          commission_amount:packagePaid*rate,
+          source:"dermed_auto",
+          source_sale_id:String(sale.id),
+          reference_no:sale?.reference_no||"",
+          created_by:args.adminId||null
+        };
+
+        // Insert the combined package row. Then separately calculate singles
+        // using the original calculator is unsafe because it may also insert
+        // another package row. Instead, calculate eligible singles here.
+        const singleRows=[];
+        let budget=Math.max(0,firstPayment-productTotal);
+        for(const x of singles){
+          const base=line(x);
+          const covered=Math.min(base,budget);
+          budget=Math.max(0,budget-covered);
+          if(base<=0 || covered+0.005<base) continue;
+
+          const sx=String(x?.service_type||x?.type||"").toLowerCase();
+          const swp=sx.includes("with product")||sx.includes("service_product");
+          const sr=(swp?num(cfg.service_product_rate):num(cfg.service_rate))/100;
+          if(sr<=0)continue;
+
+          singleRows.push({...common,
+            service_type:swp?"service_product":"service",
+            service_detail:x.name||"Service",
+            service_id:x.service_id||null,
+            unit:Math.max(1,num(x.quantity??x.unit??1)),
+            unit_price:num(x.price??x.unit_price),
+            subtotal:base,
+            commission_rate:sr,
+            commission_amount:base*sr
+          });
+        }
+
+        const rows=[...singleRows,common];
+
+        // Save as one commission batch.
+        let pending=rows;
+        for(let attempt=0;attempt<8;attempt++){
+          const r=await sb.from("medifella_sale_commissions").insert(pending);
+          if(!r.error)return;
+
+          const e=String(r.error.message||r.error.details||"");
+          const mm=e.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']?.*does not exist/i)
+            ||e.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i)
+            ||e.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
+
+          if(mm&&Object.prototype.hasOwnProperty.call(pending[0],mm[1])){
+            pending=pending.map(row=>{const c={...row};delete c[mm[1]];return c;});
+            continue;
+          }
+          return;
+        }
+      }catch(err){
+        console.error("Combined package commission:",err);
+      }
     }
+
+    combined.__packageCombinedWrapped=true;
+    window.recordFirstDermedSaleCommission=combined;
+    return true;
   }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",mark,{once:true});
-  else mark();
+
+  function boot(){
+    if(wrap())return;
+    setTimeout(wrap,300);
+    setTimeout(wrap,800);
+    setTimeout(wrap,1500);
+    setTimeout(wrap,2500);
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});
+  else boot();
 })();
 </script>
 </body>
