@@ -2048,7 +2048,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 #invoicePrint .mf-invoice[data-sale-type="DERMED"] .mf-invoice-table thead tr th{
   background:#C9901E !important;
   background-color:#C9901E !important;
-  color:#FFFFFF !important;
+  color:#000000 !important;
   -webkit-print-color-adjust:exact !important;
   print-color-adjust:exact !important;
 }
@@ -2061,10 +2061,10 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 #invoicePrint .mf-invoice[data-sale-type="MEDIFELLA"] .mf-invoice-table thead tr th,
 #invoicePrint .mf-invoice[data-sale-type="MEDI FELLA"] .mf-invoice-table thead tr th,
-#invoicePrint .mf-invoice[data-sale-type="MEDIFELLA SALE"] .mf-invoice-table thead tr th{
+#invoicePrint .mf-invoice[data-sale-type="MEDIFELLA SALE"] .mf-invoice-table thead tr th,
   background:#46C3D9 !important;
   background-color:#46C3D9 !important;
-  color:#FFFFFF !important;
+  color:#000000 !important;
   -webkit-print-color-adjust:exact !important;
   print-color-adjust:exact !important;
 }
@@ -4959,6 +4959,9 @@ function openPrintFromCanvas(canvas,paper,sale){
    body{display:block!important}
    #paper{width:${paper.widthMm}mm!important;height:${paper.heightMm}mm!important}
  }
+#invoicePrint .mf-invoice .mf-invoice-table thead tr th{
+  color:#000000 !important;
+}
 </style>
 </head>
 <body>
@@ -5217,6 +5220,9 @@ async function printInvoice(id,size="A4"){
   overflow-y:auto!important;
 }
 #mtsSale #mtsBuyerResults.show{display:block!important}
+#invoicePrint .mf-invoice .mf-invoice-table thead tr th{
+  color:#000000 !important;
+}
 </style>
 </head>
 <body>
