@@ -7519,7 +7519,7 @@ document.addEventListener("DOMContentLoaded",function(){
         x.discount_type=dt.value;
         x.discount_value=Math.max(0,num(dv.value));
         updateTotals();
-        const base=x.price*x.quantity, d=itemDiscount(base,x.discount_type,x.discount_value);
+        const base=x.price*x.quantity, d=itemDiscount(base,x.discount_type,x.discount_value,x.quantity);
         const sub=tr.querySelector(".dermed-subtotal");if(sub)sub.value=fmt(Math.max(0,base-d));
       };
       [q,p,dv].forEach(el=>el.addEventListener("input",sync));
@@ -7636,7 +7636,7 @@ document.addEventListener("DOMContentLoaded",function(){
         const q=Math.max(1,num(x.quantity)),p=Math.max(0,num(x.price)),base=q*p,d=itemDiscount(base,x.discount_type||"percent",x.discount_value||0,x.quantity);return n+Math.max(0,base-d);
       },0);
       const invoiceScale=rawLineTotal>0?Math.min(1,c.initial/rawLineTotal):1;
-      const requiredNow=[...items.map(x=>({package:false,subtotal:Math.max(0,num(x.price)*Math.max(1,num(x.quantity))-itemDiscount(num(x.price)*Math.max(1,num(x.quantity)),x.discount_type||"percent",x.discount_value||0))})),...servicesArr.map(x=>({package:String(x.service_payment_type||"Single").toLowerCase()==="package",subtotal:Math.max(0,num(x.price)*Math.max(1,num(x.quantity))-itemDiscount(num(x.price)*Math.max(1,num(x.quantity)),x.discount_type||"percent",x.discount_value||0))}))].filter(x=>!x.package).reduce((n,x)=>n+x.subtotal*invoiceScale,0);
+      const requiredNow=[...items.map(x=>({package:false,subtotal:Math.max(0,num(x.price)*Math.max(1,num(x.quantity))-itemDiscount(num(x.price)*Math.max(1,num(x.quantity)),x.discount_type||"percent",x.discount_value||0,x.quantity))})),...servicesArr.map(x=>({package:String(x.service_payment_type||"Single").toLowerCase()==="package",subtotal:Math.max(0,num(x.price)*Math.max(1,num(x.quantity))-itemDiscount(num(x.price)*Math.max(1,num(x.quantity)),x.discount_type||"percent",x.discount_value||0,x.quantity))}))].filter(x=>!x.package).reduce((n,x)=>n+x.subtotal*invoiceScale,0);
       const hasPackage=servicesArr.some(x=>String(x.service_payment_type||"Single").toLowerCase()==="package");
       if(!hasPackage || paid+0.005<requiredNow || paid>=c.initial-0.005){msg(E("dermedStatus"),"Partial Payment is allowed only when Package services are included, and all Products / Single services must be fully paid first.",true);return}
     }
@@ -14785,85 +14785,7 @@ async function loadCommissionRecords(retry=0){
 })();
 </script>
 
-<script id="fix-usd-discount-per-unit">
-(function(){
-  "use strict";
 
-  function num(v){
-    const n=Number(String(v==null?"":v).replace(/[$,\s]/g,""));
-    return Number.isFinite(n)?n:0;
-  }
-
-  function fixRows(){
-    const root=document.querySelector("#dermedSaleSection")
-      ||document.querySelector("[data-sale-type='dermed']")
-      ||document;
-
-    const rows=root.querySelectorAll("tr");
-    rows.forEach(function(row){
-      const selects=row.querySelectorAll("select");
-      const inputs=row.querySelectorAll("input");
-      if(!inputs.length)return;
-
-      let qtyInput=null, priceInput=null, discountInput=null;
-      inputs.forEach(function(i){
-        const ph=String(i.placeholder||"").toLowerCase();
-        const name=String(i.name||"").toLowerCase();
-        const cls=String(i.className||"").toLowerCase();
-
-        if(!qtyInput && (name.includes("qty")||ph.includes("qty")||cls.includes("quantity")))
-          qtyInput=i;
-        if(!priceInput && (name.includes("price")||ph.includes("price")||cls.includes("price")))
-          priceInput=i;
-        if(!discountInput && (name.includes("discount")||ph.includes("discount")||cls.includes("discount")))
-          discountInput=i;
-      });
-
-      if(!qtyInput||!priceInput||!discountInput||!selects.length)return;
-
-      const mode=String(selects[0].value||"").toLowerCase();
-      if(mode!=="usd" && mode!=="amount" && mode!=="$")return;
-
-      const qty=Math.max(1,num(qtyInput.value)||1);
-      const price=Math.max(0,num(priceInput.value));
-      const discount=Math.max(0,num(discountInput.value));
-
-      // USD discount is PER UNIT:
-      // 6 × $80 with $20/unit discount = 6 × ($80-$20) = $360.
-      const subtotal=Math.max(0,qty*(price-discount));
-
-      // Update the visible subtotal in this row when it is a plain text cell.
-      const cells=row.querySelectorAll("td");
-      if(cells.length){
-        for(let i=cells.length-1;i>=0;i--){
-          const cell=cells[i];
-          const txt=String(cell.textContent||"").trim();
-          if(txt.includes("$")){
-            cell.textContent="$"+subtotal.toFixed(2);
-            break;
-          }
-        }
-      }
-
-      // Trigger the app's normal recalculation without changing its other logic.
-      discountInput.dispatchEvent(new Event("input",{bubbles:true}));
-    });
-  }
-
-  // This is only a safety layer; the underlying commission calculation above
-  // is already corrected.
-  document.addEventListener("input",function(e){
-    if(e.target && e.target.matches("input,select")) setTimeout(fixRows,0);
-  },true);
-  document.addEventListener("change",function(e){
-    if(e.target && e.target.matches("input,select")) setTimeout(fixRows,0);
-  },true);
-
-  setTimeout(fixRows,500);
-  setTimeout(fixRows,1200);
-  setTimeout(fixRows,2500);
-})();
-</script>
 
 <script id="package-commission-combine-final">
 (function(){
