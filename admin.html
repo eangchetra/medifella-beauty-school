@@ -2042,6 +2042,34 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 @media(max-width:800px){.commission-detail-info{grid-template-columns:1fr 1fr}.commission-modal-overlay{padding:8px}.commission-modal{padding:14px;margin:5px auto}}
 </style>
 <meta name="dermed-appointment-fix" content="schema-safe-v2"><meta http-equiv="Cache-Control" content="no-cache, no-store, must-revalidate">
+
+<style id="invoice-table-brand-header-v9">
+/* Invoice item-table TOP TITLE ROW ONLY */
+#invoicePrint .mf-invoice[data-sale-type="DERMED"] .mf-invoice-table thead tr th{
+  background:#C9901E !important;
+  background-color:#C9901E !important;
+  color:#FFFFFF !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-invoice-table thead tr th{
+  background:#F8F601 !important;
+  background-color:#F8F601 !important;
+  color:#111111 !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+#invoicePrint .mf-invoice[data-sale-type="MEDIFELLA"] .mf-invoice-table thead tr th,
+#invoicePrint .mf-invoice[data-sale-type="MEDI FELLA"] .mf-invoice-table thead tr th,
+#invoicePrint .mf-invoice[data-sale-type="MEDIFELLA SALE"] .mf-invoice-table thead tr th{
+  background:#46C3D9 !important;
+  background-color:#46C3D9 !important;
+  color:#FFFFFF !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+</style>
+
 </head>
 <body>
 
@@ -3140,6 +3168,25 @@ const SUPABASE_ANON_KEY="sb_publishable_gwLGNpQg4mo-Ae_OvlGiMQ_rZVx7S3I";
 const CLOUDFLARE_STORAGE_URL="https://medi-fella-storage.eang-chetraafs.workers.dev";
 const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY); window.sb=sb;
 const $=id=>document.getElementById(id);
+
+function dermedAppointmentForSale(sale){
+  try{
+    const list = Array.isArray(window.appointments) ? window.appointments : [];
+    if(!sale) return null;
+    const saleCustomerId = String(sale.customer_id || sale.student_id || "").trim();
+    const salePhone = String(sale.student_phone || sale.customer_phone || "").trim();
+    const saleName = String(sale.student_name || sale.customer_name || "").trim().toLowerCase();
+    return list.find(a=>{
+      if(String(a.status||"").toLowerCase()==="cancelled") return false;
+      const aid=String(a.customer_id||"").trim();
+      const aphone=String(a.customer_phone||"").trim();
+      const aname=String(a.customer_name||"").trim().toLowerCase();
+      if(saleCustomerId && aid && saleCustomerId===aid) return true;
+      if(salePhone && aphone && salePhone===aphone) return true;
+      return !!(saleName && aname && saleName===aname);
+    }) || null;
+  }catch(e){ return null; }
+}
 function msg(el,text,error=false){el.className="status"+(error?" error":"");el.textContent=text}
 function clearMsg(el){el.className="";el.textContent=""}
 function esc(v){return String(v??"").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]))}
@@ -7151,7 +7198,9 @@ function renderDermedSales(){
      <td>${money(bal)}</td>
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
-       <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button><button class="light" type="button" onclick="showSalePaymentDetails('${attr(x.id)}');return false;">View Payment</button><button class="gold dermed-list-add-appointment" type="button"
+       <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button><button class="light" type="button" onclick="showSalePaymentDetails('${attr(x.id)}');return false;">View Payment</button>${dermedAppointmentForSale(x)
+ ? `<span class="status-badge" style="display:inline-block;padding:5px 9px;border-radius:6px;background:#e8f5e9;color:#2e7d32;font-weight:600;white-space:nowrap">✓ Appointment Added</span>`
+ : `<button class="gold dermed-list-add-appointment" type="button"
          data-dermed-appointment-sale-id="${attr(x.id)}"
          data-dermed-appointment-customer-id="${attr(x.customer_id||"")}"
          data-dermed-appointment-student-id="${attr(x.student_id||"")}"
@@ -7159,12 +7208,14 @@ function renderDermedSales(){
          data-dermed-appointment-name="${attr(x.student_name||x.customer_name||"")}"
          data-dermed-appointment-phone="${attr(x.student_phone||x.customer_phone||"")}"
          data-dermed-appointment-code="${attr(x.student_id||x.customer_code||"")}"
-       >+ Add Appointment</button>
+       >+ Add Appointment</button>`}
        ${bal>0.005?`<button class="gold" type="button" onclick="recordDermedSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
  }).join("")}</table></div>`:'<p class="muted">No Dermed sales found.</p>';
 }
+
+window.renderDermedSales=renderDermedSales;
 
 async function recordDermedSalePayment(id){
  const s=salesRecords.find(x=>String(x.id)===String(id)&&String(x.sale_type||"").toUpperCase()==="DERMED");
@@ -9985,7 +10036,7 @@ document.addEventListener("DOMContentLoaded",function(){
         .order("time",{ascending:true})
         .order("created_at",{ascending:false});
       if(error)throw error;
-      appointments=Array.isArray(data)?data:[];
+      appointments=Array.isArray(data)?data:[]; window.appointments=appointments;
 
       // One-time migration of appointments created by the older localStorage version.
       // This only runs when the database table is empty, so existing database records
@@ -10015,7 +10066,7 @@ document.addEventListener("DOMContentLoaded",function(){
           }));
           const {data:inserted,error:insertError}=await sb.from("medifella_appointments").insert(rows).select("*");
           if(!insertError && Array.isArray(inserted)){
-            appointments=inserted;
+            appointments=inserted; window.appointments=appointments;
             localStorage.removeItem(STORAGE_KEY);
           }
         }
@@ -10168,9 +10219,15 @@ document.addEventListener("DOMContentLoaded",function(){
     };
     try{
       const saved=await insertAppointment(row);
-      appointments.unshift(saved||row);
+      appointments.unshift(saved||row); window.appointments=appointments;
       renderAll();
       showStatus("Appointment saved successfully.",false);
+
+try{
+  if (typeof loadDermedSales === "function") await loadDermedSales();
+  else if (typeof renderDermedSales === "function") await renderDermedSales();
+  else if (typeof refreshDermedSales === "function") await refreshDermedSales();
+}catch(_e){}
       setTimeout(clearForm,700);
     }catch(e){
       console.error("Save appointment error:",e);
@@ -10181,7 +10238,7 @@ document.addEventListener("DOMContentLoaded",function(){
     try{
       const updated=await updateAppointmentDb(id,changes);
       const idx=appointments.findIndex(x=>String(x.id)===String(id));
-      if(idx>=0)appointments[idx]=updated||Object.assign(appointments[idx],changes);
+      if(idx>=0)appointments[idx]=updated||Object.assign(appointments[idx],changes); window.appointments=appointments;
       renderAll();
       return updated||appointments[idx]||null;
     }catch(e){
@@ -10196,7 +10253,7 @@ document.addEventListener("DOMContentLoaded",function(){
     if(!confirm(`Delete appointment for ${a.customer_name||"customer"}?`))return;
     try{
       await deleteAppointmentDb(id);
-      appointments=appointments.filter(x=>String(x.id)!==String(id));
+      appointments=appointments.filter(x=>String(x.id)!==String(id)); window.appointments=appointments;
       renderAll();
     }catch(e){
       console.error("Delete appointment error:",e);
@@ -15815,6 +15872,10 @@ async function loadCommissionRecords(retry=0){
       }
 
       if(status)status.textContent="Appointment saved successfully.";
+      window.appointments = Array.isArray(window.appointments) ? window.appointments : [];
+      if(typeof window.renderDermedSales==="function"){
+        try{window.renderDermedSales()}catch(_){}
+      }
       setTimeout(()=>{
         closeAppointment();
         // The current Dermed Sale form remains untouched, so the user is
