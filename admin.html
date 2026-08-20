@@ -16851,5 +16851,202 @@ window.calculateFirstPaymentPackageCommissionV22=function(firstPayment, products
 
 })();
 </script>
+
+<script id="dermed-first-payment-commission-final-v23">
+(function(){
+"use strict";
+
+const N=v=>{
+  const n=Number(String(v??"").replace(/[$,\s]/g,""));
+  return Number.isFinite(n)&&n>=0?n:0;
+};
+const lineTotal=x=>{
+  const q=Math.max(1,N(x?.quantity??x?.unit??1));
+  const p=Math.max(0,N(x?.price??x?.unit_price??0));
+  const base=q*p;
+  const dt=String(x?.discount_type||"percent").toLowerCase();
+  const dv=N(x?.discount_value);
+  const d=dt==="usd"
+    ?Math.min(base,Math.max(0,dv)*q)
+    :Math.min(base,base*dv/100);
+  return Math.max(0,base-d);
+};
+const productGross=x=>
+  Math.max(1,N(x?.quantity??x?.unit??1))*Math.max(0,N(x?.price??x?.unit_price??0));
+
+const serviceType=x=>{
+  const s=String(x?.service_type||x?.type||"").toLowerCase();
+  return s.includes("with product")||s.includes("service_product")
+    ?"Service With Product":"Only Service";
+};
+const paymentType=x=>
+  String(x?.service_payment_type||"Single").toLowerCase()==="package"
+    ?"Package":"Single";
+
+window.recordFirstDermedSaleCommission=async function(args){
+  const sale=args?.sale, buyer=args?.buyer, buyerType=args?.buyerType;
+  const buyerId=args?.buyerId, staffId=args?.staffId;
+  if(String(sale?.sale_type||"").trim().toUpperCase()!=="DERMED"||!sale?.id||!staffId||!buyerId)return;
+
+  // Strict first-invoice rule.
+  let historyQuery;
+  if(buyerType==="student"){
+    historyQuery=await sb.from("medifella_sales")
+      .select("id,created_at,sale_date")
+      .eq("sale_type","DERMED")
+      .eq("student_id",buyerId)
+      .order("created_at",{ascending:true});
+  }else{
+    historyQuery=await sb.from("medifella_sales")
+      .select("id,created_at,sale_date")
+      .eq("sale_type","DERMED")
+      .eq("customer_id",buyerId)
+      .order("created_at",{ascending:true});
+  }
+  if(historyQuery.error)throw historyQuery.error;
+  const history=Array.isArray(historyQuery.data)?historyQuery.data:[];
+  if(!history.length || String(history[0].id)!==String(sale.id))return;
+
+  const cfg=typeof window.getCurrentSaleStaffConfig==="function"
+    ?window.getCurrentSaleStaffConfig(staffId):null;
+  if(!cfg)return;
+
+  let items=Array.isArray(args?.items)?args.items:[];
+  let services=Array.isArray(args?.servicesArr)?args.servicesArr:[];
+  const products=items;
+  const singles=services.filter(x=>paymentType(x)==="Single");
+  const packages=services.filter(x=>paymentType(x)==="Package");
+
+  // IMPORTANT: the first-payment allocation uses the product PRICE amount,
+  // not the discounted product subtotal. This matches the agreed rule:
+  // $200 first payment - $25 product - $45 single service = $130 packages.
+  const productAmount=products.reduce((s,x)=>s+productGross(x),0);
+  const singleTotal=singles.reduce((s,x)=>s+lineTotal(x),0);
+
+  // Get the actual FIRST payment, not the current accumulated paid balance.
+  const pr=await sb.from("medifella_sale_payments")
+    .select("id,amount,payment_date,created_at")
+    .eq("sale_id",String(sale.id))
+    .order("payment_date",{ascending:true})
+    .order("created_at",{ascending:true})
+    .limit(1);
+  if(pr.error)throw pr.error;
+  const firstPayment=pr.data?.[0]?N(pr.data[0].amount):0;
+  if(firstPayment<=0)return;
+
+  // Single services must be covered before package commission.
+  const remainingAfterProducts=Math.max(0,firstPayment-productAmount);
+  let singleBudget=remainingAfterProducts;
+  const rows=[];
+
+  for(const x of singles){
+    const base=lineTotal(x);
+    if(base<=0)continue;
+    const covered=Math.min(base,singleBudget);
+    singleBudget=Math.max(0,singleBudget-covered);
+
+    // No commission for a single service that was not fully covered.
+    if(covered+0.005<base)continue;
+
+    const type=serviceType(x);
+    const rate=(type==="Service With Product"
+      ?N(cfg.service_product_rate):N(cfg.service_rate))/100;
+    if(rate<=0)continue;
+
+    rows.push({
+      commission_date:String(sale?.sale_date||new Date().toISOString()).slice(0,10),
+      staff_id:staffId,
+      staff_name:args?.staff?.name_en||args?.staff?.name_kh||args?.staff?.name_km||args?.staff?.name||cfg.staff_name||"",
+      customer_id:buyerType==="customer"?buyerId:null,
+      student_id:buyerType==="student"?buyerId:null,
+      customer_name:buyer?.name||buyer?.full_name||sale?.customer_name||sale?.student_name||"",
+      customer_phone:buyer?.phone||sale?.customer_phone||sale?.student_phone||"",
+      service_type:type==="Service With Product"?"service_product":"service",
+      service_detail:x.name||"Service",
+      service_id:x.service_id||null,
+      unit:Math.max(1,N(x.quantity??x.unit??1)),
+      unit_price:N(x.price??x.unit_price),
+      discount:Math.max(0,
+        Math.max(1,N(x.quantity??x.unit??1))*Math.max(0,N(x.price??x.unit_price??0))
+        -base
+      ),
+      subtotal:base,
+      commission_rate:rate,
+      commission_amount:base*rate,
+      source:"dermed_auto",
+      source_sale_id:String(sale.id),
+      reference_no:sale?.reference_no||"",
+      created_by:args?.adminId||null
+    });
+  }
+
+  // ALL packages are combined into one commission base.
+  // This is the agreed rule for two or more packages.
+  const packageGross=packages.reduce((s,x)=>s+lineTotal(x),0);
+  const packageBudget=Math.min(
+    Math.max(0,firstPayment-productAmount-singleTotal),
+    packageGross
+  );
+
+  if(packageBudget>0){
+    const validPackages=packages.filter(x=>lineTotal(x)>0);
+    const firstPackage=validPackages[0];
+    if(firstPackage){
+      const type=serviceType(firstPackage);
+      const rate=(type==="Service With Product"
+        ?N(cfg.service_product_rate):N(cfg.service_rate))/100;
+
+      if(rate>0){
+        rows.push({
+          commission_date:String(sale?.sale_date||new Date().toISOString()).slice(0,10),
+          staff_id:staffId,
+          staff_name:args?.staff?.name_en||args?.staff?.name_kh||args?.staff?.name_km||args?.staff?.name||cfg.staff_name||"",
+          customer_id:buyerType==="customer"?buyerId:null,
+          student_id:buyerType==="student"?buyerId:null,
+          customer_name:buyer?.name||buyer?.full_name||sale?.customer_name||sale?.student_name||"",
+          customer_phone:buyer?.phone||sale?.customer_phone||sale?.student_phone||"",
+          service_type:type==="Service With Product"?"service_product":"service",
+          service_detail:validPackages.map(x=>x.name||"Package Service").join(" + "),
+          service_id:null,
+          unit:1,
+          unit_price:packageBudget,
+          discount:0,
+          subtotal:packageBudget,
+          commission_rate:rate,
+          commission_amount:packageBudget*rate,
+          source:"dermed_auto",
+          source_sale_id:String(sale.id),
+          reference_no:sale?.reference_no||"",
+          created_by:args?.adminId||null
+        });
+      }
+    }
+  }
+
+  if(!rows.length)return;
+
+  // Insert once, tolerating optional schema columns just like the existing app.
+  let pending=rows;
+  for(let attempt=0;attempt<8;attempt++){
+    const r=await sb.from("medifella_sale_commissions").insert(pending);
+    if(!r.error)return;
+
+    const e=String(r.error.message||r.error.details||"");
+    const mm=e.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']?.*does not exist/i)
+      ||e.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i)
+      ||e.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
+    if(mm&&Object.prototype.hasOwnProperty.call(pending[0],mm[1])){
+      pending=pending.map(row=>{
+        const copy={...row}; delete copy[mm[1]]; return copy;
+      });
+      continue;
+    }
+    console.error("V23 Dermed commission insert failed:",r.error);
+    return;
+  }
+};
+window.recordFirstDermedSaleCommission.__v23=true;
+})();
+</script>
 </body>
 </html>
