@@ -11922,7 +11922,29 @@ async function loadCommissionRecords(retry=0){
   "use strict";
 
   function isAdminProductUser(){
-    return String(window.currentProfile?.role || "").toLowerCase() === "admin";
+    // Admin is determined from the real logged-in Supabase profile first.
+    // The specific owner/admin email is also recognized as Admin so the
+    // Product Cost and Stock Report cannot disappear when currentProfile
+    // has not finished synchronizing after login.
+    const role = String(window.currentProfile?.role || "").trim().toLowerCase();
+    if(role === "admin") return true;
+
+    const email = String(
+      window.currentUserEmail ||
+      window.userEmail ||
+      window.currentUser?.email ||
+      window.adminUser?.email ||
+      localStorage.getItem("userEmail") ||
+      localStorage.getItem("email") ||
+      ""
+    ).trim().toLowerCase();
+
+    if(email === "eang.chetraafs@gmail.com") return true;
+
+    const username = String(window.currentProfile?.username || "").trim().toLowerCase();
+    if(username === "eang.chetraafs@gmail.com") return true;
+
+    return false;
   }
   function P(id){ return document.getElementById(id); }
   function escP(v){
@@ -12110,6 +12132,13 @@ async function loadCommissionRecords(retry=0){
   }
 
   // Keep the role-specific UI synchronized after login/permission refresh.
+  // Re-apply the Product Cost + Stock Report visibility after the
+  // dashboard finishes loading and whenever the account state changes.
+  window.__forceProductAdminVisibility=function(){
+    try{ productRoleUI(); }catch(_){}
+    try{ if(typeof window.renderProductList==="function") window.renderProductList(); }catch(_){}
+  };
+
   const originalApply=window.applyAccountPermissions;
   if(typeof originalApply==="function" && !window.__productRoleApplyPatched){
     window.__productRoleApplyPatched=true;
@@ -14290,6 +14319,30 @@ async function loadCommissionRecords(retry=0){
 
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
   else install();
+})();
+</script>
+
+<script id="final-admin-product-cost-report-visibility">
+(function(){
+  "use strict";
+  function force(){
+    try{
+      if(typeof window.__forceProductAdminVisibility==="function"){
+        window.__forceProductAdminVisibility();
+      }
+    }catch(_){}
+  }
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",function(){
+      setTimeout(force,100);
+      setTimeout(force,800);
+      setTimeout(force,2000);
+    });
+  }else{
+    setTimeout(force,100);
+    setTimeout(force,800);
+    setTimeout(force,2000);
+  }
 })();
 </script>
 </body>
