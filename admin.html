@@ -2646,6 +2646,17 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </div>
 </section>
 
+<style id="appointment-add-customer-style">
+  #appointmentAddCustomer{
+    height:46px;
+    padding:10px 14px;
+    font-weight:800;
+  }
+  @media(max-width:650px){
+    #appointmentAddCustomer{min-width:0!important;width:auto}
+  }
+</style>
+
 <section id="appointments" class="section">
   <div class="appointment-titlebar">
     <div>
@@ -2662,9 +2673,14 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
         <label>Customer Phone Number / Name / ID *</label>
         <div style="display:flex;gap:8px;align-items:flex-start">
           <div style="flex:1;position:relative">
-            <input id="appointmentCustomerSearch" autocomplete="off" placeholder="Search Student or Customer">
-            <input id="appointmentCustomerId" type="hidden"><input id="appointmentCustomerSource" type="hidden" value="customer">
-            <div id="appointmentCustomerResults" class="appointment-results"></div>
+            <div style="display:flex;gap:8px;align-items:center">
+              <div style="flex:1;position:relative">
+                <input id="appointmentCustomerSearch" autocomplete="off" placeholder="Search Student or Customer">
+                <input id="appointmentCustomerId" type="hidden"><input id="appointmentCustomerSource" type="hidden" value="customer">
+                <div id="appointmentCustomerResults" class="appointment-results"></div>
+              </div>
+              <button id="appointmentAddCustomer" class="gold" type="button" style="white-space:nowrap;min-width:145px">+ Add Customer</button>
+            </div>
           </div>
           <div style="width:180px">
             <select id="appointmentCustomerType" title="Customer type">
@@ -8057,14 +8073,19 @@ $("mtsSalesRefresh").onclick=loadSales;$("dermedSalesRefresh").onclick=loadSales
 $("stockTimeDisplay").value=phTime().replace("T"," ");$("stockTime").value=phTime();if($("stockReportDate"))$("stockReportDate").value=new Date().toISOString().slice(0,10);setAutoTime("mtsSaleTime");setAutoTime("dermedSaleTime");
 
 let saleCustomerTargetType="dermed";
+let appointmentCustomerAddMode=false;
 function openSaleCustomerForm(type){
- saleCustomerTargetType=type||"dermed";
+ appointmentCustomerAddMode=(type==="appointment");
+ saleCustomerTargetType=appointmentCustomerAddMode?"dermed":(type||"dermed");
  $("saleCustomerName").value="";
  $("saleCustomerPhone").value="";
  $("saleCustomerStatus").textContent="";
+ const title=$("saleCustomerModal")?.querySelector("h2");
+ if(title) title.textContent=appointmentCustomerAddMode?"Add New Customer for Appointment":"Add New Customer";
  $("saleCustomerModal").style.display="flex";
  setTimeout(()=>$("saleCustomerName").focus(),50);
 }
+
 function closeSaleCustomerForm(){ $("saleCustomerModal").style.display="none"; }
 async function saveSaleCustomer(){
   const name = $("saleCustomerName").value.trim();
@@ -8096,7 +8117,7 @@ async function saveSaleCustomer(){
     // Reload the authoritative Customer List from Supabase.
     await loadCustomers();
 
-    // Find the newly-created customer and select it in this sale.
+    // Find the newly-created customer from the refreshed Customer List.
     const savedCustomer = customers.find(x =>
       String(x.name||"").trim() === name &&
       String(x.phone||"").trim() === phone
@@ -8104,7 +8125,19 @@ async function saveSaleCustomer(){
       String(x.customer_code||"").trim() === customerCode
     );
 
-    if(savedCustomer && typeof chooseBuyer === "function"){
+    if(appointmentCustomerAddMode){
+      // Appointment: immediately select the newly-created customer in the
+      // appointment customer picker, so the user can save the appointment
+      // without searching for the customer again.
+      if(savedCustomer){
+        if($("appointmentCustomerId")) $("appointmentCustomerId").value=String(savedCustomer.id||"");
+        if($("appointmentCustomerSource")) $("appointmentCustomerSource").value="customer";
+        if($("appointmentCustomerSearch")) $("appointmentCustomerSearch").value=savedCustomer.name||name;
+        if($("appointmentCustomerHint")) $("appointmentCustomerHint").textContent=`Selected: ${savedCustomer.name||name} · ${savedCustomer.customer_code||customerCode||"No ID"} · ${savedCustomer.phone||phone||"No phone"}`;
+        if($("appointmentCustomerType")) $("appointmentCustomerType").value="New Customer";
+        if($("appointmentCustomerResults")) $("appointmentCustomerResults").classList.remove("show");
+      }
+    }else if(savedCustomer && typeof chooseBuyer === "function"){
       chooseBuyer(saleCustomerTargetType, "customer", savedCustomer.id);
     }else if(savedCustomer){
       if($("dermedBuyerSearch")) $("dermedBuyerSearch").value=savedCustomer.name||name;
@@ -8113,6 +8146,7 @@ async function saveSaleCustomer(){
     }
 
     closeSaleCustomerForm();
+    appointmentCustomerAddMode=false;
   }catch(e){
     console.error("Dermed Sale customer save error:",e);
     status.textContent = "Could not save customer: " + (e.message || "Unknown error");
@@ -8123,13 +8157,17 @@ async function saveSaleCustomer(){
 }
 $("mtsNewCustomer").onclick=()=>openSaleCustomerForm("mts");
 $("dermedNewCustomer").onclick=()=>openSaleCustomerForm("dermed");
+$("appointmentAddCustomer").onclick=()=>openSaleCustomerForm("appointment");
 
 // Delegated handlers are required because the modal is inserted later in the HTML.
 document.addEventListener("click", function(e){
-  const newCustomerBtn = e.target.closest && e.target.closest("#dermedNewCustomer, #mtsNewCustomer");
+  const newCustomerBtn = e.target.closest && e.target.closest("#dermedNewCustomer, #mtsNewCustomer, #appointmentAddCustomer");
   if(newCustomerBtn){
     e.preventDefault();
-    openSaleCustomerForm(newCustomerBtn.id === "mtsNewCustomer" ? "mts" : "dermed");
+    openSaleCustomerForm(
+      newCustomerBtn.id === "mtsNewCustomer" ? "mts" :
+      newCustomerBtn.id === "appointmentAddCustomer" ? "appointment" : "dermed"
+    );
     return;
   }
 
