@@ -2898,6 +2898,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <textarea id="dermedSaleNote" rows="4" placeholder="Enter note here..."></textarea>
 
 <div class="sale-actions">
+<button id="dermedAddAppointment" class="gold" type="button">+ Appointment</button>
 <button id="saveDermedSale" class="gold" type="button">Save Dermed Sale & Generate Invoice</button>
 <button id="clearDermedSale" class="light" type="button">Clear</button>
 </div>
@@ -7242,7 +7243,6 @@ async function saveSaleCustomer(){
     }
 
     closeSaleCustomerForm();
-    alert("Customer saved successfully to Customer List.");
   }catch(e){
     console.error("Dermed Sale customer save error:",e);
     status.textContent = "Could not save customer: " + (e.message || "Unknown error");
@@ -15150,6 +15150,670 @@ async function loadCommissionRecords(retry=0){
   setTimeout(install,800);
   setTimeout(install,1500);
   setTimeout(install,2500);
+})();
+</script>
+
+<style id="dermed-appointment-and-discount-final-style">
+#dermedAppointmentModal{
+  position:fixed;inset:0;background:#0008;z-index:100000;display:none;
+  overflow:auto;padding:22px;
+}
+#dermedAppointmentModal.show{display:block}
+.dermed-appointment-box{
+  max-width:900px;margin:30px auto;background:#fff;border-radius:16px;
+  padding:22px;box-shadow:0 20px 60px #0004;
+}
+.dermed-appointment-head{
+  display:flex;justify-content:space-between;align-items:center;gap:12px;
+  border-bottom:1px solid var(--line);padding-bottom:12px;margin-bottom:16px;
+}
+.dermed-appointment-grid{
+  display:grid;grid-template-columns:2fr 1fr 1fr;gap:14px;
+}
+.dermed-appointment-grid .full{grid-column:1/-1}
+.dermed-appointment-actions{
+  display:flex;gap:8px;justify-content:flex-end;margin-top:16px;
+}
+@media(max-width:850px){
+  .dermed-appointment-grid{grid-template-columns:1fr}
+  .dermed-appointment-grid .full{grid-column:auto}
+}
+#dermedItems .dermed-item-row .sale-item-discount-wrap{
+  display:grid!important;grid-template-columns:66px 1fr!important;gap:5px!important;
+  min-width:150px!important;visibility:visible!important;opacity:1!important;
+}
+#dermedItems .dermed-item-row .dermed-disc-type,
+#dermedItems .dermed-item-row .dermed-disc-value{
+  display:block!important;visibility:visible!important;opacity:1!important;
+}
+</style>
+
+<div id="dermedAppointmentModal" aria-hidden="true">
+  <div class="dermed-appointment-box">
+    <div class="dermed-appointment-head">
+      <div>
+        <h2 style="margin:0">+ Appointment</h2>
+        <div class="muted">Add an appointment without losing the current Dermed Sale.</div>
+      </div>
+      <button id="dermedAppointmentClose" class="light" type="button">× Close</button>
+    </div>
+
+    <div class="dermed-appointment-grid">
+      <div class="full">
+        <label>Student / Customer *</label>
+        <input id="dermedAppointmentCustomerSearch" autocomplete="off"
+               placeholder="Customer information is filled automatically. You can change/search it.">
+        <input id="dermedAppointmentCustomerId" type="hidden">
+        <input id="dermedAppointmentCustomerSource" type="hidden" value="customer">
+        <div id="dermedAppointmentCustomerResults" class="appointment-results"></div>
+        <div id="dermedAppointmentCustomerHint" class="muted" style="margin-top:6px"></div>
+      </div>
+
+      <div>
+        <label>Customer Type</label>
+        <select id="dermedAppointmentCustomerType">
+          <option value="Old Customer">Old Customer</option>
+          <option value="New Customer">New Customer</option>
+        </select>
+      </div>
+
+      <div>
+        <label>Appointment Date *</label>
+        <input id="dermedAppointmentDate" type="date">
+      </div>
+
+      <div>
+        <label>Appointment Time *</label>
+        <input id="dermedAppointmentTime" type="time">
+      </div>
+
+      <div class="full">
+        <label>Note</label>
+        <textarea id="dermedAppointmentNote" rows="4"
+          placeholder="Write an appointment note (optional)..."></textarea>
+      </div>
+    </div>
+
+    <div id="dermedAppointmentStatus"></div>
+
+    <div class="dermed-appointment-actions">
+      <button id="dermedAppointmentSave" class="gold" type="button">Save Appointment</button>
+      <button id="dermedAppointmentCancel" class="light" type="button">Cancel</button>
+    </div>
+  </div>
+</div>
+
+<script id="dermed-customer-appointment-discount-final">
+(function(){
+  "use strict";
+
+  function E(id){return document.getElementById(id)}
+  function N(v){
+    const n=Number(String(v??"").replace(/[$,\s]/g,""));
+    return Number.isFinite(n)?n:0;
+  }
+  function escv(v){
+    return typeof esc==="function" ? esc(v) :
+      String(v??"").replace(/[&<>"']/g,c=>({
+        "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
+      }[c]));
+  }
+  function localDate(){
+    if(typeof phTime==="function")return String(phTime()).slice(0,10);
+    return new Date().toISOString().slice(0,10);
+  }
+
+  // ---------------- CUSTOMER CREATED IN DERMED SALE ----------------
+  // Keep the existing successful behavior: after creation, reload the
+  // authoritative customer list and automatically select the new customer.
+  // No "Customer saved successfully" alert.
+  async function selectCreatedDermedCustomer(){
+    const name=String(E("saleCustomerName")?.value||"").trim();
+    const phone=String(E("saleCustomerPhone")?.value||"").trim();
+    if(!name||!phone)return;
+
+    if(typeof loadCustomers==="function"){
+      await loadCustomers();
+    }
+
+    const list=Array.isArray(window.customers)?window.customers:[];
+    const found=list.find(x=>
+      String(x.name||"").trim()===name &&
+      String(x.phone||"").trim()===phone
+    );
+
+    if(found && typeof chooseBuyer==="function"){
+      chooseBuyer("dermed","customer",found.id);
+    }else if(found){
+      if(E("dermedBuyerSearch"))E("dermedBuyerSearch").value=found.name||name;
+      if(E("dermedBuyerType"))E("dermedBuyerType").value="customer";
+      if(E("dermedBuyerId"))E("dermedBuyerId").value=found.id;
+    }
+  }
+
+  // ---------------- DISCOUNT COLUMN ----------------
+  // The Dermed table has one renderer in the older controller and another
+  // in the newer controller. Override the combined renderer so a discount
+  // control is ALWAYS rendered for both Product and Service rows, including
+  // when there is only one product.
+  window.renderDermedCombinedItems=function(){
+    const body=E("dermedItems");
+    if(!body)return;
+
+    const products=Array.isArray(window.dermedSaleItems)?window.dermedSaleItems:[];
+    const servicesArr=Array.isArray(window.dermedServiceItems)?window.dermedServiceItems:[];
+
+    function line(x){
+      const q=Math.max(1,N(x.quantity||1));
+      const price=Math.max(0,N(x.price));
+      const base=price*q;
+      const dv=Math.max(0,N(x.discount_value));
+      const dt=String(x.discount_type||"percent").toLowerCase();
+      const d=dt==="usd"?Math.min(base,dv*q):Math.min(base,base*dv/100);
+      return Math.max(0,base-d);
+    }
+
+    function row(x,kind,i){
+      const q=Math.max(1,N(x.quantity||1));
+      const price=Math.max(0,N(x.price));
+      const dt=String(x.discount_type||"percent").toLowerCase();
+      const dv=Math.max(0,N(x.discount_value));
+      const subtotal=line(x);
+      const code=kind==="product"?(x.product_code||""):(x.service_code||"");
+      const label=x.name||("Product"===kind?"Product":"Service");
+      const maxStock=kind==="product" && typeof productStock==="function"
+        ?Math.max(1,N(productStock(x.product_id))+q):999999;
+
+      return `<tr class="dermed-item-row" data-kind="${kind}" data-index="${i}">
+        <td>
+          <strong>${escv(label)}</strong>
+          <div class="muted">${escv(code)}</div>
+        </td>
+        <td>
+          <input class="sale-item-qty dermed-qty" type="text" inputmode="numeric"
+            value="${q}" ${kind==="product"?`max="${maxStock}"`:""}>
+        </td>
+        <td>
+          <input class="sale-item-price dermed-price" type="text" inputmode="decimal"
+            value="${price.toFixed(2)}">
+        </td>
+        <td>
+          <div class="sale-item-discount-wrap">
+            <select class="sale-item-discount-type dermed-disc-type">
+              <option value="percent" ${dt==="percent"?"selected":""}>%</option>
+              <option value="usd" ${dt==="usd"?"selected":""}>USD</option>
+            </select>
+            <input class="sale-item-discount-value dermed-disc-value"
+              type="text" inputmode="decimal" autocomplete="off"
+              placeholder="0" value="${dv?dv:""}">
+          </div>
+        </td>
+        <td>
+          <input class="sale-item-subtotal dermed-subtotal" readonly
+            value="${typeof fmt==="function"?fmt(subtotal):"$"+subtotal.toFixed(2)}">
+        </td>
+        <td>
+          <button class="danger" type="button"
+            data-remove-dermed="${kind}:${i}">×</button>
+        </td>
+      </tr>`;
+    }
+
+    const html=[];
+    products.forEach((x,i)=>html.push(row(x,"product",i)));
+    servicesArr.forEach((x,i)=>html.push(row(x,"service",i)));
+
+    body.innerHTML=html.join("") ||
+      '<tr><td colspan="6" class="muted">No products or services added.</td></tr>';
+
+    body.querySelectorAll(".dermed-item-row").forEach(tr=>{
+      const kind=tr.dataset.kind;
+      const i=Number(tr.dataset.index);
+      const arr=kind==="product"?products:servicesArr;
+      const x=arr[i];
+      if(!x)return;
+
+      const q=tr.querySelector(".dermed-qty");
+      const p=tr.querySelector(".dermed-price");
+      const dt=tr.querySelector(".dermed-disc-type");
+      const dv=tr.querySelector(".dermed-disc-value");
+      const sub=tr.querySelector(".dermed-subtotal");
+
+      const sync=()=>{
+        x.quantity=Math.max(1,N(q?.value)||1);
+        if(kind==="product" && typeof productStock==="function"){
+          x.quantity=Math.min(x.quantity,Math.max(1,N(productStock(x.product_id))+1));
+        }
+        x.price=Math.max(0,N(p?.value));
+        x.discount_type=dt?.value||"percent";
+        x.discount_value=Math.max(0,N(dv?.value));
+
+        const value=line(x);
+        if(sub)sub.value=typeof fmt==="function"?fmt(value):"$"+value.toFixed(2);
+        if(typeof window.updateTotals==="function"){
+          try{window.updateTotals()}catch(_){}
+        }
+      };
+
+      [q,p,dv].forEach(el=>{
+        if(el)el.addEventListener("input",sync);
+      });
+      if(dt)dt.addEventListener("change",sync);
+
+      const rm=tr.querySelector("[data-remove-dermed]");
+      if(rm)rm.onclick=()=>{
+        arr.splice(i,1);
+        window.renderDermedCombinedItems();
+      };
+    });
+
+    if(typeof window.updateTotals==="function"){
+      try{window.updateTotals()}catch(_){}
+    }
+  };
+
+  // Make common add-service path immediately show the discount controls.
+  const originalAddService=window.addDermedService;
+  if(typeof originalAddService==="function" && !originalAddService.__discountWrapped){
+    const wrapped=function(){
+      const r=originalAddService.apply(this,arguments);
+      setTimeout(()=>window.renderDermedCombinedItems(),0);
+      return r;
+    };
+    wrapped.__discountWrapped=true;
+    window.addDermedService=wrapped;
+  }
+
+  // ---------------- APPOINTMENT MODAL ----------------
+  let returnToInvoice=false;
+
+  function currentBuyer(){
+    const type=E("dermedBuyerType")?.value||"";
+    const id=E("dermedBuyerId")?.value||"";
+    if(!id)return null;
+
+    if(type==="student"){
+      const s=(Array.isArray(window.students)?window.students:[]).find(x=>String(x.id)===String(id));
+      if(!s)return null;
+      return {
+        id:s.id, source:"student",
+        name:s.full_name||s.full_name_km||"Student",
+        phone:s.phone||"",
+        code:s.student_id||""
+      };
+    }
+
+    const c=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(id));
+    if(!c)return null;
+    return {
+      id:c.id, source:"customer",
+      name:c.name||"Customer",
+      phone:c.phone||"",
+      code:c.customer_code||""
+    };
+  }
+
+  function openAppointment(){
+    const b=currentBuyer();
+
+    if(E("dermedAppointmentCustomerId"))E("dermedAppointmentCustomerId").value=b?.id||"";
+    if(E("dermedAppointmentCustomerSource"))E("dermedAppointmentCustomerSource").value=b?.source||"customer";
+    if(E("dermedAppointmentCustomerSearch"))E("dermedAppointmentCustomerSearch").value=b?.name||"";
+    if(E("dermedAppointmentCustomerHint"))
+      E("dermedAppointmentCustomerHint").textContent=b
+        ?`Selected: ${b.name} · ${b.code||"No ID"} · ${b.phone||"No phone"}`
+        :"Search and select a customer or student.";
+
+    if(E("dermedAppointmentCustomerType"))
+      E("dermedAppointmentCustomerType").value="Old Customer";
+    if(E("dermedAppointmentDate"))
+      E("dermedAppointmentDate").value=localDate();
+    if(E("dermedAppointmentTime"))
+      E("dermedAppointmentTime").value="";
+    if(E("dermedAppointmentNote"))
+      E("dermedAppointmentNote").value="";
+    if(E("dermedAppointmentStatus"))
+      E("dermedAppointmentStatus").textContent="";
+
+    E("dermedAppointmentModal")?.classList.add("show");
+    E("dermedAppointmentModal")?.setAttribute("aria-hidden","false");
+  }
+
+  function closeAppointment(){
+    E("dermedAppointmentModal")?.classList.remove("show");
+    E("dermedAppointmentModal")?.setAttribute("aria-hidden","true");
+  }
+
+  function renderAppointmentCustomerResults(){
+    const input=E("dermedAppointmentCustomerSearch");
+    const box=E("dermedAppointmentCustomerResults");
+    if(!input||!box)return;
+
+    const q=String(input.value||"").trim().toLowerCase();
+    if(!q){
+      box.innerHTML="";
+      box.classList.remove("show");
+      return;
+    }
+
+    const rows=[];
+    (Array.isArray(window.students)?window.students:[]).filter(s=>
+      [s.student_id,s.full_name,s.full_name_km,s.phone,s.email]
+        .join(" ").toLowerCase().includes(q)
+    ).slice(0,8).forEach(s=>rows.push({
+      source:"student",id:s.id,code:s.student_id||"",
+      name:s.full_name||s.full_name_km||"Student",phone:s.phone||""
+    }));
+
+    (Array.isArray(window.customers)?window.customers:[]).filter(c=>
+      [c.customer_code,c.name,c.phone,c.email]
+        .join(" ").toLowerCase().includes(q)
+    ).slice(0,8).forEach(c=>rows.push({
+      source:"customer",id:c.id,code:c.customer_code||"",
+      name:c.name||"Customer",phone:c.phone||""
+    }));
+
+    box.innerHTML=rows.length
+      ?rows.map(r=>`<button type="button"
+          data-dermed-appt-id="${escv(r.id)}"
+          data-dermed-appt-source="${escv(r.source)}">
+          <strong>${escv(r.name)}</strong>
+          <div class="muted">${escv(r.source==="student"?"Student":"Customer")}
+          · ${escv(r.code||"No ID")} · ${escv(r.phone||"No phone")}</div>
+        </button>`).join("")
+      :'<div class="muted" style="padding:12px">No matching customer or student.</div>';
+
+    box.classList.add("show");
+  }
+
+  async function saveAppointmentFromDermed(){
+    const id=E("dermedAppointmentCustomerId")?.value||"";
+    const source=E("dermedAppointmentCustomerSource")?.value||"customer";
+    const date=E("dermedAppointmentDate")?.value||"";
+    const time=E("dermedAppointmentTime")?.value||"";
+    const note=String(E("dermedAppointmentNote")?.value||"").trim();
+    const status=E("dermedAppointmentStatus");
+
+    let c=null;
+    if(source==="student"){
+      c=(Array.isArray(window.students)?window.students:[]).find(x=>String(x.id)===String(id));
+    }else{
+      c=(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(id));
+    }
+
+    if(!c){
+      if(status)status.textContent="Please select a Student or Customer.";
+      return;
+    }
+    if(!date||!time){
+      if(status)status.textContent="Please select appointment date and time.";
+      return;
+    }
+
+    const data=source==="student"
+      ?{
+        id:String(c.id),name:c.full_name||c.full_name_km||"Student",
+        phone:c.phone||"",code:c.student_id||""
+      }
+      :{
+        id:String(c.id),name:c.name||"Customer",
+        phone:c.phone||"",code:c.customer_code||""
+      };
+
+    const row={
+      id:"APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
+      customer_id:data.id,
+      customer_name:data.name,
+      customer_phone:data.phone,
+      customer_code:data.code,
+      customer_source:source,
+      customer_type:E("dermedAppointmentCustomerType")?.value||"Old Customer",
+      date,time,note,status:"pending",
+      created_at:new Date().toISOString(),
+      confirmed_at:null,cancelled_at:null,met_at:null
+    };
+
+    const btn=E("dermedAppointmentSave");
+    if(btn)btn.disabled=true;
+    if(status)status.textContent="Saving appointment...";
+
+    try{
+      // Use the same Supabase appointment table as Appointment Management.
+      const r=await sb.from("medifella_appointments").insert(row).select("*").single();
+      if(r.error)throw r.error;
+
+      // Refresh Appointment Management data if available.
+      if(typeof window.refreshAppointments==="function"){
+        try{await window.refreshAppointments()}catch(_){}
+      }
+
+      if(status)status.textContent="Appointment saved successfully.";
+      setTimeout(()=>{
+        closeAppointment();
+        // The current Dermed Sale form remains untouched, so the user is
+        // returned to the old invoice/sale and can click Generate Invoice.
+        if(typeof window.scrollTo==="function"){
+          E("dermedSaleFormCard")?.scrollIntoView({behavior:"smooth",block:"start"});
+        }
+      },350);
+    }catch(e){
+      console.error("Dermed appointment save:",e);
+      if(status)status.textContent="Could not save appointment: "+(e?.message||e);
+    }finally{
+      if(btn)btn.disabled=false;
+    }
+  }
+
+  function bindAppointment(){
+    const add=E("dermedAddAppointment");
+    if(add&&!add.dataset.apptBound){
+      add.dataset.apptBound="1";
+      add.addEventListener("click",function(e){
+        e.preventDefault();
+        openAppointment();
+      });
+    }
+
+    const close=E("dermedAppointmentClose");
+    const cancel=E("dermedAppointmentCancel");
+    if(close&&!close.dataset.bound){
+      close.dataset.bound="1";
+      close.onclick=closeAppointment;
+    }
+    if(cancel&&!cancel.dataset.bound){
+      cancel.dataset.bound="1";
+      cancel.onclick=closeAppointment;
+    }
+
+    const save=E("dermedAppointmentSave");
+    if(save&&!save.dataset.bound){
+      save.dataset.bound="1";
+      save.onclick=saveAppointmentFromDermed;
+    }
+
+    const search=E("dermedAppointmentCustomerSearch");
+    const results=E("dermedAppointmentCustomerResults");
+    if(search&&!search.dataset.bound){
+      search.dataset.bound="1";
+      search.oninput=renderAppointmentCustomerResults;
+      search.onfocus=renderAppointmentCustomerResults;
+    }
+    if(results&&!results.dataset.bound){
+      results.dataset.bound="1";
+      results.addEventListener("mousedown",function(e){
+        const b=e.target.closest("[data-dermed-appt-id]");
+        if(!b)return;
+        e.preventDefault();
+        const source=b.dataset.dermedApptSource||"customer";
+        const id=b.dataset.dermedApptId||"";
+        const c=source==="student"
+          ?(Array.isArray(window.students)?window.students:[]).find(x=>String(x.id)===String(id))
+          :(Array.isArray(window.customers)?window.customers:[]).find(x=>String(x.id)===String(id));
+        if(!c)return;
+
+        const name=source==="student"
+          ?(c.full_name||c.full_name_km||"Student")
+          :(c.name||"Customer");
+        const code=source==="student"?(c.student_id||""):(c.customer_code||"");
+
+        E("dermedAppointmentCustomerId").value=id;
+        E("dermedAppointmentCustomerSource").value=source;
+        E("dermedAppointmentCustomerSearch").value=name;
+        E("dermedAppointmentCustomerHint").textContent=
+          `Selected: ${name} · ${code||"No ID"} · ${c.phone||"No phone"}`;
+        results.classList.remove("show");
+      },true);
+    }
+
+    const modal=E("dermedAppointmentModal");
+    if(modal&&!modal.dataset.bound){
+      modal.dataset.bound="1";
+      modal.addEventListener("click",e=>{
+        if(e.target===modal)closeAppointment();
+      });
+    }
+  }
+
+  function boot(){
+    bindAppointment();
+    setTimeout(bindAppointment,300);
+    setTimeout(bindAppointment,800);
+    setTimeout(bindAppointment,1500);
+
+    // Re-render the Dermed rows after the current controller initializes.
+    setTimeout(()=>{
+      if(typeof window.renderDermedCombinedItems==="function"){
+        try{window.renderDermedCombinedItems()}catch(_){}
+      }
+    },500);
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",boot,{once:true});
+  }else boot();
+})();
+</script>
+
+<style id="dermed-list-add-appointment-style">
+.dermed-list-add-appointment{margin-left:6px;white-space:nowrap}
+</style>
+<script id="dermed-list-add-appointment-final">
+(function(){
+  "use strict";
+
+  function E(id){return document.getElementById(id);}
+
+  function saleFromButton(btn){
+    var id=btn&&((btn.dataset&&btn.dataset.saleId)||btn.getAttribute("data-sale-id")||
+      (btn.dataset&&btn.dataset.id)||btn.getAttribute("data-id"));
+    if(!id)return {id:""};
+
+    var lists=[window.dermedSales,window.dermedSaleList,window.sales,window.medifellaSales];
+    for(var i=0;i<lists.length;i++){
+      var list=lists[i];
+      if(Array.isArray(list)){
+        for(var j=0;j<list.length;j++){
+          if(String(list[j].id)===String(id))return list[j];
+        }
+      }
+    }
+    return {id:String(id)};
+  }
+
+  function openAppointment(sale){
+    var modal=E("dermedAppointmentModal");
+    if(!modal){
+      alert("Appointment window is not available.");
+      return;
+    }
+
+    var customerId=sale.customer_id||sale.customerId||sale.student_id||sale.studentId||"";
+    var source=sale.student_id||sale.studentId?"student":"customer";
+    var name=sale.customer_name||sale.student_name||"";
+    var phone=sale.customer_phone||sale.student_phone||"";
+    var code=sale.customer_code||sale.student_id||"";
+
+    if(!name && customerId){
+      var list=source==="student"?window.students:window.customers;
+      list=Array.isArray(list)?list:[];
+      for(var i=0;i<list.length;i++){
+        if(String(list[i].id)===String(customerId)){
+          name=source==="student"?(list[i].full_name||list[i].full_name_km||"Student"):(list[i].name||"Customer");
+          phone=list[i].phone||phone;
+          code=source==="student"?(list[i].student_id||""):(list[i].customer_code||"");
+          break;
+        }
+      }
+    }
+
+    if(E("dermedAppointmentCustomerId"))E("dermedAppointmentCustomerId").value=customerId;
+    if(E("dermedAppointmentCustomerSource"))E("dermedAppointmentCustomerSource").value=source;
+    if(E("dermedAppointmentCustomerSearch"))E("dermedAppointmentCustomerSearch").value=name;
+    if(E("dermedAppointmentCustomerHint"))E("dermedAppointmentCustomerHint").textContent=
+      name ? "Selected: "+name+" · "+(code||"No ID")+" · "+(phone||"No phone")
+           : "Search and select a customer or student.";
+    if(E("dermedAppointmentDate")&&!E("dermedAppointmentDate").value)
+      E("dermedAppointmentDate").value=new Date().toISOString().slice(0,10);
+
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden","false");
+  }
+
+  window.openDermedAppointmentForSale=openAppointment;
+
+  function addButtons(){
+    var buttons=document.querySelectorAll("button");
+    for(var i=0;i<buttons.length;i++){
+      var payment=buttons[i];
+      var label=String(payment.textContent||"").trim().toLowerCase();
+      if(label.indexOf("payment")<0)continue;
+      if(payment.closest("#dermedAppointmentModal"))continue;
+
+      var row=payment.closest("tr,.sale-list-row,.list-row,.card");
+      if(!row)continue;
+      if(row.querySelector(".dermed-list-add-appointment"))continue;
+
+      var add=document.createElement("button");
+      add.type="button";
+      add.className="dermed-list-add-appointment";
+      add.textContent="+ Add Appointment";
+      var id=payment.dataset.saleId||payment.dataset.id||
+        payment.getAttribute("data-sale-id")||payment.getAttribute("data-id")||
+        row.dataset.saleId||row.dataset.id;
+      if(id)add.dataset.saleId=id;
+
+      add.onclick=function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        openAppointment(saleFromButton(this));
+      };
+
+      payment.insertAdjacentElement("afterend",add);
+    }
+  }
+
+  document.addEventListener("click",function(e){
+    var b=e.target.closest(".dermed-list-add-appointment");
+    if(!b)return;
+    e.preventDefault();
+    e.stopPropagation();
+    openAppointment(saleFromButton(b));
+  },true);
+
+  function boot(){
+    addButtons();
+    setTimeout(addButtons,300);
+    setTimeout(addButtons,800);
+    setTimeout(addButtons,1500);
+    setTimeout(addButtons,2500);
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});
+  else boot();
+
+  if(window.MutationObserver){
+    new MutationObserver(function(){addButtons();}).observe(document.body,{childList:true,subtree:true});
+  }
 })();
 </script>
 </body>
