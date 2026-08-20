@@ -3325,7 +3325,12 @@ document.querySelectorAll(".nav").forEach(b=>b.onclick=()=>{
  if(b.dataset.section==="saleCommission"){
    const commissionBox=$("commissionList");
    if(commissionBox)commissionBox.innerHTML='<p class="muted">Loading Commission List...</p>';
-   setTimeout(()=>loadCommissionRecords(),50);
+   // Commission loader lives inside its own module/IIFE, so always call the
+   // explicitly exposed global function. This also works after a hard refresh.
+   setTimeout(()=>{
+     if(typeof window.loadCommissionRecords==="function") window.loadCommissionRecords();
+     else if(commissionBox) commissionBox.innerHTML='<div class="status error">Commission loader is not ready yet. Please wait a moment and click Commission Management again.</div>';
+   },50);
  }
 });
 
@@ -3336,7 +3341,7 @@ sb.auth.onAuthStateChange(async (event)=>{
     const account=await getCurrentAccount();
     if(account){
       adminUser=account.user;currentProfile=account.profile;applyAccountPermissions();
-      if(typeof loadCommissionRecords==='function')setTimeout(()=>loadCommissionRecords(),500);
+      if(typeof window.loadCommissionRecords==="function")setTimeout(()=>window.loadCommissionRecords(),500);
     }
   }
 });
@@ -11190,10 +11195,10 @@ async function loadCommissionRecords(retry=0){
 
     if(seq!==__commissionLoadSeq)return;
 
-    if(retry<8){
-      // Wait for the Supabase client/session to finish initializing, then
-      // perform a completely new query.
-      setTimeout(()=>loadCommissionRecords(retry+1),700);
+    // A hard refresh can briefly initialize Supabase after this module runs.
+    // Retry a few times, but never leave the page stuck on Loading forever.
+    if(retry<4){
+      setTimeout(()=>window.loadCommissionRecords(retry+1),700);
       return;
     }
 
@@ -11206,6 +11211,11 @@ async function loadCommissionRecords(retry=0){
     if(gt)gt.innerHTML="";
   }
 }
+
+  // IMPORTANT: this commission module is wrapped in an IIFE. Expose the
+  // loader explicitly so the dashboard navigation and auth refresh handler
+  // can call it after a hard refresh without a ReferenceError.
+  window.loadCommissionRecords=loadCommissionRecords;
 
   function filteredCommissionRecords(){
     const staff=C("commissionFilterStaff")?.value||"";
@@ -11667,7 +11677,7 @@ async function loadCommissionRecords(retry=0){
     renderCommissionItems();
     // Do not block Commission Management initialization. A delayed load gives
     // the existing Supabase client time to finish initialization after refresh.
-    setTimeout(()=>loadCommissionRecords(),1200);
+    setTimeout(()=>window.loadCommissionRecords(),1200);
   }
 
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bindCommission,{once:true});
