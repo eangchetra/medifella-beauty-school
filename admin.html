@@ -7044,7 +7044,15 @@ function renderDermedSales(){
      <td>${money(bal)}</td>
      <td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td>
      <td><div class="actions">
-       <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button><button class="light" type="button" onclick="showSalePaymentDetails('${attr(x.id)}');return false;">View Payment</button>
+       <button class="light" type="button" onclick="window.showDermedSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button><button class="light" type="button" onclick="showSalePaymentDetails('${attr(x.id)}');return false;">View Payment</button><button class="gold dermed-list-add-appointment" type="button"
+         data-dermed-appointment-sale-id="${attr(x.id)}"
+         data-dermed-appointment-customer-id="${attr(x.customer_id||"")}"
+         data-dermed-appointment-student-id="${attr(x.student_id||"")}"
+         data-dermed-appointment-source="${attr(x.student_id?"student":"customer")}"
+         data-dermed-appointment-name="${attr(x.student_name||x.customer_name||"")}"
+         data-dermed-appointment-phone="${attr(x.student_phone||x.customer_phone||"")}"
+         data-dermed-appointment-code="${attr(x.student_id||x.customer_code||"")}"
+       >+ Add Appointment</button>
        ${bal>0.005?`<button class="gold" type="button" onclick="recordDermedSalePayment('${attr(x.id)}')">Payment</button>`:""}
      </div></td>
    </tr>`;
@@ -15703,117 +15711,81 @@ async function loadCommissionRecords(retry=0){
 
   function E(id){return document.getElementById(id);}
 
-  function saleFromButton(btn){
-    var id=btn&&((btn.dataset&&btn.dataset.saleId)||btn.getAttribute("data-sale-id")||
-      (btn.dataset&&btn.dataset.id)||btn.getAttribute("data-id"));
-    if(!id)return {id:""};
-
-    var lists=[window.dermedSales,window.dermedSaleList,window.sales,window.medifellaSales];
-    for(var i=0;i<lists.length;i++){
-      var list=lists[i];
-      if(Array.isArray(list)){
-        for(var j=0;j<list.length;j++){
-          if(String(list[j].id)===String(id))return list[j];
-        }
-      }
-    }
-    return {id:String(id)};
-  }
-
-  function openAppointment(sale){
-    var modal=E("dermedAppointmentModal");
+  async function openFromList(btn){
+    const modal=E("dermedAppointmentModal");
     if(!modal){
       alert("Appointment window is not available.");
       return;
     }
 
-    var customerId=sale.customer_id||sale.customerId||sale.student_id||sale.studentId||"";
-    var source=sale.student_id||sale.studentId?"student":"customer";
-    var name=sale.customer_name||sale.student_name||"";
-    var phone=sale.customer_phone||sale.student_phone||"";
-    var code=sale.customer_code||sale.student_id||"";
+    let source=btn.dataset.dermedAppointmentSource||"customer";
+    let id=source==="student"
+      ?(btn.dataset.dermedAppointmentStudentId||"")
+      :(btn.dataset.dermedAppointmentCustomerId||"");
 
-    if(!name && customerId){
-      var list=source==="student"?window.students:window.customers;
-      list=Array.isArray(list)?list:[];
-      for(var i=0;i<list.length;i++){
-        if(String(list[i].id)===String(customerId)){
-          name=source==="student"?(list[i].full_name||list[i].full_name_km||"Student"):(list[i].name||"Customer");
-          phone=list[i].phone||phone;
-          code=source==="student"?(list[i].student_id||""):(list[i].customer_code||"");
-          break;
+    let name=btn.dataset.dermedAppointmentName||"";
+    let phone=btn.dataset.dermedAppointmentPhone||"";
+    let code=btn.dataset.dermedAppointmentCode||"";
+
+    // The row should already contain the customer. If not, fetch the exact
+    // customer/student referenced by this sale before opening the form.
+    try{
+      if(!name && id){
+        if(source==="student"){
+          const r=await sb.from("students")
+            .select("id,full_name,full_name_km,phone,student_id")
+            .eq("id",String(id)).limit(1);
+          if(!r.error && r.data && r.data[0]){
+            const s=r.data[0];
+            name=s.full_name||s.full_name_km||"Student";
+            phone=s.phone||"";
+            code=s.student_id||"";
+          }
+        }else{
+          const r=await sb.from("medifella_customers")
+            .select("id,name,phone,customer_code")
+            .eq("id",String(id)).limit(1);
+          if(!r.error && r.data && r.data[0]){
+            const c=r.data[0];
+            name=c.name||"Customer";
+            phone=c.phone||"";
+            code=c.customer_code||"";
+          }
         }
       }
+    }catch(err){
+      console.warn("Dermed appointment customer lookup:",err);
     }
 
-    if(E("dermedAppointmentCustomerId"))E("dermedAppointmentCustomerId").value=customerId;
-    if(E("dermedAppointmentCustomerSource"))E("dermedAppointmentCustomerSource").value=source;
-    if(E("dermedAppointmentCustomerSearch"))E("dermedAppointmentCustomerSearch").value=name;
-    if(E("dermedAppointmentCustomerHint"))E("dermedAppointmentCustomerHint").textContent=
-      name ? "Selected: "+name+" · "+(code||"No ID")+" · "+(phone||"No phone")
-           : "Search and select a customer or student.";
-    if(E("dermedAppointmentDate")&&!E("dermedAppointmentDate").value)
-      E("dermedAppointmentDate").value=new Date().toISOString().slice(0,10);
+    E("dermedAppointmentCustomerId").value=id;
+    E("dermedAppointmentCustomerSource").value=source;
+    E("dermedAppointmentCustomerSearch").value=name;
+    E("dermedAppointmentCustomerHint").textContent=name
+      ?`Selected: ${name} · ${code||"No ID"} · ${phone||"No phone"}`
+      :"Search and select a customer or student.";
+
+    E("dermedAppointmentCustomerType").value="Old Customer";
+    if(E("dermedAppointmentDate")&&!E("dermedAppointmentDate").value){
+      E("dermedAppointmentDate").value=
+        typeof localDate==="function"?localDate():new Date().toISOString().slice(0,10);
+    }
+    E("dermedAppointmentTime").value="";
+    E("dermedAppointmentNote").value="";
+    E("dermedAppointmentStatus").textContent="";
 
     modal.classList.add("show");
     modal.setAttribute("aria-hidden","false");
   }
 
-  window.openDermedAppointmentForSale=openAppointment;
-
-  function addButtons(){
-    var buttons=document.querySelectorAll("button");
-    for(var i=0;i<buttons.length;i++){
-      var payment=buttons[i];
-      var label=String(payment.textContent||"").trim().toLowerCase();
-      if(label.indexOf("payment")<0)continue;
-      if(payment.closest("#dermedAppointmentModal"))continue;
-
-      var row=payment.closest("tr,.sale-list-row,.list-row,.card");
-      if(!row)continue;
-      if(row.querySelector(".dermed-list-add-appointment"))continue;
-
-      var add=document.createElement("button");
-      add.type="button";
-      add.className="dermed-list-add-appointment";
-      add.textContent="+ Add Appointment";
-      var id=payment.dataset.saleId||payment.dataset.id||
-        payment.getAttribute("data-sale-id")||payment.getAttribute("data-id")||
-        row.dataset.saleId||row.dataset.id;
-      if(id)add.dataset.saleId=id;
-
-      add.onclick=function(e){
-        e.preventDefault();
-        e.stopPropagation();
-        openAppointment(saleFromButton(this));
-      };
-
-      payment.insertAdjacentElement("afterend",add);
-    }
-  }
+  window.openDermedAppointmentFromList=openFromList;
 
   document.addEventListener("click",function(e){
-    var b=e.target.closest(".dermed-list-add-appointment");
-    if(!b)return;
+    const btn=e.target.closest(".dermed-list-add-appointment");
+    if(!btn)return;
     e.preventDefault();
-    e.stopPropagation();
-    openAppointment(saleFromButton(b));
+    e.stopImmediatePropagation();
+    openFromList(btn);
   },true);
-
-  function boot(){
-    addButtons();
-    setTimeout(addButtons,300);
-    setTimeout(addButtons,800);
-    setTimeout(addButtons,1500);
-    setTimeout(addButtons,2500);
-  }
-
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});
-  else boot();
-
-  if(window.MutationObserver){
-    new MutationObserver(function(){addButtons();}).observe(document.body,{childList:true,subtree:true});
-  }
 })();
 </script>
 </body>
