@@ -7452,7 +7452,10 @@ document.addEventListener("DOMContentLoaded",function(){
     const odAmount=0;
     const initial=Math.max(0,sub);
     const status=E("dermedPaymentStatus")?.value||"Paid";
-    const paid=Math.min(initial,num(E("dermedAmountPaidNow")?.value));
+    let paid=num(E("dermedAmountPaidNow")?.value);
+    if(status==="Paid") paid=initial;
+    else if(status==="Due") paid=0;
+    else paid=Math.min(initial,Math.max(0,paid));
     const due=Math.max(0,initial-paid);
     let existingDue=0;
     const bt=E("dermedBuyerType")?.value, bid=E("dermedBuyerId")?.value;
@@ -11614,69 +11617,103 @@ async function loadCommissionRecords(retry=0){
   const $=id=>document.getElementById(id);
   const N=v=>{const n=Number(String(v??"").replace(/[$,\s]/g,""));return Number.isFinite(n)&&n>=0?n:0};
   const money=v=>typeof window.money==="function"?window.money(v):"$"+N(v).toFixed(2);
+
+  const products=()=>Array.isArray(window.dermedSaleItems)?window.dermedSaleItems:[];
+  const services=()=>Array.isArray(window.dermedServiceItems)?window.dermedServiceItems:[];
+
   function lineTotal(x){
-    const q=Math.max(1,N(x?.quantity??x?.unit??1)),p=Math.max(0,N(x?.price??x?.unit_price??0)),base=q*p;
-    const dt=String(x?.discount_type||"percent").toLowerCase(),dv=N(x?.discount_value);
+    const q=Math.max(1,N(x?.quantity??x?.unit??1));
+    const p=Math.max(0,N(x?.price??x?.unit_price??0));
+    const base=q*p;
+    const dt=String(x?.discount_type||"percent").toLowerCase();
+    const dv=N(x?.discount_value);
     const d=dt==="usd"?Math.min(base,dv):Math.min(base,base*dv/100);
     return Math.max(0,base-d);
   }
-  function serviceType(x){const s=String(x?.service_type||x?.type||"").toLowerCase();return s.includes("with product")||s.includes("service_product")?"Service With Product":"Only Service"}
-  function paymentType(x){return String(x?.service_payment_type||"Single").toLowerCase()==="package"?"Package":"Single"}
+  function serviceType(x){
+    const s=String(x?.service_type||x?.type||"").toLowerCase();
+    return s.includes("with product")||s.includes("service_product")?"Service With Product":"Only Service";
+  }
+  function paymentType(x){
+    return String(x?.service_payment_type||"Single").toLowerCase()==="package"?"Package":"Single";
+  }
 
-  // Invoice total = products + services. This is NOT commission.
+  // This is ONLY the Dermed invoice calculation.
+  // Product-only invoices are valid: Products + discounts = total.
   function calculateDermedInvoice(){
-    const products=Array.isArray(window.dermedSaleItems)?window.dermedSaleItems:[];
-    const services=Array.isArray(window.dermedServiceItems)?window.dermedServiceItems:[];
-    const productTotal=products.reduce((s,x)=>s+lineTotal(x),0);
-    const serviceTotal=services.reduce((s,x)=>s+lineTotal(x),0);
+    const productTotal=products().reduce((s,x)=>s+lineTotal(x),0);
+    const serviceTotal=services().reduce((s,x)=>s+lineTotal(x),0);
     const total=productTotal+serviceTotal;
     const status=$("dermedPaymentStatus")?.value||"Paid";
-    const paid=status==="Paid"?total:status==="Due"?0:Math.min(total,N($("dermedAmountPaidNow")?.value));
+    let paid=N($("dermedAmountPaidNow")?.value);
+    if(status==="Paid") paid=total;
+    else if(status==="Due") paid=0;
+    else paid=Math.min(total,Math.max(0,paid));
     return {productTotal,serviceTotal,total,paid,due:Math.max(0,total-paid)};
   }
 
-  // Commission = services only. Product-only never earns commission.
+  // This is ONLY the commission calculation.
+  // Product-only = no commission, but the invoice still saves normally.
   function calculateDermedCommission(){
-    const products=Array.isArray(window.dermedSaleItems)?window.dermedSaleItems:[];
-    const services=Array.isArray(window.dermedServiceItems)?window.dermedServiceItems:[];
     const invoice=calculateDermedInvoice();
-    const productTotal=products.reduce((s,x)=>s+lineTotal(x),0);
-    const singles=services.filter(x=>paymentType(x)==="Single");
-    const packages=services.filter(x=>paymentType(x)==="Package");
+    const productTotal=products().reduce((s,x)=>s+lineTotal(x),0);
+    const singles=services().filter(x=>paymentType(x)==="Single");
+    const packages=services().filter(x=>paymentType(x)==="Package");
     const singleTotal=singles.reduce((s,x)=>s+lineTotal(x),0);
     const packageTotal=packages.reduce((s,x)=>s+lineTotal(x),0);
     const mandatory=productTotal+singleTotal;
     let packagePaid=Math.min(Math.max(0,invoice.paid-mandatory),packageTotal);
     const staffId=$("dermedSaleStaff")?.value||"";
-    const cfg=typeof window.getCurrentSaleStaffConfig==="function"?window.getCurrentSaleStaffConfig(staffId):null;
+    const cfg=typeof window.getCurrentSaleStaffConfig==="function"
+      ?window.getCurrentSaleStaffConfig(staffId):null;
     const rows=[];
+
     for(const x of singles){
-      const base=lineTotal(x),type=serviceType(x),rate=(type==="Service With Product"?N(cfg?.service_product_rate):N(cfg?.service_rate))/100;
+      const base=lineTotal(x),type=serviceType(x);
+      const rate=(type==="Service With Product"?N(cfg?.service_product_rate):N(cfg?.service_rate))/100;
       if(base>0&&rate>0)rows.push({name:x.name||"Service",type,payment:"Single",base,rate,amount:base*rate});
     }
     for(const x of packages){
-      const base=Math.min(lineTotal(x),packagePaid);packagePaid=Math.max(0,packagePaid-base);
-      const type=serviceType(x),rate=(type==="Service With Product"?N(cfg?.service_product_rate):N(cfg?.service_rate))/100;
+      const base=Math.min(lineTotal(x),packagePaid);
+      packagePaid=Math.max(0,packagePaid-base);
+      const type=serviceType(x);
+      const rate=(type==="Service With Product"?N(cfg?.service_product_rate):N(cfg?.service_rate))/100;
       if(base>0&&rate>0)rows.push({name:x.name||"Service",type,payment:"Package",base,rate,amount:base*rate});
     }
-    return {invoiceTotal:invoice.total,paid:invoice.paid,productTotal,singleTotal,mandatory,packagePaid,rows,commission:rows.reduce((s,x)=>s+x.amount,0)};
+    return {
+      invoiceTotal:invoice.total,paid:invoice.paid,productTotal,singleTotal,
+      mandatory,packagePaid,rows,
+      commission:rows.reduce((s,x)=>s+x.amount,0)
+    };
   }
 
   function update(){
     const c=calculateDermedInvoice();
+
     if($("dermedItemsSubtotal"))$("dermedItemsSubtotal").textContent=money(c.total);
     if($("dermedSummarySubtotal"))$("dermedSummarySubtotal").textContent=money(c.total);
     if($("dermedInitialTotal"))$("dermedInitialTotal").textContent=money(c.total);
     if($("dermedPaidBalanceDisplay"))$("dermedPaidBalanceDisplay").textContent=money(c.paid);
     if($("dermedDueDisplay"))$("dermedDueDisplay").textContent=money(c.due);
-    if($("dermedGrandTotalDue"))$("dermedGrandTotalDue").textContent=money(c.due);
-    const a=$("dermedAmountPaidNow"),st=$("dermedPaymentStatus")?.value||"Paid";
+    if($("dermedGrandTotalDue")){
+      let existing=0;
+      const bt=$("dermedBuyerType")?.value,bid=$("dermedBuyerId")?.value;
+      if(bt==="student"&&typeof window.studentOutstanding==="function"){
+        existing=Math.max(0,N(window.studentOutstanding(bid)));
+      }
+      $("dermedGrandTotalDue").textContent=money(existing+c.due);
+    }
+    if($("dermedTotal"))$("dermedTotal").textContent=money(c.total);
+
+    const a=$("dermedAmountPaidNow");
+    const st=$("dermedPaymentStatus")?.value||"Paid";
     if(a){
-      if(st==="Paid"){a.value=c.total.toFixed(2);a.readOnly=true}
-      else if(st==="Due"){a.value="0.00";a.readOnly=true}
-      else{a.readOnly=false;if(N(a.value)>c.total)a.value=c.total.toFixed(2)}
+      if(st==="Paid"){a.value=c.total.toFixed(2);a.readOnly=true;a.style.background="#f3f7f7";}
+      else if(st==="Due"){a.value="0.00";a.readOnly=true;a.style.background="#f3f7f7";}
+      else{a.readOnly=false;a.style.background="#fff";if(N(a.value)>c.total)a.value=c.total.toFixed(2);}
     }
   }
+
   window.calculateDermedInvoice=calculateDermedInvoice;
   window.calculateDermedCommission=calculateDermedCommission;
   window.updateDermedInvoiceUI=update;
@@ -11688,22 +11725,30 @@ async function loadCommissionRecords(retry=0){
       root.addEventListener("input",()=>setTimeout(update,0),true);
       root.addEventListener("change",()=>setTimeout(update,0),true);
     }
-    ["dermedPaymentStatus","dermedAmountPaidNow"].forEach(id=>{
+
+    ["dermedPaymentStatus","dermedAmountPaidNow","dermedBuyerType","dermedBuyerId","dermedSaleStaff"].forEach(id=>{
       const x=$(id);
       if(x&&x.dataset.dualCalcBound!=="1"){
         x.dataset.dualCalcBound="1";
-        x.addEventListener("input",update);x.addEventListener("change",update);
+        x.addEventListener("input",update);
+        x.addEventListener("change",update);
       }
     });
+
     const results=$("dermedItemResults");
     if(results&&results.dataset.dualCalcBound!=="1"){
       results.dataset.dualCalcBound="1";
-      results.addEventListener("click",()=>setTimeout(update,30),true);
+      results.addEventListener("click",()=>setTimeout(update,50),true);
     }
+
     setTimeout(update,50);
   }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind,{once:true});else bind();
-  setTimeout(bind,300);setTimeout(bind,1000);setTimeout(bind,2000);
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",bind,{once:true});
+  else bind();
+  setTimeout(bind,300);
+  setTimeout(bind,1000);
+  setTimeout(bind,2000);
 })();
 </script>
 
