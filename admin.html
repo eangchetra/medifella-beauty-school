@@ -5453,10 +5453,14 @@ function openPrintFromCanvas(canvas,paper,sale){
       tab.removeAttribute("aria-hidden");
       tab.disabled=false;
     }
+    // Keep the Stock Report panel hidden unless its tab is selected.
     if(panel){
-      panel.classList.remove("hidden");
-      panel.style.display="";
-      panel.removeAttribute("aria-hidden");
+      const activeTab=document.querySelector('.product-tab.active');
+      if(activeTab?.dataset.productTab!=="stockReportPanel") {
+        panel.classList.add("hidden");
+        panel.style.display="";
+        panel.setAttribute("aria-hidden","true");
+      }
     }
   }
 
@@ -7067,6 +7071,14 @@ async function loadStockMovements(){
     renderProductList();
     renderStockList();
     renderStockReport();
+    try{
+      const selectedId=$("stockProductId")?.value||"";
+      const selectedProduct=products.find(x=>String(x.id)===String(selectedId));
+      if(selectedProduct && $("stockProductHint")){
+        const current=typeof productStock==="function"?Number(productStock(selectedProduct.id)):0;
+        $("stockProductHint").textContent=`Selected: ${selectedProduct.name} · Current In Stock: ${current}`;
+      }
+    }catch(_){}
   }catch(e){
     console.error("Inventory movement load error:",e);
     stockMovements=[];
@@ -7119,16 +7131,32 @@ function renderProductList(){
    localStorage.getItem("userRole")||localStorage.getItem("role")||"").toLowerCase();
  const isAdmin=role==="admin" || (role==="staff" && typeof window.staffHasPermissionV28==="function" && window.staffHasPermissionV28("products")) || email==="eang.chetraafs@gmail.com";
 
+ // Current stock is calculated from the same inventory movements used by
+ // Product Management, so it updates when stock-in or sale movements load.
+ const getStock=(id)=>{
+   try{return Math.max(0,Number(productStock(id))||0)}catch(_){
+     const rows=Array.isArray(window.stockMovements)?window.stockMovements:[];
+     return Math.max(0,rows.filter(m=>String(m.product_id)===String(id)).reduce((total,m)=>{
+       const q=Math.max(0,Number(m.quantity||0));
+       const type=String(m.movement_type||"").trim().toLowerCase();
+       if(type==="stock_in"||type==="stockin"||type==="in")return total+q;
+       if(type==="sale"||type==="stock_out"||type==="stockout"||type==="out")return total-q;
+       return total;
+     },0));
+   }
+ };
+
  $("productList").innerHTML=rows.length?`
  <div class="table-wrap"><table class="table" id="productListTable">
   <tr>
-   <th>Product ID</th><th>Product Name</th>
+   <th>Product ID</th><th>Product Name</th><th>In Stock</th>
    ${isAdmin?"<th>Cost</th>":""}
    <th>Price</th><th>Source</th><th>Action</th>
   </tr>
   ${rows.map(p=>`<tr>
    <td>${esc(p.product_code)}</td>
    <td>${esc(p.name)}</td>
+   <td><strong>${getStock(p.id)}</strong></td>
    ${isAdmin?`<td>${p.cost!==null&&p.cost!==undefined&&p.cost!==""?money(p.cost):"—"}</td>`:""}
    <td>${money(p.price)}</td>
    <td>${esc(sourceLabel(p))}</td>
@@ -7139,6 +7167,7 @@ function renderProductList(){
   </tr>`).join("")}
  </table></div>`:'<p class="muted">No products found.</p>';
 }
+
 function renderStockList(){
  if(!$("stockList"))return;
  const q=($("stockSearch")?.value||"").trim().toLowerCase();
@@ -7501,11 +7530,27 @@ $("stockReportPdf")?.addEventListener("click",()=>{
 
 function renderProductSearchResults(){
  const input=$("stockProductSearch"),res=$("stockProductResults");if(!input||!res)return;
- const q=(input.value||"").toLowerCase().trim();const rows=products.filter(x=>(`${x.product_code||""} ${x.name||""}`).toLowerCase().includes(q)).slice(0,15);
- res.innerHTML=rows.map(x=>`<button type="button" onclick="chooseStockProduct('${attr(x.id)}')"><strong>${esc(x.name)}</strong><div class="muted">${esc(x.product_code)} · ${money(x.price)}</div></button>`).join("");
+ const q=(input.value||"").toLowerCase().trim();
+ const rows=products
+   .filter(x=>(`${x.product_code||""} ${x.name||""}`).toLowerCase().includes(q))
+   .slice(0,15);
+ res.innerHTML=rows.map(x=>{
+   const stock=typeof productStock==="function"?Number(productStock(x.id)):0;
+   return `<button type="button" onclick="chooseStockProduct('${attr(x.id)}')">
+     <strong>${esc(x.name)}</strong>
+     <div class="muted">${esc(x.product_code)} · ${money(x.price)} · <strong>In Stock: ${stock}</strong></div>
+   </button>`;
+ }).join("");
  res.classList.toggle("show",!!q);
 }
-function chooseStockProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p)return;$("stockProductId").value=p.id;$("stockProductSearch").value=`${p.product_code} · ${p.name}`;$("stockProductHint").textContent=`Selected: ${p.name}`;$("stockProductResults").classList.remove("show")}
+function chooseStockProduct(id){
+ const p=products.find(x=>String(x.id)===String(id));if(!p)return;
+ const stock=typeof productStock==="function"?Number(productStock(p.id)):0;
+ $("stockProductId").value=p.id;
+ $("stockProductSearch").value=`${p.product_code} · ${p.name}`;
+ $("stockProductHint").textContent=`Selected: ${p.name} · Current In Stock: ${stock}`;
+ $("stockProductResults").classList.remove("show");
+}
 
 // Product Management sub-tabs
 function openProductTab(panelId){
@@ -15407,10 +15452,14 @@ async function loadCommissionRecords(retry=0){
           tab.disabled=false;
           tab.setAttribute("aria-hidden","false");
         }
+        // Stock Report is a tab, not a second panel below Product List.
         if(panel){
-          panel.classList.remove("hidden");
-          panel.style.display="";
-          panel.setAttribute("aria-hidden","false");
+          const activeTab=document.querySelector('.product-tab.active');
+          if(activeTab?.dataset.productTab!=="stockReportPanel") {
+            panel.classList.add("hidden");
+            panel.style.display="";
+            panel.setAttribute("aria-hidden","true");
+          }
         }
 
         const cost=document.getElementById("productCost");
@@ -17275,7 +17324,8 @@ function forceStaffFullAccess(){
     btn.disabled=false;
   });
   // Staff with full access can use every management section just like Admin.
-  ["productCreateCard","stockReportPanel"].forEach(function(id){
+  // Stock Report is tab-controlled; never force its panel open here.
+  ["productCreateCard"].forEach(function(id){
     const el=document.getElementById(id);
     if(el){el.classList.remove("hidden");el.style.display="";}
   });
@@ -18380,113 +18430,39 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 </script>
 
 
-<script>
-/* V37 PRODUCT LIST STOCK DISPLAY FINAL */
-
-/* V37 PRODUCT LIST STOCK DISPLAY FINAL */
+<script id="product-tabs-layout-final-v39">
 (function(){
   "use strict";
-  function E(id){return document.getElementById(id);}
-  function render(){
-    const box=E("productList");
-    if(!box)return;
-
-    const all=Array.isArray(window.products)
-      ?window.products
-      :(typeof products!=="undefined"&&Array.isArray(products)?products:[]);
-    const q=(E("productSearch")?.value||"").trim().toLowerCase();
-    const from=E("productFromDate")?.value||"";
-    const to=E("productToDate")?.value||"";
-
-    const rows=all.filter(function(p){
-      const text=(`${p.product_code||""} ${p.name||""}`).toLowerCase();
-      if(q && !text.includes(q))return false;
-      const d=String(p.created_at||"").slice(0,10);
-      if(from && d<from)return false;
-      if(to && d>to)return false;
-      return true;
+  function syncProductTabs(){
+    const tabs=document.querySelectorAll(".product-tab");
+    const panels=document.querySelectorAll(".product-panel");
+    if(!tabs.length || !panels.length) return;
+    let active=document.querySelector(".product-tab.active");
+    if(!active) active=document.querySelector('[data-product-tab="productListPanel"]');
+    const activeId=active?.dataset.productTab || "productListPanel";
+    tabs.forEach(tab=>tab.classList.toggle("active",tab.dataset.productTab===activeId));
+    panels.forEach(panel=>{
+      const show=panel.id===activeId;
+      panel.classList.toggle("hidden",!show);
+      panel.setAttribute("aria-hidden",show?"false":"true");
     });
-
-    let admin=false;
-    try{
-      admin=typeof isAdminProductUser==="function"
-        ?isAdminProductUser()
-        :String(window.currentUserRole||window.userRole||"").toLowerCase()==="admin";
-    }catch(_){}
-
-    function stock(id){
-      try{
-        if(typeof productStock==="function")return Math.max(0,Number(productStock(id))||0);
-      }catch(_){}
-      const moves=Array.isArray(window.stockMovements)?window.stockMovements:[];
-      return Math.max(0,moves.reduce(function(total,m){
-        if(String(m.product_id)!==String(id))return total;
-        const qty=Math.max(0,Number(m.quantity||0));
-        const type=String(m.movement_type||"").trim().toLowerCase();
-        if(["stock_in","stockin","in"].includes(type))return total+qty;
-        if(["sale","stock_out","stockout","out"].includes(type))return total-qty;
-        return total;
-      },0));
-    }
-
-    box.innerHTML=rows.length
-      ? `<div class="table-wrap"><table class="table" id="productListTable">
-          <tr>
-            <th>Product ID</th>
-            <th>Product Name</th>
-            <th>In Stock</th>
-            ${admin?"<th>Cost</th>":""}
-            <th>Price</th>
-            <th>Source</th>
-            <th>Action</th>
-          </tr>
-          ${rows.map(function(p){
-            const s=stock(p.id);
-            return `<tr>
-              <td>${typeof esc==="function"?esc(p.product_code):String(p.product_code||"")}</td>
-              <td>${typeof esc==="function"?esc(p.name):String(p.name||"")}</td>
-              <td><strong>${s}</strong></td>
-              ${admin?`<td>${typeof money==="function"?money(p.cost):String(p.cost??"")}</td>`:""}
-              <td>${typeof money==="function"?money(p.price):String(p.price??"")}</td>
-              <td>${typeof sourceLabel==="function"?esc(sourceLabel(p)):esc(p.source||"")}</td>
-              <td><div class="actions">
-                <button type="button" class="light" onclick="editProduct('${String(p.id).replace(/'/g,"\\'")}')">Edit</button>
-                <button type="button" class="danger" onclick="deleteProduct('${String(p.id).replace(/'/g,"\\'")}')">Delete</button>
-              </div></td>
-            </tr>`;
-          }).join("")}
-        </table></div>`
-      : '<p class="muted">No products found.</p>';
   }
-
-  window.renderProductList=render;
-
   function install(){
-    const s=E("productSearch");
-    const from=E("productFromDate");
-    const to=E("productToDate");
-    const refresh=E("productRefresh");
-    [s,from,to].forEach(function(el){
-      if(!el || el.dataset.stockVisibleSearchBound==="1")return;
-      el.dataset.stockVisibleSearchBound="1";
-      el.addEventListener(el===s?"input":"change",render);
+    document.querySelectorAll(".product-tab").forEach(tab=>{
+      if(tab.__v39LayoutBound) return;
+      tab.addEventListener("click",()=>requestAnimationFrame(syncProductTabs));
+      tab.__v39LayoutBound=true;
     });
-    if(refresh && refresh.dataset.stockVisibleBound!=="1"){
-      refresh.dataset.stockVisibleBound="1";
-      refresh.addEventListener("click",render);
-    }
-    render();
+    syncProductTabs();
   }
-
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",install,{once:true});
-  }else install();
-
-  // Stock movements may load after products. Refresh after the existing
-  // async loaders finish without changing their behavior.
-  [300,800,1500,3000].forEach(function(ms){setTimeout(render,ms);});
+  if(document.readyState==="loading") document.addEventListener("DOMContentLoaded",install,{once:true});
+  else install();
+  setTimeout(install,300);
+  setTimeout(install,1000);
+  setInterval(syncProductTabs,1000);
 })();
 </script>
+
 </body>
 </html>
 
