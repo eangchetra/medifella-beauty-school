@@ -7216,13 +7216,42 @@ function renderInventoryControls(){
    * Do NOT filter Sale Staff by job_title. A permitted Dermed Staff user
    * should be able to select any available sale staff exactly like Admin.
    */
-  const allStaff=Array.isArray(staffInfoRecords)?staffInfoRecords:[];
+  // Prefer the Staff Management records. If the current account cannot read
+  // medifella_staff because of RLS, fall back to the account profiles so the
+  // dropdown is never left empty for a permitted staff/admin user.
+  const sourceStaff = Array.isArray(staffInfoRecords) && staffInfoRecords.length
+    ? staffInfoRecords
+    : (Array.isArray(staffProfiles) ? staffProfiles : []);
+
+  const allStaff = sourceStaff.map(x=>({
+    ...x,
+    _label: x.name_en || x.name_kh || x.name || x.full_name || x.username || "Staff",
+    _job: x.job_title || x.jobTitle || x.job || (String(x.role||"").toLowerCase()==="admin" ? "Admin" : "Staff")
+  }));
 
   if($("stockStaff")){
-    $("stockStaff").innerHTML='<option value="">Select staff</option>'+
+    const el=$("stockStaff");
+    // Keep the selected staff in the element itself so repeated permission/
+    // inventory refreshes cannot reset it back to "Select staff".
+    const savedValue=String(el.dataset.selectedStaff || el.value || "");
+    el.innerHTML='<option value="">Select staff</option>'+
       allStaff.map(x=>
-        `<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`
+        `<option value="${attr(String(x.id))}">${esc(x._label)} · ${esc(x._job)}</option>`
       ).join("");
+    if(savedValue && allStaff.some(x=>String(x.id)===savedValue)){
+      el.value=savedValue;
+    }else if(!savedValue){
+      el.value="";
+    }
+  }
+
+  const stockStaffEl=$("stockStaff");
+  if(stockStaffEl && !stockStaffEl.dataset.selectionHandlerInstalled){
+    stockStaffEl.addEventListener("change",function(){
+      this.dataset.selectedStaff=String(this.value||"");
+    });
+    stockStaffEl.dataset.selectionHandlerInstalled="1";
+    if(stockStaffEl.value) stockStaffEl.dataset.selectedStaff=String(stockStaffEl.value);
   }
 
   function fill(id,placeholder){
@@ -7231,7 +7260,7 @@ function renderInventoryControls(){
     const oldValue=el.value;
     el.innerHTML=`<option value="">${placeholder}</option>`+
       allStaff.map(x=>
-        `<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`
+        `<option value="${attr(x.id)}">${esc(x._label)} · ${esc(x._job)}</option>`
       ).join("");
 
     if(oldValue && allStaff.some(x=>String(x.id)===String(oldValue))){
@@ -7569,7 +7598,9 @@ function clearProductForm(){$("productEditId").value="";$("productName").value="
 function editProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p)return;$("productEditId").value=p.id;$("productName").value=p.name||"";$("productCost").value=p.cost??"";$("productPrice").value=p.price??"";$("productSource").value=p.source||"Korean";$("productSourceOther").value=p.source_other||"";$("productSource").dispatchEvent(new Event("change"));$("products").scrollIntoView({behavior:"smooth"})}
 async function deleteProduct(id){if(!confirm("Delete this product? Its stock history will also be deleted. Continue?"))return;const r=await sb.from("medifella_products").delete().eq("id",id);if(r.error){alert("Delete failed: "+r.error.message);return}await loadProducts();await loadStockMovements();}
 $("clearProduct").onclick=clearProductForm;
-$("saveStock").onclick=async()=>{clearMsg($("stockStatus"));const editId=window.editingStockId||"";const pid=$("stockProductId").value,q=Number($("stockAmount").value||0),staff=$("stockStaff").value;if(!pid||q<=0||!staff){msg($("stockStatus"),"Select product, amount and staff.",true);return}try{const t=$("stockTime").value||phTime();const p=products.find(x=>String(x.id)===String(pid));const payload={product_id:pid,movement_type:"stock_in",quantity:q,staff_id:staff,staff_name:staffInfoRecords.find(x=>String(x.id)===String(staff))?.name_en||"",stock_time:t,created_by:adminUser.id,notes:"Stock In"};const r=editId?await sb.from("medifella_inventory_movements").update(payload).eq("id",editId):await sb.from("medifella_inventory_movements").insert(payload);if(r.error)throw r.error;msg($("stockStatus"),editId?"Stock entry updated.":`Stock added: ${p?.name||""}`);window.editingStockId="";$("saveStock").textContent="Save Stock";$("stockAmount").value="";$("stockProductId").value="";$("stockProductSearch").value="";$("stockProductHint").textContent="Select a product from the search results.";setAutoTime("stockTimeDisplay","stockTime");await loadStockMovements()}catch(e){msg($("stockStatus"),e.message,true)}};
+$("saveStock").onclick=async()=>{clearMsg($("stockStatus"));const editId=window.editingStockId||"";const pid=$("stockProductId").value,q=Number($("stockAmount").value||0),staff=$("stockStaff").value;if(!pid||q<=0||!staff){msg($("stockStatus"),"Select product, amount and staff.",true);return}try{const t=$("stockTime").value||phTime();const p=products.find(x=>String(x.id)===String(pid));const selectedStaff=(Array.isArray(staffInfoRecords)?staffInfoRecords:[]).find(x=>String(x.id)===String(staff))
+  || (Array.isArray(staffProfiles)?staffProfiles:[]).find(x=>String(x.id)===String(staff));
+const payload={product_id:pid,movement_type:"stock_in",quantity:q,staff_id:staff,staff_name:selectedStaff?.name_en||selectedStaff?.name_kh||selectedStaff?.name||selectedStaff?.full_name||selectedStaff?.username||"",stock_time:t,created_by:adminUser.id,notes:"Stock In"};const r=editId?await sb.from("medifella_inventory_movements").update(payload).eq("id",editId):await sb.from("medifella_inventory_movements").insert(payload);if(r.error)throw r.error;msg($("stockStatus"),editId?"Stock entry updated.":`Stock added: ${p?.name||""}`);window.editingStockId="";$("saveStock").textContent="Save Stock";$("stockAmount").value="";$("stockProductId").value="";$("stockProductSearch").value="";$("stockProductHint").textContent="Select a product from the search results.";if($("stockStaff"))$("stockStaff").dataset.selectedStaff="";setAutoTime("stockTimeDisplay","stockTime");await loadStockMovements()}catch(e){msg($("stockStatus"),e.message,true)}};
 function editStock(id){const m=stockMovements.find(x=>String(x.id)===String(id));if(!m)return;$("stockProductId").value=m.product_id;const p=products.find(x=>String(x.id)===String(m.product_id));$("stockProductSearch").value=`${p?.product_code||""} · ${p?.name||""}`;$("stockProductHint").textContent=`Selected: ${p?.name||""}`;$("stockAmount").value=m.quantity;$("stockStaff").value=m.staff_id||"";$("stockTime").value=m.stock_time||"";$("stockTimeDisplay").value=String(m.stock_time||"").replace("T"," ");window.editingStockId=id;$("saveStock").textContent="Update Stock";$("products").scrollIntoView({behavior:"smooth",block:"start"})}
 async function deleteStock(id){if(!confirm("Delete this stock entry? The product's available stock will decrease by this amount. Continue?"))return;const r=await sb.from("medifella_inventory_movements").delete().eq("id",id);if(r.error){alert("Delete failed: "+r.error.message);return}await loadStockMovements();}
 
