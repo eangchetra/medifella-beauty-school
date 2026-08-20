@@ -2061,9 +2061,42 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 #invoicePrint .mf-invoice[data-sale-type="MEDIFELLA"] .mf-invoice-table thead tr th,
 #invoicePrint .mf-invoice[data-sale-type="MEDI FELLA"] .mf-invoice-table thead tr th,
-#invoicePrint .mf-invoice[data-sale-type="MEDIFELLA SALE"] .mf-invoice-table thead tr th,
+#invoicePrint .mf-invoice[data-sale-type="MEDIFELLA SALE"] .mf-invoice-table thead tr th{
   background:#46C3D9 !important;
   background-color:#46C3D9 !important;
+  color:#000000 !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+</style>
+
+
+<style id="invoice-top-title-row-branding-v12">
+/* V12: invoice top title row = brand/logo color; text stays BLACK */
+#invoiceOverlay .mf-invoice[data-sale-type="MEDIFELLA"] .mf-invoice-table thead tr th,
+#invoiceOverlay .mf-invoice[data-sale-type="MEDI FELLA"] .mf-invoice-table thead tr th,
+#invoiceOverlay .mf-invoice[data-sale-type="MEDIFELLA SALE"] .mf-invoice-table thead tr th,
+#invoicePrint .mf-invoice[data-sale-type="MEDIFELLA"] .mf-invoice-table thead tr th,
+#invoicePrint .mf-invoice[data-sale-type="MEDI FELLA"] .mf-invoice-table thead tr th,
+#invoicePrint .mf-invoice[data-sale-type="MEDIFELLA SALE"] .mf-invoice-table thead tr th {
+  background:#46C3D9 !important;
+  background-color:#46C3D9 !important;
+  color:#000000 !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+#invoiceOverlay .mf-invoice[data-sale-type="DERMED"] .mf-invoice-table thead tr th,
+#invoicePrint .mf-invoice[data-sale-type="DERMED"] .mf-invoice-table thead tr th {
+  background:#C9901E !important;
+  background-color:#C9901E !important;
+  color:#000000 !important;
+  -webkit-print-color-adjust:exact !important;
+  print-color-adjust:exact !important;
+}
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-invoice-table thead tr th,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-invoice-table thead tr th {
+  background:#F8F601 !important;
+  background-color:#F8F601 !important;
   color:#000000 !important;
   -webkit-print-color-adjust:exact !important;
   print-color-adjust:exact !important;
