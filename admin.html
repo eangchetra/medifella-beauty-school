@@ -3273,7 +3273,7 @@ async function getCurrentAccount(){
 function applyAccountPermissions(){
   const role=String(currentProfile?.role||"").toLowerCase();
   const permissions=normalizeStaffPermissions(currentProfile?.permissions);
-  const allowed=key=>role==="admin" || role==="staff" || permissions[key]===true;
+  const allowed=key=>role==="admin" || (role==="staff" && permissions[key]===true);
   document.querySelectorAll(".nav").forEach(btn=>{
     btn.classList.toggle("hidden",!allowed(btn.dataset.section));
   });
@@ -7061,7 +7061,7 @@ function renderProductList(){
    localStorage.getItem("userEmail")||localStorage.getItem("email")||"").trim().toLowerCase();
  const role=String(window.currentUserRole||window.userRole||window.currentRole||
    localStorage.getItem("userRole")||localStorage.getItem("role")||"").toLowerCase();
- const isAdmin=email==="eang.chetraafs@gmail.com" || role==="admin" || role==="staff" || role.includes("admin");
+ const isAdmin=role==="admin" || (role==="staff" && typeof window.staffHasPermissionV28==="function" && window.staffHasPermissionV28("products")) || email==="eang.chetraafs@gmail.com";
 
  $("productList").innerHTML=rows.length?`
  <div class="table-wrap"><table class="table" id="productListTable">
@@ -12830,7 +12830,10 @@ async function loadCommissionRecords(retry=0){
       (typeof currentProfile !== "undefined" ? currentProfile?.role : "") || ""
     ).trim().toLowerCase();
 
-    if(role === "admin" || role === "staff") return true;
+    if(role === "admin") return true;
+    if(role === "staff" && typeof window.staffHasPermissionV28==="function"){
+      return window.staffHasPermissionV28("products");
+    }
 
     // Fallback for the owner account.
     const email = String(
@@ -15240,7 +15243,7 @@ async function loadCommissionRecords(retry=0){
         (typeof adminUser!=="undefined" ? adminUser?.email : "") || ""
       ).trim().toLowerCase();
 
-      if(role==="admin" || role==="staff" || email==="eang.chetraafs@gmail.com"){
+      if(role==="admin" || (role==="staff" && typeof window.staffHasPermissionV28==="function" && window.staffHasPermissionV28("products")) || email==="eang.chetraafs@gmail.com"){
         const tab=document.querySelector('[data-product-tab="stockReportPanel"]');
         const panel=document.getElementById("stockReportPanel");
         if(tab){
@@ -16803,9 +16806,9 @@ function installLoginRepair(){
       }
 
       var role=String((profile&&profile.role)||"").toLowerCase();
-      if(role && role!=="admin" && role!=="super_admin" && role!=="administrator"){
+      if(role && role!=="admin" && role!=="staff" && role!=="super_admin" && role!=="administrator"){
         await client.auth.signOut();
-        throw new Error("This account does not have admin access.");
+        throw new Error("This account does not have a valid Medi Fella role.");
       }
 
       localStorage.setItem("medifellaRememberedLogin",id);
@@ -17106,7 +17109,7 @@ function staffIsFullAccess(){
     const role=String(
       (typeof currentProfile!=="undefined" ? currentProfile?.role : "") || ""
     ).trim().toLowerCase();
-    return role==="admin" || role==="staff";
+    return role==="admin";
   }catch(_){ return false; }
 }
 function forceStaffFullAccess(){
@@ -17342,6 +17345,170 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       return false;
     }
   };
+})();
+</script>
+
+
+<script id="staff-permission-full-control-v28">
+(function(){
+  "use strict";
+
+  /*
+   * V28:
+   * Staff accounts are NOT automatically full-access.
+   * A staff user receives exactly the sections checked by the Admin in
+   * Staff Accounts > Permissions. Once a section is granted, the staff user
+   * can use that section's normal controls just like Admin.
+   */
+
+  function role(){
+    try{
+      return String((typeof currentProfile!=="undefined" ? currentProfile?.role : "") || "")
+        .trim().toLowerCase();
+    }catch(_){ return ""; }
+  }
+
+  function permissions(){
+    try{
+      if(typeof normalizeStaffPermissions==="function"){
+        return normalizeStaffPermissions(
+          typeof currentProfile!=="undefined" ? currentProfile?.permissions : {}
+        );
+      }
+    }catch(_){}
+    return {};
+  }
+
+  function hasPermission(key){
+    const r=role();
+    if(r==="admin") return true;
+    if(r!=="staff") return false;
+    return permissions()[key]===true;
+  }
+
+  window.staffHasPermissionV28=hasPermission;
+
+  // Replace the old permission application. The previous V27 code treated
+  // every staff account as allowed; V28 uses the Admin-selected permissions.
+  window.applyAccountPermissions=function(){
+    const r=role();
+    const p=permissions();
+    const allowed=function(key){
+      return r==="admin" || (r==="staff" && p[key]===true);
+    };
+
+    document.querySelectorAll(".nav").forEach(function(btn){
+      const key=btn.dataset.section;
+      btn.classList.toggle("hidden",!allowed(key));
+      btn.disabled=!allowed(key);
+    });
+
+    const active=document.querySelector(".nav.active");
+    if(!active || active.classList.contains("hidden") || active.disabled){
+      const first=[...document.querySelectorAll(".nav")]
+        .find(function(x){return !x.classList.contains("hidden") && !x.disabled;});
+      document.querySelectorAll(".nav").forEach(function(x){x.classList.remove("active");});
+      document.querySelectorAll(".section").forEach(function(x){x.classList.remove("active");});
+      if(first){
+        first.classList.add("active");
+        const section=document.getElementById(first.dataset.section);
+        if(section)section.classList.add("active");
+      }
+    }
+
+    const ca=document.getElementById("currentAdmin");
+    const ar=document.getElementById("adminRole");
+    if(ca){
+      ca.textContent=(typeof currentProfile!=="undefined" &&
+        (currentProfile.username||currentProfile.email))
+        || (typeof adminUser!=="undefined" && (adminUser.email||adminUser.id)) || "";
+    }
+    if(ar){
+      ar.innerHTML=r==="admin"
+        ? '<span class="badge verified">Administrator</span>'
+        : '<span class="badge pending">Staff</span>';
+    }
+
+    // Product Management is a normal permission-controlled section.
+    // There is no extra "staff cannot create/edit" restriction when Product
+    // Management has been granted by the Admin.
+    const productCard=document.getElementById("productCreateCard");
+    if(productCard) productCard.classList.toggle("hidden",!allowed("products"));
+
+    if(typeof updateSaleDateTimeDisplay==="function"){
+      try{updateSaleDateTimeDisplay();}catch(_){}
+    }
+  };
+
+  // Product controls follow the Product Management permission, not the role.
+  window.isAdminProductUserV28=function(){
+    return role()==="admin" || hasPermission("products");
+  };
+
+  // Make the login-repair handler accept both Admin and Staff profiles.
+  // The original V27 repair rejected Staff after authentication.
+  const oldLoginButton=document.getElementById("loginBtn");
+  if(oldLoginButton && !oldLoginButton.__v28Wrapped){
+    const oldHandler=oldLoginButton.onclick;
+    if(typeof oldHandler==="function"){
+      oldLoginButton.onclick=async function(ev){
+        // The normal boot/getCurrentAccount path already accepts staff.
+        // Let it handle authentication first.
+        return oldHandler.call(this,ev);
+      };
+      oldLoginButton.__v28Wrapped=true;
+    }
+  }
+
+  function productUI(){
+    const allowed=hasPermission("products");
+
+    // Product cost and Stock Report are part of Product Management. If Admin
+    // grants Product Management to a staff account, show the same controls.
+    const cost=document.getElementById("productCost");
+    if(cost){
+      const box=cost.closest(".row") || cost.parentElement;
+      const label=cost.previousElementSibling;
+      if(box)box.classList.toggle("hidden",!allowed);
+      if(label && label.tagName==="LABEL")label.classList.toggle("hidden",!allowed);
+      cost.disabled=!allowed;
+      cost.setAttribute("aria-hidden",allowed?"false":"true");
+    }
+
+    const reportTab=document.querySelector('[data-product-tab="stockReportPanel"]');
+    const reportPanel=document.getElementById("stockReportPanel");
+    if(reportTab)reportTab.classList.toggle("hidden",!allowed);
+    if(reportPanel && !allowed)reportPanel.classList.add("hidden");
+  }
+
+  // Override the old product role helper used by V27's product patch.
+  window.__staffPermissionProductAllowedV28=function(){
+    return hasPermission("products");
+  };
+
+  // Re-apply after the older V24 force-full-access timers run.
+  function enforce(){
+    try{window.applyAccountPermissions();}catch(_){}
+    try{productUI();}catch(_){}
+  }
+
+  function install(){
+    enforce();
+    setTimeout(enforce,100);
+    setTimeout(enforce,500);
+    setTimeout(enforce,1200);
+    setTimeout(enforce,2500);
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else{
+    install();
+  }
+
+  // Keep permissions correct if auth/profile refreshes or an older patch
+  // attempts to expose all staff navigation.
+  setInterval(enforce,3000);
 })();
 </script>
 
