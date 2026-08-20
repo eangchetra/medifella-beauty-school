@@ -4742,7 +4742,7 @@ function renderSales(){
  $("salesList").innerHTML=rows.length?`<div class="table-wrap"><table class="table"><tr><th>Date / Time</th><th>Reference</th><th>Student</th><th>Items</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>${rows.map(s=>{
    const total=saleTotal(s),paid=salePaid(s),bal=Math.max(0,total-paid),status=saleStatus(total,paid),badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
    const dt=saleDateValue(s),time=saleField(s,["sale_time","time"],"");
-   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td><button class="light" type="button" onclick="showSaleItemsDetails('${attr(s.id)}');return false;">View Details</button></td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button><button class="light" type="button" onclick="showSalePaymentDetails('${attr(s.id)}');return false;">View Payment</button>${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}</div></td></tr>`;
+   return`<tr><td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td><td><strong>${esc(saleRef(s)||"—")}</strong></td><td>${esc(saleCustomer(s)||"—")}<div class="muted">${esc(saleField(s,["student_phone","phone"],""))}</div></td><td><button class="light" type="button" onclick="showSaleItemsDetails('${attr(s.id)}');return false;">View Details</button></td><td>${money(total)}</td><td>${money(paid)}</td><td>${money(bal)}</td><td><span class="badge ${badge}">${status==="Partial"?"Partial Payment":esc(status)}</span></td><td><div class="actions"><button class="light" type="button" onclick="window.showSaleInvoice('${attr(s.id)}','A4'); return false;">View Invoice</button><button class="light" type="button" onclick="showSalePaymentDetails('${attr(s.id)}');return false;">View Payment</button>${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(s.id)}')">Payment</button>`:""}<button class="danger" type="button" onclick="deleteCompleteSaleRecord('${attr(s.id)}');return false;">Delete</button></div></td></tr>`;
  }).join("")}</table></div>`:'<p class="muted">No sales found.</p>';
  updateSalesMetrics();
 }
@@ -7611,6 +7611,61 @@ async function saveInventorySale(type){
   resetNewInventorySale(type);await loadSales();await loadStockMovements();showSaleInvoice(r.data.id);
  }catch(e){msg($(type+"Status"),e.message||"Could not save sale.",true)}
 }
+
+/* V36: Delete a complete sale record and all related history. */
+async function deleteCompleteSaleRecord(id){
+  const sale=(Array.isArray(salesRecords)?salesRecords:[]).find(x=>String(x.id)===String(id));
+  if(!sale){alert("Sale record not found. Please refresh the list.");return false;}
+
+  const label=String(sale.reference_no||saleRef(sale)||"this invoice");
+  const warning=
+    `Delete ${label}?\n\n`+
+    `This will permanently delete the sale record, related payment history, `+
+    `inventory movement records, and commission records linked to this invoice.\n\n`+
+    `This action cannot be undone.`;
+  if(!confirm(warning))return false;
+
+  try{
+    // Remove every commission row linked to this invoice, including old
+    // automatic Dermed commission records.
+    let r=await sb.from("medifella_sale_commissions")
+      .delete().eq("source_sale_id",String(id));
+    if(r.error)throw r.error;
+
+    r=await sb.from("medifella_sale_payments")
+      .delete().eq("sale_id",String(id));
+    if(r.error)throw r.error;
+
+    r=await sb.from("medifella_inventory_movements")
+      .delete().eq("sale_id",String(id));
+    if(r.error)throw r.error;
+
+    // Delete the invoice last.
+    r=await sb.from("medifella_sales")
+      .delete().eq("id",String(id));
+    if(r.error)throw r.error;
+
+    salesRecords=(Array.isArray(salesRecords)?salesRecords:[])
+      .filter(x=>String(x.id)!==String(id));
+
+    if(typeof renderSales==="function")renderSales();
+    if(typeof renderMtsSales==="function")renderMtsSales();
+    if(typeof renderDermedSales==="function")renderDermedSales();
+    if(typeof updateSalesMetrics==="function")updateSalesMetrics();
+
+    alert(`${label} deleted successfully.`);
+    return true;
+  }catch(e){
+    console.error("Delete sale error:",e);
+    alert(
+      `Delete failed: ${e?.message||e}\n\n`+
+      `If this is a Supabase row-level security (RLS) error, apply the V36 Sale Delete RLS SQL file.`
+    );
+    return false;
+  }
+}
+window.deleteCompleteSaleRecord=deleteCompleteSaleRecord;
+
 function isMtsListRecord(x){
  const t=String(x?.sale_type||"").trim().toUpperCase().replace(/[\s_-]+/g,"");
  const ref=String(x?.reference_no||"").trim().toUpperCase();
@@ -7644,6 +7699,7 @@ function renderMtsSales(){
      <td><div class="actions">
        <button class="light" type="button" onclick="window.showSaleInvoice('${attr(x.id)}','A4'); return false;">View Invoice</button><button class="light" type="button" onclick="showSalePaymentDetails('${attr(x.id)}');return false;">View Payment</button>
        ${bal>0.005?`<button class="gold" type="button" onclick="recordSalePayment('${attr(x.id)}')">Payment</button>`:""}
+       <button class="danger" type="button" onclick="deleteCompleteSaleRecord('${attr(x.id)}');return false;">Delete</button>
      </div></td>
    </tr>`;
  }).join("")}</table></div>`:'<p class="muted">No MTS sales found.</p>';
@@ -7723,6 +7779,7 @@ function renderDermedSales(){
          data-dermed-appointment-code="${attr(x.student_id||x.customer_code||"")}"
        >+ Add Appointment</button>`}
        ${bal>0.005?`<button class="gold" type="button" onclick="recordDermedSalePayment('${attr(x.id)}')">Payment</button>`:""}
+       <button class="danger" type="button" onclick="deleteCompleteSaleRecord('${attr(x.id)}');return false;">Delete</button>
      </div></td>
    </tr>`;
  }).join("")}</table></div>`:'<p class="muted">No Dermed sales found.</p>';
