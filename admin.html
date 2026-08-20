@@ -14864,5 +14864,213 @@ async function loadCommissionRecords(retry=0){
   setTimeout(fixRows,2500);
 })();
 </script>
+
+<script id="package-commission-combine-final">
+(function(){
+  "use strict";
+
+  function wrap(){
+    const original=window.recordFirstDermedSaleCommission;
+    if(typeof original!=="function") return false;
+    if(original.__packageCombinedWrapped) return true;
+
+    async function combined(args){
+      try{
+        // Verify first invoice + first payment before allowing the existing
+        // commission calculation to run.
+        const sale=args?.sale, buyerType=args?.buyerType, buyerId=args?.buyerId;
+        if(!sale?.id || !buyerId) return;
+
+        let q=sb.from("medifella_sales")
+          .select("id,created_at")
+          .eq("sale_type","DERMED");
+
+        q=buyerType==="student"
+          ?q.eq("student_id",String(buyerId))
+          :q.eq("customer_id",String(buyerId));
+
+        const history=await q.order("created_at",{ascending:true});
+        if(history.error) return;
+
+        const sales=Array.isArray(history.data)?history.data:[];
+        if(sales.length && String(sales[0].id)!==String(sale.id)) return;
+
+        // Any existing automatic commission means the first-payment
+        // commission has already been issued.
+        let cq=sb.from("medifella_sale_commissions")
+          .select("id")
+          .eq("source","dermed_auto");
+
+        cq=buyerType==="student"
+          ?cq.eq("student_id",String(buyerId))
+          :cq.eq("customer_id",String(buyerId));
+
+        const prior=await cq.limit(1);
+        if(prior.error || prior.data?.length) return;
+
+        // IMPORTANT:
+        // We call the original calculator only for the first payment.
+        // The original calculator may create separate package rows, so after
+        // it returns we do not duplicate them. Package combining is handled
+        // by a dedicated combined insert below instead.
+        //
+        // To keep the existing service-rate logic, calculate the package
+        // amount here and create ONE combined package row, while letting the
+        // original function handle single-service rows would create duplicate
+        // package rows. Therefore we cannot call original when packages exist.
+        const services=Array.isArray(args?.servicesArr)?args.servicesArr:[];
+        const packages=services.filter(x=>
+          String(x?.service_payment_type||"Single").toLowerCase()==="package"
+        );
+
+        if(!packages.length){
+          return await original(args);
+        }
+
+        const num=v=>{
+          const n=Number(String(v??"").replace(/[$,\s]/g,""));
+          return Number.isFinite(n)?n:0;
+        };
+
+        const line=x=>{
+          const qty=Math.max(1,num(x?.quantity??x?.unit??1));
+          const price=Math.max(0,num(x?.price??x?.unit_price));
+          const base=qty*price;
+          const dv=Math.max(0,num(x?.discount_value));
+          const dt=String(x?.discount_type||"percent").toLowerCase();
+          return Math.max(0,base-(dt==="usd"?Math.min(base,dv*qty):Math.min(base,base*dv/100)));
+        };
+
+        const products=Array.isArray(args?.items)?args.items:[];
+        const singles=services.filter(x=>
+          String(x?.service_payment_type||"Single").toLowerCase()!=="package"
+        );
+
+        const productTotal=products.reduce((s,x)=>s+line(x),0);
+        const singleTotal=singles.reduce((s,x)=>s+line(x),0);
+        const packageTotal=packages.reduce((s,x)=>s+line(x),0);
+
+        const firstPayment=Math.max(0,num(
+          sale?.first_payment_amount ??
+          sale?.paid_amount_first_payment ??
+          sale?.initial_payment ??
+          sale?.amount_paid_now ??
+          sale?.paid_now ??
+          0
+        ));
+        if(firstPayment<=0) return;
+
+        const packagePaid=Math.min(
+          Math.max(0,firstPayment-productTotal-singleTotal),
+          packageTotal
+        );
+        if(packagePaid<=0){
+          // No package portion was paid; use original for eligible singles.
+          return await original(args);
+        }
+
+        const cfg=typeof window.getCurrentSaleStaffConfig==="function"
+          ?window.getCurrentSaleStaffConfig(args.staffId):null;
+        if(!cfg) return;
+
+        const firstPackage=packages.find(x=>line(x)>0);
+        const st=String(firstPackage?.service_type||firstPackage?.type||"").toLowerCase();
+        const withProduct=st.includes("with product")||st.includes("service_product");
+        const rate=(withProduct?num(cfg.service_product_rate):num(cfg.service_rate))/100;
+        if(rate<=0) return;
+
+        const names=packages.filter(x=>line(x)>0).map(x=>x.name||"Package Service");
+        const common={
+          commission_date:String(sale?.sale_date||new Date().toISOString()).slice(0,10),
+          staff_id:args.staffId,
+          staff_name:args.staff?.name_en||args.staff?.name_kh||args.staff?.name_km||args.staff?.name||cfg.staff_name||"",
+          customer_id:buyerType==="customer"?buyerId:null,
+          student_id:buyerType==="student"?buyerId:null,
+          customer_name:args.buyer?.name||args.buyer?.full_name||sale?.customer_name||sale?.student_name||"",
+          customer_phone:args.buyer?.phone||sale?.customer_phone||sale?.student_phone||"",
+          service_type:withProduct?"service_product":"service",
+          service_detail:names.join(" + "),
+          service_id:null,
+          unit:1,
+          unit_price:packagePaid,
+          discount:0,
+          subtotal:packagePaid,
+          commission_rate:rate,
+          commission_amount:packagePaid*rate,
+          source:"dermed_auto",
+          source_sale_id:String(sale.id),
+          reference_no:sale?.reference_no||"",
+          created_by:args.adminId||null
+        };
+
+        // Insert the combined package row. Then separately calculate singles
+        // using the original calculator is unsafe because it may also insert
+        // another package row. Instead, calculate eligible singles here.
+        const singleRows=[];
+        let budget=Math.max(0,firstPayment-productTotal);
+        for(const x of singles){
+          const base=line(x);
+          const covered=Math.min(base,budget);
+          budget=Math.max(0,budget-covered);
+          if(base<=0 || covered+0.005<base) continue;
+
+          const sx=String(x?.service_type||x?.type||"").toLowerCase();
+          const swp=sx.includes("with product")||sx.includes("service_product");
+          const sr=(swp?num(cfg.service_product_rate):num(cfg.service_rate))/100;
+          if(sr<=0)continue;
+
+          singleRows.push({...common,
+            service_type:swp?"service_product":"service",
+            service_detail:x.name||"Service",
+            service_id:x.service_id||null,
+            unit:Math.max(1,num(x.quantity??x.unit??1)),
+            unit_price:num(x.price??x.unit_price),
+            subtotal:base,
+            commission_rate:sr,
+            commission_amount:base*sr
+          });
+        }
+
+        const rows=[...singleRows,common];
+
+        // Save as one commission batch.
+        let pending=rows;
+        for(let attempt=0;attempt<8;attempt++){
+          const r=await sb.from("medifella_sale_commissions").insert(pending);
+          if(!r.error)return;
+
+          const e=String(r.error.message||r.error.details||"");
+          const mm=e.match(/column ["']?([A-Za-z_][A-Za-z0-9_]*)["']?.*does not exist/i)
+            ||e.match(/Could not find the ['"]([A-Za-z_][A-Za-z0-9_]*)['"] column/i)
+            ||e.match(/schema cache.*['"]([A-Za-z_][A-Za-z0-9_]*)['"]/i);
+
+          if(mm&&Object.prototype.hasOwnProperty.call(pending[0],mm[1])){
+            pending=pending.map(row=>{const c={...row};delete c[mm[1]];return c;});
+            continue;
+          }
+          return;
+        }
+      }catch(err){
+        console.error("Combined package commission:",err);
+      }
+    }
+
+    combined.__packageCombinedWrapped=true;
+    window.recordFirstDermedSaleCommission=combined;
+    return true;
+  }
+
+  function boot(){
+    if(wrap())return;
+    setTimeout(wrap,300);
+    setTimeout(wrap,800);
+    setTimeout(wrap,1500);
+    setTimeout(wrap,2500);
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",boot,{once:true});
+  else boot();
+})();
+</script>
 </body>
 </html>
