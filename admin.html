@@ -7126,17 +7126,33 @@ function isSaleCounterCashierStaff(x){
 function renderInventoryControls(){
  if($("stockStaff")){
    $("stockStaff").innerHTML='<option value="">Select staff</option>'+
-     staffInfoRecords.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en)} · ${esc(x.job_title)}</option>`).join("");
+     (Array.isArray(staffInfoRecords)?staffInfoRecords:[]).map(x=>
+       `<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`
+     ).join("");
  }
- const eligibleStaff=(Array.isArray(staffInfoRecords)?staffInfoRecords:[]).filter(isSaleCounterCashierStaff);
+
+ /*
+  * V29 FIX:
+  * Sale Staff must behave exactly like the Admin sale form.
+  * Do NOT filter the dropdown by job_title here. The previous filter could
+  * leave Dermed Sale with only "Select Sale Staff" when staff records used a
+  * different/blank job-title value.
+  *
+  * The Admin-selected Staff permissions control which module the user can
+  * access. Once inside Dermed/MTS Sale, the Sale Staff selector must contain
+  * the available staff records normally.
+  */
+ const allStaff=(Array.isArray(staffInfoRecords)?staffInfoRecords:[]);
 
  ["mtsSaleStaff","dermedSaleStaff"].forEach(id=>{
    const el=$(id);
    if(!el)return;
    const oldValue=el.value;
    el.innerHTML='<option value="">Select Sale Staff</option>'+
-     eligibleStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`).join("");
-   if(oldValue && eligibleStaff.some(x=>String(x.id)===String(oldValue))) el.value=oldValue;
+     allStaff.map(x=>
+       `<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`
+     ).join("");
+   if(oldValue && allStaff.some(x=>String(x.id)===String(oldValue))) el.value=oldValue;
  });
 
  ["mtsCashier","dermedCashier"].forEach(id=>{
@@ -7144,10 +7160,13 @@ function renderInventoryControls(){
    if(!el)return;
    const oldValue=el.value;
    el.innerHTML='<option value="">Select Cashier</option>'+
-     eligibleStaff.map(x=>`<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`).join("");
-   if(oldValue && eligibleStaff.some(x=>String(x.id)===String(oldValue))) el.value=oldValue;
+     allStaff.map(x=>
+       `<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`
+     ).join("");
+   if(oldValue && allStaff.some(x=>String(x.id)===String(oldValue))) el.value=oldValue;
  });
 }
+
 window.refreshSaleStaffCashierOptions=renderInventoryControls;
 try{renderInventoryControls()}catch(e){}
 
@@ -17509,6 +17528,276 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   // Keep permissions correct if auth/profile refreshes or an older patch
   // attempts to expose all staff navigation.
   setInterval(enforce,3000);
+})();
+</script>
+
+
+<script id="dermed-sale-staff-selector-v29">
+(function(){
+  function refresh(){
+    try{
+      if(typeof renderInventoryControls==="function") renderInventoryControls();
+    }catch(e){}
+  }
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",function(){
+      refresh(); setTimeout(refresh,500); setTimeout(refresh,1500);
+    },{once:true});
+  }else{
+    refresh(); setTimeout(refresh,500); setTimeout(refresh,1500);
+  }
+})();
+</script>
+
+
+<script id="staff-selected-sales-full-access-v30">
+(function(){
+  "use strict";
+
+  function getRole(){
+    try{
+      return String(
+        (typeof currentProfile!=="undefined" ? currentProfile?.role : "") || ""
+      ).trim().toLowerCase();
+    }catch(e){ return ""; }
+  }
+
+  function getPerms(){
+    try{
+      if(typeof normalizeStaffPermissions==="function"){
+        return normalizeStaffPermissions(
+          typeof currentProfile!=="undefined" ? currentProfile?.permissions : {}
+        ) || {};
+      }
+    }catch(e){}
+    try{
+      return (typeof currentProfile!=="undefined" && currentProfile?.permissions) || {};
+    }catch(e){ return {}; }
+  }
+
+  function canModule(key){
+    const r=getRole();
+    if(r==="admin" || r==="administrator" || r==="super_admin") return true;
+    if(r!=="staff") return false;
+    return getPerms()[key] === true;
+  }
+
+  window.staffSelectedModuleAccessV30 = canModule;
+
+  /*
+   * When a Staff account has been granted a sale module, expose the same
+   * normal sale controls as Admin. This does not grant modules that Admin
+   * did not select.
+   */
+  function apply(){
+    const sales = [
+      ["dermed","dermedSale"],
+      ["mts","mtsSale"],
+      ["medifella","medifellaSale"]
+    ];
+
+    sales.forEach(function(pair){
+      const key=pair[0], section=pair[1], allowed=canModule(key);
+      const navs=document.querySelectorAll(
+        `[data-section="${section}"], [data-module="${key}"], [data-permission="${key}"]`
+      );
+      navs.forEach(function(el){
+        el.classList.toggle("hidden", !allowed);
+        if("disabled" in el) el.disabled=!allowed;
+      });
+    });
+
+    // Sale Staff and Cashier selectors must remain enabled for an allowed sale.
+    if(canModule("dermed")){
+      ["dermedSaleStaff","dermedCashier"].forEach(function(id){
+        const el=document.getElementById(id);
+        if(el){
+          el.disabled=false;
+          el.removeAttribute("readonly");
+        }
+      });
+    }
+    if(canModule("mts")){
+      ["mtsSaleStaff","mtsCashier"].forEach(function(id){
+        const el=document.getElementById(id);
+        if(el){
+          el.disabled=false;
+          el.removeAttribute("readonly");
+        }
+      });
+    }
+    if(canModule("medifella")){
+      ["mfSaleStaff","medifellaSaleStaff","mfCashier","medifellaCashier"].forEach(function(id){
+        const el=document.getElementById(id);
+        if(el){
+          el.disabled=false;
+          el.removeAttribute("readonly");
+        }
+      });
+    }
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",function(){
+      apply();
+      setTimeout(apply,500);
+      setTimeout(apply,1500);
+      setTimeout(apply,3000);
+    },{once:true});
+  }else{
+    apply();
+    setTimeout(apply,500);
+    setTimeout(apply,1500);
+    setTimeout(apply,3000);
+  }
+})();
+</script>
+
+
+<script id="all-admin-selected-functions-v31">
+(function(){
+  "use strict";
+
+  /*
+   * V31 permission rule:
+   * Admin = everything.
+   * Staff = exactly the functions/modules selected by Admin.
+   *
+   * This is intentionally generic so it applies not only to Sales, but also
+   * Appointment, Commission, Products, Services, Customers, Students,
+   * Certificates, News, Courses, Staff Management, etc., wherever the page
+   * exposes data-section/data-permission/data-module attributes.
+   */
+
+  function getRole(){
+    try{
+      return String(
+        (typeof currentProfile!=="undefined" ? currentProfile?.role : "") || ""
+      ).trim().toLowerCase();
+    }catch(e){ return ""; }
+  }
+
+  function getPermissions(){
+    try{
+      if(typeof normalizeStaffPermissions==="function"){
+        return normalizeStaffPermissions(
+          typeof currentProfile!=="undefined" ? currentProfile?.permissions : {}
+        ) || {};
+      }
+    }catch(e){}
+    try{
+      return (typeof currentProfile!=="undefined" && currentProfile?.permissions) || {};
+    }catch(e){ return {}; }
+  }
+
+  function admin(){
+    const r=getRole();
+    return r==="admin" || r==="administrator" || r==="super_admin";
+  }
+
+  function allowed(key){
+    if(admin()) return true;
+    if(getRole()!=="staff") return false;
+    const p=getPermissions();
+    return p[key]===true;
+  }
+
+  window.staffCanUseV31=allowed;
+
+  function keyFor(el){
+    return String(
+      el?.dataset?.permission ||
+      el?.dataset?.module ||
+      el?.dataset?.section ||
+      el?.getAttribute?.("data-permission-key") ||
+      ""
+    ).trim();
+  }
+
+  function applyNavigation(){
+    document.querySelectorAll(
+      ".nav,[data-permission],[data-module],[data-permission-key]"
+    ).forEach(function(el){
+      const key=keyFor(el);
+      if(!key)return;
+
+      // Only permission-bearing UI elements are controlled here.
+      const ok=allowed(key);
+      el.classList.toggle("hidden",!ok);
+      if("disabled" in el) el.disabled=!ok;
+      el.setAttribute("aria-hidden",ok?"false":"true");
+    });
+  }
+
+  /*
+   * When a staff member has access to a module, do not apply an additional
+   * role-based readonly/disabled restriction to that module's controls.
+   * Admin-selected permission is the deciding rule.
+   */
+  function enableAllowedControls(){
+    const mappings=[
+      ["studentRegistration","studentRegistration"],
+      ["medifella","medifellaSale"],
+      ["mts","mtsSale"],
+      ["dermed","dermedSale"],
+      ["commission","saleCommissionManagement"],
+      ["saleCommission","saleCommissionManagement"],
+      ["saleStaff","saleStaffManagement"],
+      ["appointment","appointmentManagement"],
+      ["products","productManagement"],
+      ["services","servicesManagement"],
+      ["staff","staffManagement"],
+      ["customers","customerManagement"],
+      ["customer","customerManagement"],
+      ["certificate","certificateVerification"],
+      ["news","newsFeed"],
+      ["courses","courseManagement"],
+      ["staffAccounts","staffAccounts"],
+      ["users","adminUsers"]
+    ];
+
+    mappings.forEach(function(pair){
+      const perm=pair[0], section=pair[1];
+      if(!allowed(perm))return;
+
+      document.querySelectorAll(
+        `#${section} button,#${section} input,#${section} select,#${section} textarea,`+
+        `[data-section="${section}"] button,[data-section="${section}"] input,`+
+        `[data-section="${section}"] select,[data-section="${section}"] textarea`
+      ).forEach(function(el){
+        // Do not override controls that are genuinely disabled for a business
+        // reason (e.g. an unavailable field); only undo permission/role locks.
+        if(el.dataset.permissionLocked==="true") return;
+        el.removeAttribute("readonly");
+      });
+    });
+  }
+
+  function apply(){
+    try{
+      applyNavigation();
+      enableAllowedControls();
+      if(typeof renderInventoryControls==="function") renderInventoryControls();
+    }catch(e){}
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",function(){
+      apply();
+      setTimeout(apply,300);
+      setTimeout(apply,1000);
+      setTimeout(apply,2500);
+    },{once:true});
+  }else{
+    apply();
+    setTimeout(apply,300);
+    setTimeout(apply,1000);
+    setTimeout(apply,2500);
+  }
+
+  // Re-apply after section/profile rendering. This does not grant permissions;
+  // it only keeps the UI synchronized with the Admin-selected permissions.
+  setInterval(apply,3000);
 })();
 </script>
 
