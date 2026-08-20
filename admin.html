@@ -5179,7 +5179,7 @@ async function saveMediFellaSale(){
      const base=price*quantity;
      const itemDiscount=discountType==="percent"
        ? Math.min(base,base*discountValue/100)
-       : Math.min(base,discountValue);
+       : Math.min(base,discountValue*quantity);
      return {
        name,
        course_id:String(row.querySelector(".sale-course-id")?.value||"")||null,
@@ -7447,9 +7447,12 @@ document.addEventListener("DOMContentLoaded",function(){
   const pItems=()=>window.dermedSaleItems||(window.dermedSaleItems=[]);
   const sItems=()=>window.dermedServiceItems||(window.dermedServiceItems=[]);
 
-  function itemDiscount(base,type,value){
+  function itemDiscount(base,type,value,quantity){
     const v=Math.max(0,num(value));
-    return type==="percent"?Math.min(base,base*v/100):Math.min(base,v);
+    const qty=Math.max(1,num(quantity)||1);
+    return type==="percent"
+      ?Math.min(base,base*v/100)
+      :Math.min(base,v*qty);
   }
 
   window.addSaleProduct=function(type,pid){
@@ -7486,7 +7489,7 @@ document.addEventListener("DOMContentLoaded",function(){
 
   function rowHtml(x,kind,i){
     const base=num(x.price)*Math.max(1,num(x.quantity));
-    const disc=itemDiscount(base,x.discount_type||"percent",x.discount_value||0);
+    const disc=itemDiscount(base,x.discount_type||"percent",x.discount_value||0,x.quantity);
     const sub=Math.max(0,base-disc);
     const label=kind==="product"?(x.name||"Product"):(x.name||"Service");
     const code=kind==="product"?(x.product_code||""):(x.service_code||"");
@@ -7528,10 +7531,10 @@ document.addEventListener("DOMContentLoaded",function(){
 
   function calc(){
     const productsTotal=pItems().reduce((sum,x)=>{
-      const base=num(x.price)*Math.max(1,num(x.quantity));return sum+Math.max(0,base-itemDiscount(base,x.discount_type||"percent",x.discount_value||0));
+      const base=num(x.price)*Math.max(1,num(x.quantity));return sum+Math.max(0,base-itemDiscount(base,x.discount_type||"percent",x.discount_value||0,x.quantity));
     },0);
     const servicesTotal=sItems().reduce((sum,x)=>{
-      const base=num(x.price)*Math.max(1,num(x.quantity));return sum+Math.max(0,base-itemDiscount(base,x.discount_type||"percent",x.discount_value||0));
+      const base=num(x.price)*Math.max(1,num(x.quantity));return sum+Math.max(0,base-itemDiscount(base,x.discount_type||"percent",x.discount_value||0,x.quantity));
     },0);
     const sub=productsTotal+servicesTotal;
     // Dermed Sale has NO overall/invoice-level discount.
@@ -7630,7 +7633,7 @@ document.addEventListener("DOMContentLoaded",function(){
     if(status==="Due" && paid>0.005){msg(E("dermedStatus"),"Due status must have $0.00 paid.",true);return}
     if(status==="Partial"){
       const rawLineTotal=[...items,...servicesArr].reduce((n,x)=>{
-        const q=Math.max(1,num(x.quantity)),p=Math.max(0,num(x.price)),base=q*p,d=itemDiscount(base,x.discount_type||"percent",x.discount_value||0);return n+Math.max(0,base-d);
+        const q=Math.max(1,num(x.quantity)),p=Math.max(0,num(x.price)),base=q*p,d=itemDiscount(base,x.discount_type||"percent",x.discount_value||0,x.quantity);return n+Math.max(0,base-d);
       },0);
       const invoiceScale=rawLineTotal>0?Math.min(1,c.initial/rawLineTotal):1;
       const requiredNow=[...items.map(x=>({package:false,subtotal:Math.max(0,num(x.price)*Math.max(1,num(x.quantity))-itemDiscount(num(x.price)*Math.max(1,num(x.quantity)),x.discount_type||"percent",x.discount_value||0))})),...servicesArr.map(x=>({package:String(x.service_payment_type||"Single").toLowerCase()==="package",subtotal:Math.max(0,num(x.price)*Math.max(1,num(x.quantity))-itemDiscount(num(x.price)*Math.max(1,num(x.quantity)),x.discount_type||"percent",x.discount_value||0))}))].filter(x=>!x.package).reduce((n,x)=>n+x.subtotal*invoiceScale,0);
@@ -7658,11 +7661,11 @@ document.addEventListener("DOMContentLoaded",function(){
     const saleDate=(editingRecord && storedDate) ? storedDate : now.slice(0,10);
     const saleTime=(editingRecord && storedTime) ? storedTime : now.slice(11);
     const itemPayload=items.map(x=>{
-      const q=Math.max(1,num(x.quantity)),price=Math.max(0,num(x.price)),base=price*q,d=itemDiscount(base,x.discount_type||"percent",x.discount_value||0);
+      const q=Math.max(1,num(x.quantity)),price=Math.max(0,num(x.price)),base=price*q,d=itemDiscount(base,x.discount_type||"percent",x.discount_value||0,x.quantity);
       return {...x,quantity:q,unit_price:price,discount_type:x.discount_type||"percent",discount_value:num(x.discount_value),discount_amount:d,subtotal:Math.max(0,base-d),discount_input:(x.discount_type||"percent")==="percent"?`${num(x.discount_value)}%`:`$${num(x.discount_value).toFixed(2)}`};
     });
     const servicePayload=servicesArr.map(x=>{
-      const q=Math.max(1,num(x.quantity)),price=Math.max(0,num(x.price)),base=price*q,d=itemDiscount(base,x.discount_type||"percent",x.discount_value||0);
+      const q=Math.max(1,num(x.quantity)),price=Math.max(0,num(x.price)),base=price*q,d=itemDiscount(base,x.discount_type||"percent",x.discount_value||0,x.quantity);
       return {...x,quantity:q,unit_price:price,discount_type:x.discount_type||"percent",discount_value:num(x.discount_value),discount_amount:d,subtotal:Math.max(0,base-d),discount_input:(x.discount_type||"percent")==="percent"?`${num(x.discount_value)}%`:`$${num(x.discount_value).toFixed(2)}`};
     });
     const payload={
