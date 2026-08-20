@@ -7125,47 +7125,48 @@ function isSaleCounterCashierStaff(x){
  return ["sale","counter","cashier","sale counter cashier"].includes(title);
 }
 function renderInventoryControls(){
- if($("stockStaff")){
-   $("stockStaff").innerHTML='<option value="">Select staff</option>'+
-     (Array.isArray(staffInfoRecords)?staffInfoRecords:[]).map(x=>
-       `<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`
-     ).join("");
- }
+  /*
+   * V34:
+   * Sale Staff/Cashier dropdowns must be populated for Admin and for Staff
+   * accounts that have the corresponding sale permission.
+   *
+   * Do NOT filter Sale Staff by job_title. A permitted Dermed Staff user
+   * should be able to select any available sale staff exactly like Admin.
+   */
+  const allStaff=Array.isArray(staffInfoRecords)?staffInfoRecords:[];
 
- /*
-  * V29 FIX:
-  * Sale Staff must behave exactly like the Admin sale form.
-  * Do NOT filter the dropdown by job_title here. The previous filter could
-  * leave Dermed Sale with only "Select Sale Staff" when staff records used a
-  * different/blank job-title value.
-  *
-  * The Admin-selected Staff permissions control which module the user can
-  * access. Once inside Dermed/MTS Sale, the Sale Staff selector must contain
-  * the available staff records normally.
-  */
- const allStaff=(Array.isArray(staffInfoRecords)?staffInfoRecords:[]);
+  if($("stockStaff")){
+    $("stockStaff").innerHTML='<option value="">Select staff</option>'+
+      allStaff.map(x=>
+        `<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`
+      ).join("");
+  }
 
- ["mtsSaleStaff","dermedSaleStaff"].forEach(id=>{
-   const el=$(id);
-   if(!el)return;
-   const oldValue=el.value;
-   el.innerHTML='<option value="">Select Sale Staff</option>'+
-     allStaff.map(x=>
-       `<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`
-     ).join("");
-   if(oldValue && allStaff.some(x=>String(x.id)===String(oldValue))) el.value=oldValue;
- });
+  function fill(id,placeholder){
+    const el=$(id);
+    if(!el)return;
+    const oldValue=el.value;
+    el.innerHTML=`<option value="">${placeholder}</option>`+
+      allStaff.map(x=>
+        `<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`
+      ).join("");
 
- ["mtsCashier","dermedCashier"].forEach(id=>{
-   const el=$(id);
-   if(!el)return;
-   const oldValue=el.value;
-   el.innerHTML='<option value="">Select Cashier</option>'+
-     allStaff.map(x=>
-       `<option value="${attr(x.id)}">${esc(x.name_en||x.name_kh||x.name||"Staff")} · ${esc(x.job_title||"")}</option>`
-     ).join("");
-   if(oldValue && allStaff.some(x=>String(x.id)===String(oldValue))) el.value=oldValue;
- });
+    if(oldValue && allStaff.some(x=>String(x.id)===String(oldValue))){
+      el.value=oldValue;
+    }
+  }
+
+  fill("dermedSaleStaff","Select Sale Staff");
+  fill("mtsSaleStaff","Select Sale Staff");
+
+  fill("dermedCashier","Select Cashier");
+  fill("mtsCashier","Select Cashier");
+
+  // Some versions use these alternate Medi Fella IDs.
+  fill("mfSaleStaff","Select Sale Staff");
+  fill("medifellaSaleStaff","Select Sale Staff");
+  fill("mfCashier","Select Cashier");
+  fill("medifellaCashier","Select Cashier");
 }
 
 window.refreshSaleStaffCashierOptions=renderInventoryControls;
@@ -18155,6 +18156,65 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     return result;
   };
 
+})();
+</script>
+
+
+<script id="dermed-staff-selector-final-v34">
+(function(){
+  "use strict";
+
+  function allowedDermed(){
+    try{
+      const role=String(
+        (typeof currentProfile!=="undefined" ? currentProfile?.role : "") || ""
+      ).trim().toLowerCase();
+
+      if(role==="admin" || role==="administrator" || role==="super_admin")return true;
+      if(role!=="staff")return false;
+
+      let p={};
+      if(typeof normalizeStaffPermissions==="function"){
+        p=normalizeStaffPermissions(currentProfile?.permissions)||{};
+      }else{
+        p=currentProfile?.permissions||{};
+      }
+
+      return p.dermed===true || p.dermedSale===true || p.dermed_sale===true;
+    }catch(e){
+      return false;
+    }
+  }
+
+  function apply(){
+    if(!allowedDermed())return;
+
+    ["dermedSaleStaff","dermedCashier"].forEach(function(id){
+      const el=document.getElementById(id);
+      if(!el)return;
+      el.disabled=false;
+      el.removeAttribute("readonly");
+      el.removeAttribute("aria-disabled");
+    });
+
+    try{
+      if(typeof renderInventoryControls==="function")renderInventoryControls();
+    }catch(e){}
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",function(){
+      apply();
+      setTimeout(apply,300);
+      setTimeout(apply,1000);
+      setTimeout(apply,2500);
+    },{once:true});
+  }else{
+    apply();
+    setTimeout(apply,300);
+    setTimeout(apply,1000);
+    setTimeout(apply,2500);
+  }
 })();
 </script>
 
