@@ -6813,8 +6813,7 @@ function editStaffInfo(id){const x=staffInfoRecords.find(x=>String(x.id)===Strin
 async function deleteStaffInfo(id){if(!confirm("Delete this staff member?"))return;const r=await sb.from("medifella_staff").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadStaffInfo()}
 $("clearStaffInfo").onclick=clearStaffInfoForm;
 
-$("saveCustomer").onclick=async()=>{clearMsg($("customerStatus"));const id=$("customerEditId").value,name=$("customerName").value.trim(),phone=$("customerPhone").value.trim();if(!name||!phone){msg($("customerStatus"),"Customer Name and Phone Number are required.",true);return}try{const payload={name,phone};let r=id?await sb.from("medifella_customers").update(payload).eq("id",id):await sb.from("medifella_customers").insert({...payload,customer_code:genId("C",customers,"customer_code")});if(r.error)throw r.error;msg($("customerStatus"),id?"Customer updated.":"Customer added.");clearCustomerForm();await loadCustomers()}catch(e){msg($("customerStatus"),e.message,true)}};
-function clearCustomerForm(){$("customerEditId").value="";$("customerName").value="";$("customerPhone").value=""}
+$("saveCustomer").onclick=async()=>{clearMsg($("customerStatus"));const id=$("customerEditId").value,name=$("customerName").value.trim(),phone=$("customerPhone").value.trim();if(!name||!phone){msg($("customerStatus"),"Customer Name and Phone Number are required.",true);return}try{const normalizeName=v=>String(v||"").trim().split(/\s+/).join(" ").toLowerCase();const normalizePhone=v=>String(v||"").split(/\D+/).join("");if(!id){const {data:existing,error:checkError}=await sb.from("medifella_customers").select("id,name,phone");if(checkError)throw checkError;const list=Array.isArray(existing)?existing:[];const sameName=list.find(x=>normalizeName(x.name)===normalizeName(name));const samePhone=list.find(x=>normalizePhone(x.phone)===normalizePhone(phone));}const payload={name,phone};let r=id?await sb.from("medifella_customers").update(payload).eq("id",id):await sb.from("medifella_customers").insert({...payload,customer_code:genId("C",customers,"customer_code")});if(r.error)throw r.error;msg($("customerStatus"),id?"Customer updated.":"Customer added.");clearCustomerForm();await loadCustomers()}catch(e){msg($("customerStatus"),e.message,true)}};function clearCustomerForm(){$("customerEditId").value="";$("customerName").value="";$("customerPhone").value=""}
 function editCustomer(id){const x=customers.find(x=>String(x.id)===String(id));if(!x)return;$("customerEditId").value=x.id;$("customerName").value=x.name||"";$("customerPhone").value=x.phone||""}
 async function deleteCustomer(id){if(!confirm("Delete this customer?"))return;const r=await sb.from("medifella_customers").delete().eq("id",id);if(r.error)alert(r.error.message);else await loadCustomers()}
 $("clearCustomer").onclick=clearCustomerForm;
@@ -15067,6 +15066,90 @@ async function loadCommissionRecords(retry=0){
   }else{
     boot();
   }
+})();
+</script>
+
+<script id="customer-phone-only-unique-final">
+(function(){
+  "use strict";
+
+  function normalizePhone(v){
+    return String(v == null ? "" : v)
+      .replace(/[\s().-]/g,"")
+      .trim();
+  }
+
+  async function phoneAlreadyExists(phone, excludeId){
+    const p=normalizePhone(phone);
+    if(!p) return false;
+
+    const r=await sb.from("medifella_customers")
+      .select("id,phone")
+      .eq("phone",String(phone).trim());
+
+    if(r.error){
+      console.error("Customer phone duplicate check failed:",r.error);
+      // Do not block saving because of a network/query error here.
+      return false;
+    }
+
+    return (r.data||[]).some(row=>{
+      if(excludeId && String(row.id)===String(excludeId)) return false;
+      return normalizePhone(row.phone)===p;
+    });
+  }
+
+  window.medifellaCustomerPhoneAlreadyExists=phoneAlreadyExists;
+
+  async function validateCustomerPhone(phone, excludeId){
+    if(await phoneAlreadyExists(phone,excludeId)){
+      alert("This phone number already exists. Please use a different phone number.");
+      return false;
+    }
+    return true;
+  }
+
+  window.validateCustomerPhoneUnique=validateCustomerPhone;
+
+  // Intercept customer create/edit forms by detecting the customer form
+  // submission. Name is intentionally NOT checked.
+  function install(){
+    const forms=document.querySelectorAll("form");
+    forms.forEach(form=>{
+      if(form.__phoneUniqueInstalled) return;
+
+      const phoneInput=form.querySelector(
+        'input[name="phone"],input[name="customer_phone"],input[id*="phone" i]'
+      );
+      if(!phoneInput) return;
+
+      form.__phoneUniqueInstalled=true;
+      form.addEventListener("submit",async function(e){
+        if(form.__phoneValidationRunning) return;
+        form.__phoneValidationRunning=true;
+
+        const idInput=form.querySelector(
+          'input[name="id"],input[name="customer_id"],input[type="hidden"][data-customer-id]'
+        );
+        const excludeId=idInput?.value||null;
+
+        const ok=await validateCustomerPhone(phoneInput.value,excludeId);
+
+        if(!ok){
+          e.preventDefault();
+          e.stopImmediatePropagation();
+        }
+
+        form.__phoneValidationRunning=false;
+      },true);
+    });
+  }
+
+  install();
+  setTimeout(install,300);
+  setTimeout(install,800);
+  setTimeout(install,1500);
+  setTimeout(install,2500);
 })();
 </script>
 </body>
