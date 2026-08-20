@@ -3137,7 +3137,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 const SUPABASE_URL="https://dwrpriwxbjgxpsvhclai.supabase.co";
 const SUPABASE_ANON_KEY="sb_publishable_gwLGNpQg4mo-Ae_OvlGiMQ_rZVx7S3I";
 const CLOUDFLARE_STORAGE_URL="https://medi-fella-storage.eang-chetraafs.workers.dev";
-const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY);
+const sb=supabase.createClient(SUPABASE_URL,SUPABASE_ANON_KEY); window.sb=sb;
 const $=id=>document.getElementById(id);
 function msg(el,text,error=false){el.className="status"+(error?" error":"");el.textContent=text}
 function clearMsg(el){el.className="";el.textContent=""}
@@ -6278,7 +6278,7 @@ function productStock(pid){
 async function loadProducts(){
  const {data,error}=await sb.from("medifella_products").select("*").order("created_at",{ascending:false});
  if(error){products=[]; if($("productList"))$("productList").innerHTML=`<p class="muted">${esc(error.message)}. Run the Product Management SQL setup.</p>`;return}
- products=data||[]; renderProductList();
+ products=data||[]; window.products=products; renderProductList();
 }
 async function loadStockMovements(){
   try{
@@ -6287,7 +6287,7 @@ async function loadStockMovements(){
     let r=await sb.from("medifella_inventory_movements").select("*");
     if(r.error)throw r.error;
 
-    stockMovements=Array.isArray(r.data)?r.data:[];
+    stockMovements=Array.isArray(r.data)?r.data:[]; window.stockMovements=stockMovements;
     // Newest first for the Stock History display, without requiring created_at.
     stockMovements.sort((a,b)=>{
       const ta=Date.parse(a?.stock_time||a?.created_at||"")||0;
@@ -11839,6 +11839,223 @@ async function loadCommissionRecords(retry=0){
 })();
 </script>
 
+
+<script id="product-role-stock-visibility-patch">
+(function(){
+  "use strict";
+
+  function isAdminProductUser(){
+    return String(window.currentProfile?.role || "").toLowerCase() === "admin";
+  }
+  function P(id){ return document.getElementById(id); }
+  function escP(v){
+    return typeof window.esc === "function" ? window.esc(v) :
+      String(v ?? "").replace(/[&<>"']/g,m=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[m]));
+  }
+  function attrP(v){
+    return typeof window.attr === "function" ? window.attr(v) :
+      String(v ?? "").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+  }
+  function moneyP(v){
+    return typeof window.money === "function" ? window.money(v) :
+      "$"+Number(v||0).toFixed(2);
+  }
+
+  function productRoleUI(){
+    const admin=isAdminProductUser();
+
+    // Cost is an administrator-only field.
+    const cost=P("productCost");
+    const costLabel=cost?.previousElementSibling;
+    if(cost){
+      const row=cost.closest(".row");
+      const costBox=cost.parentElement;
+      if(costBox) costBox.classList.toggle("hidden",!admin);
+      if(costLabel && costLabel.tagName==="LABEL") costLabel.classList.toggle("hidden",!admin);
+      cost.setAttribute("aria-hidden",admin?"false":"true");
+      if(!admin){
+        cost.value="";
+        cost.disabled=true;
+      }else{
+        cost.disabled=false;
+      }
+    }
+
+    // Stock Report is administrator-only. Stock History remains available.
+    const reportTab=document.querySelector('[data-product-tab="stockReportPanel"]');
+    const reportPanel=P("stockReportPanel");
+    if(reportTab) reportTab.classList.toggle("hidden",!admin);
+    if(reportPanel && !admin){
+      reportPanel.classList.add("hidden");
+      // If the report was active, return staff to Product List.
+      if(reportTab?.classList.contains("active")){
+        reportTab.classList.remove("active");
+        const listTab=document.querySelector('[data-product-tab="productListPanel"]');
+        listTab?.classList.add("active");
+        P("productListPanel")?.classList.remove("hidden");
+      }
+    }
+  }
+
+  // Replace the product list renderer so Current Stock is always visible.
+  window.renderProductList=function(){
+    if(!P("productList")) return;
+    const q=(P("productSearch")?.value||"").trim().toLowerCase();
+    const products=Array.isArray(window.products)?window.products:[];
+    const rows=products
+      .filter(p=>(`${p.product_code||""} ${p.name||""}`).toLowerCase().includes(q))
+      .filter(p=>{
+        const s=String(p.created_at||"").slice(0,10);
+        const from=P("productFromDate")?.value||"";
+        const to=P("productToDate")?.value||"";
+        return (!from||s>=from)&&(!to||s<=to);
+      });
+
+    const admin=isAdminProductUser();
+    P("productList").innerHTML=rows.length
+      ? `<div class="table-wrap"><table class="table" id="productListTable">
+          <tr>
+            <th>Product ID</th>
+            <th>Product Name</th>
+            <th>Current Stock</th>
+            ${admin ? "<th>Cost</th>" : ""}
+            <th>Price</th>
+            <th>Source</th>
+            <th>Action</th>
+          </tr>
+          ${rows.map(p=>{
+            const stock=(Array.isArray(window.stockMovements)?window.stockMovements:[]).reduce((total,m)=>{
+              if(String(m.product_id)!==String(p.id)) return total;
+              const q=Math.max(0,Number(m.quantity||0));
+              const type=String(m.movement_type||"").trim().toLowerCase();
+              if(type==="stock_in"||type==="stockin"||type==="in") return total+q;
+              if(type==="sale"||type==="stock_out"||type==="stockout"||type==="out") return total-q;
+              return total;
+            },0);
+            return `<tr>
+              <td>${escP(p.product_code)}</td>
+              <td>${escP(p.name)}</td>
+              <td><strong>${stock}</strong></td>
+              ${admin ? `<td>${moneyP(p.cost)}</td>` : ""}
+              <td>${moneyP(p.price)}</td>
+              <td>${escP(typeof window.sourceLabel==="function"?window.sourceLabel(p):(p.source||""))}</td>
+              <td><div class="actions">
+                <button type="button" class="light" onclick="editProduct('${attrP(p.id)}')">Edit</button>
+                <button type="button" class="danger" onclick="deleteProduct('${attrP(p.id)}')">Delete</button>
+              </div></td>
+            </tr>`;
+          }).join("")}
+        </table></div>`
+      : '<p class="muted">No products found.</p>';
+  };
+
+  // Staff can edit product name/price/source, but cannot view or change cost.
+  window.editProduct=function(id){
+    const products=Array.isArray(window.products)?window.products:[];
+    const p=products.find(x=>String(x.id)===String(id));
+    if(!p) return;
+    P("productEditId").value=p.id;
+    P("productName").value=p.name||"";
+    P("productPrice").value=p.price??"";
+    P("productSource").value=p.source||"Korean";
+    P("productSourceOther").value=p.source_other||"";
+    P("productSource")?.dispatchEvent(new Event("change"));
+
+    if(isAdminProductUser()){
+      P("productCost").value=p.cost??"";
+    }else{
+      P("productCost").value="";
+    }
+
+    productRoleUI();
+    P("products")?.scrollIntoView({behavior:"smooth"});
+  };
+
+  // Replace the save handler. Admins can create/update cost; staff never send a cost update.
+  const saveBtn=P("saveProduct");
+  if(saveBtn){
+    saveBtn.onclick=async function(){
+      if(typeof window.clearMsg==="function") window.clearMsg(P("productStatus"));
+      const id=P("productEditId")?.value||"";
+      const name=(P("productName")?.value||"").trim();
+      const price=Number(P("productPrice")?.value||0);
+      const source=P("productSource")?.value||"Korean";
+      const source_other=(P("productSourceOther")?.value||"").trim();
+
+      if(!name || price<0){
+        window.msg?.(P("productStatus"),"Please fill Product Name and Price.",true);
+        return;
+      }
+
+      const admin=isAdminProductUser();
+      const cost=Number(P("productCost")?.value||0);
+
+      // Staff cannot create a new product because creating one requires a cost
+      // that only an administrator is allowed to enter.
+      if(!admin && !id){
+        window.msg?.(P("productStatus"),"Only an Admin can add a new product because Product Cost is restricted to Admin accounts.",true);
+        return;
+      }
+      if(admin && cost<0){
+        window.msg?.(P("productStatus"),"Please enter a valid Product Cost.",true);
+        return;
+      }
+
+      try{
+        let payload;
+        if(admin){
+          payload={name,cost,price,source,source_other:source==="Others"?source_other:null};
+        }else{
+          // Deliberately omit cost so staff cannot change it.
+          payload={name,price,source,source_other:source==="Others"?source_other:null};
+        }
+
+        let r;
+        if(id){
+          r=await window.sb.from("medifella_products").update(payload).eq("id",id);
+        }else{
+          const existing=Array.isArray(window.products)?window.products:[];
+          let max=0;
+          existing.forEach(x=>{const m=String(x.product_code||"").match(/^P(\d+)$/i);if(m)max=Math.max(max,Number(m[1]));});
+          payload.product_code="P"+String(max+1).padStart(4,"0");
+          r=await window.sb.from("medifella_products").insert(payload);
+        }
+        if(r.error) throw r.error;
+
+        window.msg?.(P("productStatus"),id?"Product updated.":"Product added.");
+        if(typeof window.clearProductForm==="function") window.clearProductForm();
+        if(typeof window.loadProducts==="function") await window.loadProducts();
+        productRoleUI();
+      }catch(e){
+        window.msg?.(P("productStatus"),e.message||"Could not save product.",true);
+      }
+    };
+  }
+
+  // Keep the role-specific UI synchronized after login/permission refresh.
+  const originalApply=window.applyAccountPermissions;
+  if(typeof originalApply==="function" && !window.__productRoleApplyPatched){
+    window.__productRoleApplyPatched=true;
+    window.applyAccountPermissions=function(){
+      const result=originalApply.apply(this,arguments);
+      try{productRoleUI();}catch(_){}
+      return result;
+    };
+  }
+
+  function init(){
+    productRoleUI();
+    try{window.renderProductList();}catch(_){}
+  }
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",init,{once:true});
+  }else{
+    init();
+  }
+  setTimeout(productRoleUI,300);
+  setTimeout(productRoleUI,1000);
+})();
+</script>
 </body>
 </html>
 <style id="mts-invoice-edit-products-v8">
