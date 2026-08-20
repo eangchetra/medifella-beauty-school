@@ -4810,6 +4810,58 @@ function openPrintFromCanvas(canvas,paper,sale){
 
 
 
+
+<script id="admin-stock-report-visibility-final">
+(function(){
+  "use strict";
+  function roleIsAdmin(){
+    const email=String(
+      window.currentUserEmail||window.userEmail||window.currentUser?.email||
+      localStorage.getItem("userEmail")||localStorage.getItem("email")||""
+    ).trim().toLowerCase();
+
+    if(email==="eang.chetraafs@gmail.com") return true;
+
+    const r=String(
+      window.currentUserRole||window.userRole||window.currentRole||
+      localStorage.getItem("userRole")||localStorage.getItem("role")||""
+    ).toLowerCase();
+
+    return r==="admin" || r.includes("admin");
+  }
+  function applyAdminReportVisibility(){
+    if(!roleIsAdmin()) return;
+
+    const tab=document.querySelector('[data-product-tab="stockReportPanel"]');
+    const panel=document.getElementById("stockReportPanel");
+
+    if(tab){
+      tab.classList.remove("hidden");
+      tab.style.display="";
+      tab.removeAttribute("aria-hidden");
+      tab.disabled=false;
+    }
+    if(panel){
+      panel.classList.remove("hidden");
+      panel.style.display="";
+      panel.removeAttribute("aria-hidden");
+    }
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",applyAdminReportVisibility,{once:true});
+  }else{
+    applyAdminReportVisibility();
+  }
+
+  const observer=new MutationObserver(applyAdminReportVisibility);
+  observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:["class","style","aria-hidden"]});
+
+  setTimeout(applyAdminReportVisibility,300);
+  setTimeout(applyAdminReportVisibility,1000);
+  setTimeout(applyAdminReportVisibility,2000);
+});
+</script>
 </body>
 
 </html>`;
@@ -6345,7 +6397,32 @@ function renderProductList(){
  const q=($("productSearch")?.value||"").trim().toLowerCase();
  const rows=products.filter(p=>(`${p.product_code||""} ${p.name||""}`).toLowerCase().includes(q))
    .filter(p=>inDateRange(p.created_at,"productFromDate","productToDate"));
- $("productList").innerHTML=rows.length?`<div class="table-wrap"><table class="table" id="productListTable"><tr><th>Product ID</th><th>Product Name</th><th>Price</th><th>Source</th><th>Action</th></tr>${rows.map(p=>`<tr><td>${esc(p.product_code)}</td><td>${esc(p.name)}</td><td>${money(p.price)}</td><td>${esc(sourceLabel(p))}</td><td><div class="actions"><button type="button" class="light" onclick="editProduct('${attr(p.id)}')">Edit</button><button type="button" class="danger" onclick="deleteProduct('${attr(p.id)}')">Delete</button></div></td></tr>`).join("")}</table></div>`:'<p class="muted">No products found.</p>';
+
+ const email=String(window.currentUserEmail||window.userEmail||window.currentUser?.email||
+   localStorage.getItem("userEmail")||localStorage.getItem("email")||"").trim().toLowerCase();
+ const role=String(window.currentUserRole||window.userRole||window.currentRole||
+   localStorage.getItem("userRole")||localStorage.getItem("role")||"").toLowerCase();
+ const isAdmin=email==="eang.chetraafs@gmail.com" || role==="admin" || role.includes("admin");
+
+ $("productList").innerHTML=rows.length?`
+ <div class="table-wrap"><table class="table" id="productListTable">
+  <tr>
+   <th>Product ID</th><th>Product Name</th>
+   ${isAdmin?"<th>Cost</th>":""}
+   <th>Price</th><th>Source</th><th>Action</th>
+  </tr>
+  ${rows.map(p=>`<tr>
+   <td>${esc(p.product_code)}</td>
+   <td>${esc(p.name)}</td>
+   ${isAdmin?`<td>${p.cost!==null&&p.cost!==undefined&&p.cost!==""?money(p.cost):"—"}</td>`:""}
+   <td>${money(p.price)}</td>
+   <td>${esc(sourceLabel(p))}</td>
+   <td><div class="actions">
+    <button type="button" class="light" onclick="editProduct('${attr(p.id)}')">Edit</button>
+    <button type="button" class="danger" onclick="deleteProduct('${attr(p.id)}')">Delete</button>
+   </div></td>
+  </tr>`).join("")}
+ </table></div>`:'<p class="muted">No products found.</p>';
 }
 function renderStockList(){
  if(!$("stockList"))return;
