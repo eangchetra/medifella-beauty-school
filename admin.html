@@ -7342,14 +7342,27 @@ function renderInventoryControls(){
   function fill(id,placeholder){
     const el=$(id);
     if(!el)return;
-    const oldValue=el.value;
+
+    const isSaleStaff=(id==="mtsSaleStaff" || id==="dermedSaleStaff");
+    const saved=isSaleStaff
+      ? String(el.dataset.persistedSaleStaff || el.value || "")
+      : String(el.value || "");
+
     el.innerHTML=`<option value="">${placeholder}</option>`+
       allStaff.map(x=>
         `<option value="${attr(x.id)}">${esc(x._label)} · ${esc(x._job)}</option>`
       ).join("");
 
-    if(oldValue && allStaff.some(x=>String(x.id)===String(oldValue))){
-      el.value=oldValue;
+    if(saved && allStaff.some(x=>String(x.id)===saved)){
+      el.value=saved;
+    }
+
+    if(isSaleStaff && el.dataset.saleStaffPersistBound!=="1"){
+      el.addEventListener("change",function(){
+        this.dataset.persistedSaleStaff=String(this.value||"");
+      });
+      el.dataset.saleStaffPersistBound="1";
+      if(el.value)el.dataset.persistedSaleStaff=String(el.value);
     }
   }
 
@@ -7388,22 +7401,34 @@ function renderInventoryControls(){
   // Sale Staff Management (medifella_sale_staff), never from the
   // general staff list.
   function refreshSaleStaffOnlySelectors(){
-    const latest = (typeof latestConfigs==="function")
-      ? latestConfigs()
-      : [];
+    const latest = (typeof latestConfigs==="function") ? latestConfigs() : [];
     const targets = ["dermedSaleStaff","mtsSaleStaff"];
 
     targets.forEach(id=>{
       const el=$(id);
       if(!el)return;
-      const oldValue=el.value;
+
+      const saved=String(el.dataset.persistedSaleStaff || el.value || "");
+
+      // Do not destroy a working selection when a background refresh briefly
+      // returns no Sale Staff rows (common while RLS/auth data is loading).
+      if(!latest.length){
+        if(saved && [...el.options].some(o=>String(o.value)===saved)){
+          el.value=saved;
+        }
+        return;
+      }
+
       el.innerHTML='<option value="">Select Sale Staff</option>'+
         latest.map(x=>
           `<option value="${attr(x.staff_id)}">${esc(x.staff_name||"Staff")} · P ${Number(x.product_rate||0)}% / S ${Number(x.service_rate||0)}% / SP ${Number(x.service_product_rate||0)}%</option>`
         ).join("");
-      if(oldValue && latest.some(x=>String(x.staff_id)===String(oldValue))){
-        el.value=oldValue;
+
+      if(saved && latest.some(x=>String(x.staff_id)===saved)){
+        el.value=saved;
       }
+
+      if(el.value)el.dataset.persistedSaleStaff=String(el.value);
     });
   }
 
@@ -7435,7 +7460,16 @@ function renderInventoryControls(){
         const el=$(id);
         if(!el || el.tagName !== "SELECT") return;
 
-        const oldValue=el.value;
+        const saved=String(el.dataset.persistedSaleStaff || el.value || "");
+
+        // Never wipe a selected staff member because a background Supabase
+        // refresh temporarily returns zero rows.
+        if(!rows.length){
+          if(saved && [...el.options].some(o=>String(o.value)===saved))
+            el.value=saved;
+          return;
+        }
+
         el.innerHTML='<option value="">Select Sale Staff</option>'+
           rows.map(x=>{
             const idv=x.staff_id ?? x.id ?? "";
@@ -7443,8 +7477,16 @@ function renderInventoryControls(){
             return `<option value="${attr(idv)}">${esc(name)}</option>`;
           }).join("");
 
-        if(oldValue && rows.some(x=>String(x.staff_id ?? x.id)===String(oldValue))){
-          el.value=oldValue;
+        if(saved && rows.some(x=>String(x.staff_id ?? x.id)===saved)){
+          el.value=saved;
+        }
+        if(el.value)el.dataset.persistedSaleStaff=String(el.value);
+
+        if(el.dataset.saleStaffPersistBound!=="1"){
+          el.addEventListener("change",function(){
+            this.dataset.persistedSaleStaff=String(this.value||"");
+          });
+          el.dataset.saleStaffPersistBound="1";
         }
       });
     }catch(e){
@@ -19384,7 +19426,6 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       if(option){
         writing=true;
         el.value=value;
-        el.dispatchEvent(new Event("change",{bubbles:true}));
         writing=false;
       }
     });
@@ -19581,6 +19622,56 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   [50,150,300,600,1000,2000,3500].forEach(ms=>setTimeout(bindAndRestore,ms));
 
   new MutationObserver(bindAndRestore).observe(document.body,{childList:true,subtree:true});
+})();
+</script>
+
+
+<script id="mts-dermed-sale-staff-selection-final">
+(function(){
+  "use strict";
+  const saved={mts:"",dermed:""};
+
+  function get(id,key){
+    const el=document.getElementById(id);
+    if(!el)return;
+    const current=String(el.value||"");
+    if(current){
+      saved[key]=current;
+      el.dataset.persistedSaleStaff=current;
+    }else if(el.dataset.persistedSaleStaff){
+      saved[key]=String(el.dataset.persistedSaleStaff);
+    }
+  }
+
+  function restore(id,key){
+    const el=document.getElementById(id);
+    if(!el)return;
+    const wanted=saved[key]||String(el.dataset.persistedSaleStaff||"");
+    if(!wanted)return;
+    const opt=[...el.options].find(o=>String(o.value)===wanted);
+    if(opt && el.value!==wanted)el.value=wanted;
+  }
+
+  function run(){
+    get("mtsSaleStaff","mts");
+    get("dermedSaleStaff","dermed");
+    restore("mtsSaleStaff","mts");
+    restore("dermedSaleStaff","dermed");
+  }
+
+  document.addEventListener("change",function(e){
+    if(e.target?.id==="mtsSaleStaff"){
+      saved.mts=String(e.target.value||"");
+      e.target.dataset.persistedSaleStaff=saved.mts;
+    }
+    if(e.target?.id==="dermedSaleStaff"){
+      saved.dermed=String(e.target.value||"");
+      e.target.dataset.persistedSaleStaff=saved.dermed;
+    }
+  },true);
+
+  [0,50,150,300,600,1000,2000,3000].forEach(ms=>setTimeout(run,ms));
+  setInterval(run,1000);
 })();
 </script>
 
