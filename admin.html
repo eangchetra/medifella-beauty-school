@@ -6989,7 +6989,17 @@ $("courseSave").onclick=async()=>{
    }
    msg($("courseStatus"),id?"Course updated.":"Course created.");
    clearCourse();await loadCourses();updateMetrics()
- }catch(e){msg($("courseStatus"),e.message,true)}
+ }catch(e){
+   const em=String(e?.message||e||"");
+   if(/row-level security|violates row-level security policy|new row violates/i.test(em)){
+     msg($("courseStatus"),
+       "Course save was blocked by Supabase RLS. Please run the COURSE_STAFF_ACCESS_RLS_FIX.sql file once in Supabase SQL Editor, then try again.",
+       true
+     );
+   }else{
+     msg($("courseStatus"),em,true);
+   }
+ }
 };
 function editCourse(id){
  const c=courses.find(x=>x.id===id);if(!c)return;
@@ -7313,9 +7323,46 @@ function renderInventoryControls(){
   fillCashier("dermedCashier","Select Cashier");
   fillCashier("mtsCashier","Select Cashier");
 
-  // Medi Fella Sale cashier selector.
+  // Cashier for Medi Fella Sale remains restricted to Cashier / Counter / Sale.
   fillCashier("mfCashier","Select Cashier");
   fillCashier("medifellaCashier","Select Cashier");
+
+  // IMPORTANT:
+  // Dermed Sale and MTS Sale Sale Staff must come ONLY from
+  // Sale Staff Management (medifella_sale_staff), never from the
+  // general staff list.
+  function refreshSaleStaffOnlySelectors(){
+    const latest = (typeof latestConfigs==="function")
+      ? latestConfigs()
+      : [];
+    const targets = ["dermedSaleStaff","mtsSaleStaff"];
+
+    targets.forEach(id=>{
+      const el=$(id);
+      if(!el)return;
+      const oldValue=el.value;
+      el.innerHTML='<option value="">Select Sale Staff</option>'+
+        latest.map(x=>
+          `<option value="${attr(x.staff_id)}">${esc(x.staff_name||"Staff")} · P ${Number(x.product_rate||0)}% / S ${Number(x.service_rate||0)}% / SP ${Number(x.service_product_rate||0)}%</option>`
+        ).join("");
+      if(oldValue && latest.some(x=>String(x.staff_id)===String(oldValue))){
+        el.value=oldValue;
+      }
+    });
+  }
+
+  refreshSaleStaffOnlySelectors();
+
+  // Keep the dedicated Sale Staff Management refresh in sync with both
+  // Dermed Sale and MTS Sale selectors.
+  const originalRefreshSaleStaffManagementOptions =
+    window.refreshSaleStaffManagementOptions;
+  window.refreshSaleStaffManagementOptions = function(){
+    if(typeof originalRefreshSaleStaffManagementOptions==="function"){
+      originalRefreshSaleStaffManagementOptions();
+    }
+    refreshSaleStaffOnlySelectors();
+  };
 
   // Some versions use these alternate Medi Fella IDs.
   fill("mfSaleStaff","Select Sale Staff");
