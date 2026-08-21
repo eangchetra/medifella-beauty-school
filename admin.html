@@ -7488,10 +7488,18 @@ function renderInventoryControls(){
         return;
       }
 
-      el.innerHTML='<option value="">Select Sale Staff</option>'+
-        latest.map(x=>
-          `<option value="${attr(x.staff_id)}">${esc(x.staff_name||"Staff")} · P ${Number(x.product_rate||0)}% / S ${Number(x.service_rate||0)}% / SP ${Number(x.service_product_rate||0)}%</option>`
-        ).join("");
+      const nextOptions=latest.map(x=>({
+        value:String(x.staff_id),
+        label:`${x.staff_name||"Staff"} · P ${Number(x.product_rate||0)}% / S ${Number(x.service_rate||0)}% / SP ${Number(x.service_product_rate||0)}%`
+      }));
+      const currentOptions=[...el.options].map(o=>({value:String(o.value),label:String(o.textContent||"")}));
+      const same=currentOptions.length===nextOptions.length &&
+        currentOptions.every((o,i)=>o.value===nextOptions[i].value && o.label===nextOptions[i].label);
+
+      if(!same){
+        el.innerHTML='<option value="">Select Sale Staff</option>'+
+          nextOptions.map(x=>`<option value="${attr(x.value)}">${esc(x.label)}</option>`).join("");
+      }
 
       if(saved && latest.some(x=>String(x.staff_id)===saved)){
         el.value=saved;
@@ -7543,7 +7551,13 @@ function renderInventoryControls(){
           rows.map(x=>{
             const idv=x.staff_id ?? x.id ?? "";
             const name=x.staff_name ?? x.name ?? "Sale Staff";
-            return `<option value="${attr(idv)}">${esc(name)}</option>`;
+            const productRate=Number(x.product_rate ?? x.product_commission_rate ?? 0);
+            const serviceRate=Number(x.service_rate ?? x.service_commission_rate ?? 0);
+            const serviceProductRate=Number(x.service_product_rate ?? x.service_product_commission_rate ?? 0);
+            const label = id === "dermedSaleStaff"
+              ? `${name} · P ${productRate}% / S ${serviceRate}% / SP ${serviceProductRate}%`
+              : name;
+            return `<option value="${attr(idv)}">${esc(label)}</option>`;
           }).join("");
 
         if(saved && rows.some(x=>String(x.staff_id ?? x.id)===saved)){
@@ -19689,6 +19703,33 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 
   // Handle complete replacement of a selector by the existing renderer.
   new MutationObserver(sync).observe(document.body,{childList:true,subtree:true});
+})();
+</script>
+
+
+<script id="dermed-sale-staff-rate-no-flash-final">
+(function(){
+  "use strict";
+  function sync(){
+    const el=document.getElementById("dermedSaleStaff");
+    if(!el)return;
+    if(el.value){
+      el.dataset.persistedSaleStaff=String(el.value);
+      return;
+    }
+    const wanted=String(el.dataset.persistedSaleStaff||"");
+    if(wanted){
+      const option=[...el.options].find(o=>String(o.value)===wanted);
+      if(option)el.value=wanted;
+    }
+  }
+  const el=document.getElementById("dermedSaleStaff");
+  if(el){
+    el.addEventListener("change",function(){
+      this.dataset.persistedSaleStaff=String(this.value||"");
+    },true);
+  }
+  [0,100,300,700,1200,2000].forEach(ms=>setTimeout(sync,ms));
 })();
 </script>
 
