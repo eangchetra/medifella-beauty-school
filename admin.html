@@ -2169,6 +2169,28 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .section.active{display:block!important}
 </style>
 
+
+<style id="dashboard-initial-paint-stable">
+  /* Prevent permission/nav initialization from visibly flashing sections. */
+  body.dashboard-pending #adminPanel,
+  body.dashboard-pending main,
+  body.dashboard-pending .admin-layout{
+    visibility:hidden!important;
+  }
+</style>
+<script id="dashboard-initial-paint-stable-script">
+(function(){
+  document.body.classList.add("dashboard-pending");
+  function reveal(){
+    document.body.classList.remove("dashboard-pending");
+  }
+  // Reveal after the authentication/permission initialization scripts have
+  // completed their startup work.
+  [250,600,1000,1600].forEach(ms=>setTimeout(reveal,ms));
+  window.addEventListener("load",function(){setTimeout(reveal,150);},{once:true});
+})();
+</script>
+
 </head>
 <body>
 
@@ -19240,6 +19262,89 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       open(btn);
     }
   },false);
+})();
+</script>
+
+
+<script id="dermed-appointment-authoritative-controller">
+(function(){
+  "use strict";
+
+  function E(id){return document.getElementById(id);}
+
+  function closeModal(){
+    const m=E("dermedAppointmentModal");
+    if(!m)return;
+    m.classList.remove("show");
+    m.setAttribute("aria-hidden","true");
+    m.style.display="none";
+  }
+
+  function openModal(){
+    const m=E("dermedAppointmentModal");
+    if(!m)return;
+    m.classList.add("show");
+    m.setAttribute("aria-hidden","false");
+    m.style.display="block";
+    if(typeof bindDermedAppointmentDateInput==="function")
+      bindDermedAppointmentDateInput();
+    const d=E("dermedAppointmentDate");
+    if(d){
+      d.type="text";
+      d.inputMode="numeric";
+      d.placeholder="dd/mm/yyyy";
+      d.maxLength=10;
+    }
+  }
+
+  document.addEventListener("click",async function(e){
+    const close=e.target.closest("#dermedAppointmentClose,#dermedAppointmentCancel");
+    const save=e.target.closest("#dermedAppointmentSave");
+    const add=e.target.closest("#dermedAddAppointment");
+
+    if(!close && !save && !add)return;
+
+    // These controls belong to the Dermed Appointment modal. Prevent the
+    // multiple older handlers from fighting each other.
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    if(close){
+      closeModal();
+      return;
+    }
+
+    if(add){
+      openModal();
+      return;
+    }
+
+    if(save){
+      const btn=E("dermedAppointmentSave");
+      if(btn && btn.disabled)return;
+
+      if(typeof window.saveAppointmentFromDermed==="function"){
+        try{
+          await window.saveAppointmentFromDermed();
+        }catch(err){
+          console.error("Dermed appointment save:",err);
+        }
+      }else{
+        const status=E("dermedAppointmentStatus");
+        if(status)status.textContent="Save Appointment function is not available.";
+      }
+    }
+  },true);
+
+  // Also allow clicking the dark overlay to close the appointment box.
+  document.addEventListener("click",function(e){
+    const m=E("dermedAppointmentModal");
+    if(m && e.target===m){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeModal();
+    }
+  },true);
 })();
 </script>
 
