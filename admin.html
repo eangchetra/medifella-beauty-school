@@ -7629,10 +7629,11 @@ $("saveStock").onclick=async()=>{
 
     // Inventory movements store quantities as positive numbers.
     // The movement type determines whether stock is added or removed.
-    const movementType="stock_in";
-    // The existing DB check constraint accepts stock_in. A negative stock_in
-    // quantity is used as a stock-reduction adjustment.
-    const quantity=q;
+    const movementType=q>0?"stock_in":"sale";
+    // The database requires quantity >= 0. A negative adjustment such as -29
+    // is therefore stored as a positive quantity (29) with the existing
+    // "sale" movement type, which reduces stock by 29.
+    const quantity=Math.abs(q);
     const notes=q>0?"Stock In":"Stock Adjustment / Stock Reduction";
 
     const payload={
@@ -7656,7 +7657,7 @@ $("saveStock").onclick=async()=>{
     }
     if(r.error)throw r.error;
 
-    const resultingStock=currentStock+q;
+    const resultingStock=currentStock + q;
     msg(
       $("stockStatus"),
       editId
