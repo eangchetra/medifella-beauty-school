@@ -20557,6 +20557,377 @@ ${styles}
 })();
 </script>
 
+
+<script id="strict-one-page-invoice-print-final">
+(function(){
+  "use strict";
+
+  function getInvoice(){
+    return document.querySelector("#invoiceOverlay .mf-invoice") ||
+           document.querySelector("#invoicePrint .mf-invoice") ||
+           document.querySelector(".invoice-overlay .mf-invoice") ||
+           document.querySelector(".mf-invoice");
+  }
+
+  async function printStrictOnePage(){
+    const source=getInvoice();
+    if(!source){
+      alert("Please open the invoice first.");
+      return;
+    }
+
+    const w=window.open("","_blank","width=1000,height=1300");
+    if(!w){
+      alert("Please allow pop-ups for this website.");
+      return;
+    }
+
+    const clone=source.cloneNode(true);
+    clone.querySelectorAll(
+      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,[data-no-print='true']"
+    ).forEach(el=>el.remove());
+
+    const styles=[...document.querySelectorAll("style,link[rel='stylesheet']")]
+      .map(n=>n.outerHTML).join("\n");
+
+    w.document.open();
+    w.document.write(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Invoice</title>
+${styles}
+<style id="strict-one-page-css">
+  @page{
+    size:A4 portrait;
+    margin:0!important;
+  }
+
+  html,body{
+    margin:0!important;
+    padding:0!important;
+    width:210mm!important;
+    height:297mm!important;
+    min-height:297mm!important;
+    max-height:297mm!important;
+    overflow:hidden!important;
+    background:#fff!important;
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+  }
+
+  #strictPage{
+    position:relative!important;
+    width:210mm!important;
+    height:297mm!important;
+    min-height:297mm!important;
+    max-height:297mm!important;
+    overflow:hidden!important;
+    margin:0!important;
+    padding:0!important;
+    page-break-after:avoid!important;
+    break-after:avoid-page!important;
+    background:#fff!important;
+  }
+
+  #strictInvoice{
+    position:absolute!important;
+    left:0!important;
+    top:0!important;
+    width:210mm!important;
+    margin:0!important;
+    padding:0!important;
+    transform-origin:top left!important;
+    page-break-before:avoid!important;
+    page-break-after:avoid!important;
+    break-before:avoid-page!important;
+    break-after:avoid-page!important;
+  }
+
+  #strictInvoice .mf-invoice{
+    width:210mm!important;
+    max-width:210mm!important;
+    min-width:210mm!important;
+    margin:0!important;
+    padding:0!important;
+    page-break-before:avoid!important;
+    page-break-after:avoid!important;
+    break-before:avoid-page!important;
+    break-after:avoid-page!important;
+  }
+
+  #strictInvoice table,
+  #strictInvoice tr,
+  #strictInvoice td,
+  #strictInvoice th{
+    break-inside:avoid!important;
+    page-break-inside:avoid!important;
+  }
+
+  @media print{
+    html,body,#strictPage{
+      width:210mm!important;
+      height:297mm!important;
+      min-height:297mm!important;
+      max-height:297mm!important;
+      overflow:hidden!important;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="strictPage"><div id="strictInvoice">${clone.outerHTML}</div></div>
+<script>
+(async function(){
+  try{
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+  }catch(e){}
+
+  const imgs=[...document.images];
+  await Promise.all(imgs.map(function(img){
+    if(img.complete)return Promise.resolve();
+    return new Promise(function(resolve){
+      img.addEventListener("load",resolve,{once:true});
+      img.addEventListener("error",resolve,{once:true});
+    });
+  }));
+
+  await new Promise(function(resolve){
+    requestAnimationFrame(function(){
+      requestAnimationFrame(resolve);
+    });
+  });
+
+  const page=document.getElementById("strictPage");
+  const box=document.getElementById("strictInvoice");
+  const invoice=box.querySelector(".mf-invoice");
+
+  // A4 CSS pixels at 96dpi: 210mm x 297mm.
+  const A4W=793.7008;
+  const A4H=1122.5197;
+
+  // Measure the untransformed, fully rendered invoice.
+  const rect=invoice.getBoundingClientRect();
+  const fullW=Math.max(
+    invoice.scrollWidth||0,
+    rect.width||0,
+    invoice.offsetWidth||0
+  );
+  const fullH=Math.max(
+    invoice.scrollHeight||0,
+    rect.height||0,
+    invoice.offsetHeight||0
+  );
+
+  // Fit both dimensions into exactly one A4 page.
+  const scale=Math.min(A4W/fullW, A4H/fullH, 1);
+
+  box.style.width=fullW+"px";
+  box.style.height=fullH+"px";
+  box.style.transformOrigin="top left";
+  box.style.transform="scale("+scale+")";
+
+  // Center only horizontally; never create extra vertical layout.
+  const usedW=fullW*scale;
+  box.style.left=Math.max(0,(A4W-usedW)/2)+"px";
+  box.style.top="0px";
+
+  // Force the print document to have exactly one page of content.
+  page.style.width=A4W+"px";
+  page.style.height=A4H+"px";
+  page.style.overflow="hidden";
+
+  await new Promise(function(resolve){
+    requestAnimationFrame(function(){
+      requestAnimationFrame(resolve);
+    });
+  });
+
+  setTimeout(function(){
+    window.focus();
+    window.print();
+  },200);
+})();
+<\/script>
+</body>
+</html>`);
+    w.document.close();
+    w.focus();
+  }
+
+  window.saveInvoicePDFExact=printStrictOnePage;
+  window.downloadInvoicePDF=printStrictOnePage;
+  window.printInvoice=printStrictOnePage;
+  window.exactInvoicePrint=printStrictOnePage;
+
+  // Highest-priority click handler for Save PDF and Print in invoice viewer.
+  document.addEventListener("click",function(e){
+    const btn=e.target.closest(
+      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button"
+    );
+    if(!btn)return;
+
+    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
+
+    if(text.includes("save pdf") || text==="print" || text.includes("print invoice")){
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+      printStrictOnePage();
+    }
+  },true);
+})();
+</script>
+
+
+<script id="final-a4-standard-print-a4-a5-choice">
+(function(){
+  "use strict";
+
+  function invoiceNode(){
+    return document.querySelector("#invoiceOverlay .mf-invoice") ||
+           document.querySelector("#invoicePrint .mf-invoice") ||
+           document.querySelector(".invoice-overlay .mf-invoice") ||
+           document.querySelector(".mf-invoice");
+  }
+
+  async function printInvoiceA4Standard(){
+    const source=invoiceNode();
+    if(!source){
+      alert("Please open the invoice first.");
+      return;
+    }
+
+    const w=window.open("","_blank","width=1000,height=1300");
+    if(!w){
+      alert("Please allow pop-ups for this website.");
+      return;
+    }
+
+    const clone=source.cloneNode(true);
+    clone.querySelectorAll(
+      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,[data-no-print='true']"
+    ).forEach(el=>el.remove());
+
+    const styles=[...document.querySelectorAll("style,link[rel='stylesheet']")]
+      .map(n=>n.outerHTML).join("\n");
+
+    w.document.open();
+    w.document.write(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Invoice</title>
+${styles}
+<style id="a4-invoice-print-css">
+  /* The invoice itself is always A4. The laptop's Print dialog can scale it
+     to A5 if the user chooses A5. */
+  @page{
+    size:A4 portrait;
+    margin:0;
+  }
+  html,body{
+    margin:0!important;
+    padding:0!important;
+    width:210mm!important;
+    min-width:210mm!important;
+    background:#fff!important;
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+  }
+  #invoicePrintPage{
+    width:210mm!important;
+    min-width:210mm!important;
+    margin:0!important;
+    padding:0!important;
+    background:#fff!important;
+  }
+  #invoicePrintPage .mf-invoice{
+    width:210mm!important;
+    max-width:210mm!important;
+    min-width:210mm!important;
+    margin:0!important;
+    box-sizing:border-box!important;
+    break-inside:avoid!important;
+    page-break-inside:avoid!important;
+  }
+  #invoicePrintPage table,
+  #invoicePrintPage tr,
+  #invoicePrintPage td,
+  #invoicePrintPage th{
+    break-inside:avoid!important;
+    page-break-inside:avoid!important;
+  }
+  @media print{
+    html,body{
+      width:210mm!important;
+      min-width:210mm!important;
+    }
+    #invoicePrintPage{
+      width:210mm!important;
+      min-width:210mm!important;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="invoicePrintPage">${clone.outerHTML}</div>
+<script>
+(async function(){
+  try{
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+  }catch(e){}
+
+  const imgs=[...document.images];
+  await Promise.all(imgs.map(function(img){
+    if(img.complete)return Promise.resolve();
+    return new Promise(function(resolve){
+      img.addEventListener("load",resolve,{once:true});
+      img.addEventListener("error",resolve,{once:true});
+    });
+  }));
+
+  await new Promise(function(resolve){
+    requestAnimationFrame(function(){
+      requestAnimationFrame(resolve);
+    });
+  });
+
+  setTimeout(function(){
+    window.focus();
+    window.print();
+  },150);
+})();
+<\/script>
+</body>
+</html>`);
+    w.document.close();
+    w.focus();
+  }
+
+  window.printInvoiceA4Standard=printInvoiceA4Standard;
+
+  // Only intercept Print. Save PDF is deliberately left separate.
+  document.addEventListener("click",function(e){
+    const btn=e.target.closest(
+      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button"
+    );
+    if(!btn)return;
+
+    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
+
+    if(text==="print" || text.includes("print invoice")){
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+      printInvoiceA4Standard();
+    }
+  },true);
+})();
+</script>
+
 </body>
 </html>
 
