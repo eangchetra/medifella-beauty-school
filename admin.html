@@ -186,7 +186,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .sale-section-title{display:flex;justify-content:space-between;align-items:center;margin-top:24px;margin-bottom:10px}
 .sale-section-title h2{margin:0;color:#1aa8bb;font-size:21px}
 .sale-table-wrap{overflow:visible;border:1px solid #d8eaed;border-radius:12px}
-.sale-entry-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.sale-entry-table{width:100%!important;max-width:none!important;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .sale-entry-table th{background:#42b8c8;color:#fff;padding:13px 12px;text-align:left;font-size:14px}
 .sale-entry-table th:first-child{border-radius:11px 0 0 0}.sale-entry-table th:last-child{border-radius:0 11px 0 0}
 .sale-entry-table td{padding:10px;border-top:1px solid #e0eef0;vertical-align:middle;background:#fff}
@@ -2379,11 +2379,12 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
   <div class="sale-table-wrap">
     <table class="sale-entry-table">
-      <thead>\n     <tr style="background:${invoiceBrand.color};color:#FFFFFF"
-          <th style="width:45%">Course / Product</th>
+      <thead>
+        <tr>
+          <th style="width:42%">Course / Product</th>
           <th style="width:10%">Qty</th>
-          <th style="width:15%">Unit Price (USD)</th>
-          <th style="width:18%">Discount</th>
+          <th style="width:14%">Unit Price (USD)</th>
+          <th style="width:19%">Discount</th>
           <th style="width:15%">Subtotal (USD)</th>
           <th style="width:46px"></th>
         </tr>
@@ -7380,6 +7381,9 @@ function renderInventoryControls(){
       if(error) throw error;
 
       const rows = Array.isArray(data) ? data : [];
+      // Keep a dedicated in-page cache so repeated UI refreshes do not
+      // temporarily erase the Sale Staff choices.
+      window.__dedicatedSaleStaffRows = rows.slice();
       const targets = [
         "mtsSaleStaff",
         "mtsSaleStaffId",
@@ -7405,8 +7409,14 @@ function renderInventoryControls(){
           el.value=oldValue;
         }
       });
+
+      // Also refresh the normal Dermed selector after the dedicated records
+      // have arrived, so it immediately becomes selectable.
+      if(typeof refreshDermedSaleStaff==="function") refreshDermedSaleStaff();
     }catch(e){
       console.warn("Could not load Sale Staff Management list:", e);
+      // Do not wipe an already populated selector if the refresh request
+      // temporarily fails.
     }
   }
 
@@ -15562,9 +15572,31 @@ async function loadCommissionRecords(retry=0){
     return [...map.values()];
   }
   function refreshDermedSaleStaff(){
-    const el=E("dermedSaleStaff");if(!el)return;const old=el.value,latest=latestConfigs();
-    el.innerHTML='<option value="">Select Sale Staff</option>'+latest.map(x=>'<option value="'+attrV(x.staff_id)+'">'+escV(x.staff_name||'Staff')+' · P '+N(x.product_rate)+'% / S '+N(x.service_rate)+'% / SP '+N(x.service_product_rate)+'%</option>').join('');
-    if(old&&latest.some(x=>String(x.staff_id)===String(old)))el.value=old;
+    const el=E("dermedSaleStaff");if(!el)return;
+    const old=el.value;
+    // Prefer the dedicated Sale Staff Management cache. This prevents the
+    // selector from being cleared by the periodic refresh while the
+    // management records are loading.
+    const managed = latestConfigs();
+    const cached = Array.isArray(window.__dedicatedSaleStaffRows)
+      ? window.__dedicatedSaleStaffRows
+      : [];
+    const source = managed.length ? managed : cached;
+    const rows = source.filter(x => {
+      const sid=String(x.staff_id ?? x.id ?? "").trim();
+      return sid && x.active !== false;
+    });
+    el.innerHTML='<option value="">Select Sale Staff</option>'+
+      rows.map(x=>{
+        const sid=x.staff_id ?? x.id;
+        const name=x.staff_name ?? x.name ?? "Sale Staff";
+        return '<option value="'+attrV(sid)+'">'+escV(name)+
+          ' · P '+N(x.product_rate)+'% / S '+N(x.service_rate)+
+          '% / SP '+N(x.service_product_rate)+'%</option>';
+      }).join('');
+    if(old && rows.some(x=>String(x.staff_id ?? x.id)===String(old))){
+      el.value=old;
+    }
   }
   window.refreshSaleStaffManagementOptions=refreshDermedSaleStaff;
   window.getCurrentSaleStaffConfig=function(staffId){return latestConfigs().find(x=>String(x.staff_id)===String(staffId))||null};
