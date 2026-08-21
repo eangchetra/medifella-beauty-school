@@ -7312,8 +7312,11 @@ function renderInventoryControls(){
     }
   }
 
-  fill("dermedSaleStaff","Select Sale Staff");
-  fill("mtsSaleStaff","Select Sale Staff");
+  // IMPORTANT: Do NOT populate Dermed/MTS Sale Staff from the general
+  // staff list here. These two selectors belong exclusively to
+  // Sale Staff Management (medifella_sale_staff). The old fill() calls
+  // caused the selected value to be overwritten every refresh cycle.
+  // They are populated by refreshSaleStaffOnlySelectors() below.
 
   // Cashier selector: ONLY staff whose Job Title is exactly
   // Cashier, Counter, or Sale. Do not show other job titles.
@@ -7355,16 +7358,34 @@ function renderInventoryControls(){
     targets.forEach(id=>{
       const el=$(id);
       if(!el)return;
-      const oldValue=el.value;
+
+      // Remember the user's selection outside the DOM. Other permission/
+      // inventory refreshes may rebuild options, but must never lose it.
+      const oldValue=String(el.dataset.selectedSaleStaff || el.value || "");
       el.innerHTML='<option value="">Select Sale Staff</option>'+
         latest.map(x=>
           `<option value="${attr(x.staff_id)}">${esc(x.staff_name||"Staff")} · P ${Number(x.product_rate||0)}% / S ${Number(x.service_rate||0)}% / SP ${Number(x.service_product_rate||0)}%</option>`
         ).join("");
+
       if(oldValue && latest.some(x=>String(x.staff_id)===String(oldValue))){
         el.value=oldValue;
+        el.dataset.selectedSaleStaff=oldValue;
+      }else if(!oldValue){
+        el.value="";
       }
     });
   }
+
+  // Preserve the selected Sale Staff whenever any page-level refresh runs.
+  ["dermedSaleStaff","mtsSaleStaff"].forEach(id=>{
+    const el=$(id);
+    if(!el || el.dataset.saleStaffSelectionBound==="1")return;
+    el.dataset.saleStaffSelectionBound="1";
+    el.addEventListener("change",function(){
+      this.dataset.selectedSaleStaff=String(this.value||"");
+    });
+    if(el.value)el.dataset.selectedSaleStaff=String(el.value);
+  });
 
   refreshSaleStaffOnlySelectors();
 
@@ -7397,7 +7418,7 @@ function renderInventoryControls(){
         const el=$(id);
         if(!el || el.tagName !== "SELECT") return;
 
-        const oldValue=el.value;
+        const oldValue=String(el.dataset.selectedSaleStaff || el.value || "");
         el.innerHTML='<option value="">Select Sale Staff</option>'+
           rows.map(x=>{
             const idv=x.staff_id ?? x.id ?? "";
@@ -7407,6 +7428,23 @@ function renderInventoryControls(){
 
         if(oldValue && rows.some(x=>String(x.staff_id ?? x.id)===String(oldValue))){
           el.value=oldValue;
+          el.dataset.selectedSaleStaff=oldValue;
+        }
+      });
+
+      // Bind selection persistence after the options are present.
+      ["dermedSaleStaff","mtsSaleStaff"].forEach(id=>{
+        const el=$(id);
+        if(!el)return;
+        if(el.dataset.saleStaffSelectionBound!=="1"){
+          el.dataset.saleStaffSelectionBound="1";
+          el.addEventListener("change",function(){
+            this.dataset.selectedSaleStaff=String(this.value||"");
+          });
+        }
+        const selected=String(el.dataset.selectedSaleStaff || "");
+        if(selected && rows.some(x=>String(x.staff_id ?? x.id)===selected)){
+          el.value=selected;
         }
       });
 
@@ -17965,9 +18003,34 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     };
 
     document.querySelectorAll(".nav").forEach(function(btn){
-      const key=btn.dataset.section;
-      btn.classList.toggle("hidden",!allowed(key));
-      btn.disabled=!allowed(key);
+      // The navigation data-section names for the three sale modules are
+      // different from the canonical permission keys used by
+      // normalizeStaffPermissions(). The old code checked "mtsSale" and
+      // "dermedSale" directly while other patches checked "mts"/"dermed".
+      // That made the same buttons alternate between visible and hidden.
+      const rawKey=String(btn.dataset.section||"").trim();
+      const permissionKeyMap={
+        medifellaSale:"sales",
+        mtsSale:"mtsSale",
+        dermedSale:"dermedSale",
+        saleCommission:"saleCommission",
+        saleStaffManagement:"saleStaffManagement",
+        appointments:"appointments",
+        products:"products",
+        services:"services",
+        staffManagement:"staffManagement",
+        customers:"customers",
+        certificates:"certificates",
+        posts:"posts",
+        courses:"courses",
+        staff:"staff",
+        admins:"admins",
+        students:"students"
+      };
+      const key=permissionKeyMap[rawKey]||rawKey;
+      const ok=allowed(key);
+      btn.classList.toggle("hidden",!ok);
+      btn.disabled=!ok;
     });
 
     const active=document.querySelector(".nav.active");
@@ -18139,9 +18202,9 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
    */
   function apply(){
     const sales = [
-      ["dermed","dermedSale"],
-      ["mts","mtsSale"],
-      ["medifella","medifellaSale"]
+      ["dermedSale","dermedSale"],
+      ["mtsSale","mtsSale"],
+      ["sales","medifellaSale"]
     ];
 
     sales.forEach(function(pair){
@@ -18156,7 +18219,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     });
 
     // Sale Staff and Cashier selectors must remain enabled for an allowed sale.
-    if(canModule("dermed")){
+    if(canModule("dermedSale")){
       ["dermedSaleStaff","dermedCashier"].forEach(function(id){
         const el=document.getElementById(id);
         if(el){
@@ -18165,7 +18228,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
         }
       });
     }
-    if(canModule("mts")){
+    if(canModule("mtsSale")){
       ["mtsSaleStaff","mtsCashier"].forEach(function(id){
         const el=document.getElementById(id);
         if(el){
@@ -18174,7 +18237,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
         }
       });
     }
-    if(canModule("medifella")){
+    if(canModule("sales")){
       ["mfSaleStaff","medifellaSaleStaff","mfCashier","medifellaCashier"].forEach(function(id){
         const el=document.getElementById(id);
         if(el){
