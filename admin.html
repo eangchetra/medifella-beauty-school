@@ -186,7 +186,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 .sale-section-title{display:flex;justify-content:space-between;align-items:center;margin-top:24px;margin-bottom:10px}
 .sale-section-title h2{margin:0;color:#1aa8bb;font-size:21px}
 .sale-table-wrap{overflow:visible;border:1px solid #d8eaed;border-radius:12px}
-.sale-entry-table{width:100%!important;max-width:none!important;border-collapse:separate;border-spacing:0;table-layout:fixed}
+.sale-entry-table{width:100%;border-collapse:separate;border-spacing:0;table-layout:fixed}
 .sale-entry-table th{background:#42b8c8;color:#fff;padding:13px 12px;text-align:left;font-size:14px}
 .sale-entry-table th:first-child{border-radius:11px 0 0 0}.sale-entry-table th:last-child{border-radius:0 11px 0 0}
 .sale-entry-table td{padding:10px;border-top:1px solid #e0eef0;vertical-align:middle;background:#fff}
@@ -2379,12 +2379,11 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
   <div class="sale-table-wrap">
     <table class="sale-entry-table">
-      <thead>
-        <tr>
-          <th style="width:42%">Course / Product</th>
+      <thead>\n     <tr style="background:${invoiceBrand.color};color:#FFFFFF"
+          <th style="width:45%">Course / Product</th>
           <th style="width:10%">Qty</th>
-          <th style="width:14%">Unit Price (USD)</th>
-          <th style="width:19%">Discount</th>
+          <th style="width:15%">Unit Price (USD)</th>
+          <th style="width:18%">Discount</th>
           <th style="width:15%">Subtotal (USD)</th>
           <th style="width:46px"></th>
         </tr>
@@ -3952,35 +3951,19 @@ function findCourseMatch(query){
  return matches.length===1?matches[0]:null;
 }
 
-function syncSaleItemRowSubtotal(row){
- const price=parseMoneyInput(row?.querySelector(".sale-item-price")?.value);
- const quantity=Math.max(1,parseInt(row?.querySelector(".sale-item-qty")?.value,10)||1);
- const discountType=String(row?.querySelector(".sale-item-discount-type")?.value||"percent").toLowerCase()==="usd"?"usd":"percent";
- const discountValue=Math.max(0,parseMoneyInput(row?.querySelector(".sale-item-discount-value")?.value));
- const base=price*quantity;
- const discount=discountType==="percent"
-   ? Math.min(base,base*discountValue/100)
-   : Math.min(base,discountValue*quantity);
- const subtotal=Math.max(0,base-discount);
- const subtotalInput=row?.querySelector(".sale-item-subtotal");
- if(subtotalInput) subtotalInput.value=money(subtotal);
- return subtotal;
-}
-
 function addSaleItemRow(name="",price=0,qty=1,courseId=""){
- const tr=document.createElement("tr");
- tr.className="sale-item";
+ const tr=document.createElement("tr");tr.className="sale-item";
  tr.innerHTML=`<td>
    <strong class="sale-course-name">${esc(name||"")}</strong>
    <input class="sale-course-id" type="hidden" value="${attr(courseId)}">
  </td>
- <td><input class="sale-item-qty" type="text" inputmode="numeric" autocomplete="off" value="${Math.max(1,Number(qty||1))}"></td>
+ <td><input class="sale-item-qty" type="text" inputmode="numeric" autocomplete="off" value="${Number(qty||1)}"></td>
  <td><input class="sale-item-price" type="text" inputmode="decimal" autocomplete="off" value="${Number(price||0)}"></td>
  <td><div class="sale-item-discount-wrap">
-   <select class="sale-item-discount-type"><option value="percent" selected>%</option><option value="usd">USD</option></select>
-   <input class="sale-item-discount-value" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="0">
+   <select class="sale-item-discount-type"><option value="percent">%</option><option value="usd">USD</option></select>
+   <input class="sale-item-discount-value" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="">
  </div></td>
- <td><input class="sale-item-subtotal" type="text" readonly value="$0.00"></td>
+ <td><input class="sale-item-subtotal" readonly value="$0.00"></td>
  <td><button class="danger sale-remove-btn remove-sale-item" type="button">×</button></td>`;
  $("saleItems").appendChild(tr);
 
@@ -3989,16 +3972,8 @@ function addSaleItemRow(name="",price=0,qty=1,courseId=""){
  const discountType=tr.querySelector(".sale-item-discount-type");
  const discountValue=tr.querySelector(".sale-item-discount-value");
 
- [qtyInput,priceInput,discountValue].forEach(input=>{
-   input.addEventListener("input",()=>{
-     syncSaleItemRowSubtotal(tr);
-     updateSaleTotals();
-   });
- });
- discountType.addEventListener("change",()=>{
-   syncSaleItemRowSubtotal(tr);
-   updateSaleTotals();
- });
+ [qtyInput,priceInput,discountValue].forEach(i=>i.addEventListener("input",updateSaleTotals));
+ discountType.addEventListener("change",updateSaleTotals);
 
  tr.querySelector(".remove-sale-item").onclick=()=>{
    tr.remove();
@@ -4020,9 +3995,6 @@ function addSaleItemRow(name="",price=0,qty=1,courseId=""){
      priceInput.value=Number(price||c.price||0);
    }
  }
-
- // Always calculate the row subtotal after the course price has been applied.
- syncSaleItemRowSubtotal(tr);
  updateSaleTotals();
 }
 
@@ -4210,9 +4182,13 @@ function updateSaleTotals(){
  $("saleGrandTotalDue").textContent=money(calc.grandStudentDue);
 
  document.querySelectorAll("#saleItems .sale-item").forEach(w=>{
-   // Keep the visible row subtotal synchronized with the exact same
-   // calculation used by the Medi Fella Sale totals.
-   syncSaleItemRowSubtotal(w);
+   const p=parseMoneyInput(w.querySelector(".sale-item-price").value);
+   const q=Math.max(1,parseInt(w.querySelector(".sale-item-qty").value,10)||1);
+   const type=w.querySelector(".sale-item-discount-type").value;
+   const value=parseMoneyInput(w.querySelector(".sale-item-discount-value").value);
+   const base=p*q;
+   const d=type==="percent"?Math.min(base,base*value/100):Math.min(base,value);
+   w.querySelector(".sale-item-subtotal").value=money(Math.max(0,base-d));
  });
 }
 
@@ -4324,8 +4300,7 @@ function editSaleFromInvoice(id){
      row.querySelector(".sale-item-discount-type").value=
        String(x.discount_type||"percent").toLowerCase()==="usd"?"usd":"percent";
      row.querySelector(".sale-item-discount-value").value=
-       Number(x.discount_value||0)?String(x.discount_value):"0";
-     syncSaleItemRowSubtotal(row);
+       Number(x.discount_value||0)?String(x.discount_value):"";
    }
  });
 
@@ -5117,12 +5092,29 @@ function showSaleInvoice(id,size="A4"){
    const x=items[i];
    if(x){
      const qty=x.quantity ?? 1;
-     const discount=x.discount_input ?? (x.discount_percent ?? "");
-     const discountText = discount === "" ? "" : (
-       String(discount).trim().endsWith("%")
-         ? esc(String(discount).trim())
-         : `${esc(String(discount).trim())}%`
-     );
+     // MTS stores item discounts as discount_type / discount_value and
+     // discount_amount. Show the ACTUAL USD discount amount in the
+     // invoice Discount column.
+     let discountText = "";
+     if(isMtsSale){
+       const qtyNum=Math.max(1,Number(qty)||1);
+       const priceNum=Math.max(0,Number(x.unit_price ?? x.price ?? 0)||0);
+       const base=qtyNum*priceNum;
+       const dv=Math.max(0,Number(x.discount_value)||0);
+       const dt=String(x.discount_type||"percent").toLowerCase();
+       const calculated=dt==="usd"
+         ? Math.min(base,dv*qtyNum)
+         : Math.min(base,base*dv/100);
+       const amount=Math.max(0,Number(x.discount_amount ?? calculated)||0);
+       discountText=amount>0 ? usd(amount) : "";
+     }else{
+       const discount=x.discount_input ?? (x.discount_percent ?? "");
+       discountText = discount === "" ? "" : (
+         String(discount).trim().endsWith("%")
+           ? esc(String(discount).trim())
+           : `${esc(String(discount).trim())}%`
+       );
+     }
      const descTextColor = isDermedSale ? "#111111" : "#FFFFFF";
      return `<tr>
        <td>${i+1}</td>
@@ -7312,11 +7304,8 @@ function renderInventoryControls(){
     }
   }
 
-  // IMPORTANT: Do NOT populate Dermed/MTS Sale Staff from the general
-  // staff list here. These two selectors belong exclusively to
-  // Sale Staff Management (medifella_sale_staff). The old fill() calls
-  // caused the selected value to be overwritten every refresh cycle.
-  // They are populated by refreshSaleStaffOnlySelectors() below.
+  fill("dermedSaleStaff","Select Sale Staff");
+  fill("mtsSaleStaff","Select Sale Staff");
 
   // Cashier selector: ONLY staff whose Job Title is exactly
   // Cashier, Counter, or Sale. Do not show other job titles.
@@ -7358,53 +7347,16 @@ function renderInventoryControls(){
     targets.forEach(id=>{
       const el=$(id);
       if(!el)return;
-
-      // CRITICAL: once the user has selected a Sale Staff, do not rebuild
-      // this <select> during the dashboard's periodic refreshes. Rebuilding
-      // the options is what was causing the selected value to jump back to
-      // "Select Sale Staff".
-      const selected=String(el.dataset.selectedSaleStaff || el.value || "");
-      if(selected){
-        const optionStillExists=[...el.options].some(o=>String(o.value)===selected);
-        if(optionStillExists){
-          if(el.value!==selected)el.value=selected;
-          el.dataset.selectedSaleStaff=selected;
-          return;
-        }
-      }
-
-      // Only populate an empty selector, or recover it when its current
-      // option list has not been loaded yet.
-      const rows = latest.length
-        ? latest
-        : (Array.isArray(window.__dedicatedSaleStaffRows)
-            ? window.__dedicatedSaleStaffRows
-            : []);
-
+      const oldValue=el.value;
       el.innerHTML='<option value="">Select Sale Staff</option>'+
-        rows.map(x=>
-          `<option value="${attr(x.staff_id ?? x.id)}">${esc(x.staff_name||x.name||"Staff")} · P ${Number(x.product_rate||0)}% / S ${Number(x.service_rate||0)}% / SP ${Number(x.service_product_rate||0)}%</option>`
+        latest.map(x=>
+          `<option value="${attr(x.staff_id)}">${esc(x.staff_name||"Staff")} · P ${Number(x.product_rate||0)}% / S ${Number(x.service_rate||0)}% / SP ${Number(x.service_product_rate||0)}%</option>`
         ).join("");
-
-      if(selected && rows.some(x=>String(x.staff_id ?? x.id)===selected)){
-        el.value=selected;
-        el.dataset.selectedSaleStaff=selected;
-      }else{
-        el.value="";
+      if(oldValue && latest.some(x=>String(x.staff_id)===String(oldValue))){
+        el.value=oldValue;
       }
     });
   }
-
-  // Preserve the selected Sale Staff whenever any page-level refresh runs.
-  ["dermedSaleStaff","mtsSaleStaff"].forEach(id=>{
-    const el=$(id);
-    if(!el || el.dataset.saleStaffSelectionBound==="1")return;
-    el.dataset.saleStaffSelectionBound="1";
-    el.addEventListener("change",function(){
-      this.dataset.selectedSaleStaff=String(this.value||"");
-    });
-    if(el.value)el.dataset.selectedSaleStaff=String(el.value);
-  });
 
   refreshSaleStaffOnlySelectors();
 
@@ -7421,9 +7373,6 @@ function renderInventoryControls(){
       if(error) throw error;
 
       const rows = Array.isArray(data) ? data : [];
-      // Keep a dedicated in-page cache so repeated UI refreshes do not
-      // temporarily erase the Sale Staff choices.
-      window.__dedicatedSaleStaffRows = rows.slice();
       const targets = [
         "mtsSaleStaff",
         "mtsSaleStaffId",
@@ -7437,14 +7386,7 @@ function renderInventoryControls(){
         const el=$(id);
         if(!el || el.tagName !== "SELECT") return;
 
-        const oldValue=String(el.dataset.selectedSaleStaff || el.value || "");
-        const optionStillExists=[...el.options].some(o=>String(o.value)===oldValue);
-        if(oldValue && optionStillExists){
-          el.value=oldValue;
-          el.dataset.selectedSaleStaff=oldValue;
-          return;
-        }
-
+        const oldValue=el.value;
         el.innerHTML='<option value="">Select Sale Staff</option>'+
           rows.map(x=>{
             const idv=x.staff_id ?? x.id ?? "";
@@ -7454,33 +7396,10 @@ function renderInventoryControls(){
 
         if(oldValue && rows.some(x=>String(x.staff_id ?? x.id)===String(oldValue))){
           el.value=oldValue;
-          el.dataset.selectedSaleStaff=oldValue;
         }
       });
-
-      // Bind selection persistence after the options are present.
-      ["dermedSaleStaff","mtsSaleStaff"].forEach(id=>{
-        const el=$(id);
-        if(!el)return;
-        if(el.dataset.saleStaffSelectionBound!=="1"){
-          el.dataset.saleStaffSelectionBound="1";
-          el.addEventListener("change",function(){
-            this.dataset.selectedSaleStaff=String(this.value||"");
-          });
-        }
-        const selected=String(el.dataset.selectedSaleStaff || "");
-        if(selected && rows.some(x=>String(x.staff_id ?? x.id)===selected)){
-          el.value=selected;
-        }
-      });
-
-      // Also refresh the normal Dermed selector after the dedicated records
-      // have arrived, so it immediately becomes selectable.
-      if(typeof refreshDermedSaleStaff==="function") refreshDermedSaleStaff();
     }catch(e){
       console.warn("Could not load Sale Staff Management list:", e);
-      // Do not wipe an already populated selector if the refresh request
-      // temporarily fails.
     }
   }
 
@@ -8982,42 +8901,13 @@ document.addEventListener("DOMContentLoaded",function(){
     try{
       let r;
       if(editingId){
-        /*
-         * EDIT FIX:
-         * Do not use UPDATE ... SELECT().single().
-         * Supabase/PostgREST can return "Cannot coerce the result to a
-         * single JSON object" when RLS allows the UPDATE but the updated row
-         * is not returned by SELECT. The database update itself can still be
-         * successful.
-         */
-        let upd=await sb.from("medifella_sales")
-          .update(payload)
-          .eq("id",String(editingId))
-          .eq("sale_type","DERMED");
-
-        if(upd.error && /sale_time|column .* does not exist|Could not find the .* column/i.test(upd.error.message||"")){
-          const p2={...payload};
-          delete p2.sale_time;
-          upd=await sb.from("medifella_sales")
-            .update(p2)
-            .eq("id",String(editingId))
-            .eq("sale_type","DERMED");
+        let upd=await sb.from("medifella_sales").update(payload).eq("id",editingId).eq("sale_type","DERMED").select().single();
+        if(upd.error && /sale_time|column .* does not exist/i.test(upd.error.message||"")){
+          const p2={...payload};delete p2.sale_time;
+          upd=await sb.from("medifella_sales").update(p2).eq("id",editingId).eq("sale_type","DERMED").select().single();
         }
-
         if(upd.error)throw upd.error;
-
-        // Reload the authoritative list and obtain the updated row by ID.
-        // This works even when UPDATE does not return a JSON row because of RLS.
-        if(typeof loadSales==="function")await loadSales();
-        const updatedRow=(Array.isArray(salesRecords)?salesRecords:[])
-          .find(x=>String(x.id)===String(editingId) &&
-                       String(x.sale_type||"").toUpperCase()==="DERMED");
-
-        if(!updatedRow){
-          throw new Error("Dermed Sale update could not be verified. Please refresh the Dermed Sales list and try again.");
-        }
-
-        r={data:updatedRow};
+        r=upd;
       }else{
         // Reference numbers must remain unique even when salesRecords is stale
         // (for example, another browser/admin created the previous invoice).
@@ -15665,46 +15555,9 @@ async function loadCommissionRecords(retry=0){
     return [...map.values()];
   }
   function refreshDermedSaleStaff(){
-    const el=E("dermedSaleStaff");if(!el)return;
-
-    // Never rebuild an already-selected Dermed Sale Staff option during
-    // routine dashboard refreshes.
-    const old=String(el.dataset.selectedSaleStaff || el.value || "");
-    if(old){
-      const optionStillExists=[...el.options].some(o=>String(o.value)===old);
-      if(optionStillExists){
-        if(el.value!==old)el.value=old;
-        el.dataset.selectedSaleStaff=old;
-        return;
-      }
-    }
-
-    const managed = latestConfigs();
-    const cached = Array.isArray(window.__dedicatedSaleStaffRows)
-      ? window.__dedicatedSaleStaffRows
-      : [];
-    const source = managed.length ? managed : cached;
-    const rows = source.filter(x => {
-      const sid=String(x.staff_id ?? x.id ?? "").trim();
-      return sid && x.active !== false;
-    });
-
-    el.innerHTML='<option value="">Select Sale Staff</option>'+
-      rows.map(x=>{
-        const sid=x.staff_id ?? x.id;
-        const name=x.staff_name ?? x.name ?? "Sale Staff";
-        return '<option value="'+attrV(sid)+'">'+escV(name)+
-          ' · P '+N(x.product_rate)+'% / S '+N(x.service_rate)+
-          '% / SP '+N(x.service_product_rate)+'%</option>';
-      }).join('');
-
-    if(old && rows.some(x=>String(x.staff_id ?? x.id)===old)){
-      el.value=old;
-      el.dataset.selectedSaleStaff=old;
-    }else{
-      el.value="";
-      el.dataset.selectedSaleStaff="";
-    }
+    const el=E("dermedSaleStaff");if(!el)return;const old=el.value,latest=latestConfigs();
+    el.innerHTML='<option value="">Select Sale Staff</option>'+latest.map(x=>'<option value="'+attrV(x.staff_id)+'">'+escV(x.staff_name||'Staff')+' · P '+N(x.product_rate)+'% / S '+N(x.service_rate)+'% / SP '+N(x.service_product_rate)+'%</option>').join('');
+    if(old&&latest.some(x=>String(x.staff_id)===String(old)))el.value=old;
   }
   window.refreshSaleStaffManagementOptions=refreshDermedSaleStaff;
   window.getCurrentSaleStaffConfig=function(staffId){return latestConfigs().find(x=>String(x.staff_id)===String(staffId))||null};
@@ -16676,7 +16529,10 @@ async function loadCommissionRecords(retry=0){
 
       <div>
         <label>Appointment Date *</label>
-        <input id="dermedAppointmentDate" type="date">
+        <input id="dermedAppointmentDate" type="text"
+             inputmode="numeric" autocomplete="off"
+             placeholder="dd/mm/yyyy" maxlength="10"
+             aria-label="Appointment Date (dd/mm/yyyy)">
       </div>
 
       <div>
@@ -16924,7 +16780,7 @@ async function loadCommissionRecords(retry=0){
     if(E("dermedAppointmentCustomerType"))
       E("dermedAppointmentCustomerType").value="Old Customer";
     if(E("dermedAppointmentDate"))
-      E("dermedAppointmentDate").value=localDate();
+      E("dermedAppointmentDate").value=formatDermedAppointmentDate(localDate());
     if(E("dermedAppointmentTime"))
       E("dermedAppointmentTime").value="";
     if(E("dermedAppointmentNote"))
@@ -16983,13 +16839,97 @@ async function loadCommissionRecords(retry=0){
     box.classList.add("show");
   }
 
+  function formatDermedAppointmentDate(value){
+    const s=String(value||"").trim();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
+      const [y,m,d]=s.split("-");
+      return `${d}/${m}/${y}`;
+    }
+    return s;
+  }
+
+  function parseDermedAppointmentDate(value){
+    const s=String(value||"").trim();
+    const m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(!m) return {ok:false,message:"Use date format DD/MM/YYYY."};
+
+    const day=Number(m[1]);
+    const month=Number(m[2]);
+    const year=Number(m[3]);
+
+    if(day<1 || day>31)
+      return {ok:false,message:"Day must be between 01 and 31."};
+    if(month<1 || month>12)
+      return {ok:false,message:"Month must be between 01 and 12."};
+    if(year<1000 || year>9999)
+      return {ok:false,message:"Year must have 4 digits."};
+
+    // Keep the user's requested DD/MM/YYYY format while also making
+    // sure the date is a real calendar date (e.g. 31/02 is rejected).
+    const dt=new Date(Date.UTC(year,month-1,day));
+    if(dt.getUTCFullYear()!==year ||
+       dt.getUTCMonth()!==month-1 ||
+       dt.getUTCDate()!==day)
+      return {ok:false,message:"Please enter a valid calendar date."};
+
+    return {
+      ok:true,
+      value:`${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`
+    };
+  }
+
+  function bindDermedAppointmentDateInput(){
+    const el=E("dermedAppointmentDate");
+    if(!el || el.dataset.ddmmyyyyBound) return;
+    el.dataset.ddmmyyyyBound="1";
+
+    el.addEventListener("input",function(){
+      let digits=String(el.value||"").replace(/\D/g,"").slice(0,8);
+
+      // Enforce DD <= 31 and MM <= 12 while typing.
+      if(digits.length>=2){
+        let d=Number(digits.slice(0,2));
+        if(d>31) digits="31"+digits.slice(2);
+      }
+      if(digits.length>=4){
+        let mo=Number(digits.slice(2,4));
+        if(mo>12) digits=digits.slice(0,2)+"12"+digits.slice(4);
+      }
+
+      if(digits.length>4)
+        el.value=digits.slice(0,2)+"/"+digits.slice(2,4)+"/"+digits.slice(4);
+      else if(digits.length>2)
+        el.value=digits.slice(0,2)+"/"+digits.slice(2);
+      else
+        el.value=digits;
+    });
+
+    el.addEventListener("blur",function(){
+      if(!el.value.trim()) return;
+      const parsed=parseDermedAppointmentDate(el.value);
+      if(!parsed.ok){
+        el.setCustomValidity(parsed.message);
+      }else{
+        el.setCustomValidity("");
+      }
+    });
+  }
+
   async function saveAppointmentFromDermed(){
     const id=E("dermedAppointmentCustomerId")?.value||"";
     const source=E("dermedAppointmentCustomerSource")?.value||"customer";
-    const date=E("dermedAppointmentDate")?.value||"";
+    const dateInput=E("dermedAppointmentDate")?.value||"";
     const time=E("dermedAppointmentTime")?.value||"";
     const note=String(E("dermedAppointmentNote")?.value||"").trim();
     const status=E("dermedAppointmentStatus");
+
+    const parsedDate=parseDermedAppointmentDate(dateInput);
+    if(!parsedDate.ok){
+      if(status)status.textContent=parsedDate.message;
+      E("dermedAppointmentDate")?.focus();
+      return;
+    }
+    const date=parsedDate.value;
 
     let c=null;
     if(source==="student"){
@@ -17084,6 +17024,8 @@ async function loadCommissionRecords(retry=0){
       cancel.dataset.bound="1";
       cancel.onclick=closeAppointment;
     }
+
+    bindDermedAppointmentDateInput();
 
     const save=E("dermedAppointmentSave");
     if(save&&!save.dataset.bound){
@@ -17233,8 +17175,8 @@ async function loadCommissionRecords(retry=0){
 
     E("dermedAppointmentCustomerType").value="Old Customer";
     if(E("dermedAppointmentDate")&&!E("dermedAppointmentDate").value){
-      E("dermedAppointmentDate").value=
-        typeof localDate==="function"?localDate():new Date().toISOString().slice(0,10);
+      E("dermedAppointmentDate").value=formatDermedAppointmentDate(
+        typeof localDate==="function"?localDate():new Date().toISOString().slice(0,10));
     }
     E("dermedAppointmentTime").value="";
     E("dermedAppointmentNote").value="";
@@ -18073,34 +18015,9 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     };
 
     document.querySelectorAll(".nav").forEach(function(btn){
-      // The navigation data-section names for the three sale modules are
-      // different from the canonical permission keys used by
-      // normalizeStaffPermissions(). The old code checked "mtsSale" and
-      // "dermedSale" directly while other patches checked "mts"/"dermed".
-      // That made the same buttons alternate between visible and hidden.
-      const rawKey=String(btn.dataset.section||"").trim();
-      const permissionKeyMap={
-        medifellaSale:"sales",
-        mtsSale:"mtsSale",
-        dermedSale:"dermedSale",
-        saleCommission:"saleCommission",
-        saleStaffManagement:"saleStaffManagement",
-        appointments:"appointments",
-        products:"products",
-        services:"services",
-        staffManagement:"staffManagement",
-        customers:"customers",
-        certificates:"certificates",
-        posts:"posts",
-        courses:"courses",
-        staff:"staff",
-        admins:"admins",
-        students:"students"
-      };
-      const key=permissionKeyMap[rawKey]||rawKey;
-      const ok=allowed(key);
-      btn.classList.toggle("hidden",!ok);
-      btn.disabled=!ok;
+      const key=btn.dataset.section;
+      btn.classList.toggle("hidden",!allowed(key));
+      btn.disabled=!allowed(key);
     });
 
     const active=document.querySelector(".nav.active");
@@ -18272,9 +18189,9 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
    */
   function apply(){
     const sales = [
-      ["dermedSale","dermedSale"],
-      ["mtsSale","mtsSale"],
-      ["sales","medifellaSale"]
+      ["dermed","dermedSale"],
+      ["mts","mtsSale"],
+      ["medifella","medifellaSale"]
     ];
 
     sales.forEach(function(pair){
@@ -18289,7 +18206,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     });
 
     // Sale Staff and Cashier selectors must remain enabled for an allowed sale.
-    if(canModule("dermedSale")){
+    if(canModule("dermed")){
       ["dermedSaleStaff","dermedCashier"].forEach(function(id){
         const el=document.getElementById(id);
         if(el){
@@ -18298,7 +18215,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
         }
       });
     }
-    if(canModule("mtsSale")){
+    if(canModule("mts")){
       ["mtsSaleStaff","mtsCashier"].forEach(function(id){
         const el=document.getElementById(id);
         if(el){
@@ -18307,7 +18224,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
         }
       });
     }
-    if(canModule("sales")){
+    if(canModule("medifella")){
       ["mfSaleStaff","medifellaSaleStaff","mfCashier","medifellaCashier"].forEach(function(id){
         const el=document.getElementById(id);
         if(el){
