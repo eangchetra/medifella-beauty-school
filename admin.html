@@ -2164,30 +2164,33 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </script>
 
 
-<style id="stable-section-display-final">
-.section{display:none!important}
-.section.active{display:block!important}
-</style>
 
 
-<style id="dashboard-initial-paint-stable">
-  /* Prevent permission/nav initialization from visibly flashing sections. */
-  body.dashboard-pending #adminPanel,
-  body.dashboard-pending main,
-  body.dashboard-pending .admin-layout{
-    visibility:hidden!important;
-  }
+
+
+
+
+<style id="dermed-staff-section-prepaint-fix">
+  /* Keep the authenticated dashboard invisible until the existing boot()
+     and applyAccountPermissions() choose the permitted active section. */
+  body.dermedBootPending #appView{visibility:hidden!important}
+  body.dermedBootReady #appView{visibility:visible!important}
 </style>
-<script id="dashboard-initial-paint-stable-script">
+<script id="dermed-staff-section-prepaint-fix-script">
 (function(){
-  document.body.classList.add("dashboard-pending");
-  function reveal(){
-    document.body.classList.remove("dashboard-pending");
-  }
-  // Reveal after the authentication/permission initialization scripts have
-  // completed their startup work.
-  [250,600,1000,1600].forEach(ms=>setTimeout(reveal,ms));
-  window.addEventListener("load",function(){setTimeout(reveal,150);},{once:true});
+  try{
+    document.body.classList.add("dermedBootPending");
+    window.addEventListener("load",function(){
+      setTimeout(function(){
+        document.body.classList.remove("dermedBootPending");
+        document.body.classList.add("dermedBootReady");
+      },120);
+    },{once:true});
+    setTimeout(function(){
+      document.body.classList.remove("dermedBootPending");
+      document.body.classList.add("dermedBootReady");
+    },2500);
+  }catch(e){}
 })();
 </script>
 
@@ -3392,7 +3395,11 @@ function applyAccountPermissions(){
     const first=[...document.querySelectorAll(".nav")].find(x=>!x.classList.contains("hidden"));
     document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
     document.querySelectorAll(".section").forEach(x=>x.classList.remove("active"));
-    if(first){first.classList.add("active");$(first.dataset.section).classList.add("active");}
+    if(first){
+      first.classList.add("active");
+      const firstSection=$(first.dataset.section);
+      if(firstSection)firstSection.classList.add("active");
+    }
   }
   $("currentAdmin").textContent=currentProfile.username || currentProfile.email || adminUser.email || adminUser.id;
   $("adminRole").innerHTML=role==="admin"
