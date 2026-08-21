@@ -2198,23 +2198,67 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </style>
 <script id="no-mts-dermed-flash-init">
 (function(){
+  "use strict";
   try{
-    document.documentElement.classList.add("dashboard-starting");
+    const root=document.documentElement;
+    root.classList.add("dashboard-starting");
 
-    function ready(){
-      document.documentElement.classList.remove("dashboard-starting");
-      document.documentElement.classList.add("dashboard-ready");
+    let timer=null;
+    let stableSince=0;
+
+    function navSignature(){
+      return [...document.querySelectorAll(".nav")]
+        .map(function(x){
+          return (x.dataset.section||"")+":"+
+                 (x.classList.contains("hidden")?"H":"V")+":"+
+                 (x.classList.contains("active")?"A":"-")+":"+
+                 (x.disabled?"D":"E");
+        }).join("|");
     }
 
-    // Give the existing authentication/permission initialization time to
-    // finish selecting the one permitted active section.
-    window.addEventListener("load", function(){
-      setTimeout(ready, 300);
-    }, {once:true});
+    let last=navSignature();
 
-    // Safety fallback so the dashboard cannot remain hidden indefinitely.
-    setTimeout(ready, 3500);
-  }catch(e){}
+    function revealIfStable(){
+      const now=Date.now();
+      const sig=navSignature();
+
+      if(sig!==last){
+        last=sig;
+        stableSince=now;
+        return;
+      }
+
+      if(!stableSince)stableSince=now;
+
+      // Wait until the permission/navigation state has stopped changing.
+      // This is after the known 100/500/1200/2500ms permission patches.
+      if(now-stableSince>=700){
+        root.classList.remove("dashboard-starting");
+        root.classList.add("dashboard-ready");
+        if(timer)clearInterval(timer);
+      }
+    }
+
+    // Observe permission changes rather than guessing based on page load.
+    const observer=new MutationObserver(function(){
+      stableSince=Date.now();
+      last=navSignature();
+    });
+    observer.observe(document.body,{subtree:true,attributes:true,attributeFilter:["class","disabled"]});
+
+    stableSince=Date.now();
+    timer=setInterval(revealIfStable,100);
+
+    // Hard safety limit: never keep the dashboard hidden longer than 6s.
+    setTimeout(function(){
+      root.classList.remove("dashboard-starting");
+      root.classList.add("dashboard-ready");
+      if(timer)clearInterval(timer);
+      observer.disconnect();
+    },6000);
+  }catch(e){
+    document.documentElement.classList.remove("dashboard-starting");
+  }
 })();
 </script>
 
