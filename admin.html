@@ -2844,7 +2844,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <div><label>In Stock Amount *</label><input id="stockAmount" type="number" step="1" min="-999999" placeholder="e.g. 20 or -29"></div>
 <div><label>In Stock Staff *</label><select id="stockStaff"></select></div>
 </div>
-<label>In Stock Time</label><input id="stockTimeDisplay" readonly>
+<label>Note</label><textarea id="stockNote" rows="3" placeholder="Write a note for this stock movement..."></textarea><label>In Stock Time</label><input id="stockTimeDisplay" readonly>
 <input id="stockTime" type="hidden">
 <button id="saveStock" class="gold" style="margin-top:14px">Save Stock</button>
 <div id="stockStatus"></div>
@@ -7271,7 +7271,7 @@ function renderStockList(){
    return (`${p?.product_code||""} ${p?.name||""}`).toLowerCase().includes(q)
      && inDateRange(m.stock_time||m.created_at,"stockFromDate","stockToDate");
  });
- $("stockList").innerHTML=rows.length?`<div class="table-wrap"><table class="table" id="stockListTable"><tr><th>Product ID</th><th>Product</th><th>Amount</th><th>Staff</th><th>In Stock Time</th><th>Action</th></tr>${rows.map(m=>{const p=products.find(x=>String(x.id)===String(m.product_id));const st=staffInfoRecords.find(x=>String(x.id)===String(m.staff_id));return `<tr><td>${esc(p?.product_code||"")}</td><td>${esc(p?.name||"")}</td><td>${esc(m.quantity)}</td><td>${esc(st?.name_en||m.staff_name||"")}</td><td>${esc(m.stock_time||m.created_at||"")}</td><td><div class="actions"><button type="button" class="light" onclick="editStock('${attr(m.id)}')">Edit</button><button type="button" class="danger" onclick="deleteStock('${attr(m.id)}')">Delete</button></div></td></tr>`}).join("")}</table></div>`:'<p class="muted">No stock records found.</p>';
+ $("stockList").innerHTML=rows.length?`<div class="table-wrap"><table class="table" id="stockListTable"><tr><th>Product ID</th><th>Product</th><th>Amount</th><th>Staff</th><th>Note</th><th>In Stock Time</th><th>Action</th></tr>${rows.map(m=>{const p=products.find(x=>String(x.id)===String(m.product_id));const st=staffInfoRecords.find(x=>String(x.id)===String(m.staff_id));return `<tr><td>${esc(p?.product_code||"")}</td><td>${esc(p?.name||"")}</td><td>${esc(m.quantity)}</td><td>${esc(st?.name_en||m.staff_name||"")}</td><td>${esc(m.note||m.notes||"")}</td><td>${esc(m.stock_time||m.created_at||"")}</td><td><div class="actions"><button type="button" class="light" onclick="editStock('${attr(m.id)}')">Edit</button><button type="button" class="danger" onclick="deleteStock('${attr(m.id)}')">Delete</button></div></td></tr>`}).join("")}</table></div>`:'<p class="muted">No stock records found.</p>';
 }
 function renderStaffInfoList(){
  if(!$("staffInfoList"))return;
@@ -7841,7 +7841,8 @@ $("saveStock").onclick=async()=>{
       staff_name:selectedStaff?.name_en||selectedStaff?.name_kh||selectedStaff?.name||selectedStaff?.full_name||selectedStaff?.username||"",
       stock_time:t,
       created_by:adminUser.id,
-      notes
+      notes,
+      note:String($("stockNote")?.value||"").trim()
     };
 
     let r;
@@ -7871,6 +7872,7 @@ $("saveStock").onclick=async()=>{
     $("stockProductSearch").value="";
     $("stockProductHint").textContent="Select a product from the search results.";
     if($("stockStaff"))$("stockStaff").dataset.selectedStaff="";
+    if($("stockNote"))$("stockNote").value="";
     setAutoTime("stockTimeDisplay","stockTime");
     await loadStockMovements();
   }catch(e){
@@ -7878,7 +7880,7 @@ $("saveStock").onclick=async()=>{
   }
 };
 
-function editStock(id){const m=stockMovements.find(x=>String(x.id)===String(id));if(!m)return;$("stockProductId").value=m.product_id;const p=products.find(x=>String(x.id)===String(m.product_id));$("stockProductSearch").value=`${p?.product_code||""} · ${p?.name||""}`;$("stockProductHint").textContent=`Selected: ${p?.name||""}`;$("stockAmount").value=m.quantity;$("stockStaff").value=m.staff_id||"";$("stockTime").value=m.stock_time||"";$("stockTimeDisplay").value=String(m.stock_time||"").replace("T"," ");window.editingStockId=id;$("saveStock").textContent="Update Stock";$("products").scrollIntoView({behavior:"smooth",block:"start"})}
+function editStock(id){const m=stockMovements.find(x=>String(x.id)===String(id));if(!m)return;if($("stockNote"))$("stockNote").value=m.note||m.notes||"";$("stockProductId").value=m.product_id;const p=products.find(x=>String(x.id)===String(m.product_id));$("stockProductSearch").value=`${p?.product_code||""} · ${p?.name||""}`;$("stockProductHint").textContent=`Selected: ${p?.name||""}`;$("stockAmount").value=m.quantity;$("stockStaff").value=m.staff_id||"";$("stockTime").value=m.stock_time||"";$("stockTimeDisplay").value=String(m.stock_time||"").replace("T"," ");window.editingStockId=id;$("saveStock").textContent="Update Stock";$("products").scrollIntoView({behavior:"smooth",block:"start"})}
 async function deleteStock(id){if(!confirm("Delete this stock entry? The product's available stock will decrease by this amount. Continue?"))return;const r=await sb.from("medifella_inventory_movements").delete().eq("id",id);if(r.error){alert("Delete failed: "+r.error.message);return}await loadStockMovements();}
 
 $("saveStaffInfo").onclick=async()=>{clearMsg($("staffInfoStatus"));const id=$("staffInfoEditId").value,name_en=$("staffInfoNameEn").value.trim(),name_kh=$("staffInfoNameKh").value.trim(),phone=$("staffInfoPhone").value.trim(),date_of_birth=$("staffInfoDob").value,enroll_date=$("staffInfoEnrollDate").value,status=$("staffInfoStatus").value,job=$("staffInfoJob").value,job_title=job==="Other"?$("staffInfoJobOther").value.trim():job;if(!name_en||!name_kh||!phone||!date_of_birth||!enroll_date||!job_title){msg($("staffInfoStatus"),"Please fill all staff fields.",true);return}try{const payload={name_en,name_kh,phone,date_of_birth,enroll_date,status,job_title};let r=id?await sb.from("medifella_staff").update(payload).eq("id",id):await sb.from("medifella_staff").insert({...payload,staff_code:genId("ST",staffInfoRecords,"staff_code")});if(r.error)throw r.error;msg($("staffInfoStatus"),id?"Staff updated.":"Staff added.");clearStaffInfoForm();await loadStaffInfo()}catch(e){msg($("staffInfoStatus"),e.message,true)}};
