@@ -18665,3 +18665,106 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   new MutationObserver(addNote).observe(document.body,{childList:true,subtree:true});
 })();
 </script>
+
+<script id="final-staff-product-visibility-fix-v40">
+(function(){
+  "use strict";
+
+  function currentRole(){
+    try{
+      return String(
+        (typeof currentProfile !== "undefined" ? currentProfile?.role : "") ||
+        window.currentUserRole ||
+        localStorage.getItem("userRole") ||
+        localStorage.getItem("role") ||
+        ""
+      ).trim().toLowerCase();
+    }catch(_){ return ""; }
+  }
+
+  function isStaff(){ return currentRole()==="staff"; }
+  function isAdmin(){ return currentRole()==="admin"; }
+
+  function hideStaffProductCreateBox(){
+    const box=document.getElementById("productCreateCard");
+    if(!box) return;
+
+    // Staff accounts should never see the Add New Product box.
+    // Admin accounts keep the original box unchanged.
+    if(isStaff()){
+      box.classList.add("hidden");
+      box.style.display="none";
+      box.setAttribute("aria-hidden","true");
+    }else if(isAdmin()){
+      box.classList.remove("hidden");
+      box.style.display="";
+      box.removeAttribute("aria-hidden");
+    }
+  }
+
+  function hideStaffCostColumn(){
+    if(!isStaff()) return;
+    const table=document.getElementById("productListTable");
+    if(!table) return;
+
+    const header=[...table.querySelectorAll("thead th, tr:first-child th")];
+    const costIndex=header.findIndex(th=>/^cost$/i.test((th.textContent||"").trim()));
+    if(costIndex<0) return;
+
+    table.querySelectorAll("tr").forEach(row=>{
+      const cells=row.children;
+      if(cells[costIndex]) cells[costIndex].remove();
+    });
+  }
+
+  function applyStaffProductVisibility(){
+    hideStaffProductCreateBox();
+    hideStaffCostColumn();
+  }
+
+  // Keep the Product List working normally, then remove only the Cost column
+  // for Staff. This does not change stock, price, source, actions, or search.
+  const originalRender=window.renderProductList;
+  if(typeof originalRender==="function" && !originalRender.__v40StaffCostWrapped){
+    const wrapped=function(){
+      const result=originalRender.apply(this,arguments);
+      try{ applyStaffProductVisibility(); }catch(_){ }
+      return result;
+    };
+    wrapped.__v40StaffCostWrapped=true;
+    window.renderProductList=wrapped;
+  }
+
+  // Also re-apply after account permission refreshes, because older patches
+  // in this file may otherwise make the product creation card visible again.
+  const originalApply=window.applyAccountPermissions;
+  if(typeof originalApply==="function" && !originalApply.__v40StaffProductWrapped){
+    const wrappedApply=function(){
+      const result=originalApply.apply(this,arguments);
+      try{ applyStaffProductVisibility(); }catch(_){ }
+      return result;
+    };
+    wrappedApply.__v40StaffProductWrapped=true;
+    window.applyAccountPermissions=wrappedApply;
+  }
+
+  function install(){
+    applyStaffProductVisibility();
+    try{ if(typeof window.renderProductList==="function") window.renderProductList(); }catch(_){ }
+    applyStaffProductVisibility();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else{
+    install();
+  }
+
+  // The dashboard has several existing permission/UI patches. Keep this
+  // final rule enforced after those patches run.
+  setTimeout(applyStaffProductVisibility,300);
+  setTimeout(applyStaffProductVisibility,1000);
+  setTimeout(applyStaffProductVisibility,2000);
+  setInterval(applyStaffProductVisibility,2500);
+})();
+</script>
