@@ -8109,10 +8109,10 @@ function resetNewInventorySale(type){
  renderSaleProductRows(type);if(type==="dermed")renderDermedCombinedItems();
 }
 async function saveInventorySale(type){
- const buyerType=$(type+"BuyerType").value,buyerId=$(type+"BuyerId").value,staffId=$(type+"SaleStaff").value,items=window[type+"SaleItems"]||[];
+ const buyerType=$(type+"BuyerType").value,buyerId=$(type+"BuyerId").value,staffId=type==="mts"?null:$(type+"SaleStaff").value,items=window[type+"SaleItems"]||[];
  const serviceItems=type==="dermed"?(window.dermedServiceItems||[]):[];
  if(!buyerType||!buyerId){msg($(type+"Status"),"Please select a Student or Customer.",true);return}
- if(!staffId){msg($(type+"Status"),"Please select Sale Staff.",true);return}
+ if(type==="dermed"&&!staffId){msg($(type+"Status"),"Please select Sale Staff.",true);return}
  if(!items.length&&!serviceItems.length){msg($(type+"Status"),"Add at least one product"+(type==="dermed"?" or service":"")+".",true);return}
  for(const it of items){if(Number(it.quantity)>productStock(it.product_id)){msg($(type+"Status"),`Not enough stock for ${it.name}. Available: ${productStock(it.product_id)}.`,true);return}}
  const buyer=buyerType==="student"?students.find(x=>String(x.id)===String(buyerId)):customers.find(x=>String(x.id)===String(buyerId));
@@ -10566,13 +10566,11 @@ document.addEventListener("DOMContentLoaded",function(){
  }
     const buyerType=E("mtsBuyerType")?.value;
     const buyerId=E("mtsBuyerId")?.value;
-    const staffId=E("mtsSaleStaff")?.value;     const cashierId=E("mtsCashier")?.value||"";     const items=window.mtsSaleItems||[];
+    const staffId=null;
+    const cashierId=E("mtsCashier")?.value||"";     const items=window.mtsSaleItems||[];
 
     if(!buyerType||!buyerId){
       msg(E("mtsStatus"),"Please select a Student or Customer.",true); return;
-    }
-    if(!staffId){
-      msg(E("mtsStatus"),"Please select Sale Staff.",true); return;
     }
     if(!items.length){
       msg(E("mtsStatus"),"Add at least one product.",true); return;
@@ -10589,7 +10587,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const buyer=buyerType==="student"
       ?students.find(x=>String(x.id)===String(buyerId))
       :customers.find(x=>String(x.id)===String(buyerId));
-    const staff=staffInfoRecords.find(x=>String(x.id)===String(staffId));
+    const staff=null;
     const c=calcMtsFinal();
 
     if(c.status==="Partial" && (c.paid<=0 || c.paid>=c.total-0.005)){
@@ -10714,8 +10712,8 @@ document.addEventListener("DOMContentLoaded",function(){
         product_id:x.product_id,
         movement_type:"sale",
         quantity:Number(x.quantity),
-        staff_id:staffId,
-        staff_name:staff?.name_en||"",
+        staff_id:null,
+        staff_name:"",
         stock_time:now,
         created_by:adminUser?.id||null,
         sale_id:saleId,
@@ -11049,10 +11047,10 @@ document.addEventListener("DOMContentLoaded",function(){
 
     const buyerType=E("mtsBuyerType")?.value||"";
     const buyerId=E("mtsBuyerId")?.value||"";
-    const staffId=E("mtsSaleStaff")?.value||"";const cashierId=E("mtsCashier")?.value||"";
+    const staffId=null;const cashierId=E("mtsCashier")?.value||"";
     const items=Array.isArray(window.mtsSaleItems)?window.mtsSaleItems:[];
     if(!buyerType||!buyerId){msg(E("mtsStatus"),"Please select a Student or Customer.",true);return;}
-    if(!staffId){msg(E("mtsStatus"),"Please select Sale Staff (Job Title: Sale Counter Cashier).",true);return;}if(!cashierId){msg(E("mtsStatus"),"Please select Cashier (Job Title: Sale Counter Cashier).",true);return;}
+    if(!cashierId){msg(E("mtsStatus"),"Please select Cashier (Job Title: Sale Counter Cashier).",true);return;}
     if(!items.length){msg(E("mtsStatus"),"Add at least one product.",true);return;}
 
     for(const it of items){
@@ -14714,9 +14712,8 @@ async function loadCommissionRecords(retry=0){
  }
  function positionBuyer(){const i=E('mtsBuyerSearch'),r=E('mtsBuyerResults'),p=r?.parentElement;if(!i||!r||!p)return;const ir=i.getBoundingClientRect(),pr=p.getBoundingClientRect();r.style.top=(ir.bottom-pr.top+4)+'px';r.style.left=(ir.left-pr.left)+'px';r.style.width=ir.width+'px';r.style.right='auto'}
  async function saveMts(){
-   const buyerType=E('mtsBuyerType')?.value,buyerId=E('mtsBuyerId')?.value,staffId=E('mtsSaleStaff')?.value,items=window.mtsSaleItems||[];
+   const buyerType=E('mtsBuyerType')?.value,buyerId=E('mtsBuyerId')?.value,staffId=null,items=window.mtsSaleItems||[];
    if(!buyerType||!buyerId){msg(E('mtsStatus'),'Please select a Student or Customer.',true);return}
-   if(!staffId){msg(E('mtsStatus'),'Please select Sale Staff.',true);return}
    if(!items.length){msg(E('mtsStatus'),'Add at least one product.',true);return}
    for(const it of items){if(Number(it.quantity)>productStock(it.product_id)){msg(E('mtsStatus'),`Not enough stock for ${it.name}. Available: ${productStock(it.product_id)}.`,true);return}}
    const buyer=buyerType==='student'?students.find(x=>String(x.id)===String(buyerId)):customers.find(x=>String(x.id)===String(buyerId));
@@ -14727,7 +14724,7 @@ async function loadCommissionRecords(retry=0){
    const payload={reference_no:reference,sale_type:code,sale_date:now.slice(0,10),sale_time:now.slice(11),student_id:buyerType==='student'?buyerId:null,student_name:buyer?.full_name||buyer?.name||'',student_phone:buyer?.phone||'',customer_id:buyerType==='customer'?buyerId:null,customer_type:buyerType,sale_staff_id:staffId,sale_staff_name:staff?.name_en||'',cashier_id:cashierId,cashier_name:((staffInfoRecords||[]).find(x=>String(x.id)===String(cashierId))?.name_en||""),subtotal:c.sub,discount:c.od,shipping:0,grand_total:c.total,paid:c.paid,balance:c.due,payment_status:c.st,payment_method:E('mtsPaymentMethod')?.value||'Cash',sale_status:'Completed',items:normalized,service_items:[],service_total:0,notes:''};
    try{const r=await sb.from('medifella_sales').insert({...payload,created_by:adminUser.id}).select().single();if(r.error)throw r.error;const movements=items.map(x=>({product_id:x.product_id,movement_type:'sale',quantity:Number(x.quantity),staff_id:staffId,staff_name:staff?.name_en||'',stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));if(movements.length){const mr=await sb.from('medifella_inventory_movements').insert(movements);if(mr.error)throw mr.error}if(c.paid>0){const pr=await sb.from('medifella_sale_payments').insert({sale_id:String(r.data.id),amount:c.paid,payment_method:E('mtsPaymentMethod')?.value||'Cash',payment_date:now.slice(0,10),note:c.st==='Partial'?'Partial Payment':'Paid in Full',created_by:adminUser.id});if(pr.error)console.warn('MTS payment history:',pr.error.message)}msg(E('mtsStatus'),`MTS sale saved. Invoice ${reference}.`);if(typeof resetNewInventorySale==='function')resetNewInventorySale('mts');await loadSales();await loadStockMovements();showSaleInvoice(r.data.id)}catch(e){msg(E('mtsStatus'),e.message||'Could not save MTS sale.',true)}
  }
- function resetMts(){window.mtsSaleItems=[];E('mtsBuyerType')&&(E('mtsBuyerType').value='');E('mtsBuyerId')&&(E('mtsBuyerId').value='');E('mtsBuyerSearch')&&(E('mtsBuyerSearch').value='');E('mtsBuyerHint')&&(E('mtsBuyerHint').textContent='Choose a student or customer. You can add a new customer.');E('mtsSaleStaff')&&(E('mtsSaleStaff').value='');E('mtsOverallDiscountType')&&(E('mtsOverallDiscountType').value='percent');E('mtsOverallDiscountValue')&&(E('mtsOverallDiscountValue').value='');E('mtsPaymentMethod')&&(E('mtsPaymentMethod').value='Cash');E('mtsPaymentStatus')&&(E('mtsPaymentStatus').value='Paid');E('mtsAmountPaidNow')&&(E('mtsAmountPaidNow').value='0.00');if(typeof setAutoTime==='function')setAutoTime('mtsSaleTime');render();totals()}
+ function resetMts(){window.mtsSaleItems=[];E('mtsBuyerType')&&(E('mtsBuyerType').value='');E('mtsBuyerId')&&(E('mtsBuyerId').value='');E('mtsBuyerSearch')&&(E('mtsBuyerSearch').value='');E('mtsBuyerHint')&&(E('mtsBuyerHint').textContent='Choose a student or customer. You can add a new customer.');E('mtsOverallDiscountType')&&(E('mtsOverallDiscountType').value='percent');E('mtsOverallDiscountValue')&&(E('mtsOverallDiscountValue').value='');E('mtsPaymentMethod')&&(E('mtsPaymentMethod').value='Cash');E('mtsPaymentStatus')&&(E('mtsPaymentStatus').value='Paid');E('mtsAmountPaidNow')&&(E('mtsAmountPaidNow').value='0.00');if(typeof setAutoTime==='function')setAutoTime('mtsSaleTime');render();totals()}
  function bind(){
    const save=E('saveMtsSale');if(save){save.type='button';save.onclick=function(e){e.preventDefault();saveMts()}}
    const clear=E('clearMtsSale');if(clear){clear.type='button';clear.onclick=function(e){e.preventDefault();resetMts()}}
@@ -19664,6 +19661,25 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   window.addEventListener("beforeunload",function(){
     observer.disconnect();
   },{once:true});
+})();
+</script>
+
+
+<script id="mts-sale-staff-fully-removed-final">
+(function(){
+  "use strict";
+  function hideMtsStaff(){
+    ["mtsSaleStaff","mtsSaleStaffSelect","mtsSaleStaffId"].forEach(function(id){
+      var el=document.getElementById(id);
+      if(!el)return;
+      var wrap=el.closest(".field,.form-group,.input-group,.form-field,.form-row");
+      if(wrap)wrap.style.display="none";
+      el.style.display="none";
+      el.removeAttribute("required");
+      el.required=false;
+    });
+  }
+  hideMtsStaff();
 })();
 </script>
 
