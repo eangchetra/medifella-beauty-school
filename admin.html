@@ -7414,7 +7414,7 @@ function addSaleProduct(type,pid){
    const arr=window.mtsSaleItems||(window.mtsSaleItems=[]);
    const existing=arr.find(x=>String(x.product_id)===String(pid));
    if(existing){
-     const stock=typeof productStock==="function"?Number(productStock(existing.product_id)):999999;
+     const stock=typeof window.__currentProductStock==="function"?Number(window.__currentProductStock(existing.product_id)):999999;
      existing.quantity=Math.min((Number(existing.quantity)||1)+1,Math.max(1,stock));
    }else{
      arr.push({
@@ -8605,6 +8605,21 @@ document.addEventListener("DOMContentLoaded",function(){
   window.editingDermedSaleId = window.editingDermedSaleId || null;
 
   async function saveDermed(){
+ // Dermed stock validation before save: zero-stock products cannot be sold.
+ if(Array.isArray(window.dermedSaleItems)){
+   for(const item of window.dermedSaleItems){
+     const available=typeof window.__currentProductStock==="function"?Number(window.__currentProductStock(item.product_id)||0):0;
+     const qty=Math.max(1,Number(item.quantity)||1);
+     if(available<=0){
+       alert(`Cannot save Dermed Sale: "${item.name||"Product"}" is out of stock.`);
+       return;
+     }
+     if(qty>available){
+       alert(`Cannot save Dermed Sale: "${item.name||"Product"}" has only ${available} in stock.`);
+       return;
+     }
+   }
+ }
     if(window.__dermedSaveInProgress)return;
     const buyerType=E("dermedBuyerType")?.value,buyerId=E("dermedBuyerId")?.value,staffId=E("dermedSaleStaff")?.value,cashierId=E("dermedCashier")?.value;
     const c=calc(), items=pItems(), servicesArr=sItems();
@@ -9456,10 +9471,11 @@ document.addEventListener("DOMContentLoaded",function(){
     }).slice(0,15);
 
     results.innerHTML=rows.map(function(p){
-      const stock=typeof productStock==="function"?productStock(p.id):0;
-      return `<button type="button" data-mts-final-product-id="${String(p.id).replace(/"/g,"&quot;")}">
+      const stock=typeof window.__currentProductStock==="function"?Number(window.__currentProductStock(p.id)||0):0;
+      const disabled=stock<=0;
+      return `<button type="button" data-mts-final-product-id="${String(p.id).replace(/"/g,"&quot;")}" ${disabled?"disabled":""} style="${disabled?"opacity:.55;cursor:not-allowed":""}">
         <strong>${escLocal(p.name||"")}</strong>
-        <div class="muted">${escLocal(p.product_code||"")} · ${moneyLocal(p.price)} · Stock: ${stock}</div>
+        <div class="muted">${escLocal(p.product_code||"")} · ${moneyLocal(p.price)} · Stock: ${stock}${disabled?" · Out of stock":""}</div>
       </button>`;
     }).join("") || '<div class="muted" style="padding:10px">No product found.</div>';
 
@@ -9471,6 +9487,12 @@ document.addEventListener("DOMContentLoaded",function(){
     const list=Array.isArray(window.products)?window.products:[];
     const p=list.find(function(x){return String(x.id)===String(pid)});
     if(!p)return;
+
+    const stock=typeof window.__currentProductStock==="function"?Number(window.__currentProductStock(p.id)||0):0;
+    if(stock<=0){
+      alert("This product is out of stock and cannot be added to MTS Sale.");
+      return;
+    }
 
     const arr=window.mtsSaleItems||(window.mtsSaleItems=[]);
     const existing=arr.find(function(x){return String(x.product_id)===String(pid)});
@@ -9519,7 +9541,7 @@ document.addEventListener("DOMContentLoaded",function(){
       const btn=e.target.closest("button[data-mts-final-product-id]");
       if(!btn)return;
       e.preventDefault();
-      e.stopImmediatePropagation();
+      e.stopPropagation();
       window.mtsAddProductFinal(btn.getAttribute("data-mts-final-product-id"));
     },true);
   }
@@ -10125,6 +10147,21 @@ document.addEventListener("DOMContentLoaded",function(){
   }
 
   async function saveMtsFinal(){
+ // MTS stock validation before save: zero-stock products cannot be sold.
+ if(Array.isArray(window.mtsSaleItems)){
+   for(const item of window.mtsSaleItems){
+     const available=typeof window.__currentProductStock==="function"?Number(window.__currentProductStock(item.product_id)||0):0;
+     const qty=Math.max(1,Number(item.quantity)||1);
+     if(available<=0){
+       alert(`Cannot save MTS Sale: "${item.name||"Product"}" is out of stock.`);
+       return;
+     }
+     if(qty>available){
+       alert(`Cannot save MTS Sale: "${item.name||"Product"}" has only ${available} in stock.`);
+       return;
+     }
+   }
+ }
     const buyerType=E("mtsBuyerType")?.value;
     const buyerId=E("mtsBuyerId")?.value;
     const staffId=E("mtsSaleStaff")?.value;     const cashierId=E("mtsCashier")?.value||"";     const items=window.mtsSaleItems||[];
@@ -11324,6 +11361,27 @@ try{
 })();
 </script>
 
+<script id="stock-add-availability-sync">
+(function(){
+  "use strict";
+  window.__currentProductStock=function(pid){
+    const key=String(pid);
+    try{
+      if(window.itemSearchCache && window.itemSearchCache.stock instanceof Map){
+        const v=window.itemSearchCache.stock.get(key);
+        if(v!==undefined && Number.isFinite(Number(v))) return Math.max(0,Number(v));
+      }
+    }catch(e){}
+    try{
+      if(typeof productStock==="function"){
+        return Math.max(0,Number(productStock(pid)||0));
+      }
+    }catch(e){}
+    return 0;
+  };
+})();
+</script>
+
 <script id="dermed-product-add-final-fix">
 (function(){
   "use strict";
@@ -11340,6 +11398,12 @@ try{
     const list=Array.isArray(window.products)?window.products:[];
     const p=list.find(x=>String(x.id)===String(pid));
     if(!p)return;
+
+    const stock=typeof window.__currentProductStock==="function"?Number(window.__currentProductStock(p.id)||0):0;
+    if(stock<=0){
+      alert("This product is out of stock and cannot be added to Dermed Sale.");
+      return;
+    }
 
     const arr=window.dermedSaleItems||(window.dermedSaleItems=[]);
     const existing=arr.find(x=>String(x.product_id)===String(pid));
@@ -11382,11 +11446,17 @@ try{
         return false;
       }
 
+      const availableNow=Math.max(0,Number(typeof window.__currentProductStock==="function"?window.__currentProductStock(pid):0));
+      if(availableNow<=0){
+        alert("This product is out of stock and cannot be added to Dermed Sale.");
+        return false;
+      }
+
       const arr=window.dermedSaleItems||(window.dermedSaleItems=[]);
       const existing=arr.find(x=>String(x.product_id)===String(pid));
 
       if(existing){
-        const available=Math.max(0,Number(productStock(pid)||0));
+        const available=availableNow;
         existing.quantity=Math.min(
           Math.max(1,Number(existing.quantity)||1)+1,
           Math.max(1,available)
