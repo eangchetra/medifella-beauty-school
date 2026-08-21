@@ -2146,22 +2146,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </style>
 
 
-<script id="stable-section-startup">
-(function(){
-  function stabilize(){
-    const sections=document.querySelectorAll(".section");
-    if(!sections.length)return;
-    sections.forEach(s=>s.classList.remove("active"));
-    // Do not force a page choice here. The existing permission code will
-    // activate the first permitted section once authentication finishes.
-  }
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",stabilize,{once:true});
-  }else{
-    stabilize();
-  }
-})();
-</script>
+
 
 
 
@@ -2186,37 +2171,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </style>
 
 
-<style id="no-mts-dermed-flash">
-  /* Hide the dashboard while auth + staff permissions are initializing.
-     Do NOT override .section display rules; the existing app controls those. */
-  html.dashboard-starting body #appView{
-    visibility:hidden !important;
-  }
-  html.dashboard-ready body #appView{
-    visibility:visible !important;
-  }
-</style>
-<script id="no-mts-dermed-flash-init">
-(function(){
-  try{
-    document.documentElement.classList.add("dashboard-starting");
 
-    function ready(){
-      document.documentElement.classList.remove("dashboard-starting");
-      document.documentElement.classList.add("dashboard-ready");
-    }
-
-    // Give the existing authentication/permission initialization time to
-    // finish selecting the one permitted active section.
-    window.addEventListener("load", function(){
-      setTimeout(ready, 300);
-    }, {once:true});
-
-    // Safety fallback so the dashboard cannot remain hidden indefinitely.
-    setTimeout(ready, 3500);
-  }catch(e){}
-})();
-</script>
 
 
 <style id="sale-commission-toggle-style">
@@ -19564,6 +19519,68 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 
   // The dashboard can re-render sections after login/permission loading.
   [100,300,700,1200,2000].forEach(ms=>setTimeout(init,ms));
+})();
+</script>
+
+
+<script id="mts-dermed-sale-staff-persist-final">
+(function(){
+  "use strict";
+  const state={mts:"",dermed:""};
+
+  function getSelects(){
+    return [
+      {id:"mtsSaleStaff",key:"mts"},
+      {id:"dermedSaleStaff",key:"dermed"},
+      {id:"mtsSaleStaffSelect",key:"mts"},
+      {id:"dermedSaleStaffSelect",key:"dermed"}
+    ].map(x=>({ ...x, el:document.getElementById(x.id)}))
+     .filter(x=>x.el);
+  }
+
+  function remember(x){
+    if(x.el && x.el.value){
+      state[x.key]=String(x.el.value);
+      x.el.dataset.persistedSaleStaff=state[x.key];
+    }
+  }
+
+  function restore(){
+    getSelects().forEach(x=>{
+      const wanted=state[x.key] || x.el.dataset.persistedSaleStaff || "";
+      if(!wanted)return;
+      const option=[...x.el.options].find(o=>String(o.value)===wanted);
+      if(option && x.el.value!==wanted){
+        x.el.value=wanted;
+      }
+    });
+  }
+
+  document.addEventListener("change",function(e){
+    const x=getSelects().find(y=>y.el===e.target);
+    if(x)remember(x);
+  },true);
+
+  function bindAndRestore(){
+    getSelects().forEach(x=>{
+      if(x.el.dataset.saleStaffPersistBound!=="1"){
+        x.el.dataset.saleStaffPersistBound="1";
+        const obs=new MutationObserver(function(){
+          // If the application temporarily rebuilds the options, restore
+          // the previous selection once the option exists again.
+          restore();
+        });
+        obs.observe(x.el,{childList:true,subtree:true});
+        if(x.el.value)remember(x);
+      }
+    });
+    restore();
+  }
+
+  bindAndRestore();
+  [50,150,300,600,1000,2000,3500].forEach(ms=>setTimeout(bindAndRestore,ms));
+
+  new MutationObserver(bindAndRestore).observe(document.body,{childList:true,subtree:true});
 })();
 </script>
 
