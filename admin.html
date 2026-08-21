@@ -20057,1310 +20057,70 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 </script>
 
 
-<script id="all-invoices-khmer-pdf-final-safety">
+
+<script id="medi-fella-final-pdf-controller">
 (function(){
   "use strict";
-  // Ensure the browser has completed font loading before any invoice export.
-  async function prepareInvoiceFonts(){
+
+  /*
+   * FINAL PDF CONTROLLER
+   * - Save PDF never calls window.print()
+   * - Save PDF sends the exact invoice HTML/CSS to the server renderer.
+   * - Print opens the browser print dialog from the exact invoice HTML.
+   * - Existing legacy canvas/jsPDF functions are left in place for compatibility,
+   *   but the public entry points are overridden here.
+   *
+   * If the website is on GitHub Pages, set:
+   *   window.INVOICE_PDF_ENDPOINT = "https://YOUR-VERCEL-PROJECT.vercel.app/api/invoice-pdf";
+   * before this script runs, or replace the placeholder below.
+   */
+
+  window.INVOICE_PDF_ENDPOINT =
+    window.INVOICE_PDF_ENDPOINT ||
+    "/api/invoice-pdf";
+
+  function invoiceNode(){
+    return document.querySelector("#invoiceOverlay .mf-invoice") ||
+           document.querySelector("#invoicePrint .mf-invoice") ||
+           document.querySelector(".invoice-overlay .mf-invoice") ||
+           document.querySelector(".mf-invoice");
+  }
+
+  function invoiceFileName(){
     try{
-      if(window.ensureMtsKhmerFontsLoaded){
-        await window.ensureMtsKhmerFontsLoaded();
+      if(typeof window.invoiceFileName==="function"){
+        const n=window.invoiceFileName();
+        if(n)return String(n).replace(/\.pdf$/i,"");
       }
+    }catch(_){}
+
+    const ref =
+      document.querySelector("#invoicePrint [data-invoice-reference]")?.textContent ||
+      document.querySelector("#invoicePrint .invoice-reference")?.textContent ||
+      "invoice";
+
+    return String(ref).trim().replace(/[^a-z0-9_-]+/gi,"_") || "invoice";
+  }
+
+  async function waitForInvoice(node){
+    if(!node)throw new Error("Invoice preview is not available.");
+
+    try{
       if(document.fonts && document.fonts.ready){
         await document.fonts.ready;
       }
     }catch(_){}
-  }
-  window.prepareAllInvoiceKhmerFonts=prepareInvoiceFonts;
-})();
-</script>
-
-
-<script id="exact-invoice-html-pdf-export-final">
-(function(){
-  "use strict";
-
-  function getPaper(size){
-    return String(size||"A4").toUpperCase()==="A5"
-      ? {name:"A5",widthMm:148,heightMm:210}
-      : {name:"A4",widthMm:210,heightMm:297};
-  }
-
-  function wait(ms){return new Promise(r=>setTimeout(r,ms));}
-
-  async function waitForPopupAssets(doc){
-    try{
-      if(doc.fonts && doc.fonts.ready) await doc.fonts.ready;
-    }catch(_){}
-
-    const imgs=[...doc.images];
-    await Promise.all(imgs.map(img=>{
-      if(img.complete) return Promise.resolve();
-      return new Promise(resolve=>{
-        img.addEventListener("load",resolve,{once:true});
-        img.addEventListener("error",resolve,{once:true});
-      });
-    }));
-
-    // Give the browser one layout/paint cycle after fonts and images load.
-    await wait(100);
-  }
-
-  function copyPageStyles(targetDoc){
-    // Copy the exact stylesheet elements already used by the dashboard.
-    // This avoids rebuilding the invoice CSS and keeps the printed invoice
-    // visually identical to the invoice shown in the dashboard.
-    document.querySelectorAll("style,link[rel='stylesheet']").forEach(node=>{
-      try{
-        targetDoc.head.appendChild(node.cloneNode(true));
-      }catch(_){}
-    });
-  }
-
-  async function exactInvoicePrint(id,size="A4"){
-    const overlay=document.getElementById("invoiceOverlay");
-    const source=document.querySelector("#invoiceOverlay .mf-invoice") ||
-                 document.querySelector("#invoicePrint .mf-invoice");
-
-    // IMPORTANT: do not require salesRecords here.
-    // The invoice viewer already contains the exact invoice currently being
-    // viewed. Requiring a matching database record caused the previous
-    // "Invoice not found" error even though the invoice was visibly open.
-    if(!overlay || !source){
-      alert("Invoice viewing page is not open.");
-      return;
-    }
-
-    const printWin=window.open("about:blank","_blank","width=1000,height=1300");
-    if(!printWin){
-      alert("Please allow pop-ups for this website so the invoice can be saved as PDF.");
-      return;
-    }
-
-    const paper=getPaper(size);
-
-    // Get a useful title from the invoice currently on screen.
-    let title="Invoice";
-    try{
-      const text=source.innerText||"";
-      const m=text.match(/Invoice\s*No\.?\s*:\s*([A-Z0-9_-]+)/i);
-      if(m) title=m[1];
-    }catch(_){}
-    if(id && typeof id==="string" && id.length<100 && !/^undefined|null$/i.test(id)){
-      if(title==="Invoice") title=id;
-    }
-
-    // Clone the ACTUAL invoice-viewing DOM. No html2canvas and no canvas.
-    // The browser itself renders the Khmer text and table.
-    const clonedOverlay=overlay.cloneNode(true);
-    clonedOverlay.id="invoiceOverlay";
-    clonedOverlay.style.display="block";
-    clonedOverlay.style.position="static";
-    clonedOverlay.style.inset="auto";
-    clonedOverlay.style.width="100%";
-    clonedOverlay.style.height="auto";
-    clonedOverlay.style.overflow="visible";
-    clonedOverlay.style.background="#fff";
-
-    clonedOverlay.querySelectorAll(
-      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-preview-actions"
-    ).forEach(el=>el.remove());
-
-    clonedOverlay.querySelectorAll("[data-no-print='true']").forEach(el=>el.remove());
-
-    const wrapper=document.createElement("div");
-    wrapper.id="exactInvoicePrintRoot";
-    wrapper.appendChild(clonedOverlay);
-
-    const serialized=wrapper.outerHTML;
-
-    printWin.document.open();
-    printWin.document.write(`<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>${title} - ${paper.name}</title>
-<style id="exact-invoice-pdf-base">
-  @page{size:${paper.name} portrait;margin:0}
-  html,body{
-    margin:0!important;
-    padding:0!important;
-    width:${paper.widthMm}mm!important;
-    min-width:${paper.widthMm}mm!important;
-    background:#fff!important;
-  }
-  body{
-    overflow:visible!important;
-    -webkit-print-color-adjust:exact!important;
-    print-color-adjust:exact!important;
-  }
-  #exactInvoicePrintRoot,
-  #invoiceOverlay,
-  #invoicePrint{
-    width:${paper.widthMm}mm!important;
-    min-width:${paper.widthMm}mm!important;
-    margin:0!important;
-    padding:0!important;
-    background:#fff!important;
-  }
-  #invoiceOverlay{
-    display:block!important;
-    position:static!important;
-    inset:auto!important;
-    height:auto!important;
-    min-height:0!important;
-    overflow:visible!important;
-  }
-  #invoicePrint{
-    display:block!important;
-  }
-  #invoicePrint .mf-invoice{
-    margin:0 auto!important;
-    box-sizing:border-box!important;
-    page-break-inside:avoid!important;
-    break-inside:avoid!important;
-  }
-  .invoice-actions,#invoiceActions,.mf-actions,.invoice-preview-actions{
-    display:none!important;
-  }
-  @media print{
-    html,body,#exactInvoicePrintRoot,#invoiceOverlay,#invoicePrint{
-      width:${paper.widthMm}mm!important;
-      min-width:${paper.widthMm}mm!important;
-    }
-  }
-</style>
-</head>
-<body>
-${serialized}
-</body>
-</html>`);
-    printWin.document.close();
 
     try{
-      // Copy the dashboard's existing CSS into the print document BEFORE print.
-      copyPageStyles(printWin.document);
-      await waitForPopupAssets(printWin.document);
-
-      // Force a final browser layout/paint before printing.
-      await new Promise(r=>requestAnimationFrame(
-        ()=>requestAnimationFrame(r)
-      ));
-
-      printWin.focus();
-      setTimeout(()=>printWin.print(),100);
-    }catch(e){
-      console.error("Exact invoice print:",e);
-      try{printWin.close();}catch(_){}
-      alert("Could not prepare the invoice for printing. Please try again.");
-    }
-  }
-
-  // Replace both PDF/Print entry points with the exact DOM printer.
-  // The browser's Print dialog can then choose "Save as PDF".
-  window.downloadInvoicePDF=exactInvoicePrint;
-  window.printInvoice=exactInvoicePrint;
-  window.exactInvoicePrint=exactInvoicePrint;
-})();
-</script>
-
-
-<script id="final-save-pdf-no-library-error">
-(function(){
-  "use strict";
-
-  function getVisibleInvoice(){
-    const candidates = [
-      document.querySelector("#invoiceOverlay .mf-invoice"),
-      document.querySelector("#invoicePrint .mf-invoice"),
-      document.querySelector(".invoice-overlay .mf-invoice"),
-      document.querySelector(".mf-invoice")
-    ];
-    return candidates.find(Boolean);
-  }
-
-  async function savePdfFromExactInvoice(){
-    const invoice = getVisibleInvoice();
-    if(!invoice){
-      alert("Please open the invoice first.");
-      return;
-    }
-
-    const printWin = window.open("", "_blank", "width=1000,height=1300");
-    if(!printWin){
-      alert("Please allow pop-ups for this website so the invoice can be saved as PDF.");
-      return;
-    }
-
-    // Copy the invoice-viewing DOM exactly; do not use canvas or a PDF library.
-    const clone = invoice.cloneNode(true);
-
-    // Remove controls from the cloned invoice only.
-    clone.querySelectorAll(
-      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,[data-no-print='true']"
-    ).forEach(el => el.remove());
-
-    const styles = [...document.querySelectorAll("style,link[rel='stylesheet']")]
-      .map(n => n.outerHTML).join("\n");
-
-    printWin.document.open();
-    printWin.document.write(`<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Invoice</title>
-${styles}
-<style>
-@page{size:A4 portrait;margin:0}
-html,body{
-  margin:0!important;padding:0!important;
-  background:#fff!important;
-  width:210mm!important;
-}
-body{
-  -webkit-print-color-adjust:exact!important;
-  print-color-adjust:exact!important;
-}
-.mf-invoice{
-  width:210mm!important;
-  max-width:210mm!important;
-  margin:0 auto!important;
-  box-sizing:border-box!important;
-}
-@media print{
-  html,body{width:210mm!important}
-}
-</style>
-</head>
-<body>${clone.outerHTML}
-<script>
-(async function(){
-  try{
-    if(document.fonts && document.fonts.ready) await document.fonts.ready;
-  }catch(e){}
-  const imgs=[...document.images];
-  await Promise.all(imgs.map(function(img){
-    if(img.complete)return Promise.resolve();
-    return new Promise(function(resolve){
-      img.addEventListener("load",resolve,{once:true});
-      img.addEventListener("error",resolve,{once:true});
-    });
-  }));
-  requestAnimationFrame(function(){
-    requestAnimationFrame(function(){
-      setTimeout(function(){window.print();},100);
-    });
-  });
-})();
-<\/script>
-</body>
-</html>`);
-    printWin.document.close();
-    printWin.focus();
-  }
-
-  // Expose the replacement function.
-  window.saveInvoicePDFExact = savePdfFromExactInvoice;
-  window.downloadInvoicePDF = savePdfFromExactInvoice;
-
-  // Capture clicks on the visible Save PDF button in the invoice viewer.
-  document.addEventListener("click", function(e){
-    const btn = e.target.closest(
-      "#invoiceOverlay button, #invoicePrint button, .invoice-overlay button, button"
-    );
-    if(!btn)return;
-
-    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
-    if(!text.includes("save pdf"))return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    if(e.stopImmediatePropagation)e.stopImmediatePropagation();
-
-    savePdfFromExactInvoice();
-  }, true);
-})();
-</script>
-
-
-<script id="invoice-print-one-page-a4-a5-final">
-(function(){
-  "use strict";
-
-  function invoiceNode(){
-    return document.querySelector("#invoiceOverlay .mf-invoice") ||
-           document.querySelector("#invoicePrint .mf-invoice") ||
-           document.querySelector(".invoice-overlay .mf-invoice") ||
-           document.querySelector(".mf-invoice");
-  }
-
-  function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
-
-  async function printOnePageInvoice(){
-    const source=invoiceNode();
-    if(!source){
-      alert("Please open the invoice first.");
-      return;
-    }
-
-    const printWin=window.open("","_blank","width=1000,height=1300");
-    if(!printWin){
-      alert("Please allow pop-ups for this website.");
-      return;
-    }
-
-    const clone=source.cloneNode(true);
-    clone.querySelectorAll(
-      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,[data-no-print='true']"
-    ).forEach(el=>el.remove());
-
-    const styles=[...document.querySelectorAll("style,link[rel='stylesheet']")]
-      .map(n=>n.outerHTML).join("\n");
-
-    printWin.document.open();
-    printWin.document.write(`<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Invoice</title>
-${styles}
-<style id="one-page-print-css">
-  @page{size:A4 portrait;margin:0}
-  html,body{
-    margin:0!important;padding:0!important;
-    background:#fff!important;
-    -webkit-print-color-adjust:exact!important;
-    print-color-adjust:exact!important;
-  }
-  #printPage{
-    position:relative!important;
-    width:210mm!important;
-    height:297mm!important;
-    overflow:hidden!important;
-    margin:0!important;
-    padding:0!important;
-    background:#fff!important;
-  }
-  #printScale{
-    position:absolute!important;
-    left:0!important;
-    top:0!important;
-    width:210mm!important;
-    transform-origin:top left!important;
-  }
-  .mf-invoice{
-    width:210mm!important;
-    max-width:210mm!important;
-    min-width:210mm!important;
-    margin:0!important;
-    box-sizing:border-box!important;
-  }
-  table{max-width:100%!important}
-  @media print{
-    html,body{
-      width:210mm!important;
-      height:297mm!important;
-      overflow:hidden!important;
-    }
-    #printPage{
-      width:210mm!important;
-      height:297mm!important;
-      page-break-after:avoid!important;
-      break-after:avoid-page!important;
-    }
-  }
-</style>
-</head>
-<body>
-<div id="printPage"><div id="printScale">${clone.outerHTML}</div></div>
-<script>
-(async function(){
-  try{
-    if(document.fonts && document.fonts.ready) await document.fonts.ready;
-  }catch(e){}
-
-  const imgs=[...document.images];
-  await Promise.all(imgs.map(function(img){
-    if(img.complete)return Promise.resolve();
-    return new Promise(function(resolve){
-      img.addEventListener("load",resolve,{once:true});
-      img.addEventListener("error",resolve,{once:true});
-    });
-  }));
-
-  // Let Khmer fonts, tables, borders and images finish layout before measuring.
-  await new Promise(function(r){
-    requestAnimationFrame(function(){
-      requestAnimationFrame(r);
-    });
-  });
-
-  const page=document.getElementById("printPage");
-  const scaleBox=document.getElementById("printScale");
-  const invoice=scaleBox.querySelector(".mf-invoice");
-
-  // CSS pixels for physical A4. The print page itself is exactly 210 x 297 mm.
-  const pageW=page.getBoundingClientRect().width;
-  const pageH=page.getBoundingClientRect().height;
-
-  // Measure the real rendered invoice, including its full table and footer.
-  const rect=invoice.getBoundingClientRect();
-  const fullW=Math.max(invoice.scrollWidth,rect.width);
-  const fullH=Math.max(invoice.scrollHeight,rect.height);
-
-  const scale=Math.min(1, pageW/fullW, pageH/fullH);
-
-  scaleBox.style.width=fullW+"px";
-  scaleBox.style.transform="scale("+scale+")";
-
-  // Center horizontally when the invoice is narrower than the paper.
-  scaleBox.style.left=Math.max(0,(pageW-fullW*scale)/2)+"px";
-
-  // Re-check after applying scale.
-  await new Promise(function(r){requestAnimationFrame(r);});
-
-  setTimeout(function(){
-    window.focus();
-    window.print();
-  },150);
-})();
-<\/script>
-</body>
-</html>`);
-    printWin.document.close();
-    printWin.focus();
-  }
-
-  window.saveInvoicePDFExact=printOnePageInvoice;
-  window.downloadInvoicePDF=printOnePageInvoice;
-  window.printInvoice=printOnePageInvoice;
-  window.exactInvoicePrint=printOnePageInvoice;
-
-  // Make the visible Save PDF and Print buttons use the one-page renderer.
-  document.addEventListener("click",function(e){
-    const btn=e.target.closest(
-      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button"
-    );
-    if(!btn)return;
-    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
-
-    if(text.includes("save pdf") || text==="print" || text.includes("print invoice")){
-      e.preventDefault();
-      e.stopPropagation();
-      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
-      printOnePageInvoice();
-    }
-  },true);
-})();
-</script>
-
-
-<script id="strict-one-page-invoice-print-final">
-(function(){
-  "use strict";
-
-  function getInvoice(){
-    return document.querySelector("#invoiceOverlay .mf-invoice") ||
-           document.querySelector("#invoicePrint .mf-invoice") ||
-           document.querySelector(".invoice-overlay .mf-invoice") ||
-           document.querySelector(".mf-invoice");
-  }
-
-  async function printStrictOnePage(){
-    const source=getInvoice();
-    if(!source){
-      alert("Please open the invoice first.");
-      return;
-    }
-
-    const w=window.open("","_blank","width=1000,height=1300");
-    if(!w){
-      alert("Please allow pop-ups for this website.");
-      return;
-    }
-
-    const clone=source.cloneNode(true);
-    clone.querySelectorAll(
-      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,[data-no-print='true']"
-    ).forEach(el=>el.remove());
-
-    const styles=[...document.querySelectorAll("style,link[rel='stylesheet']")]
-      .map(n=>n.outerHTML).join("\n");
-
-    w.document.open();
-    w.document.write(`<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Invoice</title>
-${styles}
-<style id="strict-one-page-css">
-  @page{
-    size:A4 portrait;
-    margin:0!important;
-  }
-
-  html,body{
-    margin:0!important;
-    padding:0!important;
-    width:210mm!important;
-    height:297mm!important;
-    min-height:297mm!important;
-    max-height:297mm!important;
-    overflow:hidden!important;
-    background:#fff!important;
-    -webkit-print-color-adjust:exact!important;
-    print-color-adjust:exact!important;
-  }
-
-  #strictPage{
-    position:relative!important;
-    width:210mm!important;
-    height:297mm!important;
-    min-height:297mm!important;
-    max-height:297mm!important;
-    overflow:hidden!important;
-    margin:0!important;
-    padding:0!important;
-    page-break-after:avoid!important;
-    break-after:avoid-page!important;
-    background:#fff!important;
-  }
-
-  #strictInvoice{
-    position:absolute!important;
-    left:0!important;
-    top:0!important;
-    width:210mm!important;
-    margin:0!important;
-    padding:0!important;
-    transform-origin:top left!important;
-    page-break-before:avoid!important;
-    page-break-after:avoid!important;
-    break-before:avoid-page!important;
-    break-after:avoid-page!important;
-  }
-
-  #strictInvoice .mf-invoice{
-    width:210mm!important;
-    max-width:210mm!important;
-    min-width:210mm!important;
-    margin:0!important;
-    padding:0!important;
-    page-break-before:avoid!important;
-    page-break-after:avoid!important;
-    break-before:avoid-page!important;
-    break-after:avoid-page!important;
-  }
-
-  #strictInvoice table,
-  #strictInvoice tr,
-  #strictInvoice td,
-  #strictInvoice th{
-    break-inside:avoid!important;
-    page-break-inside:avoid!important;
-  }
-
-  @media print{
-    html,body,#strictPage{
-      width:210mm!important;
-      height:297mm!important;
-      min-height:297mm!important;
-      max-height:297mm!important;
-      overflow:hidden!important;
-    }
-  }
-</style>
-</head>
-<body>
-<div id="strictPage"><div id="strictInvoice">${clone.outerHTML}</div></div>
-<script>
-(async function(){
-  try{
-    if(document.fonts && document.fonts.ready) await document.fonts.ready;
-  }catch(e){}
-
-  const imgs=[...document.images];
-  await Promise.all(imgs.map(function(img){
-    if(img.complete)return Promise.resolve();
-    return new Promise(function(resolve){
-      img.addEventListener("load",resolve,{once:true});
-      img.addEventListener("error",resolve,{once:true});
-    });
-  }));
-
-  await new Promise(function(resolve){
-    requestAnimationFrame(function(){
-      requestAnimationFrame(resolve);
-    });
-  });
-
-  const page=document.getElementById("strictPage");
-  const box=document.getElementById("strictInvoice");
-  const invoice=box.querySelector(".mf-invoice");
-
-  // A4 CSS pixels at 96dpi: 210mm x 297mm.
-  const A4W=793.7008;
-  const A4H=1122.5197;
-
-  // Measure the untransformed, fully rendered invoice.
-  const rect=invoice.getBoundingClientRect();
-  const fullW=Math.max(
-    invoice.scrollWidth||0,
-    rect.width||0,
-    invoice.offsetWidth||0
-  );
-  const fullH=Math.max(
-    invoice.scrollHeight||0,
-    rect.height||0,
-    invoice.offsetHeight||0
-  );
-
-  // Fit both dimensions into exactly one A4 page.
-  const scale=Math.min(A4W/fullW, A4H/fullH, 1);
-
-  box.style.width=fullW+"px";
-  box.style.height=fullH+"px";
-  box.style.transformOrigin="top left";
-  box.style.transform="scale("+scale+")";
-
-  // Center only horizontally; never create extra vertical layout.
-  const usedW=fullW*scale;
-  box.style.left=Math.max(0,(A4W-usedW)/2)+"px";
-  box.style.top="0px";
-
-  // Force the print document to have exactly one page of content.
-  page.style.width=A4W+"px";
-  page.style.height=A4H+"px";
-  page.style.overflow="hidden";
-
-  await new Promise(function(resolve){
-    requestAnimationFrame(function(){
-      requestAnimationFrame(resolve);
-    });
-  });
-
-  setTimeout(function(){
-    window.focus();
-    window.print();
-  },200);
-})();
-<\/script>
-</body>
-</html>`);
-    w.document.close();
-    w.focus();
-  }
-
-  window.saveInvoicePDFExact=printStrictOnePage;
-  window.downloadInvoicePDF=printStrictOnePage;
-  window.printInvoice=printStrictOnePage;
-  window.exactInvoicePrint=printStrictOnePage;
-
-  // Highest-priority click handler for Save PDF and Print in invoice viewer.
-  document.addEventListener("click",function(e){
-    const btn=e.target.closest(
-      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button"
-    );
-    if(!btn)return;
-
-    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
-
-    if(text.includes("save pdf") || text==="print" || text.includes("print invoice")){
-      e.preventDefault();
-      e.stopPropagation();
-      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
-      printStrictOnePage();
-    }
-  },true);
-})();
-</script>
-
-
-<script id="final-a4-standard-print-a4-a5-choice">
-(function(){
-  "use strict";
-
-  function invoiceNode(){
-    return document.querySelector("#invoiceOverlay .mf-invoice") ||
-           document.querySelector("#invoicePrint .mf-invoice") ||
-           document.querySelector(".invoice-overlay .mf-invoice") ||
-           document.querySelector(".mf-invoice");
-  }
-
-  async function printInvoiceA4Standard(){
-    const source=invoiceNode();
-    if(!source){
-      alert("Please open the invoice first.");
-      return;
-    }
-
-    const w=window.open("","_blank","width=1000,height=1300");
-    if(!w){
-      alert("Please allow pop-ups for this website.");
-      return;
-    }
-
-    const clone=source.cloneNode(true);
-    clone.querySelectorAll(
-      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,[data-no-print='true']"
-    ).forEach(el=>el.remove());
-
-    const styles=[...document.querySelectorAll("style,link[rel='stylesheet']")]
-      .map(n=>n.outerHTML).join("\n");
-
-    w.document.open();
-    w.document.write(`<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Invoice</title>
-${styles}
-<style id="a4-invoice-print-css">
-  /* The invoice itself is always A4. The laptop's Print dialog can scale it
-     to A5 if the user chooses A5. */
-  @page{
-    size:A4 portrait;
-    margin:0;
-  }
-  html,body{
-    margin:0!important;
-    padding:0!important;
-    width:210mm!important;
-    min-width:210mm!important;
-    background:#fff!important;
-    -webkit-print-color-adjust:exact!important;
-    print-color-adjust:exact!important;
-  }
-  #invoicePrintPage{
-    width:210mm!important;
-    min-width:210mm!important;
-    margin:0!important;
-    padding:0!important;
-    background:#fff!important;
-  }
-  #invoicePrintPage .mf-invoice{
-    width:210mm!important;
-    max-width:210mm!important;
-    min-width:210mm!important;
-    margin:0!important;
-    box-sizing:border-box!important;
-    break-inside:avoid!important;
-    page-break-inside:avoid!important;
-  }
-  #invoicePrintPage table,
-  #invoicePrintPage tr,
-  #invoicePrintPage td,
-  #invoicePrintPage th{
-    break-inside:avoid!important;
-    page-break-inside:avoid!important;
-  }
-  @media print{
-    html,body{
-      width:210mm!important;
-      min-width:210mm!important;
-    }
-    #invoicePrintPage{
-      width:210mm!important;
-      min-width:210mm!important;
-    }
-  }
-</style>
-</head>
-<body>
-<div id="invoicePrintPage">${clone.outerHTML}</div>
-<script>
-(async function(){
-  try{
-    if(document.fonts && document.fonts.ready) await document.fonts.ready;
-  }catch(e){}
-
-  const imgs=[...document.images];
-  await Promise.all(imgs.map(function(img){
-    if(img.complete)return Promise.resolve();
-    return new Promise(function(resolve){
-      img.addEventListener("load",resolve,{once:true});
-      img.addEventListener("error",resolve,{once:true});
-    });
-  }));
-
-  await new Promise(function(resolve){
-    requestAnimationFrame(function(){
-      requestAnimationFrame(resolve);
-    });
-  });
-
-  setTimeout(function(){
-    window.focus();
-    window.print();
-  },150);
-})();
-<\/script>
-</body>
-</html>`);
-    w.document.close();
-    w.focus();
-  }
-
-  window.printInvoiceA4Standard=printInvoiceA4Standard;
-
-  // Only intercept Print. Save PDF is deliberately left separate.
-  document.addEventListener("click",function(e){
-    const btn=e.target.closest(
-      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button"
-    );
-    if(!btn)return;
-
-    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
-
-    if(text==="print" || text.includes("print invoice")){
-      e.preventDefault();
-      e.stopPropagation();
-      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
-      printInvoiceA4Standard();
-    }
-  },true);
-})();
-</script>
-
-
-<script id="final-working-invoice-print-handler">
-(function(){
-  "use strict";
-
-  function findInvoice(){
-    const selectors=[
-      "#invoicePrint .mf-invoice",
-      "#invoiceOverlay .mf-invoice",
-      "#invoiceModal .mf-invoice",
-      ".invoice-print .mf-invoice",
-      ".invoice-overlay .mf-invoice",
-      ".mf-invoice"
-    ];
-    for(const s of selectors){
-      const nodes=[...document.querySelectorAll(s)];
-      const visible=nodes.find(n=>{
-        const r=n.getBoundingClientRect();
-        const cs=getComputedStyle(n);
-        return r.width>50 && r.height>50 && cs.display!=="none" &&
-               cs.visibility!=="hidden";
-      });
-      if(visible)return visible;
-    }
-    return null;
-  }
-
-  async function printVisibleInvoice(){
-    const source=findInvoice();
-    if(!source){
-      alert("Please open the invoice first.");
-      return;
-    }
-
-    const w=window.open("","_blank","width=1000,height=1300");
-    if(!w){
-      alert("Please allow pop-ups for this website.");
-      return;
-    }
-
-    const clone=source.cloneNode(true);
-
-    // Remove only controls; preserve all invoice text, tables, Khmer content,
-    // logo and styling.
-    clone.querySelectorAll(
-      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,"+
-      "button,[data-no-print='true']"
-    ).forEach(el=>el.remove());
-
-    const styles=[...document.querySelectorAll("style,link[rel='stylesheet']")]
-      .map(n=>n.outerHTML).join("\n");
-
-    w.document.open();
-    w.document.write(`<!doctype html>
-<html>
-<head>
-<meta charset="utf-8">
-<title>Invoice</title>
-${styles}
-<style>
-@page{size:A4 portrait;margin:0}
-html,body{
-  margin:0!important;
-  padding:0!important;
-  background:#fff!important;
-  -webkit-print-color-adjust:exact!important;
-  print-color-adjust:exact!important;
-}
-#printRoot{
-  width:210mm!important;
-  min-height:297mm!important;
-  box-sizing:border-box!important;
-  margin:0!important;
-  padding:0!important;
-  background:#fff!important;
-}
-#printRoot > .mf-invoice{
-  width:210mm!important;
-  max-width:210mm!important;
-  min-width:0!important;
-  margin:0!important;
-  box-sizing:border-box!important;
-  background:#fff!important;
-}
-#printRoot table{
-  width:100%!important;
-  max-width:100%!important;
-  border-collapse:collapse!important;
-}
-#printRoot tr,#printRoot td,#printRoot th{
-  break-inside:avoid!important;
-  page-break-inside:avoid!important;
-}
-@media print{
-  html,body{
-    width:210mm!important;
-    min-width:210mm!important;
-  }
-}
-</style>
-</head>
-<body>
-<div id="printRoot"></div>
-<script>
-(async function(){
-  const root=document.getElementById("printRoot");
-  const invoice=${JSON.stringify(clone.outerHTML)};
-  root.innerHTML=invoice;
-
-  try{
-    if(document.fonts && document.fonts.ready) await document.fonts.ready;
-  }catch(e){}
-
-  const imgs=[...document.images];
-  await Promise.all(imgs.map(function(img){
-    if(img.complete)return Promise.resolve();
-    return new Promise(function(resolve){
-      img.addEventListener("load",resolve,{once:true});
-      img.addEventListener("error",resolve,{once:true});
-    });
-  }));
-
-  await new Promise(function(resolve){
-    requestAnimationFrame(function(){
-      requestAnimationFrame(resolve);
-    });
-  });
-
-  setTimeout(function(){
-    window.focus();
-    window.print();
-  },250);
-})();
-<\/script>
-</body>
-</html>`);
-    w.document.close();
-  }
-
-  // Print only. Save PDF is not redirected to this function.
-  window.printInvoiceA4Working=printVisibleInvoice;
-
-  document.addEventListener("click",function(e){
-    const btn=e.target.closest(
-      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button"
-    );
-    if(!btn)return;
-
-    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
-
-    if(text==="print" || text.includes("print invoice")){
-      e.preventDefault();
-      e.stopPropagation();
-      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
-      printVisibleInvoice();
-    }
-  },true);
-})();
-</script>
-
-
-<script id="final-invoice-save-pdf-and-print-controller">
-(function(){
-  "use strict";
-
-  function visibleInvoice(){
-    const selectors=[
-      "#invoiceOverlay .mf-invoice",
-      "#invoicePrint .mf-invoice",
-      "#invoiceModal .mf-invoice",
-      ".invoice-overlay .mf-invoice",
-      ".invoice-print .mf-invoice",
-      ".mf-invoice"
-    ];
-    for(const s of selectors){
-      const list=[...document.querySelectorAll(s)];
-      const el=list.find(n=>{
-        const r=n.getBoundingClientRect(), cs=getComputedStyle(n);
-        return r.width>80 && r.height>80 &&
-               cs.display!=="none" && cs.visibility!=="hidden";
-      });
-      if(el)return el;
-    }
-    return null;
-  }
-
-  async function settle(node){
-    try{
-      if(document.fonts && document.fonts.ready) await document.fonts.ready;
-    }catch(e){}
-    const imgs=[...node.querySelectorAll("img")];
-    await Promise.all(imgs.map(img=>{
-      if(img.complete) return Promise.resolve();
-      return new Promise(resolve=>{
-        img.addEventListener("load",resolve,{once:true});
-        img.addEventListener("error",resolve,{once:true});
-      });
-    }));
-    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
-  }
-
-  function cloneInvoice(node){
-    const c=node.cloneNode(true);
-    c.querySelectorAll(
-      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,"+
-      "button,[data-no-print='true']"
-    ).forEach(el=>el.remove());
-    c.style.margin="0";
-    c.style.transform="none";
-    c.style.position="static";
-    c.style.width="210mm";
-    c.style.maxWidth="210mm";
-    c.style.boxSizing="border-box";
-    return c;
-  }
-
-  async function savePDFDirect(){
-    const source=visibleInvoice();
-    if(!source){
-      alert("Please open the invoice first.");
-      return;
-    }
-
-    await settle(source);
-
-    const html2pdfLib=window.html2pdf;
-    const jsPDFLib=window.jspdf && window.jspdf.jsPDF;
-    const html2canvasLib=window.html2canvas;
-
-    if(!html2pdfLib && (!jsPDFLib || !html2canvasLib)){
-      alert("PDF rendering library is not loaded. Please refresh the page and try Save PDF again.");
-      return;
-    }
-
-    const clone=cloneInvoice(source);
-    const holder=document.createElement("div");
-    holder.id="__directPdfInvoice";
-    holder.style.position="fixed";
-    holder.style.left="-100000px";
-    holder.style.top="0";
-    holder.style.width="210mm";
-    holder.style.background="#fff";
-    holder.style.zIndex="-1";
-    holder.appendChild(clone);
-    document.body.appendChild(holder);
-
-    await settle(clone);
-
-    const ref =
-      document.querySelector("#invoiceOverlay .invoice-title")?.textContent ||
-      document.querySelector("#invoicePrint .invoice-title")?.textContent ||
-      document.querySelector("#invoiceOverlay h1")?.textContent ||
-      document.querySelector("#invoicePrint h1")?.textContent ||
-      "Invoice";
-
-    const safeName=String(ref).replace(/[^\w\u1780-\u17FF-]+/g,"_").replace(/^_+|_+$/g,"")||"Invoice";
-
-    try{
-      if(html2pdfLib){
-        const opt={
-          margin:[0,0,0,0],
-          filename:safeName+".pdf",
-          image:{type:"jpeg",quality:1},
-          html2canvas:{
-            scale:2.5,
-            useCORS:true,
-            allowTaint:false,
-            backgroundColor:"#ffffff",
-            logging:false,
-            letterRendering:true,
-            scrollX:0,
-            scrollY:0
-          },
-          jsPDF:{
-            unit:"mm",
-            format:"a4",
-            orientation:"portrait",
-            compress:true
-          },
-          pagebreak:{mode:["avoid-all","css","legacy"]}
-        };
-
-        // The invoice is already constrained to A4 width. Scale it vertically
-        // to one A4 page before handing it to html2pdf.
-        const r=clone.getBoundingClientRect();
-        const maxH=297 * (96/25.4);
-        const currentH=Math.max(clone.scrollHeight,r.height);
-        if(currentH>maxH){
-          const s=maxH/currentH;
-          clone.style.transformOrigin="top left";
-          clone.style.transform=`scale(${s})`;
-          clone.style.width=`${210/s}mm`;
-        }
-
-        await html2pdfLib().set(opt).from(clone).save();
-      }else{
-        const canvas=await html2canvasLib(clone,{
-          scale:2.5,
-          useCORS:true,
-          allowTaint:false,
-          backgroundColor:"#fff",
-          logging:false,
-          letterRendering:true
-        });
-        const pdf=new jsPDFLib({unit:"mm",format:"a4",orientation:"portrait"});
-        const pageW=210,pageH=297;
-        const imgW=pageW;
-        const imgH=canvas.height*imgW/canvas.width;
-        const scale=Math.min(1,pageH/imgH);
-        pdf.addImage(
-          canvas.toDataURL("image/jpeg",1),
-          "JPEG",
-          (pageW-imgW*scale)/2,
-          0,
-          imgW*scale,
-          imgH*scale,
-          undefined,
-          "FAST"
-        );
-        pdf.save(safeName+".pdf");
+      if(document.fonts){
+        await Promise.allSettled([
+          document.fonts.load('20px "KhmerOSMuolUploaded"'),
+          document.fonts.load('13px "KhmerOSBattambangUploaded"')
+        ]);
       }
-    }finally{
-      holder.remove();
-    }
-  }
-
-  async function printInvoice(){
-    const source=visibleInvoice();
-    if(!source){
-      alert("Please open the invoice first.");
-      return;
-    }
-    await settle(source);
-
-    const w=window.open("","_blank","width=1000,height=1300");
-    if(!w){
-      alert("Please allow pop-ups for printing.");
-      return;
-    }
-
-    const clone=cloneInvoice(source);
-    const styles=[...document.querySelectorAll("style,link[rel='stylesheet']")]
-      .map(n=>n.outerHTML).join("\n");
-
-    w.document.open();
-    w.document.write(`<!doctype html><html><head><meta charset="utf-8">
-${styles}
-<style>
-@page{size:A4 portrait;margin:0}
-html,body{margin:0!important;padding:0!important;background:#fff!important;
--webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
-#printRoot{width:210mm!important;min-height:297mm!important;margin:0!important;
-padding:0!important;overflow:hidden!important;background:#fff!important}
-#printRoot>.mf-invoice{width:210mm!important;max-width:210mm!important;
-margin:0!important;box-sizing:border-box!important}
-#printRoot table,#printRoot tr,#printRoot td,#printRoot th{
-break-inside:avoid!important;page-break-inside:avoid!important}
-</style></head><body><div id="printRoot">${clone.outerHTML}</div>
-<script>
-(async function(){
- try{if(document.fonts&&document.fonts.ready)await document.fonts.ready}catch(e){}
- const imgs=[...document.images];
- await Promise.all(imgs.map(i=>i.complete?Promise.resolve():new Promise(r=>{
-   i.addEventListener("load",r,{once:true});i.addEventListener("error",r,{once:true})
- })));
- requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(()=>window.print(),150)));
-})();
-<\/script></body></html>`);
-    w.document.close();
-  }
-
-  window.saveInvoicePDFDirect=savePDFDirect;
-  window.printInvoiceExact=printInvoice;
-
-  document.addEventListener("click",function(e){
-    const btn=e.target.closest(
-      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button"
-    );
-    if(!btn)return;
-    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
-
-    if(text.includes("save pdf")){
-      e.preventDefault(); e.stopPropagation();
-      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
-      savePDFDirect();
-      return;
-    }
-
-    if(text==="print" || text.includes("print invoice")){
-      e.preventDefault(); e.stopPropagation();
-      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
-      printInvoice();
-    }
-  },true);
-})();
-</script>
-
-
-<script id="option3-direct-html-to-pdf">
-(function(){
-  "use strict";
-
-  // Configure this to your deployed server/Edge Function endpoint.
-  // Example:
-  // window.INVOICE_PDF_ENDPOINT = "/api/invoice-pdf";
-  window.INVOICE_PDF_ENDPOINT = window.INVOICE_PDF_ENDPOINT || "/api/invoice-pdf";
-
-  function visibleInvoice(){
-    const selectors=[
-      "#invoiceOverlay .mf-invoice",
-      "#invoicePrint .mf-invoice",
-      "#invoiceModal .mf-invoice",
-      ".invoice-overlay .mf-invoice",
-      ".invoice-print .mf-invoice",
-      ".mf-invoice"
-    ];
-    for(const s of selectors){
-      const el=[...document.querySelectorAll(s)].find(n=>{
-        const r=n.getBoundingClientRect(), cs=getComputedStyle(n);
-        return r.width>80 && r.height>80 &&
-               cs.display!=="none" && cs.visibility!=="hidden";
-      });
-      if(el)return el;
-    }
-    return null;
-  }
-
-  async function waitForInvoice(invoice){
-    try{
-      if(document.fonts && document.fonts.ready) await document.fonts.ready;
     }catch(_){}
 
-    const images=[...invoice.querySelectorAll("img")];
+    const images=[...node.querySelectorAll("img")];
     await Promise.all(images.map(img=>{
       if(img.complete)return Promise.resolve();
       return new Promise(resolve=>{
@@ -21369,66 +20129,39 @@ break-inside:avoid!important;page-break-inside:avoid!important}
       });
     }));
 
-    await new Promise(resolve=>{
-      requestAnimationFrame(()=>requestAnimationFrame(resolve));
-    });
+    await new Promise(r=>requestAnimationFrame(
+      ()=>requestAnimationFrame(r)
+    ));
   }
 
-  function cloneInvoice(invoice){
-    const clone=invoice.cloneNode(true);
-
-    clone.querySelectorAll(
-      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,"+
-      "button,[data-no-print='true']"
-    ).forEach(el=>el.remove());
-
-    clone.style.width="210mm";
-    clone.style.maxWidth="210mm";
-    clone.style.margin="0";
-    clone.style.boxSizing="border-box";
-    clone.style.background="#fff";
-
-    return clone;
-  }
-
-  function collectStyles(){
+  function collectPageStyles(){
     return [...document.querySelectorAll("style,link[rel='stylesheet']")]
-      .map(node=>node.outerHTML)
+      .map(el=>el.outerHTML)
       .join("\n");
   }
 
-  function invoiceFileName(){
-    const candidates=[
-      document.querySelector("#invoiceOverlay .invoice-number")?.textContent,
-      document.querySelector("#invoicePrint .invoice-number")?.textContent,
-      document.querySelector("#invoiceOverlay .invoice-title")?.textContent,
-      document.querySelector("#invoicePrint .invoice-title")?.textContent
-    ];
-    const value=candidates.find(Boolean)||"Invoice";
-    return String(value)
-      .replace(/[^\w\u1780-\u17FF-]+/g,"_")
-      .replace(/^_+|_+$/g,"") || "Invoice";
-  }
+  function buildExportHTML(node){
+    const clone=node.cloneNode(true);
 
-  async function savePdfWithServerRenderer(){
-    const invoice=visibleInvoice();
+    clone.querySelectorAll(
+      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,[data-no-print='true']"
+    ).forEach(el=>el.remove());
 
-    if(!invoice){
-      alert("Please open the invoice first.");
-      return;
-    }
+    /*
+     * The invoice already contains absolute Supabase font URLs in its
+     * @font-face declarations. The <base> tag also makes any relative image
+     * or stylesheet URLs resolve from the live website.
+     */
+    const base=document.createElement("base");
+    base.href=location.href;
+    clone.insertBefore(base,clone.firstChild);
 
-    await waitForInvoice(invoice);
-
-    const clone=cloneInvoice(invoice);
-
-    const payload={
-      html:`<!doctype html>
-<html>
+    return `<!doctype html>
+<html lang="km">
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width,initial-scale=1">
-${collectStyles()}
+${collectPageStyles()}
 <style>
 @page{
   size:A4 portrait;
@@ -21438,46 +20171,77 @@ html,body{
   margin:0!important;
   padding:0!important;
   width:210mm!important;
+  min-width:210mm!important;
+  height:297mm!important;
   min-height:297mm!important;
   background:#fff!important;
+  overflow:hidden!important;
   -webkit-print-color-adjust:exact!important;
   print-color-adjust:exact!important;
 }
-#invoicePdfRoot{
+#mfPdfPage{
+  position:relative!important;
   width:210mm!important;
-  min-height:297mm!important;
+  height:297mm!important;
+  overflow:hidden!important;
   margin:0!important;
   padding:0!important;
   background:#fff!important;
 }
-#invoicePdfRoot .mf-invoice{
+#mfPdfScale{
+  position:absolute!important;
+  left:0!important;
+  top:0!important;
+  width:210mm!important;
+  transform-origin:top left!important;
+}
+#mfPdfScale .mf-invoice{
   width:210mm!important;
   max-width:210mm!important;
   margin:0!important;
   box-sizing:border-box!important;
 }
-#invoicePdfRoot table{
+#mfPdfScale table{
   width:100%!important;
   border-collapse:collapse!important;
 }
-#invoicePdfRoot tr,
-#invoicePdfRoot td,
-#invoicePdfRoot th{
+#mfPdfScale tr,
+#mfPdfScale td,
+#mfPdfScale th{
   break-inside:avoid!important;
   page-break-inside:avoid!important;
 }
 </style>
 </head>
 <body>
-<div id="invoicePdfRoot">${clone.outerHTML}</div>
+<div id="mfPdfPage"><div id="mfPdfScale">${clone.outerHTML}</div></div>
 </body>
-</html>`,
+</html>`;
+  }
+
+  async function saveInvoicePDFDirectServer(){
+    const node=invoiceNode();
+    if(!node){
+      alert("Please open the invoice first.");
+      return;
+    }
+
+    await waitForInvoice(node);
+
+    const payload={
+      html:buildExportHTML(node),
       filename:invoiceFileName()+".pdf",
       paper:"A4",
       onePage:true
     };
 
-    const response=await fetch(window.INVOICE_PDF_ENDPOINT,{
+    const endpoint=String(window.INVOICE_PDF_ENDPOINT||"").trim();
+
+    if(!endpoint){
+      throw new Error("Invoice PDF endpoint is not configured.");
+    }
+
+    const response=await fetch(endpoint,{
       method:"POST",
       headers:{
         "Content-Type":"application/json",
@@ -21487,13 +20251,13 @@ html,body{
     });
 
     if(!response.ok){
-      const text=await response.text().catch(()=> "");
-      throw new Error(text || ("PDF server returned HTTP "+response.status));
+      const body=await response.text().catch(()=> "");
+      throw new Error(body || ("PDF server returned HTTP "+response.status));
     }
 
     const blob=await response.blob();
 
-    if(!blob.type.includes("pdf")){
+    if(!String(blob.type||"").toLowerCase().includes("pdf")){
       throw new Error("The PDF server did not return a PDF file.");
     }
 
@@ -21504,10 +20268,190 @@ html,body{
     document.body.appendChild(a);
     a.click();
     a.remove();
+
     setTimeout(()=>URL.revokeObjectURL(url),30000);
   }
 
-  window.saveInvoicePDFDirectServer=savePdfWithServerRenderer;
+  async function printInvoiceExact(id,size="A4"){
+    const node=invoiceNode();
+    if(!node){
+      alert("Please open the invoice first.");
+      return;
+    }
+
+    const printWin=window.open(
+      "about:blank",
+      "_blank",
+      "width=1000,height=1300"
+    );
+
+    if(!printWin){
+      alert("Please allow pop-ups for this website, then click Print again.");
+      return;
+    }
+
+    try{
+      await waitForInvoice(node);
+
+      const clone=node.cloneNode(true);
+
+      clone.querySelectorAll(
+        ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,[data-no-print='true']"
+      ).forEach(el=>el.remove());
+
+      const base=document.createElement("base");
+      base.href=location.href;
+      clone.insertBefore(base,clone.firstChild);
+
+      const html=`<!doctype html>
+<html lang="km">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+${collectPageStyles()}
+<style>
+@page{
+  size:A4 portrait;
+  margin:0;
+}
+html,body{
+  margin:0!important;
+  padding:0!important;
+  background:#fff!important;
+  -webkit-print-color-adjust:exact!important;
+  print-color-adjust:exact!important;
+}
+#mfPrintPage{
+  width:210mm!important;
+  height:297mm!important;
+  min-height:297mm!important;
+  overflow:hidden!important;
+  margin:0!important;
+  padding:0!important;
+  background:#fff!important;
+}
+#mfPrintScale{
+  width:210mm!important;
+  transform-origin:top left!important;
+}
+#mfPrintScale .mf-invoice{
+  width:210mm!important;
+  max-width:210mm!important;
+  margin:0!important;
+  box-sizing:border-box!important;
+}
+#mfPrintScale table{
+  width:100%!important;
+  border-collapse:collapse!important;
+}
+#mfPrintScale tr,
+#mfPrintScale td,
+#mfPrintScale th{
+  break-inside:avoid!important;
+  page-break-inside:avoid!important;
+}
+</style>
+</head>
+<body>
+<div id="mfPrintPage"><div id="mfPrintScale">${clone.outerHTML}</div></div>
+<script>
+(async function(){
+  try{
+    if(document.fonts && document.fonts.ready){
+      await document.fonts.ready;
+    }
+  }catch(_){}
+
+  const imgs=[...document.images];
+  await Promise.all(imgs.map(img=>{
+    if(img.complete)return Promise.resolve();
+    return new Promise(resolve=>{
+      img.addEventListener("load",resolve,{once:true});
+      img.addEventListener("error",resolve,{once:true});
+    });
+  }));
+
+  await new Promise(r=>requestAnimationFrame(
+    ()=>requestAnimationFrame(r)
+  ));
+
+  const scaleRoot=document.getElementById("mfPrintScale");
+  const invoice=scaleRoot?.querySelector(".mf-invoice");
+
+  if(invoice){
+    const height=Math.max(
+      invoice.scrollHeight||0,
+      invoice.getBoundingClientRect().height||0,
+      invoice.offsetHeight||0
+    );
+
+    const pageHeight=1122.52;
+    const scale=Math.min(1,pageHeight/height);
+
+    scaleRoot.style.transform="scale("+scale+")";
+    scaleRoot.style.width=(210/scale)+"mm";
+  }
+
+  setTimeout(()=>window.print(),150);
+})();
+<\/script>
+</body>
+</html>`;
+
+      printWin.document.open();
+      printWin.document.write(html);
+      printWin.document.close();
+    }catch(error){
+      console.error("Invoice print error:",error);
+      try{printWin.close();}catch(_){}
+      alert("Could not prepare the invoice for printing.");
+    }
+  }
+
+  /*
+   * Override the legacy entry points. This is deliberate:
+   * the old file contains a canvas/jsPDF implementation and several later
+   * click handlers. These public functions are now the single final entry.
+   */
+  window.saveInvoicePDFDirectServer=saveInvoicePDFDirectServer;
+  window.downloadInvoicePDF=saveInvoicePDFDirectServer;
+  window.printInvoice=printInvoiceExact;
+  window.exactInvoicePrint=printInvoiceExact;
+
+  /*
+   * Capture Save PDF before target/bubble handlers. The inline onclick on
+   * dynamically rendered buttons is also removed so the old function cannot
+   * run afterward.
+   */
+  function bindSaveButtons(){
+    document.querySelectorAll(
+      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button,button"
+    ).forEach(btn=>{
+      const label=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
+
+      if(!label.includes("save pdf"))return;
+
+      btn.removeAttribute("onclick");
+
+      if(btn.dataset.mfDirectPdfBound==="1")return;
+      btn.dataset.mfDirectPdfBound="1";
+
+      btn.addEventListener("click",function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+
+        saveInvoicePDFDirectServer().catch(error=>{
+          console.error("Direct PDF generation failed:",error);
+          alert(
+            "Direct PDF is not connected yet.\n\n" +
+            "The invoice code is ready, but the /api/invoice-pdf " +
+            "server function must be deployed."
+          );
+        });
+      },true);
+    });
+  }
 
   document.addEventListener("click",function(e){
     const btn=e.target.closest(
@@ -21515,92 +20459,28 @@ html,body{
     );
     if(!btn)return;
 
-    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
+    const label=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
+    if(!label.includes("save pdf"))return;
 
-    if(text.includes("save pdf")){
-      e.preventDefault();
-      e.stopPropagation();
-      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+    e.preventDefault();
+    e.stopPropagation();
+    if(e.stopImmediatePropagation)e.stopImmediatePropagation();
 
-      savePdfWithServerRenderer().catch(err=>{
-        console.error("Direct HTML-to-PDF error:",err);
-        alert(
-          "Direct PDF service is not connected yet. " +
-          "Please configure the invoice PDF server endpoint."
-        );
-      });
-    }
+    saveInvoicePDFDirectServer().catch(error=>{
+      console.error("Direct PDF generation failed:",error);
+      alert(
+        "Direct PDF is not connected yet.\n\n" +
+        "Please deploy the /api/invoice-pdf function."
+      );
+    });
   },true);
-})();
-</script>
 
+  bindSaveButtons();
 
-<script id="option3-save-pdf-final-button-binding">
-(function(){
-  "use strict";
-
-  function findSaveButtons(){
-    return [...document.querySelectorAll(
-      "#invoiceOverlay button, #invoicePrint button, .invoice-overlay button, button"
-    )].filter(btn=>{
-      const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
-      return text.includes("save pdf");
-    });
-  }
-
-  function bind(){
-    findSaveButtons().forEach(btn=>{
-      // Remove the old inline Save PDF action that points to the legacy
-      // canvas/print implementation.
-      btn.removeAttribute("onclick");
-
-      // Prevent duplicate handlers when the invoice preview is re-rendered.
-      if(btn.dataset.option3Bound==="1") return;
-      btn.dataset.option3Bound="1";
-
-      btn.addEventListener("click", function(e){
-        e.preventDefault();
-        e.stopPropagation();
-        if(e.stopImmediatePropagation) e.stopImmediatePropagation();
-
-        if(typeof window.saveInvoicePDFDirectServer==="function"){
-          window.saveInvoicePDFDirectServer().catch(err=>{
-            console.error("Option 3 direct PDF error:",err);
-            alert(
-              "Direct PDF service is not connected yet. " +
-              "The invoice is ready for the HTML-to-PDF server, but the " +
-              "/api/invoice-pdf endpoint still needs to be installed."
-            );
-          });
-        }else{
-          alert("The direct HTML-to-PDF function is not loaded. Please refresh the page.");
-        }
-      }, true);
-    });
-  }
-
-  // Override the legacy global used by the original inline button.
-  // This is the critical fix that prevents Save PDF from opening Print.
-  const previousSetter = window.downloadInvoicePDF;
-  Object.defineProperty(window, "downloadInvoicePDF", {
-    configurable:true,
-    writable:true,
-    value:function(){
-      if(typeof window.saveInvoicePDFDirectServer==="function"){
-        return window.saveInvoicePDFDirectServer();
-      }
-      if(typeof previousSetter==="function"){
-        return previousSetter.apply(this, arguments);
-      }
-    }
+  new MutationObserver(bindSaveButtons).observe(document.body,{
+    subtree:true,
+    childList:true
   });
-
-  bind();
-
-  // Invoice preview is dynamically rendered, so bind again whenever the
-  // preview DOM changes.
-  const observer=new MutationObserver(bind);
-  observer.observe(document.body,{subtree:true,childList:true});
 })();
 </script>
 
