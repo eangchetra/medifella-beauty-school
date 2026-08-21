@@ -7224,11 +7224,7 @@ function isSaleCounterCashierStaff(x){
  const title=String(
    x?.job_title ?? x?.jobTitle ?? x?.job ?? ""
  ).replace(/\s+/g," ").trim().toLowerCase();
- // Staff are taken directly from Staff Management (medifella_staff).
- // Eligible job titles are ONLY Sale, Counter, Cashier, or the combined
- // "Sale Counter Cashier" title. This matches the Job Title choices in
- // Staff Management, where Sale / Counter / Cashier are separate options.
- return ["sale","counter","cashier","sale counter cashier"].includes(title);
+ return ["sale","counter","cashier"].includes(title);
 }
 function renderInventoryControls(){
   /*
@@ -7294,14 +7290,36 @@ function renderInventoryControls(){
   fill("dermedSaleStaff","Select Sale Staff");
   fill("mtsSaleStaff","Select Sale Staff");
 
-  fill("dermedCashier","Select Cashier");
-  fill("mtsCashier","Select Cashier");
+  // Cashier selector: ONLY staff whose Job Title is exactly
+  // Cashier, Counter, or Sale. Do not show other job titles.
+  const cashierEligibleStaff = allStaff.filter(x => {
+    const title = String(x._job || "").replace(/\s+/g," ").trim().toLowerCase();
+    return ["cashier","counter","sale"].includes(title);
+  });
+
+  function fillCashier(id, placeholder){
+    const el=$(id);
+    if(!el)return;
+    const oldValue=el.value;
+    el.innerHTML=`<option value="">${placeholder}</option>`+
+      cashierEligibleStaff.map(x=>
+        `<option value="${attr(x.id)}">${esc(x._label)} · ${esc(x._job)}</option>`
+      ).join("");
+    if(oldValue && cashierEligibleStaff.some(x=>String(x.id)===String(oldValue))){
+      el.value=oldValue;
+    }
+  }
+
+  fillCashier("dermedCashier","Select Cashier");
+  fillCashier("mtsCashier","Select Cashier");
+
+  // Medi Fella Sale cashier selector.
+  fillCashier("mfCashier","Select Cashier");
+  fillCashier("medifellaCashier","Select Cashier");
 
   // Some versions use these alternate Medi Fella IDs.
   fill("mfSaleStaff","Select Sale Staff");
   fill("medifellaSaleStaff","Select Sale Staff");
-  fill("mfCashier","Select Cashier");
-  fill("medifellaCashier","Select Cashier");
 }
 
 window.refreshSaleStaffCashierOptions=renderInventoryControls;
