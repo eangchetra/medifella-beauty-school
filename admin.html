@@ -8982,13 +8982,42 @@ document.addEventListener("DOMContentLoaded",function(){
     try{
       let r;
       if(editingId){
-        let upd=await sb.from("medifella_sales").update(payload).eq("id",editingId).eq("sale_type","DERMED").select().single();
-        if(upd.error && /sale_time|column .* does not exist/i.test(upd.error.message||"")){
-          const p2={...payload};delete p2.sale_time;
-          upd=await sb.from("medifella_sales").update(p2).eq("id",editingId).eq("sale_type","DERMED").select().single();
+        /*
+         * EDIT FIX:
+         * Do not use UPDATE ... SELECT().single().
+         * Supabase/PostgREST can return "Cannot coerce the result to a
+         * single JSON object" when RLS allows the UPDATE but the updated row
+         * is not returned by SELECT. The database update itself can still be
+         * successful.
+         */
+        let upd=await sb.from("medifella_sales")
+          .update(payload)
+          .eq("id",String(editingId))
+          .eq("sale_type","DERMED");
+
+        if(upd.error && /sale_time|column .* does not exist|Could not find the .* column/i.test(upd.error.message||"")){
+          const p2={...payload};
+          delete p2.sale_time;
+          upd=await sb.from("medifella_sales")
+            .update(p2)
+            .eq("id",String(editingId))
+            .eq("sale_type","DERMED");
         }
+
         if(upd.error)throw upd.error;
-        r=upd;
+
+        // Reload the authoritative list and obtain the updated row by ID.
+        // This works even when UPDATE does not return a JSON row because of RLS.
+        if(typeof loadSales==="function")await loadSales();
+        const updatedRow=(Array.isArray(salesRecords)?salesRecords:[])
+          .find(x=>String(x.id)===String(editingId) &&
+                       String(x.sale_type||"").toUpperCase()==="DERMED");
+
+        if(!updatedRow){
+          throw new Error("Dermed Sale update could not be verified. Please refresh the Dermed Sales list and try again.");
+        }
+
+        r={data:updatedRow};
       }else{
         // Reference numbers must remain unique even when salesRecords is stale
         // (for example, another browser/admin created the previous invoice).
