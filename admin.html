@@ -2175,18 +2175,12 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
 
 
-<style id="dermed-staff-mts-dermed-stable">
-  html.dermed-staff-permissions-pending #appView{
-    visibility:hidden!important;
-  }
-</style>
 
 
 
 
-<script>
-document.documentElement.classList.add("dermed-staff-permissions-pending");
-</script>
+
+
 
 </head>
 <body>
@@ -19140,42 +19134,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 
 
 
-<script id="dermed-staff-use-normal-staff-permissions">
-(function(){
-  "use strict";
 
-  // Dermed Staff uses the normal Staff permission system.
-  // The only normalization here is to make sure the two sale module keys
-  // use the same names everywhere.
-  function normalizeSalePermissionKeys(){
-    try{
-      const p=window.currentProfile?.permissions;
-      if(!p || typeof p!=="object") return;
-
-      // Preserve explicit Admin selections. If either legacy key exists,
-      // mirror it to the canonical module key used by the normal Staff nav.
-      if(p.mtsSale === undefined && p.mts !== undefined)
-        p.mtsSale=!!p.mts;
-      if(p.dermedSale === undefined && p.dermed !== undefined)
-        p.dermedSale=!!p.dermed;
-
-      if(p.mts === undefined && p.mtsSale !== undefined)
-        p.mts=!!p.mtsSale;
-      if(p.dermed === undefined && p.dermedSale !== undefined)
-        p.dermed=!!p.dermedSale;
-    }catch(e){
-      console.error("Staff permission normalization:",e);
-    }
-  }
-
-  // Run once before the existing normal Staff permission application.
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",normalizeSalePermissionKeys,{once:true});
-  }else{
-    normalizeSalePermissionKeys();
-  }
-})();
-</script>
 
 </body>
 </html>
