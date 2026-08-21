@@ -2207,6 +2207,52 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 })();
 </script>
 
+
+<style id="mts-sale-staff-hidden-cashier-only">
+  /* MTS Sale: no Sale Staff selector. Cashier remains available. */
+  #mtsSaleStaff,
+  label[for="mtsSaleStaff"],
+  #mtsSaleStaff + .select-wrap,
+  #mtsSaleStaffSelect,
+  label[for="mtsSaleStaffSelect"],
+  #mtsSaleStaffId,
+  label[for="mtsSaleStaffId"]{
+    display:none !important;
+  }
+</style>
+<script id="mts-sale-staff-remove-final">
+(function(){
+  "use strict";
+
+  function hideMtsSaleStaff(){
+    const ids=["mtsSaleStaff","mtsSaleStaffSelect","mtsSaleStaffId"];
+    ids.forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el)return;
+      el.value="";
+      el.disabled=true;
+      el.style.display="none";
+      const label=document.querySelector('label[for="'+id+'"]');
+      if(label)label.style.display="none";
+      const wrap=el.closest(".field,.form-group,.input-group,.select-wrap");
+      if(wrap)wrap.style.display="none";
+    });
+
+    // Hide a nearby field label/container if the markup does not use for=.
+    const el=document.getElementById("mtsSaleStaff");
+    if(el){
+      const parent=el.parentElement;
+      if(parent && parent.children.length<=3){
+        parent.style.display="none";
+      }
+    }
+  }
+
+  hideMtsSaleStaff();
+  [100,300,700,1200,2000].forEach(ms=>setTimeout(hideMtsSaleStaff,ms));
+})();
+</script>
+
 </head>
 <body>
 
@@ -19575,6 +19621,74 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   new MutationObserver(function(){
     sync();
   }).observe(document.body,{childList:true,subtree:true});
+})();
+</script>
+
+
+<script id="sale-staff-only-and-persist-final">
+(function(){
+  "use strict";
+
+  const IDS=["dermedSaleStaff"];
+  const saved={dermed:""};
+
+  function key(id){return "dermed";}
+  function get(id){return document.getElementById(id);}
+
+  function remember(id){
+    const el=get(id);
+    if(!el)return;
+    if(el.value){
+      saved[key(id)]=String(el.value);
+      el.dataset.saleStaffSelected=saved[key(id)];
+    }
+  }
+
+  function restore(id){
+    const el=get(id);
+    if(!el)return;
+    const wanted=saved[key(id)]||String(el.dataset.saleStaffSelected||"");
+    if(!wanted)return;
+
+    const option=[...el.options].find(o=>String(o.value)===wanted);
+    if(option && el.value!==wanted){
+      // Restore silently. Do NOT fire change, otherwise the application can
+      // rebuild the selector and create the flash again.
+      el.value=wanted;
+    }
+  }
+
+  function bind(id){
+    const el=get(id);
+    if(!el || el.dataset.saleStaffFinalBound==="1")return;
+
+    el.dataset.saleStaffFinalBound="1";
+
+    el.addEventListener("change",function(){
+      saved[key(id)]=String(this.value||"");
+      this.dataset.saleStaffSelected=saved[key(id)];
+    },true);
+
+    if(el.value)remember(id);
+
+    // Watch only option rebuilding. Do not trigger any application events.
+    new MutationObserver(function(){
+      restore(id);
+    }).observe(el,{childList:true});
+  }
+
+  function sync(){
+    IDS.forEach(id=>{
+      bind(id);
+      restore(id);
+    });
+  }
+
+  sync();
+  [100,300,700,1200,2000].forEach(ms=>setTimeout(sync,ms));
+
+  // Handle complete replacement of a selector by the existing renderer.
+  new MutationObserver(sync).observe(document.body,{childList:true,subtree:true});
 })();
 </script>
 
