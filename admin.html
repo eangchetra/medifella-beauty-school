@@ -2357,6 +2357,12 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
       <input id="saleDate" type="hidden">
       <div class="muted" style="margin-top:5px">Automatic Cambodia time (GMT+7). You do not need to enter it.</div>
     </div>
+    <div>
+      <label>Cashier *</label>
+      <select id="medifellaCashier" required>
+        <option value="">Select Cashier</option>
+      </select>
+    </div>
   </div>
 
   <div class="sale-course-picker">
@@ -4254,6 +4260,10 @@ function editSaleFromInvoice(id){
 
  $("saleReference").value=saleRef(s)||"";
 
+ const cashierId=String(saleField(s,["cashier_id"],"")||"");
+ const cashierByName=(staffInfoRecords||[]).find(x=>String(x.name_en||"")===String(saleField(s,["cashier_name"],"")||""));
+ if($("medifellaCashier"))$("medifellaCashier").value=cashierId||String(cashierByName?.id||"");
+
  const studentId=String(saleField(s,["student_id"],"")||"");
  const student=students.find(x=>String(x.id)===studentId);
  $("saleStudentId").value=studentId;
@@ -4325,7 +4335,7 @@ window.editSaleFromInvoice=editSaleFromInvoice;
 
 function resetSaleForm(){
  clearSaleEditMode();
- $("saleStudentSearch").value="";$("saleStudentId").value="";
+ $("saleStudentSearch").value="";$("saleStudentId").value="";$("medifellaCashier").value="";
  updateSaleDateTimeDisplay();$("saleReference").value=nextSaleReference();
  $("saleItems").innerHTML="";
  $("saleOverallDiscountType").value="percent";$("saleOverallDiscountValue").value="0";
@@ -5913,6 +5923,17 @@ async function saveMediFellaSale(){
      : Math.min(subtotal,discountValue);
    const total=Math.max(0,subtotal-discount);
 
+   const cashierId=String($("medifellaCashier")?.value||"").trim();
+   if(!cashierId){
+     msg($("newSaleStatus"),"Please select a cashier before saving the sale.",true);
+     return;
+   }
+   const cashier=(staffInfoRecords||[]).find(x=>String(x.id)===cashierId);
+   if(!cashier){
+     msg($("newSaleStatus"),"Selected cashier could not be found. Please select again.",true);
+     return;
+   }
+
    const selectedStatus=String($("salePaymentStatus")?.value||"Due");
    let paid=0;
    if(isEdit){
@@ -5943,6 +5964,8 @@ async function saveMediFellaSale(){
      student_id:String(student.id),
      student_name:student.full_name||"",
      student_phone:student.phone||"",
+     cashier_id:cashierId,
+     cashier_name:cashier.name_en||cashier.name_kh||cashier.name||"",
      subtotal,
      discount,
      shipping:0,
