@@ -19636,6 +19636,37 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 })();
 </script>
 
+
+<script id="mts-sale-no-sale-staff-required-final">
+(function(){
+  "use strict";
+
+  function makeMtsStaffOptional(){
+    ["mtsSaleStaff","mtsSaleStaffSelect","mtsSaleStaffId"].forEach(function(id){
+      var el=document.getElementById(id);
+      if(!el)return;
+      el.removeAttribute("required");
+      el.required=false;
+      if(typeof el.setCustomValidity==="function") el.setCustomValidity("");
+    });
+  }
+
+  // MTS no longer uses Sale Staff. Keep this field out of browser validation
+  // without changing Dermed Sale's Sale Staff requirement.
+  makeMtsStaffOptional();
+
+  var observer = new MutationObserver(function(){
+    makeMtsStaffOptional();
+  });
+  observer.observe(document.body,{childList:true,subtree:true});
+
+  // Stop observing when the page is unloaded.
+  window.addEventListener("beforeunload",function(){
+    observer.disconnect();
+  },{once:true});
+})();
+</script>
+
 </body>
 </html>
 
