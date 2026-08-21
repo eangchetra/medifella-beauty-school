@@ -6989,17 +6989,7 @@ $("courseSave").onclick=async()=>{
    }
    msg($("courseStatus"),id?"Course updated.":"Course created.");
    clearCourse();await loadCourses();updateMetrics()
- }catch(e){
-   const em=String(e?.message||e||"");
-   if(/row-level security|violates row-level security policy|new row violates/i.test(em)){
-     msg($("courseStatus"),
-       "Course save was blocked by Supabase RLS. Please run the COURSE_STAFF_ACCESS_RLS_FIX.sql file once in Supabase SQL Editor, then try again.",
-       true
-     );
-   }else{
-     msg($("courseStatus"),em,true);
-   }
- }
+ }catch(e){msg($("courseStatus"),e.message,true)}
 };
 function editCourse(id){
  const c=courses.find(x=>x.id===id);if(!c)return;
@@ -7352,6 +7342,52 @@ function renderInventoryControls(){
   }
 
   refreshSaleStaffOnlySelectors();
+
+
+  // Robust Sale Staff Management source for MTS + Dermed Sale.
+  // Both selectors must use ONLY the dedicated sale-staff records.
+  async function loadDedicatedSaleStaffIntoSaleForms(){
+    try{
+      const { data, error } = await sb
+        .from("medifella_sale_staff")
+        .select("*")
+        .order("staff_name", { ascending:true });
+
+      if(error) throw error;
+
+      const rows = Array.isArray(data) ? data : [];
+      const targets = [
+        "mtsSaleStaff",
+        "mtsSaleStaffId",
+        "mtsSaleStaffSelect",
+        "dermedSaleStaff",
+        "dermedSaleStaffId",
+        "dermedSaleStaffSelect"
+      ];
+
+      targets.forEach(id=>{
+        const el=$(id);
+        if(!el || el.tagName !== "SELECT") return;
+
+        const oldValue=el.value;
+        el.innerHTML='<option value="">Select Sale Staff</option>'+
+          rows.map(x=>{
+            const idv=x.staff_id ?? x.id ?? "";
+            const name=x.staff_name ?? x.name ?? "Sale Staff";
+            return `<option value="${attr(idv)}">${esc(name)}</option>`;
+          }).join("");
+
+        if(oldValue && rows.some(x=>String(x.staff_id ?? x.id)===String(oldValue))){
+          el.value=oldValue;
+        }
+      });
+    }catch(e){
+      console.warn("Could not load Sale Staff Management list:", e);
+    }
+  }
+
+  // Load immediately and after the page's normal staff/config refreshes.
+  loadDedicatedSaleStaffIntoSaleForms();
 
   // Keep the dedicated Sale Staff Management refresh in sync with both
   // Dermed Sale and MTS Sale selectors.
