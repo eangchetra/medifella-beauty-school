@@ -20266,133 +20266,293 @@ ${serialized}
 </script>
 
 
-<script id="direct-save-a4-invoice-final">
+<script id="final-save-pdf-no-library-error">
 (function(){
   "use strict";
 
-  function wait(ms){return new Promise(function(r){setTimeout(r,ms);});}
-
-  async function waitInvoiceReady(doc){
-    try{ if(doc.fonts && doc.fonts.ready) await doc.fonts.ready; }catch(_){}
-    var imgs=[...doc.images];
-    await Promise.all(imgs.map(function(img){
-      if(img.complete)return Promise.resolve();
-      return new Promise(function(resolve){
-        img.addEventListener("load",resolve,{once:true});
-        img.addEventListener("error",resolve,{once:true});
-      });
-    }));
-    await wait(120);
+  function getVisibleInvoice(){
+    const candidates = [
+      document.querySelector("#invoiceOverlay .mf-invoice"),
+      document.querySelector("#invoicePrint .mf-invoice"),
+      document.querySelector(".invoice-overlay .mf-invoice"),
+      document.querySelector(".mf-invoice")
+    ];
+    return candidates.find(Boolean);
   }
 
-  function getInvoiceRoot(){
-    var overlay=document.getElementById("invoiceOverlay");
-    if(!overlay) return null;
-    return overlay.querySelector(".mf-invoice") ||
-           overlay.querySelector("#invoicePrint .mf-invoice") ||
-           overlay;
-  }
-
-  function filename(){
-    var el=document.querySelector("#invoiceOverlay [data-invoice-number],#invoiceOverlay .invoice-number");
-    var t=el && el.textContent ? el.textContent.trim() : "";
-    t=t.replace(/[\\/:*?"<>|]/g,"-");
-    return (t || "Invoice") + "-A4.pdf";
-  }
-
-  async function directSaveInvoicePDF(){
-    var root=getInvoiceRoot();
-    if(!root){
+  async function savePdfFromExactInvoice(){
+    const invoice = getVisibleInvoice();
+    if(!invoice){
       alert("Please open the invoice first.");
       return;
     }
 
-    if(typeof window.jspdf==="undefined" || !window.jspdf.jsPDF){
-      alert("PDF library is not loaded. Please refresh the page and try again.");
-      return;
-    }
-    if(typeof window.html2canvas!=="function"){
-      alert("PDF rendering library is not loaded. Please refresh the page and try again.");
+    const printWin = window.open("", "_blank", "width=1000,height=1300");
+    if(!printWin){
+      alert("Please allow pop-ups for this website so the invoice can be saved as PDF.");
       return;
     }
 
-    var oldScroll=window.scrollY;
-    var oldStyle=root.getAttribute("style") || "";
+    // Copy the invoice-viewing DOM exactly; do not use canvas or a PDF library.
+    const clone = invoice.cloneNode(true);
 
-    // Capture the exact displayed invoice at its natural layout width.
-    // Keep it a single visual page by fitting the full invoice into A4.
-    root.style.boxSizing="border-box";
-    root.style.maxWidth="none";
-    root.style.width="210mm";
-    root.style.margin="0 auto";
-    root.style.background="#fff";
-    root.style.overflow="visible";
+    // Remove controls from the cloned invoice only.
+    clone.querySelectorAll(
+      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,[data-no-print='true']"
+    ).forEach(el => el.remove());
 
-    await waitInvoiceReady(document);
+    const styles = [...document.querySelectorAll("style,link[rel='stylesheet']")]
+      .map(n => n.outerHTML).join("\n");
 
-    var canvas=await window.html2canvas(root,{
-      scale:2,
-      useCORS:true,
-      allowTaint:false,
-      backgroundColor:"#ffffff",
-      logging:false,
-      imageTimeout:15000,
-      windowWidth:root.scrollWidth,
-      windowHeight:root.scrollHeight,
-      scrollX:0,
-      scrollY:0
+    printWin.document.open();
+    printWin.document.write(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Invoice</title>
+${styles}
+<style>
+@page{size:A4 portrait;margin:0}
+html,body{
+  margin:0!important;padding:0!important;
+  background:#fff!important;
+  width:210mm!important;
+}
+body{
+  -webkit-print-color-adjust:exact!important;
+  print-color-adjust:exact!important;
+}
+.mf-invoice{
+  width:210mm!important;
+  max-width:210mm!important;
+  margin:0 auto!important;
+  box-sizing:border-box!important;
+}
+@media print{
+  html,body{width:210mm!important}
+}
+</style>
+</head>
+<body>${clone.outerHTML}
+<script>
+(async function(){
+  try{
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+  }catch(e){}
+  const imgs=[...document.images];
+  await Promise.all(imgs.map(function(img){
+    if(img.complete)return Promise.resolve();
+    return new Promise(function(resolve){
+      img.addEventListener("load",resolve,{once:true});
+      img.addEventListener("error",resolve,{once:true});
     });
-
-    root.setAttribute("style",oldStyle);
-    window.scrollTo(0,oldScroll);
-
-    var jsPDF=window.jspdf.jsPDF;
-    var pdf=new jsPDF({
-      orientation:"portrait",
-      unit:"mm",
-      format:"a4",
-      compress:true
+  }));
+  requestAnimationFrame(function(){
+    requestAnimationFrame(function(){
+      setTimeout(function(){window.print();},100);
     });
-
-    var pageW=210, pageH=297;
-    var margin=0;
-    var ratio=Math.min(
-      (pageW-2*margin)/(canvas.width),
-      (pageH-2*margin)/(canvas.height)
-    );
-    var w=canvas.width*ratio;
-    var h=canvas.height*ratio;
-    var x=(pageW-w)/2;
-    var y=(pageH-h)/2;
-
-    // Keep the entire invoice on ONE A4 page.
-    pdf.addImage(canvas.toDataURL("image/png"),"PNG",x,y,w,h,undefined,"FAST");
-
-    var blob=pdf.output("blob");
-    var url=URL.createObjectURL(blob);
-    var a=document.createElement("a");
-    a.href=url;
-    a.download=filename();
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    setTimeout(function(){URL.revokeObjectURL(url);},5000);
+  });
+})();
+<\/script>
+</body>
+</html>`);
+    printWin.document.close();
+    printWin.focus();
   }
 
-  // Direct-save function used by all three invoice types.
-  window.downloadInvoicePDF=directSaveInvoicePDF;
-  window.saveInvoicePDF=directSaveInvoicePDF;
-  window.exactInvoicePrint=directSaveInvoicePDF;
+  // Expose the replacement function.
+  window.saveInvoicePDFExact = savePdfFromExactInvoice;
+  window.downloadInvoicePDF = savePdfFromExactInvoice;
 
-  // Replace the common "Download PDF" buttons without changing invoice content.
-  document.addEventListener("click",function(e){
-    var btn=e.target.closest(
-      "#downloadInvoicePDF,.download-invoice-pdf,[data-action='download-pdf']"
+  // Capture clicks on the visible Save PDF button in the invoice viewer.
+  document.addEventListener("click", function(e){
+    const btn = e.target.closest(
+      "#invoiceOverlay button, #invoicePrint button, .invoice-overlay button, button"
     );
     if(!btn)return;
+
+    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
+    if(!text.includes("save pdf"))return;
+
     e.preventDefault();
-    e.stopImmediatePropagation();
-    directSaveInvoicePDF();
+    e.stopPropagation();
+    if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+
+    savePdfFromExactInvoice();
+  }, true);
+})();
+</script>
+
+
+<script id="invoice-print-one-page-a4-a5-final">
+(function(){
+  "use strict";
+
+  function invoiceNode(){
+    return document.querySelector("#invoiceOverlay .mf-invoice") ||
+           document.querySelector("#invoicePrint .mf-invoice") ||
+           document.querySelector(".invoice-overlay .mf-invoice") ||
+           document.querySelector(".mf-invoice");
+  }
+
+  function wait(ms){ return new Promise(r=>setTimeout(r,ms)); }
+
+  async function printOnePageInvoice(){
+    const source=invoiceNode();
+    if(!source){
+      alert("Please open the invoice first.");
+      return;
+    }
+
+    const printWin=window.open("","_blank","width=1000,height=1300");
+    if(!printWin){
+      alert("Please allow pop-ups for this website.");
+      return;
+    }
+
+    const clone=source.cloneNode(true);
+    clone.querySelectorAll(
+      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,[data-no-print='true']"
+    ).forEach(el=>el.remove());
+
+    const styles=[...document.querySelectorAll("style,link[rel='stylesheet']")]
+      .map(n=>n.outerHTML).join("\n");
+
+    printWin.document.open();
+    printWin.document.write(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Invoice</title>
+${styles}
+<style id="one-page-print-css">
+  @page{size:A4 portrait;margin:0}
+  html,body{
+    margin:0!important;padding:0!important;
+    background:#fff!important;
+    -webkit-print-color-adjust:exact!important;
+    print-color-adjust:exact!important;
+  }
+  #printPage{
+    position:relative!important;
+    width:210mm!important;
+    height:297mm!important;
+    overflow:hidden!important;
+    margin:0!important;
+    padding:0!important;
+    background:#fff!important;
+  }
+  #printScale{
+    position:absolute!important;
+    left:0!important;
+    top:0!important;
+    width:210mm!important;
+    transform-origin:top left!important;
+  }
+  .mf-invoice{
+    width:210mm!important;
+    max-width:210mm!important;
+    min-width:210mm!important;
+    margin:0!important;
+    box-sizing:border-box!important;
+  }
+  table{max-width:100%!important}
+  @media print{
+    html,body{
+      width:210mm!important;
+      height:297mm!important;
+      overflow:hidden!important;
+    }
+    #printPage{
+      width:210mm!important;
+      height:297mm!important;
+      page-break-after:avoid!important;
+      break-after:avoid-page!important;
+    }
+  }
+</style>
+</head>
+<body>
+<div id="printPage"><div id="printScale">${clone.outerHTML}</div></div>
+<script>
+(async function(){
+  try{
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+  }catch(e){}
+
+  const imgs=[...document.images];
+  await Promise.all(imgs.map(function(img){
+    if(img.complete)return Promise.resolve();
+    return new Promise(function(resolve){
+      img.addEventListener("load",resolve,{once:true});
+      img.addEventListener("error",resolve,{once:true});
+    });
+  }));
+
+  // Let Khmer fonts, tables, borders and images finish layout before measuring.
+  await new Promise(function(r){
+    requestAnimationFrame(function(){
+      requestAnimationFrame(r);
+    });
+  });
+
+  const page=document.getElementById("printPage");
+  const scaleBox=document.getElementById("printScale");
+  const invoice=scaleBox.querySelector(".mf-invoice");
+
+  // CSS pixels for physical A4. The print page itself is exactly 210 x 297 mm.
+  const pageW=page.getBoundingClientRect().width;
+  const pageH=page.getBoundingClientRect().height;
+
+  // Measure the real rendered invoice, including its full table and footer.
+  const rect=invoice.getBoundingClientRect();
+  const fullW=Math.max(invoice.scrollWidth,rect.width);
+  const fullH=Math.max(invoice.scrollHeight,rect.height);
+
+  const scale=Math.min(1, pageW/fullW, pageH/fullH);
+
+  scaleBox.style.width=fullW+"px";
+  scaleBox.style.transform="scale("+scale+")";
+
+  // Center horizontally when the invoice is narrower than the paper.
+  scaleBox.style.left=Math.max(0,(pageW-fullW*scale)/2)+"px";
+
+  // Re-check after applying scale.
+  await new Promise(function(r){requestAnimationFrame(r);});
+
+  setTimeout(function(){
+    window.focus();
+    window.print();
+  },150);
+})();
+<\/script>
+</body>
+</html>`);
+    printWin.document.close();
+    printWin.focus();
+  }
+
+  window.saveInvoicePDFExact=printOnePageInvoice;
+  window.downloadInvoicePDF=printOnePageInvoice;
+  window.printInvoice=printOnePageInvoice;
+  window.exactInvoicePrint=printOnePageInvoice;
+
+  // Make the visible Save PDF and Print buttons use the one-page renderer.
+  document.addEventListener("click",function(e){
+    const btn=e.target.closest(
+      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button"
+    );
+    if(!btn)return;
+    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
+
+    if(text.includes("save pdf") || text==="print" || text.includes("print invoice")){
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+      printOnePageInvoice();
+    }
   },true);
 })();
 </script>
