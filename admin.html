@@ -2170,26 +2170,50 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 
 
 
-<style id="dermed-staff-section-prepaint-fix">
-  /* Keep the authenticated dashboard invisible until the existing boot()
-     and applyAccountPermissions() choose the permitted active section. */
-  body.dermedBootPending #appView{visibility:hidden!important}
-  body.dermedBootReady #appView{visibility:visible!important}
+
+
+
+<style id="stock-history-larger-column-headers">
+  #stockListTable th{
+    font-size:16px !important;
+    font-weight:700 !important;
+    padding:12px 10px !important;
+    white-space:nowrap;
+  }
+  #stockListTable td{
+    padding:10px !important;
+  }
 </style>
-<script id="dermed-staff-section-prepaint-fix-script">
+
+
+<style id="no-mts-dermed-flash">
+  /* Hide the dashboard while auth + staff permissions are initializing.
+     Do NOT override .section display rules; the existing app controls those. */
+  html.dashboard-starting body #appView{
+    visibility:hidden !important;
+  }
+  html.dashboard-ready body #appView{
+    visibility:visible !important;
+  }
+</style>
+<script id="no-mts-dermed-flash-init">
 (function(){
   try{
-    document.body.classList.add("dermedBootPending");
-    window.addEventListener("load",function(){
-      setTimeout(function(){
-        document.body.classList.remove("dermedBootPending");
-        document.body.classList.add("dermedBootReady");
-      },120);
-    },{once:true});
-    setTimeout(function(){
-      document.body.classList.remove("dermedBootPending");
-      document.body.classList.add("dermedBootReady");
-    },2500);
+    document.documentElement.classList.add("dashboard-starting");
+
+    function ready(){
+      document.documentElement.classList.remove("dashboard-starting");
+      document.documentElement.classList.add("dashboard-ready");
+    }
+
+    // Give the existing authentication/permission initialization time to
+    // finish selecting the one permitted active section.
+    window.addEventListener("load", function(){
+      setTimeout(ready, 300);
+    }, {once:true});
+
+    // Safety fallback so the dashboard cannot remain hidden indefinitely.
+    setTimeout(ready, 3500);
   }catch(e){}
 })();
 </script>
