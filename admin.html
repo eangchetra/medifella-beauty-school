@@ -2783,7 +2783,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <input id="stockProductId" type="hidden">
 <div id="stockProductHint" class="muted" style="margin-top:6px">Select a product from the search results.</div>
 <div class="row">
-<div><label>In Stock Amount *</label><input id="stockAmount" type="number" min="1" step="1" min="-999999"></div>
+<div><label>In Stock Amount *</label><input id="stockAmount" type="number" step="1" min="-999999" placeholder="e.g. 20 or -29"></div>
 <div><label>In Stock Staff *</label><select id="stockStaff"></select></div>
 </div>
 <label>In Stock Time</label><input id="stockTimeDisplay" readonly>
@@ -7598,9 +7598,86 @@ function clearProductForm(){$("productEditId").value="";$("productName").value="
 function editProduct(id){const p=products.find(x=>String(x.id)===String(id));if(!p)return;$("productEditId").value=p.id;$("productName").value=p.name||"";$("productCost").value=p.cost??"";$("productPrice").value=p.price??"";$("productSource").value=p.source||"Korean";$("productSourceOther").value=p.source_other||"";$("productSource").dispatchEvent(new Event("change"));$("products").scrollIntoView({behavior:"smooth"})}
 async function deleteProduct(id){if(!confirm("Delete this product? Its stock history will also be deleted. Continue?"))return;const r=await sb.from("medifella_products").delete().eq("id",id);if(r.error){alert("Delete failed: "+r.error.message);return}await loadProducts();await loadStockMovements();}
 $("clearProduct").onclick=clearProductForm;
-$("saveStock").onclick=async()=>{clearMsg($("stockStatus"));const editId=window.editingStockId||"";const pid=$("stockProductId").value,q=Number($("stockAmount").value||0),staff=$("stockStaff").value;if(!pid||q<=0||!staff){msg($("stockStatus"),"Select product, amount and staff.",true);return}try{const t=$("stockTime").value||phTime();const p=products.find(x=>String(x.id)===String(pid));const selectedStaff=(Array.isArray(staffInfoRecords)?staffInfoRecords:[]).find(x=>String(x.id)===String(staff))
-  || (Array.isArray(staffProfiles)?staffProfiles:[]).find(x=>String(x.id)===String(staff));
-const payload={product_id:pid,movement_type:"stock_in",quantity:q,staff_id:staff,staff_name:selectedStaff?.name_en||selectedStaff?.name_kh||selectedStaff?.name||selectedStaff?.full_name||selectedStaff?.username||"",stock_time:t,created_by:adminUser.id,notes:"Stock In"};const r=editId?await sb.from("medifella_inventory_movements").update(payload).eq("id",editId):await sb.from("medifella_inventory_movements").insert(payload);if(r.error)throw r.error;msg($("stockStatus"),editId?"Stock entry updated.":`Stock added: ${p?.name||""}`);window.editingStockId="";$("saveStock").textContent="Save Stock";$("stockAmount").value="";$("stockProductId").value="";$("stockProductSearch").value="";$("stockProductHint").textContent="Select a product from the search results.";if($("stockStaff"))$("stockStaff").dataset.selectedStaff="";setAutoTime("stockTimeDisplay","stockTime");await loadStockMovements()}catch(e){msg($("stockStatus"),e.message,true)}};
+$("saveStock").onclick=async()=>{
+  clearMsg($("stockStatus"));
+  const editId=window.editingStockId||"";
+  const pid=$("stockProductId").value;
+  const rawAmount=String($("stockAmount").value??"").trim();
+  const q=Number(rawAmount);
+  const staff=$("stockStaff").value;
+
+  // Positive = add stock. Negative = remove stock.
+  if(!pid || rawAmount==="" || !Number.isFinite(q) || q===0 || !staff){
+    msg($("stockStatus"),"Select product, amount and staff. Amount cannot be 0.",true);
+    return;
+  }
+
+  const currentStock=typeof productStock==="function"
+    ? Number(productStock(pid)||0)
+    : 0;
+
+  if(q<0 && currentStock + q < 0){
+    msg($("stockStatus"),`Cannot remove ${Math.abs(q)} units. Current stock is only ${currentStock}.`,true);
+    return;
+  }
+
+  try{
+    const t=$("stockTime").value||phTime();
+    const p=products.find(x=>String(x.id)===String(pid));
+    const selectedStaff=(Array.isArray(staffInfoRecords)?staffInfoRecords:[]).find(x=>String(x.id)===String(staff))
+      || (Array.isArray(staffProfiles)?staffProfiles:[]).find(x=>String(x.id)===String(staff));
+
+    // Inventory movements store quantities as positive numbers.
+    // The movement type determines whether stock is added or removed.
+    const movementType=q>0?"stock_in":"stock_out";
+    const quantity=Math.abs(q);
+    const notes=q>0?"Stock In":"Stock Adjustment / Stock Out";
+
+    const payload={
+      product_id:pid,
+      movement_type:movementType,
+      quantity,
+      staff_id:staff,
+      staff_name:selectedStaff?.name_en||selectedStaff?.name_kh||selectedStaff?.name||selectedStaff?.full_name||selectedStaff?.username||"",
+      stock_time:t,
+      created_by:adminUser.id,
+      notes
+    };
+
+    let r;
+    if(editId){
+      // Preserve the existing movement row when editing; negative input
+      // becomes a stock_out movement instead of a negative stock_in quantity.
+      r=await sb.from("medifella_inventory_movements").update(payload).eq("id",editId);
+    }else{
+      r=await sb.from("medifella_inventory_movements").insert(payload);
+    }
+    if(r.error)throw r.error;
+
+    const resultingStock=currentStock+q;
+    msg(
+      $("stockStatus"),
+      editId
+        ? `Stock entry updated. Current stock: ${resultingStock}`
+        : q>0
+          ? `Stock added: ${p?.name||""} (+${quantity}). Current stock: ${resultingStock}`
+          : `Stock reduced: ${p?.name||""} (-${quantity}). Current stock: ${resultingStock}`
+    );
+
+    window.editingStockId="";
+    $("saveStock").textContent="Save Stock";
+    $("stockAmount").value="";
+    $("stockProductId").value="";
+    $("stockProductSearch").value="";
+    $("stockProductHint").textContent="Select a product from the search results.";
+    if($("stockStaff"))$("stockStaff").dataset.selectedStaff="";
+    setAutoTime("stockTimeDisplay","stockTime");
+    await loadStockMovements();
+  }catch(e){
+    msg($("stockStatus"),e.message||"Could not save stock.",true);
+  }
+};
+
 function editStock(id){const m=stockMovements.find(x=>String(x.id)===String(id));if(!m)return;$("stockProductId").value=m.product_id;const p=products.find(x=>String(x.id)===String(m.product_id));$("stockProductSearch").value=`${p?.product_code||""} · ${p?.name||""}`;$("stockProductHint").textContent=`Selected: ${p?.name||""}`;$("stockAmount").value=m.quantity;$("stockStaff").value=m.staff_id||"";$("stockTime").value=m.stock_time||"";$("stockTimeDisplay").value=String(m.stock_time||"").replace("T"," ");window.editingStockId=id;$("saveStock").textContent="Update Stock";$("products").scrollIntoView({behavior:"smooth",block:"start"})}
 async function deleteStock(id){if(!confirm("Delete this stock entry? The product's available stock will decrease by this amount. Continue?"))return;const r=await sb.from("medifella_inventory_movements").delete().eq("id",id);if(r.error){alert("Delete failed: "+r.error.message);return}await loadStockMovements();}
 
@@ -11361,78 +11438,7 @@ try{
 })();
 </script>
 
-<script id="stock-adjustment-minus-fix">
-(function(){
-  "use strict";
 
-  function getStock(pid){
-    try{
-      if(typeof window.__currentProductStock==="function"){
-        return Math.max(0, Number(window.__currentProductStock(pid)||0));
-      }
-    }catch(e){}
-    try{
-      if(typeof productStock==="function"){
-        return Math.max(0, Number(productStock(pid)||0));
-      }
-    }catch(e){}
-    return 0;
-  }
-
-  function findStockForm(){
-    const inputs=[...document.querySelectorAll('input')];
-    const amount=inputs.find(i=>{
-      const p=(i.placeholder||'').toLowerCase();
-      const a=(i.getAttribute('aria-label')||'').toLowerCase();
-      return p.includes('stock amount') || a.includes('stock amount');
-    }) || inputs.find(i=>{
-      const label=i.closest('div')?.querySelector('label');
-      return label && /in stock amount/i.test(label.textContent||'');
-    });
-    if(!amount) return null;
-
-    let root=amount.closest('form') || amount.parentElement?.parentElement?.parentElement;
-    if(!root) root=document;
-    const product=root.querySelector('input') || document.querySelector('input');
-    const staff=root.querySelector('select') || [...document.querySelectorAll('select')].find(s=>/staff/i.test(s.previousElementSibling?.textContent||''));
-    const button=[...root.querySelectorAll('button')].find(b=>/save stock/i.test(b.textContent||'')) ||
-                 [...document.querySelectorAll('button')].find(b=>/save stock/i.test(b.textContent||''));
-    return {root,amount,staff,button};
-  }
-
-  document.addEventListener('click', function(e){
-    const btn=e.target.closest('button');
-    if(!btn || !/save stock/i.test(btn.textContent||'')) return;
-
-    const f=findStockForm();
-    if(!f) return;
-
-    const delta=Number(f.amount.value);
-    if(!Number.isFinite(delta) || delta===0) return;
-
-    // If the user enters -29 while current stock is 40, the resulting stock is 11.
-    // Never allow the adjustment to make stock negative.
-    const productId=f.root.querySelector('[data-product-id]')?.getAttribute('data-product-id') ||
-                    f.root.querySelector('input[type="hidden"]')?.value || null;
-    if(!productId) return;
-
-    const current=getStock(productId);
-    if(current + delta < 0){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      alert("Stock cannot be less than 0. Current stock: " + current + ".");
-      return;
-    }
-
-    // Store the intended resulting stock for any save logic that reads this value.
-    window.__pendingStockAdjustment = {
-      productId:String(productId),
-      delta,
-      resultingStock:current+delta
-    };
-  }, true);
-})();
-</script>
 
 <script id="stock-add-availability-sync">
 (function(){
@@ -18648,7 +18654,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     if(!label || document.getElementById('stock-minus-note')) return;
     const box=document.createElement('div');
     box.id='stock-minus-note';
-    box.textContent='Use a positive number to add stock, or a negative number to reduce stock. Example: current 40 + (-29) = 11.';
+    box.textContent='Use a positive number to add stock, or a negative number to reduce stock. Example: current 40 + (-29) = 11. Stock cannot go below 0.';
     box.style.cssText='font-size:12px;margin-top:4px;opacity:.8;';
     label.parentElement?.appendChild(box);
   }
