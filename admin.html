@@ -2146,22 +2146,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </style>
 
 
-<script id="stable-section-startup">
-(function(){
-  function stabilize(){
-    const sections=document.querySelectorAll(".section");
-    if(!sections.length)return;
-    sections.forEach(s=>s.classList.remove("active"));
-    // Do not force a page choice here. The existing permission code will
-    // activate the first permitted section once authentication finishes.
-  }
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",stabilize,{once:true});
-  }else{
-    stabilize();
-  }
-})();
-</script>
+
 
 
 
@@ -2186,37 +2171,8 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </style>
 
 
-<style id="no-mts-dermed-flash">
-  /* Hide the dashboard while auth + staff permissions are initializing.
-     Do NOT override .section display rules; the existing app controls those. */
-  html.dashboard-starting body #appView{
-    visibility:hidden !important;
-  }
-  html.dashboard-ready body #appView{
-    visibility:visible !important;
-  }
-</style>
-<script id="no-mts-dermed-flash-init">
-(function(){
-  try{
-    document.documentElement.classList.add("dashboard-starting");
 
-    function ready(){
-      document.documentElement.classList.remove("dashboard-starting");
-      document.documentElement.classList.add("dashboard-ready");
-    }
 
-    // Give the existing authentication/permission initialization time to
-    // finish selecting the one permitted active section.
-    window.addEventListener("load", function(){
-      setTimeout(ready, 300);
-    }, {once:true});
-
-    // Safety fallback so the dashboard cannot remain hidden indefinitely.
-    setTimeout(ready, 3500);
-  }catch(e){}
-})();
-</script>
 
 
 <style id="dermed-staff-mts-dermed-stable">
@@ -2224,92 +2180,12 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
     visibility:hidden!important;
   }
 </style>
-<script id="dermed-staff-mts-dermed-stable-controller">
-(function(){
-  "use strict";
 
-  function isDermedStaff(){
-    const role = String(window.currentUserRole || window.userRole || "").toLowerCase();
-    const name = String(window.currentStaffName || window.staffName || "").toLowerCase();
-    return role.includes("staff") || name.includes("dermed staff");
-  }
 
-  function findNav(keywords){
-    return [...document.querySelectorAll(".nav")].find(n=>{
-      const t=(n.textContent||"").toLowerCase();
-      const d=(n.dataset.section||"").toLowerCase();
-      return keywords.some(k=>t.includes(k)||d.includes(k));
-    });
-  }
 
-  function stabilize(){
-    if(!isDermedStaff()) return false;
 
-    const mts=findNav(["mts sale","mts"]);
-    const dermed=findNav(["dermed sale","dermed"]);
-
-    // Dermed Staff must always have both sales modules.
-    [mts,dermed].forEach(n=>{
-      if(!n)return;
-      n.classList.remove("hidden");
-      n.style.removeProperty("display");
-      n.removeAttribute("hidden");
-      n.setAttribute("aria-hidden","false");
-    });
-
-    // Do not force either module to become the active page. Keep the
-    // application's existing active-section selection.
-    return !!(mts && dermed);
-  }
-
-  document.documentElement.classList.add("dermed-staff-permissions-pending");
-
-  // Apply after the existing account/permission initialization has run.
-  [100,300,600,1000,1500,2200,3000].forEach(ms=>{
-    setTimeout(()=>{
-      if(stabilize()){
-        document.documentElement.classList.remove("dermed-staff-permissions-pending");
-      }
-    },ms);
-  });
-
-  window.addEventListener("load",function(){
-    setTimeout(()=>{
-      stabilize();
-      document.documentElement.classList.remove("dermed-staff-permissions-pending");
-    },350);
-  },{once:true});
-
-  // Keep both modules visible if an older permission script tries to hide
-  // them after startup. This observer does not change other modules.
-  const observer=new MutationObserver(function(records){
-    if(!isDermedStaff())return;
-    let relevant=false;
-    for(const r of records){
-      if(r.type==="attributes" && r.target.classList &&
-         r.target.classList.contains("nav")){
-        const t=(r.target.textContent||"").toLowerCase();
-        const d=(r.target.dataset.section||"").toLowerCase();
-        if(t.includes("mts")||t.includes("dermed")||d.includes("mts")||d.includes("dermed")){
-          relevant=true; break;
-        }
-      }
-    }
-    if(relevant) stabilize();
-  });
-
-  function startObserver(){
-    if(document.body) observer.observe(document.body,{
-      subtree:true,
-      childList:true,
-      attributes:true,
-      attributeFilter:["class","style","hidden","aria-hidden"]
-    });
-  }
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",startObserver,{once:true});
-  }else startObserver();
-})();
+<script>
+document.documentElement.classList.add("dermed-staff-permissions-pending");
 </script>
 
 </head>
@@ -18467,9 +18343,6 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   if(document.readyState==="loading"){
     document.addEventListener("DOMContentLoaded",function(){
       apply();
-      setTimeout(apply,500);
-      setTimeout(apply,1500);
-      setTimeout(apply,3000);
     },{once:true});
   }else{
     apply();
@@ -19255,223 +19128,52 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 </script>
 
 
-<script id="dermed-add-appointment-return-to-list-final">
-(function(){
-  "use strict";
-  let fromDermedList=false;
-
-  function modal(){
-    return document.getElementById("dermedAppointmentModal");
-  }
-
-  function openModal(){
-    const m=modal();
-    if(!m)return;
-    m.classList.add("show");
-    m.setAttribute("aria-hidden","false");
-    m.style.display="block";
-  }
-
-  function returnToDermedSaleList(){
-    const m=modal();
-    if(m){
-      m.classList.remove("show");
-      m.setAttribute("aria-hidden","true");
-      m.style.display="none";
-    }
-
-    // Keep the user on the existing Dermed Sale page/list.
-    // Do not navigate to another page and do not reload the whole dashboard.
-    const list=document.getElementById("dermedSalesList")
-      || document.getElementById("dermedSales")
-      || document.querySelector("#dermedSale .card:nth-of-type(2)");
-
-    if(list){
-      list.scrollIntoView({behavior:"auto",block:"start"});
-    }else{
-      const heading=[...document.querySelectorAll("h2,h3")]
-        .find(x=>/Dermed Sales/i.test(x.textContent||""));
-      if(heading)heading.scrollIntoView({behavior:"auto",block:"start"});
-    }
-
-    fromDermedList=false;
-  }
-
-  // + Appointment from the Dermed Sale page opens the appointment box.
-  document.addEventListener("click",function(e){
-    const btn=e.target.closest("#dermedAddAppointment");
-    if(!btn)return;
-    fromDermedList=true;
-    setTimeout(openModal,0);
-    setTimeout(openModal,50);
-  },true);
-
-  // Watch the existing appointment status. Only a successful save triggers
-  // the return to the Dermed Sale list.
-  function watchStatus(){
-    const s=document.getElementById("dermedAppointmentStatus");
-    if(!s || s.dataset.returnListBound)return;
-    s.dataset.returnListBound="1";
-
-    new MutationObserver(function(){
-      if(!fromDermedList)return;
-      const msg=String(s.textContent||"").trim().toLowerCase();
-      if(/saved successfully|appointment saved|created successfully|updated successfully|saved|created|updated/.test(msg)){
-        setTimeout(returnToDermedSaleList,250);
-      }
-    }).observe(s,{childList:true,subtree:true,characterData:true});
-  }
-
-  watchStatus();
-  setTimeout(watchStatus,100);
-  setTimeout(watchStatus,500);
-  setTimeout(watchStatus,1000);
-})();
-</script>
 
 
-<script id="dermed-appointment-click-final">
-(function(){
-  "use strict";
-  let opening=false;
-
-  function open(btn){
-    if(opening)return;
-    const modal=document.getElementById("dermedAppointmentModal");
-    if(!modal)return;
-    opening=true;
-
-    const source=btn.dataset.dermedAppointmentSource||"customer";
-    const id=source==="student"
-      ?(btn.dataset.dermedAppointmentStudentId||"")
-      :(btn.dataset.dermedAppointmentCustomerId||"");
-    const name=btn.dataset.dermedAppointmentName||"";
-    const phone=btn.dataset.dermedAppointmentPhone||"";
-    const code=btn.dataset.dermedAppointmentCode||"";
-
-    const set=function(id,v){const e=document.getElementById(id);if(e)e.value=v};
-    set("dermedAppointmentCustomerId",id);
-    set("dermedAppointmentCustomerSource",source);
-    set("dermedAppointmentCustomerSearch",name);
-    set("dermedAppointmentCustomerType","Old Customer");
-    set("dermedAppointmentDate",
-      typeof formatDermedAppointmentDate==="function"
-        ?formatDermedAppointmentDate(typeof localDate==="function"?localDate():new Date().toISOString().slice(0,10))
-        :"");
-    set("dermedAppointmentTime","");
-    set("dermedAppointmentNote","");
-    const hint=document.getElementById("dermedAppointmentCustomerHint");
-    if(hint)hint.textContent=name
-      ?`Selected: ${name} · ${code||"No ID"} · ${phone||"No phone"}`
-      :"Search and select a customer or student.";
-    const status=document.getElementById("dermedAppointmentStatus");
-    if(status)status.textContent="";
-
-    modal.classList.add("show");
-    modal.setAttribute("aria-hidden","false");
-    modal.style.display="block";
-
-    if(typeof bindDermedAppointmentDateInput==="function")bindDermedAppointmentDateInput();
-    const date=document.getElementById("dermedAppointmentDate");
-    if(date){
-      date.type="text";
-      date.placeholder="dd/mm/yyyy";
-      date.maxLength=10;
-      date.inputMode="numeric";
-    }
-    setTimeout(()=>{opening=false},150);
-  }
-
-  document.addEventListener("click",function(e){
-    const btn=e.target.closest(".dermed-list-add-appointment");
-    if(btn){
-      e.preventDefault();
-      open(btn);
-    }
-  },false);
-})();
-</script>
 
 
-<script id="dermed-appointment-authoritative-controller">
+
+
+
+
+
+
+
+
+<script id="dermed-staff-use-normal-staff-permissions">
 (function(){
   "use strict";
 
-  function E(id){return document.getElementById(id);}
+  // Dermed Staff uses the normal Staff permission system.
+  // The only normalization here is to make sure the two sale module keys
+  // use the same names everywhere.
+  function normalizeSalePermissionKeys(){
+    try{
+      const p=window.currentProfile?.permissions;
+      if(!p || typeof p!=="object") return;
 
-  function closeModal(){
-    const m=E("dermedAppointmentModal");
-    if(!m)return;
-    m.classList.remove("show");
-    m.setAttribute("aria-hidden","true");
-    m.style.display="none";
-  }
+      // Preserve explicit Admin selections. If either legacy key exists,
+      // mirror it to the canonical module key used by the normal Staff nav.
+      if(p.mtsSale === undefined && p.mts !== undefined)
+        p.mtsSale=!!p.mts;
+      if(p.dermedSale === undefined && p.dermed !== undefined)
+        p.dermedSale=!!p.dermed;
 
-  function openModal(){
-    const m=E("dermedAppointmentModal");
-    if(!m)return;
-    m.classList.add("show");
-    m.setAttribute("aria-hidden","false");
-    m.style.display="block";
-    if(typeof bindDermedAppointmentDateInput==="function")
-      bindDermedAppointmentDateInput();
-    const d=E("dermedAppointmentDate");
-    if(d){
-      d.type="text";
-      d.inputMode="numeric";
-      d.placeholder="dd/mm/yyyy";
-      d.maxLength=10;
+      if(p.mts === undefined && p.mtsSale !== undefined)
+        p.mts=!!p.mtsSale;
+      if(p.dermed === undefined && p.dermedSale !== undefined)
+        p.dermed=!!p.dermedSale;
+    }catch(e){
+      console.error("Staff permission normalization:",e);
     }
   }
 
-  document.addEventListener("click",async function(e){
-    const close=e.target.closest("#dermedAppointmentClose,#dermedAppointmentCancel");
-    const save=e.target.closest("#dermedAppointmentSave");
-    const add=e.target.closest("#dermedAddAppointment");
-
-    if(!close && !save && !add)return;
-
-    // These controls belong to the Dermed Appointment modal. Prevent the
-    // multiple older handlers from fighting each other.
-    e.preventDefault();
-    e.stopImmediatePropagation();
-
-    if(close){
-      closeModal();
-      return;
-    }
-
-    if(add){
-      openModal();
-      return;
-    }
-
-    if(save){
-      const btn=E("dermedAppointmentSave");
-      if(btn && btn.disabled)return;
-
-      if(typeof window.saveAppointmentFromDermed==="function"){
-        try{
-          await window.saveAppointmentFromDermed();
-        }catch(err){
-          console.error("Dermed appointment save:",err);
-        }
-      }else{
-        const status=E("dermedAppointmentStatus");
-        if(status)status.textContent="Save Appointment function is not available.";
-      }
-    }
-  },true);
-
-  // Also allow clicking the dark overlay to close the appointment box.
-  document.addEventListener("click",function(e){
-    const m=E("dermedAppointmentModal");
-    if(m && e.target===m){
-      e.preventDefault();
-      e.stopImmediatePropagation();
-      closeModal();
-    }
-  },true);
+  // Run once before the existing normal Staff permission application.
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",normalizeSalePermissionKeys,{once:true});
+  }else{
+    normalizeSalePermissionKeys();
+  }
 })();
 </script>
 
