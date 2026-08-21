@@ -2702,7 +2702,10 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
       </div>
       <div>
         <label>Appointment Date *</label>
-        <input id="appointmentDate" type="date">
+        <input id="appointmentDate" type="text"
+             inputmode="numeric" autocomplete="off"
+             placeholder="dd/mm/yyyy" maxlength="10"
+             aria-label="Appointment Date (dd/mm/yyyy)">
       </div>
       <div>
         <label>Appointment Time *</label>
@@ -11160,12 +11163,13 @@ document.addEventListener("DOMContentLoaded",function(){
     box.classList.add("show");
   }
   function clearForm(){
+    bindAppointmentDateInput();
     A("appointmentCustomerId").value="";
     if(A("appointmentCustomerSource"))A("appointmentCustomerSource").value="customer";
     A("appointmentCustomerSearch").value="";
     A("appointmentCustomerHint").textContent="Search and select a customer.";
     if(A("appointmentCustomerType"))A("appointmentCustomerType").value="Old Customer";
-    A("appointmentDate").value=localDate();
+    A("appointmentDate").value=formatAppointmentDate(localDate());
     A("appointmentTime").value="";
     if(A("appointmentNote"))A("appointmentNote").value="";
     A("appointmentFormStatus").textContent="";
@@ -11177,14 +11181,65 @@ document.addEventListener("DOMContentLoaded",function(){
     el.className=error?"status error":"status";
     el.textContent=msg||"";
   }
+  function formatAppointmentDate(value){
+    const s=String(value||"").trim();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
+      const [y,m,d]=s.split("-");
+      return `${d}/${m}/${y}`;
+    }
+    return s;
+  }
+
+  function parseAppointmentDate(value){
+    const s=String(value||"").trim();
+    const m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(!m)return {ok:false,message:"Use date format DD/MM/YYYY."};
+    const day=Number(m[1]), month=Number(m[2]), year=Number(m[3]);
+    if(day<1||day>31)return {ok:false,message:"Day must be between 01 and 31."};
+    if(month<1||month>12)return {ok:false,message:"Month must be between 01 and 12."};
+    if(year<1000||year>9999)return {ok:false,message:"Year must have 4 digits."};
+    const dt=new Date(Date.UTC(year,month-1,day));
+    if(dt.getUTCFullYear()!==year||dt.getUTCMonth()!==month-1||dt.getUTCDate()!==day)
+      return {ok:false,message:"Please enter a valid calendar date."};
+    return {ok:true,value:`${year}-${String(month).padStart(2,"0")}-${String(day).padStart(2,"0")}`};
+  }
+
+  function bindAppointmentDateInput(){
+    const el=A("appointmentDate");
+    if(!el||el.dataset.ddmmyyyyBound)return;
+    el.dataset.ddmmyyyyBound="1";
+    el.addEventListener("input",function(){
+      let digits=String(el.value||"").replace(/\D/g,"").slice(0,8);
+      if(digits.length>=2 && Number(digits.slice(0,2))>31)
+        digits="31"+digits.slice(2);
+      if(digits.length>=4 && Number(digits.slice(2,4))>12)
+        digits=digits.slice(0,2)+"12"+digits.slice(4);
+      if(digits.length>4)el.value=digits.slice(0,2)+"/"+digits.slice(2,4)+"/"+digits.slice(4);
+      else if(digits.length>2)el.value=digits.slice(0,2)+"/"+digits.slice(2);
+      else el.value=digits;
+    });
+    el.addEventListener("blur",function(){
+      if(!el.value.trim())return;
+      const p=parseAppointmentDate(el.value);
+      el.setCustomValidity(p.ok?"":p.message);
+    });
+  }
+
   async function addAppointment(){
     const customerId=A("appointmentCustomerId").value;
     const customerSource=A("appointmentCustomerSource")?.value||"customer";
     const c=getCustomer(customerId,customerSource);
-    const date=A("appointmentDate").value;
+    const dateInput=A("appointmentDate").value;
     const time=A("appointmentTime").value;
+    const parsedAppointmentDate=parseAppointmentDate(dateInput);
     if(!c){showStatus("Please search and select a customer.",true);return}
-    if(!date||!time){showStatus("Please select appointment date and time.",true);return}
+    if(!parsedAppointmentDate.ok){
+      showStatus(parsedAppointmentDate.message,true);
+      A("appointmentDate").focus();
+      return;
+    }
+    if(!time){showStatus("Please select appointment date and time.",true);return}
+    const date=parsedAppointmentDate.value;
     const data=appointmentCustomer(c,customerSource);
     const row={
       id:"APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
@@ -18997,4 +19052,19 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   setTimeout(applyStaffProductVisibility,2000);
   setInterval(applyStaffProductVisibility,2500);
 })();
+
+  document.addEventListener("DOMContentLoaded",function(){
+    ["appointmentDate","dermedAppointmentDate"].forEach(id=>{
+      const el=document.getElementById(id);
+      if(!el)return;
+      el.type="text";
+      el.inputMode="numeric";
+      el.autocomplete="off";
+      el.placeholder="dd/mm/yyyy";
+      el.maxLength=10;
+    });
+    if(typeof bindAppointmentDateInput==="function")bindAppointmentDateInput();
+    if(typeof bindDermedAppointmentDateInput==="function")bindDermedAppointmentDateInput();
+  });
+
 </script>
