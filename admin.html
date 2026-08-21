@@ -7435,9 +7435,13 @@ function renderInventoryControls(){
     }
   }
 
-  fill("dermedSaleStaff","Select Sale Staff");
-  fill("mtsSaleStaff","Select Sale Staff");
-
+  // IMPORTANT:
+  // Do NOT populate Dermed/MTS Sale Staff from the general staff list here.
+  // Those selectors are owned by Sale Staff Management
+  // (medifella_sale_staff) and must not be rebuilt by the general
+  // inventory/permission refresh. Rebuilding them here causes the selected
+  // Sale Staff to disappear/flash back to "Select Sale Staff".
+  //
   // Cashier selector: ONLY staff whose Job Title is exactly
   // Cashier, Counter, or Sale. Do not show other job titles.
   const cashierEligibleStaff = allStaff.filter(x => {
@@ -7577,7 +7581,8 @@ function renderInventoryControls(){
     }
   }
 
-  // Load immediately and after the page's normal staff/config refreshes.
+  // Load once from Sale Staff Management. Do not continuously rebuild these
+  // selectors; doing so can overwrite the user's current selection.
   loadDedicatedSaleStaffIntoSaleForms();
 
   // Keep the dedicated Sale Staff Management refresh in sync with both
