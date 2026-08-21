@@ -2783,7 +2783,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <input id="stockProductId" type="hidden">
 <div id="stockProductHint" class="muted" style="margin-top:6px">Select a product from the search results.</div>
 <div class="row">
-<div><label>In Stock Amount *</label><input id="stockAmount" type="number" min="1" step="1"></div>
+<div><label>In Stock Amount *</label><input id="stockAmount" type="number" min="1" step="1" min="-999999"></div>
 <div><label>In Stock Staff *</label><select id="stockStaff"></select></div>
 </div>
 <label>In Stock Time</label><input id="stockTimeDisplay" readonly>
@@ -4659,7 +4659,7 @@ async function editSalePayment(paymentId,saleId){
    const note=$("salePaymentEditNote").value||"";
    const err=$("salePaymentEditError");
    const btn=$("salePaymentEditSave");
-   if(amount<=0){err.textContent="Payment amount must be greater than 0.";err.style.display="block";return;}
+   if (!Number.isFinite(Number(amount)) || Number(amount) === 0) {err.textContent="Payment amount must be greater than 0.";err.style.display="block";return;}
    if(!date||!time){err.textContent="Please select payment date and time.";err.style.display="block";return;}
 
    btn.disabled=true;btn.textContent="Saving...";
@@ -4899,7 +4899,7 @@ async function recordSalePayment(id){
    const err=$("dermedPaymentError");
    const showErr=(msg)=>{err.textContent=msg;err.style.display="block";};
 
-   if(amount<=0){showErr("Enter a valid payment amount.");return}
+   if (!Number.isFinite(Number(amount)) || Number(amount) === 0) {showErr("Enter a valid payment amount.");return}
    if(amount>balance+0.005){showErr(`Payment cannot be greater than the Due amount of ${money(balance)}.`);return}
    if(!date){showErr("Please select the payment date.");return}
    if(!time){showErr("Please select the payment time.");return}
@@ -7999,7 +7999,7 @@ async function recordDermedSalePayment(id){
    const err=$("dermedPaymentError");
    const showErr=msg=>{err.textContent=msg;err.style.display="block";};
 
-   if(amount<=0){showErr("Enter a valid payment amount.");return;}
+   if (!Number.isFinite(Number(amount)) || Number(amount) === 0) {showErr("Enter a valid payment amount.");return;}
    if(amount>balance+0.005){showErr(`Payment cannot be greater than the Due amount of ${money(balance)}.`);return;}
    if(!date||!time){showErr("Please select the payment date and time.");return;}
 
@@ -11358,6 +11358,79 @@ try{
   }
   window.refreshAppointments=async()=>{await readAppointments();renderAll()};
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
+})();
+</script>
+
+<script id="stock-adjustment-minus-fix">
+(function(){
+  "use strict";
+
+  function getStock(pid){
+    try{
+      if(typeof window.__currentProductStock==="function"){
+        return Math.max(0, Number(window.__currentProductStock(pid)||0));
+      }
+    }catch(e){}
+    try{
+      if(typeof productStock==="function"){
+        return Math.max(0, Number(productStock(pid)||0));
+      }
+    }catch(e){}
+    return 0;
+  }
+
+  function findStockForm(){
+    const inputs=[...document.querySelectorAll('input')];
+    const amount=inputs.find(i=>{
+      const p=(i.placeholder||'').toLowerCase();
+      const a=(i.getAttribute('aria-label')||'').toLowerCase();
+      return p.includes('stock amount') || a.includes('stock amount');
+    }) || inputs.find(i=>{
+      const label=i.closest('div')?.querySelector('label');
+      return label && /in stock amount/i.test(label.textContent||'');
+    });
+    if(!amount) return null;
+
+    let root=amount.closest('form') || amount.parentElement?.parentElement?.parentElement;
+    if(!root) root=document;
+    const product=root.querySelector('input') || document.querySelector('input');
+    const staff=root.querySelector('select') || [...document.querySelectorAll('select')].find(s=>/staff/i.test(s.previousElementSibling?.textContent||''));
+    const button=[...root.querySelectorAll('button')].find(b=>/save stock/i.test(b.textContent||'')) ||
+                 [...document.querySelectorAll('button')].find(b=>/save stock/i.test(b.textContent||''));
+    return {root,amount,staff,button};
+  }
+
+  document.addEventListener('click', function(e){
+    const btn=e.target.closest('button');
+    if(!btn || !/save stock/i.test(btn.textContent||'')) return;
+
+    const f=findStockForm();
+    if(!f) return;
+
+    const delta=Number(f.amount.value);
+    if(!Number.isFinite(delta) || delta===0) return;
+
+    // If the user enters -29 while current stock is 40, the resulting stock is 11.
+    // Never allow the adjustment to make stock negative.
+    const productId=f.root.querySelector('[data-product-id]')?.getAttribute('data-product-id') ||
+                    f.root.querySelector('input[type="hidden"]')?.value || null;
+    if(!productId) return;
+
+    const current=getStock(productId);
+    if(current + delta < 0){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      alert("Stock cannot be less than 0. Current stock: " + current + ".");
+      return;
+    }
+
+    // Store the intended resulting stock for any save logic that reads this value.
+    window.__pendingStockAdjustment = {
+      productId:String(productId),
+      delta,
+      resultingStock:current+delta
+    };
+  }, true);
 })();
 </script>
 
@@ -18566,3 +18639,20 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 </body>
 </html>
 
+
+<script id="stock-minus-adjustment-note">
+(function(){
+  function addNote(){
+    const labels=[...document.querySelectorAll('label')];
+    const label=labels.find(x=>/in stock amount/i.test(x.textContent||''));
+    if(!label || document.getElementById('stock-minus-note')) return;
+    const box=document.createElement('div');
+    box.id='stock-minus-note';
+    box.textContent='Use a positive number to add stock, or a negative number to reduce stock. Example: current 40 + (-29) = 11.';
+    box.style.cssText='font-size:12px;margin-top:4px;opacity:.8;';
+    label.parentElement?.appendChild(box);
+  }
+  addNote();
+  new MutationObserver(addNote).observe(document.body,{childList:true,subtree:true});
+})();
+</script>
