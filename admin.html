@@ -3951,19 +3951,35 @@ function findCourseMatch(query){
  return matches.length===1?matches[0]:null;
 }
 
+function syncSaleItemRowSubtotal(row){
+ const price=parseMoneyInput(row?.querySelector(".sale-item-price")?.value);
+ const quantity=Math.max(1,parseInt(row?.querySelector(".sale-item-qty")?.value,10)||1);
+ const discountType=String(row?.querySelector(".sale-item-discount-type")?.value||"percent").toLowerCase()==="usd"?"usd":"percent";
+ const discountValue=Math.max(0,parseMoneyInput(row?.querySelector(".sale-item-discount-value")?.value));
+ const base=price*quantity;
+ const discount=discountType==="percent"
+   ? Math.min(base,base*discountValue/100)
+   : Math.min(base,discountValue*quantity);
+ const subtotal=Math.max(0,base-discount);
+ const subtotalInput=row?.querySelector(".sale-item-subtotal");
+ if(subtotalInput) subtotalInput.value=money(subtotal);
+ return subtotal;
+}
+
 function addSaleItemRow(name="",price=0,qty=1,courseId=""){
- const tr=document.createElement("tr");tr.className="sale-item";
+ const tr=document.createElement("tr");
+ tr.className="sale-item";
  tr.innerHTML=`<td>
    <strong class="sale-course-name">${esc(name||"")}</strong>
    <input class="sale-course-id" type="hidden" value="${attr(courseId)}">
  </td>
- <td><input class="sale-item-qty" type="text" inputmode="numeric" autocomplete="off" value="${Number(qty||1)}"></td>
+ <td><input class="sale-item-qty" type="text" inputmode="numeric" autocomplete="off" value="${Math.max(1,Number(qty||1))}"></td>
  <td><input class="sale-item-price" type="text" inputmode="decimal" autocomplete="off" value="${Number(price||0)}"></td>
  <td><div class="sale-item-discount-wrap">
-   <select class="sale-item-discount-type"><option value="percent">%</option><option value="usd">USD</option></select>
-   <input class="sale-item-discount-value" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="">
+   <select class="sale-item-discount-type"><option value="percent" selected>%</option><option value="usd">USD</option></select>
+   <input class="sale-item-discount-value" type="text" inputmode="decimal" autocomplete="off" placeholder="0" value="0">
  </div></td>
- <td><input class="sale-item-subtotal" readonly value="$0.00"></td>
+ <td><input class="sale-item-subtotal" type="text" readonly value="$0.00"></td>
  <td><button class="danger sale-remove-btn remove-sale-item" type="button">×</button></td>`;
  $("saleItems").appendChild(tr);
 
@@ -3972,8 +3988,16 @@ function addSaleItemRow(name="",price=0,qty=1,courseId=""){
  const discountType=tr.querySelector(".sale-item-discount-type");
  const discountValue=tr.querySelector(".sale-item-discount-value");
 
- [qtyInput,priceInput,discountValue].forEach(i=>i.addEventListener("input",updateSaleTotals));
- discountType.addEventListener("change",updateSaleTotals);
+ [qtyInput,priceInput,discountValue].forEach(input=>{
+   input.addEventListener("input",()=>{
+     syncSaleItemRowSubtotal(tr);
+     updateSaleTotals();
+   });
+ });
+ discountType.addEventListener("change",()=>{
+   syncSaleItemRowSubtotal(tr);
+   updateSaleTotals();
+ });
 
  tr.querySelector(".remove-sale-item").onclick=()=>{
    tr.remove();
@@ -3995,6 +4019,9 @@ function addSaleItemRow(name="",price=0,qty=1,courseId=""){
      priceInput.value=Number(price||c.price||0);
    }
  }
+
+ // Always calculate the row subtotal after the course price has been applied.
+ syncSaleItemRowSubtotal(tr);
  updateSaleTotals();
 }
 
@@ -4182,13 +4209,9 @@ function updateSaleTotals(){
  $("saleGrandTotalDue").textContent=money(calc.grandStudentDue);
 
  document.querySelectorAll("#saleItems .sale-item").forEach(w=>{
-   const p=parseMoneyInput(w.querySelector(".sale-item-price").value);
-   const q=Math.max(1,parseInt(w.querySelector(".sale-item-qty").value,10)||1);
-   const type=w.querySelector(".sale-item-discount-type").value;
-   const value=parseMoneyInput(w.querySelector(".sale-item-discount-value").value);
-   const base=p*q;
-   const d=type==="percent"?Math.min(base,base*value/100):Math.min(base,value);
-   w.querySelector(".sale-item-subtotal").value=money(Math.max(0,base-d));
+   // Keep the visible row subtotal synchronized with the exact same
+   // calculation used by the Medi Fella Sale totals.
+   syncSaleItemRowSubtotal(w);
  });
 }
 
@@ -4300,7 +4323,8 @@ function editSaleFromInvoice(id){
      row.querySelector(".sale-item-discount-type").value=
        String(x.discount_type||"percent").toLowerCase()==="usd"?"usd":"percent";
      row.querySelector(".sale-item-discount-value").value=
-       Number(x.discount_value||0)?String(x.discount_value):"";
+       Number(x.discount_value||0)?String(x.discount_value):"0";
+     syncSaleItemRowSubtotal(row);
    }
  });
 
