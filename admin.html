@@ -20928,6 +20928,403 @@ ${styles}
 })();
 </script>
 
+
+<script id="final-working-invoice-print-handler">
+(function(){
+  "use strict";
+
+  function findInvoice(){
+    const selectors=[
+      "#invoicePrint .mf-invoice",
+      "#invoiceOverlay .mf-invoice",
+      "#invoiceModal .mf-invoice",
+      ".invoice-print .mf-invoice",
+      ".invoice-overlay .mf-invoice",
+      ".mf-invoice"
+    ];
+    for(const s of selectors){
+      const nodes=[...document.querySelectorAll(s)];
+      const visible=nodes.find(n=>{
+        const r=n.getBoundingClientRect();
+        const cs=getComputedStyle(n);
+        return r.width>50 && r.height>50 && cs.display!=="none" &&
+               cs.visibility!=="hidden";
+      });
+      if(visible)return visible;
+    }
+    return null;
+  }
+
+  async function printVisibleInvoice(){
+    const source=findInvoice();
+    if(!source){
+      alert("Please open the invoice first.");
+      return;
+    }
+
+    const w=window.open("","_blank","width=1000,height=1300");
+    if(!w){
+      alert("Please allow pop-ups for this website.");
+      return;
+    }
+
+    const clone=source.cloneNode(true);
+
+    // Remove only controls; preserve all invoice text, tables, Khmer content,
+    // logo and styling.
+    clone.querySelectorAll(
+      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,"+
+      "button,[data-no-print='true']"
+    ).forEach(el=>el.remove());
+
+    const styles=[...document.querySelectorAll("style,link[rel='stylesheet']")]
+      .map(n=>n.outerHTML).join("\n");
+
+    w.document.open();
+    w.document.write(`<!doctype html>
+<html>
+<head>
+<meta charset="utf-8">
+<title>Invoice</title>
+${styles}
+<style>
+@page{size:A4 portrait;margin:0}
+html,body{
+  margin:0!important;
+  padding:0!important;
+  background:#fff!important;
+  -webkit-print-color-adjust:exact!important;
+  print-color-adjust:exact!important;
+}
+#printRoot{
+  width:210mm!important;
+  min-height:297mm!important;
+  box-sizing:border-box!important;
+  margin:0!important;
+  padding:0!important;
+  background:#fff!important;
+}
+#printRoot > .mf-invoice{
+  width:210mm!important;
+  max-width:210mm!important;
+  min-width:0!important;
+  margin:0!important;
+  box-sizing:border-box!important;
+  background:#fff!important;
+}
+#printRoot table{
+  width:100%!important;
+  max-width:100%!important;
+  border-collapse:collapse!important;
+}
+#printRoot tr,#printRoot td,#printRoot th{
+  break-inside:avoid!important;
+  page-break-inside:avoid!important;
+}
+@media print{
+  html,body{
+    width:210mm!important;
+    min-width:210mm!important;
+  }
+}
+</style>
+</head>
+<body>
+<div id="printRoot"></div>
+<script>
+(async function(){
+  const root=document.getElementById("printRoot");
+  const invoice=${JSON.stringify(clone.outerHTML)};
+  root.innerHTML=invoice;
+
+  try{
+    if(document.fonts && document.fonts.ready) await document.fonts.ready;
+  }catch(e){}
+
+  const imgs=[...document.images];
+  await Promise.all(imgs.map(function(img){
+    if(img.complete)return Promise.resolve();
+    return new Promise(function(resolve){
+      img.addEventListener("load",resolve,{once:true});
+      img.addEventListener("error",resolve,{once:true});
+    });
+  }));
+
+  await new Promise(function(resolve){
+    requestAnimationFrame(function(){
+      requestAnimationFrame(resolve);
+    });
+  });
+
+  setTimeout(function(){
+    window.focus();
+    window.print();
+  },250);
+})();
+<\/script>
+</body>
+</html>`);
+    w.document.close();
+  }
+
+  // Print only. Save PDF is not redirected to this function.
+  window.printInvoiceA4Working=printVisibleInvoice;
+
+  document.addEventListener("click",function(e){
+    const btn=e.target.closest(
+      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button"
+    );
+    if(!btn)return;
+
+    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
+
+    if(text==="print" || text.includes("print invoice")){
+      e.preventDefault();
+      e.stopPropagation();
+      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+      printVisibleInvoice();
+    }
+  },true);
+})();
+</script>
+
+
+<script id="final-invoice-save-pdf-and-print-controller">
+(function(){
+  "use strict";
+
+  function visibleInvoice(){
+    const selectors=[
+      "#invoiceOverlay .mf-invoice",
+      "#invoicePrint .mf-invoice",
+      "#invoiceModal .mf-invoice",
+      ".invoice-overlay .mf-invoice",
+      ".invoice-print .mf-invoice",
+      ".mf-invoice"
+    ];
+    for(const s of selectors){
+      const list=[...document.querySelectorAll(s)];
+      const el=list.find(n=>{
+        const r=n.getBoundingClientRect(), cs=getComputedStyle(n);
+        return r.width>80 && r.height>80 &&
+               cs.display!=="none" && cs.visibility!=="hidden";
+      });
+      if(el)return el;
+    }
+    return null;
+  }
+
+  async function settle(node){
+    try{
+      if(document.fonts && document.fonts.ready) await document.fonts.ready;
+    }catch(e){}
+    const imgs=[...node.querySelectorAll("img")];
+    await Promise.all(imgs.map(img=>{
+      if(img.complete) return Promise.resolve();
+      return new Promise(resolve=>{
+        img.addEventListener("load",resolve,{once:true});
+        img.addEventListener("error",resolve,{once:true});
+      });
+    }));
+    await new Promise(r=>requestAnimationFrame(()=>requestAnimationFrame(r)));
+  }
+
+  function cloneInvoice(node){
+    const c=node.cloneNode(true);
+    c.querySelectorAll(
+      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,"+
+      "button,[data-no-print='true']"
+    ).forEach(el=>el.remove());
+    c.style.margin="0";
+    c.style.transform="none";
+    c.style.position="static";
+    c.style.width="210mm";
+    c.style.maxWidth="210mm";
+    c.style.boxSizing="border-box";
+    return c;
+  }
+
+  async function savePDFDirect(){
+    const source=visibleInvoice();
+    if(!source){
+      alert("Please open the invoice first.");
+      return;
+    }
+
+    await settle(source);
+
+    const html2pdfLib=window.html2pdf;
+    const jsPDFLib=window.jspdf && window.jspdf.jsPDF;
+    const html2canvasLib=window.html2canvas;
+
+    if(!html2pdfLib && (!jsPDFLib || !html2canvasLib)){
+      alert("PDF rendering library is not loaded. Please refresh the page and try Save PDF again.");
+      return;
+    }
+
+    const clone=cloneInvoice(source);
+    const holder=document.createElement("div");
+    holder.id="__directPdfInvoice";
+    holder.style.position="fixed";
+    holder.style.left="-100000px";
+    holder.style.top="0";
+    holder.style.width="210mm";
+    holder.style.background="#fff";
+    holder.style.zIndex="-1";
+    holder.appendChild(clone);
+    document.body.appendChild(holder);
+
+    await settle(clone);
+
+    const ref =
+      document.querySelector("#invoiceOverlay .invoice-title")?.textContent ||
+      document.querySelector("#invoicePrint .invoice-title")?.textContent ||
+      document.querySelector("#invoiceOverlay h1")?.textContent ||
+      document.querySelector("#invoicePrint h1")?.textContent ||
+      "Invoice";
+
+    const safeName=String(ref).replace(/[^\w\u1780-\u17FF-]+/g,"_").replace(/^_+|_+$/g,"")||"Invoice";
+
+    try{
+      if(html2pdfLib){
+        const opt={
+          margin:[0,0,0,0],
+          filename:safeName+".pdf",
+          image:{type:"jpeg",quality:1},
+          html2canvas:{
+            scale:2.5,
+            useCORS:true,
+            allowTaint:false,
+            backgroundColor:"#ffffff",
+            logging:false,
+            letterRendering:true,
+            scrollX:0,
+            scrollY:0
+          },
+          jsPDF:{
+            unit:"mm",
+            format:"a4",
+            orientation:"portrait",
+            compress:true
+          },
+          pagebreak:{mode:["avoid-all","css","legacy"]}
+        };
+
+        // The invoice is already constrained to A4 width. Scale it vertically
+        // to one A4 page before handing it to html2pdf.
+        const r=clone.getBoundingClientRect();
+        const maxH=297 * (96/25.4);
+        const currentH=Math.max(clone.scrollHeight,r.height);
+        if(currentH>maxH){
+          const s=maxH/currentH;
+          clone.style.transformOrigin="top left";
+          clone.style.transform=`scale(${s})`;
+          clone.style.width=`${210/s}mm`;
+        }
+
+        await html2pdfLib().set(opt).from(clone).save();
+      }else{
+        const canvas=await html2canvasLib(clone,{
+          scale:2.5,
+          useCORS:true,
+          allowTaint:false,
+          backgroundColor:"#fff",
+          logging:false,
+          letterRendering:true
+        });
+        const pdf=new jsPDFLib({unit:"mm",format:"a4",orientation:"portrait"});
+        const pageW=210,pageH=297;
+        const imgW=pageW;
+        const imgH=canvas.height*imgW/canvas.width;
+        const scale=Math.min(1,pageH/imgH);
+        pdf.addImage(
+          canvas.toDataURL("image/jpeg",1),
+          "JPEG",
+          (pageW-imgW*scale)/2,
+          0,
+          imgW*scale,
+          imgH*scale,
+          undefined,
+          "FAST"
+        );
+        pdf.save(safeName+".pdf");
+      }
+    }finally{
+      holder.remove();
+    }
+  }
+
+  async function printInvoice(){
+    const source=visibleInvoice();
+    if(!source){
+      alert("Please open the invoice first.");
+      return;
+    }
+    await settle(source);
+
+    const w=window.open("","_blank","width=1000,height=1300");
+    if(!w){
+      alert("Please allow pop-ups for printing.");
+      return;
+    }
+
+    const clone=cloneInvoice(source);
+    const styles=[...document.querySelectorAll("style,link[rel='stylesheet']")]
+      .map(n=>n.outerHTML).join("\n");
+
+    w.document.open();
+    w.document.write(`<!doctype html><html><head><meta charset="utf-8">
+${styles}
+<style>
+@page{size:A4 portrait;margin:0}
+html,body{margin:0!important;padding:0!important;background:#fff!important;
+-webkit-print-color-adjust:exact!important;print-color-adjust:exact!important}
+#printRoot{width:210mm!important;min-height:297mm!important;margin:0!important;
+padding:0!important;overflow:hidden!important;background:#fff!important}
+#printRoot>.mf-invoice{width:210mm!important;max-width:210mm!important;
+margin:0!important;box-sizing:border-box!important}
+#printRoot table,#printRoot tr,#printRoot td,#printRoot th{
+break-inside:avoid!important;page-break-inside:avoid!important}
+</style></head><body><div id="printRoot">${clone.outerHTML}</div>
+<script>
+(async function(){
+ try{if(document.fonts&&document.fonts.ready)await document.fonts.ready}catch(e){}
+ const imgs=[...document.images];
+ await Promise.all(imgs.map(i=>i.complete?Promise.resolve():new Promise(r=>{
+   i.addEventListener("load",r,{once:true});i.addEventListener("error",r,{once:true})
+ })));
+ requestAnimationFrame(()=>requestAnimationFrame(()=>setTimeout(()=>window.print(),150)));
+})();
+<\/script></body></html>`);
+    w.document.close();
+  }
+
+  window.saveInvoicePDFDirect=savePDFDirect;
+  window.printInvoiceExact=printInvoice;
+
+  document.addEventListener("click",function(e){
+    const btn=e.target.closest(
+      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button"
+    );
+    if(!btn)return;
+    const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
+
+    if(text.includes("save pdf")){
+      e.preventDefault(); e.stopPropagation();
+      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+      savePDFDirect();
+      return;
+    }
+
+    if(text==="print" || text.includes("print invoice")){
+      e.preventDefault(); e.stopPropagation();
+      if(e.stopImmediatePropagation)e.stopImmediatePropagation();
+      printInvoice();
+    }
+  },true);
+})();
+</script>
+
 </body>
 </html>
 
