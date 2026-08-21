@@ -7359,18 +7359,37 @@ function renderInventoryControls(){
       const el=$(id);
       if(!el)return;
 
-      // Remember the user's selection outside the DOM. Other permission/
-      // inventory refreshes may rebuild options, but must never lose it.
-      const oldValue=String(el.dataset.selectedSaleStaff || el.value || "");
+      // CRITICAL: once the user has selected a Sale Staff, do not rebuild
+      // this <select> during the dashboard's periodic refreshes. Rebuilding
+      // the options is what was causing the selected value to jump back to
+      // "Select Sale Staff".
+      const selected=String(el.dataset.selectedSaleStaff || el.value || "");
+      if(selected){
+        const optionStillExists=[...el.options].some(o=>String(o.value)===selected);
+        if(optionStillExists){
+          if(el.value!==selected)el.value=selected;
+          el.dataset.selectedSaleStaff=selected;
+          return;
+        }
+      }
+
+      // Only populate an empty selector, or recover it when its current
+      // option list has not been loaded yet.
+      const rows = latest.length
+        ? latest
+        : (Array.isArray(window.__dedicatedSaleStaffRows)
+            ? window.__dedicatedSaleStaffRows
+            : []);
+
       el.innerHTML='<option value="">Select Sale Staff</option>'+
-        latest.map(x=>
-          `<option value="${attr(x.staff_id)}">${esc(x.staff_name||"Staff")} · P ${Number(x.product_rate||0)}% / S ${Number(x.service_rate||0)}% / SP ${Number(x.service_product_rate||0)}%</option>`
+        rows.map(x=>
+          `<option value="${attr(x.staff_id ?? x.id)}">${esc(x.staff_name||x.name||"Staff")} · P ${Number(x.product_rate||0)}% / S ${Number(x.service_rate||0)}% / SP ${Number(x.service_product_rate||0)}%</option>`
         ).join("");
 
-      if(oldValue && latest.some(x=>String(x.staff_id)===String(oldValue))){
-        el.value=oldValue;
-        el.dataset.selectedSaleStaff=oldValue;
-      }else if(!oldValue){
+      if(selected && rows.some(x=>String(x.staff_id ?? x.id)===selected)){
+        el.value=selected;
+        el.dataset.selectedSaleStaff=selected;
+      }else{
         el.value="";
       }
     });
@@ -7419,6 +7438,13 @@ function renderInventoryControls(){
         if(!el || el.tagName !== "SELECT") return;
 
         const oldValue=String(el.dataset.selectedSaleStaff || el.value || "");
+        const optionStillExists=[...el.options].some(o=>String(o.value)===oldValue);
+        if(oldValue && optionStillExists){
+          el.value=oldValue;
+          el.dataset.selectedSaleStaff=oldValue;
+          return;
+        }
+
         el.innerHTML='<option value="">Select Sale Staff</option>'+
           rows.map(x=>{
             const idv=x.staff_id ?? x.id ?? "";
@@ -15611,10 +15637,19 @@ async function loadCommissionRecords(retry=0){
   }
   function refreshDermedSaleStaff(){
     const el=E("dermedSaleStaff");if(!el)return;
-    const old=el.value;
-    // Prefer the dedicated Sale Staff Management cache. This prevents the
-    // selector from being cleared by the periodic refresh while the
-    // management records are loading.
+
+    // Never rebuild an already-selected Dermed Sale Staff option during
+    // routine dashboard refreshes.
+    const old=String(el.dataset.selectedSaleStaff || el.value || "");
+    if(old){
+      const optionStillExists=[...el.options].some(o=>String(o.value)===old);
+      if(optionStillExists){
+        if(el.value!==old)el.value=old;
+        el.dataset.selectedSaleStaff=old;
+        return;
+      }
+    }
+
     const managed = latestConfigs();
     const cached = Array.isArray(window.__dedicatedSaleStaffRows)
       ? window.__dedicatedSaleStaffRows
@@ -15624,6 +15659,7 @@ async function loadCommissionRecords(retry=0){
       const sid=String(x.staff_id ?? x.id ?? "").trim();
       return sid && x.active !== false;
     });
+
     el.innerHTML='<option value="">Select Sale Staff</option>'+
       rows.map(x=>{
         const sid=x.staff_id ?? x.id;
@@ -15632,8 +15668,13 @@ async function loadCommissionRecords(retry=0){
           ' · P '+N(x.product_rate)+'% / S '+N(x.service_rate)+
           '% / SP '+N(x.service_product_rate)+'%</option>';
       }).join('');
-    if(old && rows.some(x=>String(x.staff_id ?? x.id)===String(old))){
+
+    if(old && rows.some(x=>String(x.staff_id ?? x.id)===old)){
       el.value=old;
+      el.dataset.selectedSaleStaff=old;
+    }else{
+      el.value="";
+      el.dataset.selectedSaleStaff="";
     }
   }
   window.refreshSaleStaffManagementOptions=refreshDermedSaleStaff;
