@@ -2145,6 +2145,30 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<script id="stable-section-startup">
+(function(){
+  function stabilize(){
+    const sections=document.querySelectorAll(".section");
+    if(!sections.length)return;
+    sections.forEach(s=>s.classList.remove("active"));
+    // Do not force a page choice here. The existing permission code will
+    // activate the first permitted section once authentication finishes.
+  }
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",stabilize,{once:true});
+  }else{
+    stabilize();
+  }
+})();
+</script>
+
+
+<style id="stable-section-display-final">
+.section{display:none!important}
+.section.active{display:block!important}
+</style>
+
 </head>
 <body>
 
@@ -17247,9 +17271,8 @@ async function loadCommissionRecords(retry=0){
     const btn=e.target.closest(".dermed-list-add-appointment");
     if(!btn)return;
     e.preventDefault();
-    e.stopImmediatePropagation();
     openFromList(btn);
-  },true);
+  },false);
 })();
 </script>
 
@@ -19154,6 +19177,69 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   setTimeout(watchStatus,100);
   setTimeout(watchStatus,500);
   setTimeout(watchStatus,1000);
+})();
+</script>
+
+
+<script id="dermed-appointment-click-final">
+(function(){
+  "use strict";
+  let opening=false;
+
+  function open(btn){
+    if(opening)return;
+    const modal=document.getElementById("dermedAppointmentModal");
+    if(!modal)return;
+    opening=true;
+
+    const source=btn.dataset.dermedAppointmentSource||"customer";
+    const id=source==="student"
+      ?(btn.dataset.dermedAppointmentStudentId||"")
+      :(btn.dataset.dermedAppointmentCustomerId||"");
+    const name=btn.dataset.dermedAppointmentName||"";
+    const phone=btn.dataset.dermedAppointmentPhone||"";
+    const code=btn.dataset.dermedAppointmentCode||"";
+
+    const set=function(id,v){const e=document.getElementById(id);if(e)e.value=v};
+    set("dermedAppointmentCustomerId",id);
+    set("dermedAppointmentCustomerSource",source);
+    set("dermedAppointmentCustomerSearch",name);
+    set("dermedAppointmentCustomerType","Old Customer");
+    set("dermedAppointmentDate",
+      typeof formatDermedAppointmentDate==="function"
+        ?formatDermedAppointmentDate(typeof localDate==="function"?localDate():new Date().toISOString().slice(0,10))
+        :"");
+    set("dermedAppointmentTime","");
+    set("dermedAppointmentNote","");
+    const hint=document.getElementById("dermedAppointmentCustomerHint");
+    if(hint)hint.textContent=name
+      ?`Selected: ${name} · ${code||"No ID"} · ${phone||"No phone"}`
+      :"Search and select a customer or student.";
+    const status=document.getElementById("dermedAppointmentStatus");
+    if(status)status.textContent="";
+
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden","false");
+    modal.style.display="block";
+
+    if(typeof bindDermedAppointmentDateInput==="function")bindDermedAppointmentDateInput();
+    const date=document.getElementById("dermedAppointmentDate");
+    if(date){
+      date.type="text";
+      date.placeholder="dd/mm/yyyy";
+      date.maxLength=10;
+      date.inputMode="numeric";
+    }
+    setTimeout(()=>{opening=false},150);
+  }
+
+  document.addEventListener("click",function(e){
+    const btn=e.target.closest(".dermed-list-add-appointment");
+    if(btn){
+      e.preventDefault();
+      open(btn);
+    }
+  },false);
 })();
 </script>
 
