@@ -20118,20 +20118,19 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   }
 
   async function exactInvoicePrint(id,size="A4"){
-    const sale=(window.salesRecords||[]).find(x=>String(x.id)===String(id));
-    if(!sale){
-      alert("Invoice not found.");
-      return;
-    }
-
-    const source=document.querySelector("#invoicePrint .mf-invoice");
     const overlay=document.getElementById("invoiceOverlay");
-    if(!source || !overlay){
+    const source=document.querySelector("#invoiceOverlay .mf-invoice") ||
+                 document.querySelector("#invoicePrint .mf-invoice");
+
+    // IMPORTANT: do not require salesRecords here.
+    // The invoice viewer already contains the exact invoice currently being
+    // viewed. Requiring a matching database record caused the previous
+    // "Invoice not found" error even though the invoice was visibly open.
+    if(!overlay || !source){
       alert("Invoice viewing page is not open.");
       return;
     }
 
-    // Open immediately so Safari/Chrome do not block the print window.
     const printWin=window.open("about:blank","_blank","width=1000,height=1300");
     if(!printWin){
       alert("Please allow pop-ups for this website so the invoice can be saved as PDF.");
@@ -20139,14 +20138,20 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     }
 
     const paper=getPaper(size);
-    const title=String(
-      typeof window.saleRef==="function" ? window.saleRef(sale) :
-      sale.reference_no || sale.invoice_no || "Invoice"
-    );
 
-    // Clone the ACTUAL invoice-viewing DOM. No html2canvas. No canvas.
-    // This means Khmer text, tables, borders, spacing and fonts are rendered
-    // by the browser exactly as the viewing page.
+    // Get a useful title from the invoice currently on screen.
+    let title="Invoice";
+    try{
+      const text=source.innerText||"";
+      const m=text.match(/Invoice\s*No\.?\s*:\s*([A-Z0-9_-]+)/i);
+      if(m) title=m[1];
+    }catch(_){}
+    if(id && typeof id==="string" && id.length<100 && !/^undefined|null$/i.test(id)){
+      if(title==="Invoice") title=id;
+    }
+
+    // Clone the ACTUAL invoice-viewing DOM. No html2canvas and no canvas.
+    // The browser itself renders the Khmer text and table.
     const clonedOverlay=overlay.cloneNode(true);
     clonedOverlay.id="invoiceOverlay";
     clonedOverlay.style.display="block";
@@ -20157,14 +20162,10 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     clonedOverlay.style.overflow="visible";
     clonedOverlay.style.background="#fff";
 
-    clonedOverlay.querySelectorAll(".invoice-actions,#invoiceActions,.mf-actions").forEach(el=>el.remove());
+    clonedOverlay.querySelectorAll(
+      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-preview-actions"
+    ).forEach(el=>el.remove());
 
-    // Keep the same A4/A5 preview class as the viewing page.
-    clonedOverlay.classList.remove("preview-a4","preview-a5");
-    clonedOverlay.classList.add(size==="A5"?"preview-a5":"preview-a4");
-
-    // Remove any interactive/edit-only elements that are not part of the
-    // invoice itself, without altering invoice content.
     clonedOverlay.querySelectorAll("[data-no-print='true']").forEach(el=>el.remove());
 
     const wrapper=document.createElement("div");
@@ -20194,10 +20195,12 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     -webkit-print-color-adjust:exact!important;
     print-color-adjust:exact!important;
   }
-  #exactInvoicePrintRoot{
+  #exactInvoicePrintRoot,
+  #invoiceOverlay,
+  #invoicePrint{
     width:${paper.widthMm}mm!important;
     min-width:${paper.widthMm}mm!important;
-    margin:0 auto!important;
+    margin:0!important;
     padding:0!important;
     background:#fff!important;
   }
@@ -20205,21 +20208,12 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     display:block!important;
     position:static!important;
     inset:auto!important;
-    width:${paper.widthMm}mm!important;
-    min-width:${paper.widthMm}mm!important;
     height:auto!important;
     min-height:0!important;
     overflow:visible!important;
-    margin:0!important;
-    padding:0!important;
-    background:#fff!important;
   }
   #invoicePrint{
     display:block!important;
-    width:100%!important;
-    margin:0!important;
-    padding:0!important;
-    background:#fff!important;
   }
   #invoicePrint .mf-invoice{
     margin:0 auto!important;
@@ -20227,17 +20221,11 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     page-break-inside:avoid!important;
     break-inside:avoid!important;
   }
-  #invoicePrint .invoice-actions,
-  #invoicePrint #invoiceActions,
-  #invoicePrint .mf-actions{
+  .invoice-actions,#invoiceActions,.mf-actions,.invoice-preview-actions{
     display:none!important;
   }
   @media print{
-    html,body{
-      width:${paper.widthMm}mm!important;
-      min-width:${paper.widthMm}mm!important;
-    }
-    #exactInvoicePrintRoot,#invoiceOverlay,#invoicePrint{
+    html,body,#exactInvoicePrintRoot,#invoiceOverlay,#invoicePrint{
       width:${paper.widthMm}mm!important;
       min-width:${paper.widthMm}mm!important;
     }
@@ -20246,34 +20234,27 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 </head>
 <body>
 ${serialized}
-<script>
-(async function(){
-  try{
-    if(document.fonts && document.fonts.ready) await document.fonts.ready;
-  }catch(e){}
-  const imgs=[...document.images];
-  await Promise.all(imgs.map(function(img){
-    if(img.complete)return Promise.resolve();
-    return new Promise(function(resolve){
-      img.addEventListener("load",resolve,{once:true});
-      img.addEventListener("error",resolve,{once:true});
-    });
-  }));
-  await new Promise(function(r){requestAnimationFrame(function(){requestAnimationFrame(r);});});
-  setTimeout(function(){window.print();},150);
-})();
-<\/script>
 </body>
 </html>`);
     printWin.document.close();
 
-    // Copy the dashboard's exact CSS after the document is created.
-    // Doing this after write avoids malformed nested style content.
     try{
+      // Copy the dashboard's existing CSS into the print document BEFORE print.
       copyPageStyles(printWin.document);
       await waitForPopupAssets(printWin.document);
+
+      // Force a final browser layout/paint before printing.
+      await new Promise(r=>requestAnimationFrame(
+        ()=>requestAnimationFrame(r)
+      ));
+
       printWin.focus();
-    }catch(_){}
+      setTimeout(()=>printWin.print(),100);
+    }catch(e){
+      console.error("Exact invoice print:",e);
+      try{printWin.close();}catch(_){}
+      alert("Could not prepare the invoice for printing. Please try again.");
+    }
   }
 
   // Replace both PDF/Print entry points with the exact DOM printer.
