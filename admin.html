@@ -7629,9 +7629,11 @@ $("saveStock").onclick=async()=>{
 
     // Inventory movements store quantities as positive numbers.
     // The movement type determines whether stock is added or removed.
-    const movementType=q>0?"stock_in":"stock_out";
-    const quantity=Math.abs(q);
-    const notes=q>0?"Stock In":"Stock Adjustment / Stock Out";
+    const movementType="stock_in";
+    // The existing DB check constraint accepts stock_in. A negative stock_in
+    // quantity is used as a stock-reduction adjustment.
+    const quantity=q;
+    const notes=q>0?"Stock In":"Stock Adjustment / Stock Reduction";
 
     const payload={
       product_id:pid,
@@ -7661,7 +7663,7 @@ $("saveStock").onclick=async()=>{
         ? `Stock entry updated. Current stock: ${resultingStock}`
         : q>0
           ? `Stock added: ${p?.name||""} (+${quantity}). Current stock: ${resultingStock}`
-          : `Stock reduced: ${p?.name||""} (-${quantity}). Current stock: ${resultingStock}`
+          : `Stock reduced: ${p?.name||""} (${quantity}). Current stock: ${resultingStock}`
     );
 
     window.editingStockId="";
