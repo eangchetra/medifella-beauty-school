@@ -21534,6 +21534,76 @@ html,body{
 })();
 </script>
 
+
+<script id="option3-save-pdf-final-button-binding">
+(function(){
+  "use strict";
+
+  function findSaveButtons(){
+    return [...document.querySelectorAll(
+      "#invoiceOverlay button, #invoicePrint button, .invoice-overlay button, button"
+    )].filter(btn=>{
+      const text=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
+      return text.includes("save pdf");
+    });
+  }
+
+  function bind(){
+    findSaveButtons().forEach(btn=>{
+      // Remove the old inline Save PDF action that points to the legacy
+      // canvas/print implementation.
+      btn.removeAttribute("onclick");
+
+      // Prevent duplicate handlers when the invoice preview is re-rendered.
+      if(btn.dataset.option3Bound==="1") return;
+      btn.dataset.option3Bound="1";
+
+      btn.addEventListener("click", function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        if(e.stopImmediatePropagation) e.stopImmediatePropagation();
+
+        if(typeof window.saveInvoicePDFDirectServer==="function"){
+          window.saveInvoicePDFDirectServer().catch(err=>{
+            console.error("Option 3 direct PDF error:",err);
+            alert(
+              "Direct PDF service is not connected yet. " +
+              "The invoice is ready for the HTML-to-PDF server, but the " +
+              "/api/invoice-pdf endpoint still needs to be installed."
+            );
+          });
+        }else{
+          alert("The direct HTML-to-PDF function is not loaded. Please refresh the page.");
+        }
+      }, true);
+    });
+  }
+
+  // Override the legacy global used by the original inline button.
+  // This is the critical fix that prevents Save PDF from opening Print.
+  const previousSetter = window.downloadInvoicePDF;
+  Object.defineProperty(window, "downloadInvoicePDF", {
+    configurable:true,
+    writable:true,
+    value:function(){
+      if(typeof window.saveInvoicePDFDirectServer==="function"){
+        return window.saveInvoicePDFDirectServer();
+      }
+      if(typeof previousSetter==="function"){
+        return previousSetter.apply(this, arguments);
+      }
+    }
+  });
+
+  bind();
+
+  // Invoice preview is dynamically rendered, so bind again whenever the
+  // preview DOM changes.
+  const observer=new MutationObserver(bind);
+  observer.observe(document.body,{subtree:true,childList:true});
+})();
+</script>
+
 </body>
 </html>
 
