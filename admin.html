@@ -17356,6 +17356,8 @@ function fix(){
  document.querySelectorAll("input").forEach(function(el){
   var c=((el.id||"")+" "+(el.name||"")+" "+(el.className||"")+" "+((el.closest("td,th,form,.modal")||{}).textContent||"")).toLowerCase();
   if(c.indexOf("appointment")<0 || c.indexOf("date")<0)return;
+  // Dermed + Appointment has its own DD/MM/YYYY handler.
+  if(el.id==="dermedAppointmentDate")return;
   if(el.dataset.appDateV17==="1")return;
   var old=el.value;
   el.dataset.appDateV17="1";
@@ -19047,6 +19049,111 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     setTimeout(forceDermedDate,0);
     setTimeout(forceDermedDate,100);
   },true);
+})();
+</script>
+
+
+<script id="dermed-add-appointment-date-final-hook">
+(function(){
+  "use strict";
+  function fix(){
+    const el=document.getElementById("dermedAppointmentDate");
+    if(!el)return;
+    el.type="text";
+    el.inputMode="numeric";
+    el.autocomplete="off";
+    el.placeholder="dd/mm/yyyy";
+    el.maxLength=10;
+    const s=String(el.value||"").trim();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
+      const p=s.split("-");
+      el.value=p[2]+"/"+p[1]+"/"+p[0];
+    }
+  }
+  document.addEventListener("click",function(e){
+    const b=e.target.closest("#dermedAddAppointment,.dermed-list-add-appointment");
+    if(!b)return;
+    setTimeout(fix,0); setTimeout(fix,50); setTimeout(fix,150); setTimeout(fix,400);
+  },true);
+  new MutationObserver(function(){
+    const m=document.getElementById("dermedAppointmentModal");
+    if(m && (m.classList.contains("show") || m.getAttribute("aria-hidden")==="false")) fix();
+  }).observe(document.body,{childList:true,subtree:true,attributes:true,attributeFilter:["class","aria-hidden"]});
+})();
+</script>
+
+
+<script id="dermed-add-appointment-return-to-list-final">
+(function(){
+  "use strict";
+  let fromDermedList=false;
+
+  function modal(){
+    return document.getElementById("dermedAppointmentModal");
+  }
+
+  function openModal(){
+    const m=modal();
+    if(!m)return;
+    m.classList.add("show");
+    m.setAttribute("aria-hidden","false");
+    m.style.display="block";
+  }
+
+  function returnToDermedSaleList(){
+    const m=modal();
+    if(m){
+      m.classList.remove("show");
+      m.setAttribute("aria-hidden","true");
+      m.style.display="none";
+    }
+
+    // Keep the user on the existing Dermed Sale page/list.
+    // Do not navigate to another page and do not reload the whole dashboard.
+    const list=document.getElementById("dermedSalesList")
+      || document.getElementById("dermedSales")
+      || document.querySelector("#dermedSale .card:nth-of-type(2)");
+
+    if(list){
+      list.scrollIntoView({behavior:"auto",block:"start"});
+    }else{
+      const heading=[...document.querySelectorAll("h2,h3")]
+        .find(x=>/Dermed Sales/i.test(x.textContent||""));
+      if(heading)heading.scrollIntoView({behavior:"auto",block:"start"});
+    }
+
+    fromDermedList=false;
+  }
+
+  // + Appointment from the Dermed Sale page opens the appointment box.
+  document.addEventListener("click",function(e){
+    const btn=e.target.closest("#dermedAddAppointment");
+    if(!btn)return;
+    fromDermedList=true;
+    setTimeout(openModal,0);
+    setTimeout(openModal,50);
+  },true);
+
+  // Watch the existing appointment status. Only a successful save triggers
+  // the return to the Dermed Sale list.
+  function watchStatus(){
+    const s=document.getElementById("dermedAppointmentStatus");
+    if(!s || s.dataset.returnListBound)return;
+    s.dataset.returnListBound="1";
+
+    new MutationObserver(function(){
+      if(!fromDermedList)return;
+      const msg=String(s.textContent||"").trim().toLowerCase();
+      if(/saved successfully|appointment saved|created successfully|updated successfully|saved|created|updated/.test(msg)){
+        setTimeout(returnToDermedSaleList,250);
+      }
+    }).observe(s,{childList:true,subtree:true,characterData:true});
+  }
+
+  watchStatus();
+  setTimeout(watchStatus,100);
+  setTimeout(watchStatus,500);
+  setTimeout(watchStatus,1000);
 })();
 </script>
 
