@@ -18930,6 +18930,126 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 })();
 </script>
 
+
+<script id="dermed-staff-ddmmyyyy-final-guard">
+(function(){
+  "use strict";
+
+  function getDateEl(){
+    return document.getElementById("dermedAppointmentDate");
+  }
+
+  function toDisplay(v){
+    const s=String(v||"").trim();
+    if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
+      const p=s.split("-");
+      return p[2]+"/"+p[1]+"/"+p[0];
+    }
+    return s;
+  }
+
+  function normalize(el){
+    if(!el) return;
+    // Force text, not the browser's native date control.
+    if(el.type!=="text") el.type="text";
+    el.setAttribute("inputmode","numeric");
+    el.setAttribute("autocomplete","off");
+    el.setAttribute("placeholder","dd/mm/yyyy");
+    el.setAttribute("maxlength","10");
+    el.setAttribute("aria-label","Appointment Date (dd/mm/yyyy)");
+
+    if(!el.dataset.finalDdmmyyyyBound){
+      el.dataset.finalDdmmyyyyBound="1";
+
+      el.addEventListener("focus",function(){
+        if(/^\d{4}-\d{2}-\d{2}$/.test(el.value))
+          el.value=toDisplay(el.value);
+      });
+
+      el.addEventListener("input",function(){
+        let digits=String(el.value||"").replace(/\D/g,"").slice(0,8);
+
+        if(digits.length>=2 && Number(digits.slice(0,2))>31)
+          digits="31"+digits.slice(2);
+
+        if(digits.length>=4 && Number(digits.slice(2,4))>12)
+          digits=digits.slice(0,2)+"12"+digits.slice(4);
+
+        if(digits.length>4)
+          el.value=digits.slice(0,2)+"/"+digits.slice(2,4)+"/"+digits.slice(4);
+        else if(digits.length>2)
+          el.value=digits.slice(0,2)+"/"+digits.slice(2);
+        else
+          el.value=digits;
+      });
+
+      el.addEventListener("blur",function(){
+        const s=String(el.value||"").trim();
+        if(!s){
+          el.setCustomValidity("");
+          return;
+        }
+
+        const m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+        if(!m){
+          el.setCustomValidity("Use date format DD/MM/YYYY.");
+          return;
+        }
+
+        const d=Number(m[1]), mo=Number(m[2]), y=Number(m[3]);
+        if(d<1||d>31){
+          el.setCustomValidity("Day must be between 01 and 31.");
+          return;
+        }
+        if(mo<1||mo>12){
+          el.setCustomValidity("Month must be between 01 and 12.");
+          return;
+        }
+
+        const dt=new Date(Date.UTC(y,mo-1,d));
+        if(dt.getUTCFullYear()!==y ||
+           dt.getUTCMonth()!==mo-1 ||
+           dt.getUTCDate()!==d){
+          el.setCustomValidity("Please enter a valid calendar date.");
+          return;
+        }
+
+        el.setCustomValidity("");
+      });
+    }
+  }
+
+  function forceDermedDate(){
+    const el=getDateEl();
+    if(!el)return;
+
+    const wasDate=el.type==="date";
+    normalize(el);
+
+    // If another script changed the field back to YYYY-MM-DD,
+    // immediately restore the visible DD/MM/YYYY representation.
+    if(wasDate && /^\d{4}-\d{2}-\d{2}$/.test(el.value))
+      el.value=toDisplay(el.value);
+  }
+
+  // Run repeatedly because the Dermed staff controller can re-render
+  // the appointment modal after the initial page load.
+  forceDermedDate();
+  [50,150,300,600,1000,1500,2500,4000].forEach(ms=>setTimeout(forceDermedDate,ms));
+
+  const observer=new MutationObserver(function(){
+    forceDermedDate();
+  });
+  observer.observe(document.documentElement,{subtree:true,childList:true,attributes:true,attributeFilter:["type","value"]});
+
+  // When the Dermed appointment modal opens, force the correct field again.
+  document.addEventListener("click",function(){
+    setTimeout(forceDermedDate,0);
+    setTimeout(forceDermedDate,100);
+  },true);
+})();
+</script>
+
 </body>
 </html>
 
