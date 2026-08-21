@@ -2146,7 +2146,22 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </style>
 
 
-
+<script id="stable-section-startup">
+(function(){
+  function stabilize(){
+    const sections=document.querySelectorAll(".section");
+    if(!sections.length)return;
+    sections.forEach(s=>s.classList.remove("active"));
+    // Do not force a page choice here. The existing permission code will
+    // activate the first permitted section once authentication finishes.
+  }
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",stabilize,{once:true});
+  }else{
+    stabilize();
+  }
+})();
+</script>
 
 
 
@@ -2171,16 +2186,48 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 </style>
 
 
+<style id="no-mts-dermed-flash">
+  /* Hide the dashboard while auth + staff permissions are initializing.
+     Do NOT override .section display rules; the existing app controls those. */
+  html.dashboard-starting body #appView{
+    visibility:hidden !important;
+  }
+  html.dashboard-ready body #appView{
+    visibility:visible !important;
+  }
+</style>
+<script id="no-mts-dermed-flash-init">
+(function(){
+  try{
+    document.documentElement.classList.add("dashboard-starting");
+
+    function ready(){
+      document.documentElement.classList.remove("dashboard-starting");
+      document.documentElement.classList.add("dashboard-ready");
+    }
+
+    // Give the existing authentication/permission initialization time to
+    // finish selecting the one permitted active section.
+    window.addEventListener("load", function(){
+      setTimeout(ready, 300);
+    }, {once:true});
+
+    // Safety fallback so the dashboard cannot remain hidden indefinitely.
+    setTimeout(ready, 3500);
+  }catch(e){}
+})();
+</script>
 
 
-
-
-
-
-
-
-
-
+<style id="sale-commission-toggle-style">
+  .commission-entry-toggle-bar{
+    margin-bottom:0;
+  }
+  #toggleSaleCommissionForm{
+    min-width:170px;
+    white-space:nowrap;
+  }
+</style>
 
 </head>
 <body>
@@ -2557,7 +2604,10 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 <h1>Sale Commission Management</h1>
 
 <div class="card commission-entry-card">
-  <h2>+ Add Sale Commission</h2>
+  <div class="toolbar commission-entry-toggle-bar" style="justify-content:space-between;align-items:center">
+    <h2 style="margin:0">+ Add Sale Commission</h2>
+    <button id="toggleSaleCommissionForm" class="gold" type="button" aria-expanded="false">+ Add Sale Commission</button>
+  </div><div id="saleCommissionFormBody" class="hidden" style="margin-top:14px">
 
   <div class="row">
     <div>
@@ -2636,7 +2686,7 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
   <div id="commissionStatus"></div>
 </div>
 
-<div class="card" style="margin-top:18px">
+</div><div class="card" style="margin-top:18px">
   <div class="toolbar">
     <div>
       <label>Filter Staff Name</label>
@@ -18337,6 +18387,9 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   if(document.readyState==="loading"){
     document.addEventListener("DOMContentLoaded",function(){
       apply();
+      setTimeout(apply,500);
+      setTimeout(apply,1500);
+      setTimeout(apply,3000);
     },{once:true});
   }else{
     apply();
@@ -19122,19 +19175,397 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 </script>
 
 
+<script id="dermed-add-appointment-return-to-list-final">
+(function(){
+  "use strict";
+  let fromDermedList=false;
+
+  function modal(){
+    return document.getElementById("dermedAppointmentModal");
+  }
+
+  function openModal(){
+    const m=modal();
+    if(!m)return;
+    m.classList.add("show");
+    m.setAttribute("aria-hidden","false");
+    m.style.display="block";
+  }
+
+  function returnToDermedSaleList(){
+    const m=modal();
+    if(m){
+      m.classList.remove("show");
+      m.setAttribute("aria-hidden","true");
+      m.style.display="none";
+    }
+
+    // Keep the user on the existing Dermed Sale page/list.
+    // Do not navigate to another page and do not reload the whole dashboard.
+    const list=document.getElementById("dermedSalesList")
+      || document.getElementById("dermedSales")
+      || document.querySelector("#dermedSale .card:nth-of-type(2)");
+
+    if(list){
+      list.scrollIntoView({behavior:"auto",block:"start"});
+    }else{
+      const heading=[...document.querySelectorAll("h2,h3")]
+        .find(x=>/Dermed Sales/i.test(x.textContent||""));
+      if(heading)heading.scrollIntoView({behavior:"auto",block:"start"});
+    }
+
+    fromDermedList=false;
+  }
+
+  // + Appointment from the Dermed Sale page opens the appointment box.
+  document.addEventListener("click",function(e){
+    const btn=e.target.closest("#dermedAddAppointment");
+    if(!btn)return;
+    fromDermedList=true;
+    setTimeout(openModal,0);
+    setTimeout(openModal,50);
+  },true);
+
+  // Watch the existing appointment status. Only a successful save triggers
+  // the return to the Dermed Sale list.
+  function watchStatus(){
+    const s=document.getElementById("dermedAppointmentStatus");
+    if(!s || s.dataset.returnListBound)return;
+    s.dataset.returnListBound="1";
+
+    new MutationObserver(function(){
+      if(!fromDermedList)return;
+      const msg=String(s.textContent||"").trim().toLowerCase();
+      if(/saved successfully|appointment saved|created successfully|updated successfully|saved|created|updated/.test(msg)){
+        setTimeout(returnToDermedSaleList,250);
+      }
+    }).observe(s,{childList:true,subtree:true,characterData:true});
+  }
+
+  watchStatus();
+  setTimeout(watchStatus,100);
+  setTimeout(watchStatus,500);
+  setTimeout(watchStatus,1000);
+})();
+</script>
 
 
+<script id="dermed-appointment-click-final">
+(function(){
+  "use strict";
+  let opening=false;
+
+  function open(btn){
+    if(opening)return;
+    const modal=document.getElementById("dermedAppointmentModal");
+    if(!modal)return;
+    opening=true;
+
+    const source=btn.dataset.dermedAppointmentSource||"customer";
+    const id=source==="student"
+      ?(btn.dataset.dermedAppointmentStudentId||"")
+      :(btn.dataset.dermedAppointmentCustomerId||"");
+    const name=btn.dataset.dermedAppointmentName||"";
+    const phone=btn.dataset.dermedAppointmentPhone||"";
+    const code=btn.dataset.dermedAppointmentCode||"";
+
+    const set=function(id,v){const e=document.getElementById(id);if(e)e.value=v};
+    set("dermedAppointmentCustomerId",id);
+    set("dermedAppointmentCustomerSource",source);
+    set("dermedAppointmentCustomerSearch",name);
+    set("dermedAppointmentCustomerType","Old Customer");
+    set("dermedAppointmentDate",
+      typeof formatDermedAppointmentDate==="function"
+        ?formatDermedAppointmentDate(typeof localDate==="function"?localDate():new Date().toISOString().slice(0,10))
+        :"");
+    set("dermedAppointmentTime","");
+    set("dermedAppointmentNote","");
+    const hint=document.getElementById("dermedAppointmentCustomerHint");
+    if(hint)hint.textContent=name
+      ?`Selected: ${name} · ${code||"No ID"} · ${phone||"No phone"}`
+      :"Search and select a customer or student.";
+    const status=document.getElementById("dermedAppointmentStatus");
+    if(status)status.textContent="";
+
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden","false");
+    modal.style.display="block";
+
+    if(typeof bindDermedAppointmentDateInput==="function")bindDermedAppointmentDateInput();
+    const date=document.getElementById("dermedAppointmentDate");
+    if(date){
+      date.type="text";
+      date.placeholder="dd/mm/yyyy";
+      date.maxLength=10;
+      date.inputMode="numeric";
+    }
+    setTimeout(()=>{opening=false},150);
+  }
+
+  document.addEventListener("click",function(e){
+    const btn=e.target.closest(".dermed-list-add-appointment");
+    if(btn){
+      e.preventDefault();
+      open(btn);
+    }
+  },false);
+})();
+</script>
 
 
+<script id="dermed-appointment-authoritative-controller">
+(function(){
+  "use strict";
+
+  function E(id){return document.getElementById(id);}
+
+  function closeModal(){
+    const m=E("dermedAppointmentModal");
+    if(!m)return;
+    m.classList.remove("show");
+    m.setAttribute("aria-hidden","true");
+    m.style.display="none";
+  }
+
+  function openModal(){
+    const m=E("dermedAppointmentModal");
+    if(!m)return;
+    m.classList.add("show");
+    m.setAttribute("aria-hidden","false");
+    m.style.display="block";
+    if(typeof bindDermedAppointmentDateInput==="function")
+      bindDermedAppointmentDateInput();
+    const d=E("dermedAppointmentDate");
+    if(d){
+      d.type="text";
+      d.inputMode="numeric";
+      d.placeholder="dd/mm/yyyy";
+      d.maxLength=10;
+    }
+  }
+
+  document.addEventListener("click",async function(e){
+    const close=e.target.closest("#dermedAppointmentClose,#dermedAppointmentCancel");
+    const save=e.target.closest("#dermedAppointmentSave");
+    const add=e.target.closest("#dermedAddAppointment");
+
+    if(!close && !save && !add)return;
+
+    // These controls belong to the Dermed Appointment modal. Prevent the
+    // multiple older handlers from fighting each other.
+    e.preventDefault();
+    e.stopImmediatePropagation();
+
+    if(close){
+      closeModal();
+      return;
+    }
+
+    if(add){
+      openModal();
+      return;
+    }
+
+    if(save){
+      const btn=E("dermedAppointmentSave");
+      if(btn && btn.disabled)return;
+
+      if(typeof window.saveAppointmentFromDermed==="function"){
+        try{
+          await window.saveAppointmentFromDermed();
+        }catch(err){
+          console.error("Dermed appointment save:",err);
+        }
+      }else{
+        const status=E("dermedAppointmentStatus");
+        if(status)status.textContent="Save Appointment function is not available.";
+      }
+    }
+  },true);
+
+  // Also allow clicking the dark overlay to close the appointment box.
+  document.addEventListener("click",function(e){
+    const m=E("dermedAppointmentModal");
+    if(m && e.target===m){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      closeModal();
+    }
+  },true);
+})();
+</script>
 
 
+<script id="mts-sale-staff-selection-persist-final">
+(function(){
+  "use strict";
+
+  let savedMtsSaleStaff="";
+  let writing=false;
+
+  function getSelects(){
+    return [
+      document.getElementById("mtsSaleStaff"),
+      document.getElementById("mtsSaleStaffId"),
+      document.getElementById("mtsSaleStaffSelect")
+    ].filter(Boolean);
+  }
+
+  function remember(){
+    const el=getSelects()[0];
+    if(el && el.value) savedMtsSaleStaff=String(el.value);
+  }
+
+  function restore(){
+    if(writing)return;
+    const selects=getSelects();
+    if(!selects.length)return;
+
+    const value=savedMtsSaleStaff;
+    if(!value)return;
+
+    selects.forEach(el=>{
+      const option=[...el.options].find(o=>String(o.value)===value);
+      if(option){
+        writing=true;
+        el.value=value;
+        el.dispatchEvent(new Event("change",{bubbles:true}));
+        writing=false;
+      }
+    });
+  }
+
+  document.addEventListener("change",function(e){
+    if(getSelects().includes(e.target)){
+      savedMtsSaleStaff=String(e.target.value||"");
+    }
+  },true);
+
+  // Watch for the select being emptied/rebuilt by staff permission or
+  // Sale Staff Management refreshes, then restore the selected staff.
+  const observer=new MutationObserver(function(){
+    restore();
+  });
+
+  function start(){
+    const root=document.getElementById("mtsSale");
+    if(root)observer.observe(root,{subtree:true,childList:true});
+    restore();
+  }
+
+  if(document.readyState==="loading")
+    document.addEventListener("DOMContentLoaded",start,{once:true});
+  else
+    start();
+
+  [50,150,300,600,1000,2000].forEach(ms=>setTimeout(restore,ms));
+})();
+</script>
 
 
+<script id="mts-sale-staff-no-flash-final">
+(function(){
+  "use strict";
+
+  let selectedValue="";
+  let selectedText="";
+  let restoring=false;
+
+  function selects(){
+    return [document.getElementById("mtsSaleStaff")].filter(Boolean);
+  }
+
+  function remember(el){
+    if(!el || !el.value)return;
+    selectedValue=String(el.value);
+    const o=el.options[el.selectedIndex];
+    selectedText=o ? o.textContent : "";
+  }
+
+  function restore(){
+    if(restoring || !selectedValue)return;
+    selects().forEach(el=>{
+      const opt=[...el.options].find(o=>String(o.value)===selectedValue);
+      if(opt && el.value!==selectedValue){
+        restoring=true;
+        el.value=selectedValue;
+        restoring=false;
+      }
+    });
+  }
+
+  document.addEventListener("change",function(e){
+    if(e.target && e.target.id==="mtsSaleStaff"){
+      remember(e.target);
+    }
+  },true);
+
+  function watch(){
+    selects().forEach(el=>{
+      if(el.dataset.mtsNoFlashBound)return;
+      el.dataset.mtsNoFlashBound="1";
+
+      const observer=new MutationObserver(function(){
+        // The existing code may clear/rebuild options. Restore the user's
+        // selection immediately after that operation.
+        restore();
+      });
+      observer.observe(el,{childList:true,subtree:true});
+
+      if(el.value)remember(el);
+    });
+    restore();
+  }
+
+  watch();
+  [0,20,50,100,200,400,800,1500,2500].forEach(ms=>setTimeout(watch,ms));
+
+  // Also catch complete replacement of the select element.
+  new MutationObserver(function(){
+    watch();
+  }).observe(document.body,{childList:true,subtree:true});
+})();
+</script>
 
 
+<script id="sale-commission-toggle-final">
+(function(){
+  "use strict";
 
+  function init(){
+    const btn=document.getElementById("toggleSaleCommissionForm");
+    const box=document.getElementById("saleCommissionFormBody");
+    if(!btn || !box)return;
 
+    if(btn.dataset.bound==="1")return;
+    btn.dataset.bound="1";
 
+    function sync(){
+      const hidden=box.classList.contains("hidden");
+      btn.setAttribute("aria-expanded", hidden ? "false" : "true");
+      btn.textContent=hidden ? "+ Add Sale Commission" : "− Hide Sale Commission";
+    }
+
+    btn.addEventListener("click",function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      box.classList.toggle("hidden");
+      sync();
+    });
+
+    sync();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",init,{once:true});
+  }else{
+    init();
+  }
+
+  // The dashboard can re-render sections after login/permission loading.
+  [100,300,700,1200,2000].forEach(ms=>setTimeout(init,ms));
+})();
+</script>
 
 </body>
 </html>
