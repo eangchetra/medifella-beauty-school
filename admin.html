@@ -19530,211 +19530,93 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 
 
 
-<script id="mts-dermed-sale-staff-selection-final">
-(function(){
-  "use strict";
-  const saved={mts:"",dermed:""};
-
-  function get(id,key){
-    const el=document.getElementById(id);
-    if(!el)return;
-    const current=String(el.value||"");
-    if(current){
-      saved[key]=current;
-      el.dataset.persistedSaleStaff=current;
-    }else if(el.dataset.persistedSaleStaff){
-      saved[key]=String(el.dataset.persistedSaleStaff);
-    }
-  }
-
-  function restore(id,key){
-    const el=document.getElementById(id);
-    if(!el)return;
-    const wanted=saved[key]||String(el.dataset.persistedSaleStaff||"");
-    if(!wanted)return;
-    const opt=[...el.options].find(o=>String(o.value)===wanted);
-    if(opt && el.value!==wanted)el.value=wanted;
-  }
-
-  function run(){
-    get("mtsSaleStaff","mts");
-    get("dermedSaleStaff","dermed");
-    restore("mtsSaleStaff","mts");
-    restore("dermedSaleStaff","dermed");
-  }
-
-  document.addEventListener("change",function(e){
-    if(e.target?.id==="mtsSaleStaff"){
-      saved.mts=String(e.target.value||"");
-      e.target.dataset.persistedSaleStaff=saved.mts;
-    }
-    if(e.target?.id==="dermedSaleStaff"){
-      saved.dermed=String(e.target.value||"");
-      e.target.dataset.persistedSaleStaff=saved.dermed;
-    }
-  },true);
-
-  [0,50,150,300,600,1000,2000,3000].forEach(ms=>setTimeout(run,ms));
-  setInterval(run,1000);
-})();
-</script>
 
 
-<script id="dermed-staff-sale-selector-final-manager">
+
+
+
+
+
+
+
+
+
+
+<script id="single-dermed-sale-staff-selection-manager">
 (function(){
   "use strict";
 
-  const state={mts:"",dermed:""};
+  const remembered = {
+    dermed: "",
+    mts: ""
+  };
 
-  function get(id){return document.getElementById(id);}
+  function get(id){
+    return document.getElementById(id);
+  }
 
-  function remember(id,key){
+  function remember(id, key){
     const el=get(id);
-    if(!el)return;
-    if(el.value){
-      state[key]=String(el.value);
-      el.dataset.saleStaffSelected=state[key];
+    if(!el) return;
+    const value=String(el.value || "");
+    if(value){
+      remembered[key]=value;
+      el.dataset.userSelectedSaleStaff=value;
     }
   }
 
-  function restore(id,key){
+  function restoreOnlyAfterRebuild(id, key){
     const el=get(id);
-    if(!el)return;
-    const wanted=state[key] || String(el.dataset.saleStaffSelected||"");
-    if(!wanted)return;
-    const option=[...el.options].find(o=>String(o.value)===wanted);
-    if(option && el.value!==wanted) el.value=wanted;
+    if(!el) return;
+
+    const wanted=remembered[key] || String(el.dataset.userSelectedSaleStaff || "");
+    if(!wanted) return;
+
+    // Only restore if the renderer actually cleared/replaced the selection.
+    // Never overwrite a non-empty value chosen by the user.
+    if(!el.value){
+      const option=[...el.options].find(o=>String(o.value)===wanted);
+      if(option) el.value=wanted;
+    }
   }
 
-  function bind(id,key){
+  function bind(id, key){
     const el=get(id);
-    if(!el || el.dataset.finalSaleStaffBound==="1")return;
+    if(!el || el.dataset.singleSaleStaffManager==="1") return;
 
-    el.dataset.finalSaleStaffBound="1";
+    el.dataset.singleSaleStaffManager="1";
 
-    el.addEventListener("change",function(){
-      state[key]=String(this.value||"");
-      this.dataset.saleStaffSelected=state[key];
-    },true);
+    // This is the authoritative user selection.
+    el.addEventListener("change", function(){
+      const value=String(this.value || "");
+      remembered[key]=value;
+      this.dataset.userSelectedSaleStaff=value;
+    }, false);
 
-    if(el.value)remember(id,key);
-    else restore(id,key);
-
-    // Observe option rebuilds, but only restore. Never dispatch "change".
+    // If another part of the app replaces the options, restore the last
+    // selection silently. A user-selected new value is never overwritten.
     new MutationObserver(function(){
-      restore(id,key);
-    }).observe(el,{childList:true});
+      restoreOnlyAfterRebuild(id, key);
+    }).observe(el, {childList:true});
+
+    // Preserve any value already present when this manager attaches.
+    remember(id, key);
   }
 
   function sync(){
-    bind("mtsSaleStaff","mts");
-    bind("dermedSaleStaff","dermed");
-    restore("mtsSaleStaff","mts");
-    restore("dermedSaleStaff","dermed");
+    bind("dermedSaleStaff", "dermed");
+    // MTS Sale Staff is hidden/unused in this version, but keeping the manager
+    // here is harmless if that selector exists elsewhere.
+    bind("mtsSaleStaff", "mts");
   }
 
   sync();
-  [100,300,700,1200,2000].forEach(ms=>setTimeout(sync,ms));
 
-  // Detect complete replacement of the selector element.
+  // Handle a complete replacement of the SELECT element itself, without
+  // polling or repeatedly forcing its value.
   new MutationObserver(function(){
     sync();
-  }).observe(document.body,{childList:true,subtree:true});
-})();
-</script>
-
-
-<script id="sale-staff-only-and-persist-final">
-(function(){
-  "use strict";
-
-  const IDS=["dermedSaleStaff"];
-  const saved={dermed:""};
-
-  function key(id){return "dermed";}
-  function get(id){return document.getElementById(id);}
-
-  function remember(id){
-    const el=get(id);
-    if(!el)return;
-    if(el.value){
-      saved[key(id)]=String(el.value);
-      el.dataset.saleStaffSelected=saved[key(id)];
-    }
-  }
-
-  function restore(id){
-    const el=get(id);
-    if(!el)return;
-    const wanted=saved[key(id)]||String(el.dataset.saleStaffSelected||"");
-    if(!wanted)return;
-
-    const option=[...el.options].find(o=>String(o.value)===wanted);
-    if(option && el.value!==wanted){
-      // Restore silently. Do NOT fire change, otherwise the application can
-      // rebuild the selector and create the flash again.
-      el.value=wanted;
-    }
-  }
-
-  function bind(id){
-    const el=get(id);
-    if(!el || el.dataset.saleStaffFinalBound==="1")return;
-
-    el.dataset.saleStaffFinalBound="1";
-
-    el.addEventListener("change",function(){
-      saved[key(id)]=String(this.value||"");
-      this.dataset.saleStaffSelected=saved[key(id)];
-    },true);
-
-    if(el.value)remember(id);
-
-    // Watch only option rebuilding. Do not trigger any application events.
-    new MutationObserver(function(){
-      restore(id);
-    }).observe(el,{childList:true});
-  }
-
-  function sync(){
-    IDS.forEach(id=>{
-      bind(id);
-      restore(id);
-    });
-  }
-
-  sync();
-  [100,300,700,1200,2000].forEach(ms=>setTimeout(sync,ms));
-
-  // Handle complete replacement of a selector by the existing renderer.
-  new MutationObserver(sync).observe(document.body,{childList:true,subtree:true});
-})();
-</script>
-
-
-<script id="dermed-sale-staff-rate-no-flash-final">
-(function(){
-  "use strict";
-  function sync(){
-    const el=document.getElementById("dermedSaleStaff");
-    if(!el)return;
-    if(el.value){
-      el.dataset.persistedSaleStaff=String(el.value);
-      return;
-    }
-    const wanted=String(el.dataset.persistedSaleStaff||"");
-    if(wanted){
-      const option=[...el.options].find(o=>String(o.value)===wanted);
-      if(option)el.value=wanted;
-    }
-  }
-  const el=document.getElementById("dermedSaleStaff");
-  if(el){
-    el.addEventListener("change",function(){
-      this.dataset.persistedSaleStaff=String(this.value||"");
-    },true);
-  }
-  [0,100,300,700,1200,2000].forEach(ms=>setTimeout(sync,ms));
+  }).observe(document.body, {childList:true, subtree:true});
 })();
 </script>
 
