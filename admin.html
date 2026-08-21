@@ -5411,6 +5411,57 @@ function getInvoicePaper(size){
    : {name:"A4", widthMm:210, heightMm:297};
 }
 
+
+/* ===== MTS PDF Khmer font reliability fix =====
+   The invoice is captured as an image by html2canvas. Cross-origin Khmer
+   fonts can display correctly in the browser but fall back during capture.
+   Explicitly load the actual font files before the capture and provide them
+   to html2canvas's cloned document as data URLs when possible.
+*/
+let __mtsKhmerFontData = null;
+
+async function ensureMtsKhmerFontsLoaded(){
+  if(document.fonts){
+    try{
+      await document.fonts.load('400 16px "KhmerOSBattambangUploaded"', 'សរុប ប្រាក់');
+      await document.fonts.load('400 16px "KhmerOSMuolUploaded"', 'វិក្កយបត្រ');
+      await document.fonts.ready;
+    }catch(_){}
+  }
+
+  if(__mtsKhmerFontData) return __mtsKhmerFontData;
+
+  const urls={
+    battambang:"https://dwrpriwxbjgxpsvhclai.supabase.co/storage/v1/object/public/fonts/Khmer%20OS%20Battambang%20Regular.ttf",
+    muol:"https://dwrpriwxbjgxpsvhclai.supabase.co/storage/v1/object/public/fonts/Khmer%20OS%20Muol%20Regular.ttf"
+  };
+
+  async function toDataUrl(url){
+    try{
+      const r=await fetch(url,{mode:"cors",cache:"force-cache"});
+      if(!r.ok) throw new Error("Font HTTP "+r.status);
+      const b=await r.arrayBuffer();
+      let binary="";
+      const bytes=new Uint8Array(b);
+      const chunk=0x8000;
+      for(let i=0;i<bytes.length;i+=chunk){
+        binary+=String.fromCharCode.apply(null,bytes.subarray(i,Math.min(i+chunk,bytes.length)));
+      }
+      return "data:font/ttf;base64,"+btoa(binary);
+    }catch(_){
+      return null;
+    }
+  }
+
+  try{
+    const [b,m]=await Promise.all([toDataUrl(urls.battambang),toDataUrl(urls.muol)]);
+    __mtsKhmerFontData={battambang:b,muol:m};
+  }catch(_){
+    __mtsKhmerFontData={battambang:null,muol:null};
+  }
+  return __mtsKhmerFontData;
+}
+
 async function loadHtml2Canvas(){
  if(window.html2canvas)return;
  await new Promise((resolve,reject)=>{
@@ -5424,6 +5475,7 @@ async function loadHtml2Canvas(){
 
 async function buildInvoicePaperCanvas(size){
   await loadHtml2Canvas();
+  const allKhmerFonts=await ensureMtsKhmerFontsLoaded();
 
   const overlay=document.getElementById("invoiceOverlay");
   const source=document.querySelector("#invoicePrint .mf-invoice");
@@ -5463,6 +5515,62 @@ async function buildInvoicePaperCanvas(size){
        temporary cloned document. */
     onclone:(clonedDoc)=>{
       clonedDoc.querySelectorAll(".invoice-actions,#invoiceActions,.mf-actions").forEach(el=>el.remove());
+
+      /* Make the MTS invoice table and all Khmer labels use the same Khmer
+         fonts as the live invoice. The embedded data URL prevents a
+         cross-origin font from disappearing during canvas capture. */
+      const style=clonedDoc.createElement("style");
+      style.id="all-invoices-pdf-khmer-font-embed";
+      const b=allKhmerFonts?.battambang;
+      const m=allKhmerFonts?.muol;
+      style.textContent=`
+        ${b?`@font-face{font-family:"KhmerOSBattambangPDF";src:url("${b}") format("truetype");font-weight:400 900;font-style:normal;font-display:block;}`:""}
+        ${m?`@font-face{font-family:"KhmerOSMuolPDF";src:url("${m}") format("truetype");font-weight:400 900;font-style:normal;font-display:block;}`:""}
+
+        /* All three invoice types use embedded Khmer fonts during PDF capture. */
+        .mf-invoice .kh,
+        .mf-invoice [lang="km"],
+        .mf-invoice .mf-khmer,
+        .mf-invoice .mf-invoice-table,
+        .mf-invoice .mf-invoice-table th,
+        .mf-invoice .mf-invoice-table td,
+        .mf-invoice .mf-info-box,
+        .mf-invoice .mf-payment-box{
+          ${b?'font-family:"KhmerOSBattambangPDF","KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif !important;':'font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif !important;'}
+        }
+
+        .mf-invoice .mf-school-kh,
+        .mf-invoice .mf-invoice-label .kh,
+        .mf-invoice .mf-refund-box .kh{
+          ${m?'font-family:"KhmerOSMuolPDF","KhmerOSMuolUploaded","Khmer OS Moul","Khmer OS MOUL Regular",serif !important;':'font-family:"KhmerOSMuolUploaded","Khmer OS Moul","Khmer OS MOUL Regular",serif !important;'}
+        }
+
+        /* Keep invoice tables stable while Khmer glyphs are rasterized. */
+        .mf-invoice .mf-invoice-table{
+          font-size:13px !important;
+          line-height:1.45 !important;
+          border-collapse:collapse !important;
+          width:100% !important;
+          table-layout:fixed !important;
+        }
+        .mf-invoice .mf-invoice-table th,
+        .mf-invoice .mf-invoice-table td{
+          border:1px solid #111 !important;
+          vertical-align:middle !important;
+          box-sizing:border-box !important;
+          overflow-wrap:anywhere !important;
+          word-break:normal !important;
+        }
+      `;
+      clonedDoc.head.appendChild(style);
+
+      /* Wait until the cloned document has completed font layout. */
+      try{
+        if(clonedDoc.fonts){
+          clonedDoc.fonts.load('400 16px "KhmerOSBattambangPDF"','សរុប ប្រាក់');
+          clonedDoc.fonts.load('400 16px "KhmerOSMuolPDF"','វិក្កយបត្រ');
+        }
+      }catch(_){}
     }
   });
 
@@ -5551,6 +5659,21 @@ function openPrintFromCanvas(canvas,paper,sale){
   background-color:#46C3D9 !important;
   color:#000000 !important;
 }
+
+<style id="all-invoices-pdf-khmer-table-stability">
+#invoicePrint .mf-invoice,
+#invoiceOverlay .mf-invoice{
+  -webkit-font-smoothing:antialiased;
+  text-rendering:geometricPrecision;
+}
+#invoicePrint .mf-invoice .mf-invoice-table,
+#invoicePrint .mf-invoice .mf-invoice-table th,
+#invoicePrint .mf-invoice .mf-invoice-table td{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif !important;
+  border-collapse:collapse !important;
+}
+</style>
+
 </style>
 </head>
 <body>
@@ -19930,6 +20053,25 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     const base=N(qty)*N(unitPrice);
     return Math.max(0, base-window.calculateAllSaleDiscount(qty,unitPrice,type,value));
   };
+})();
+</script>
+
+
+<script id="all-invoices-khmer-pdf-final-safety">
+(function(){
+  "use strict";
+  // Ensure the browser has completed font loading before any invoice export.
+  async function prepareInvoiceFonts(){
+    try{
+      if(window.ensureMtsKhmerFontsLoaded){
+        await window.ensureMtsKhmerFontsLoaded();
+      }
+      if(document.fonts && document.fonts.ready){
+        await document.fonts.ready;
+      }
+    }catch(_){}
+  }
+  window.prepareAllInvoiceKhmerFonts=prepareInvoiceFonts;
 })();
 </script>
 
