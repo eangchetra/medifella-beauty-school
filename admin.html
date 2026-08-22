@@ -3396,6 +3396,7 @@ script { display:none !important; }
 
     <div class="actions" style="justify-content:flex-end;margin-top:16px">
       <button id="addPurchasingItem" class="light" type="button">+ Add Item</button>
+      <button id="pendingPurchasing" type="button" style="background:#1976d2;color:#fff;border:0;padding:9px 14px;border-radius:8px;font-weight:600">Pending</button>
       <button id="savePurchasing" class="gold" type="button">Save Purchasing</button>
       <button id="cancelPurchasing" class="light" type="button">Cancel</button>
     </div>
@@ -20827,25 +20828,48 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       items,total:items.reduce((a,x)=>a+Number(x.subtotal||0),0)
     };
   }
-  async function savePurchaseP(){
+  async function savePurchaseP(saveMode="Paid"){
     if(!P("savePurchasing"))return;
     try{
       const payload=collectPurchaseP();
       P("savePurchasing").disabled=true;
+      const mode=saveMode==="Pending"?"Pending":"Paid";
+
       let r;
       if(purchasingEditId){
+        // Editing an existing purchase keeps its current payment/arrival
+        // status unless the user explicitly uses Pending.
+        const existing=(window.purchasingRecords||[]).find(x=>String(x.id)===String(purchasingEditId));
+        payload.payment_status = mode==="Pending" ? "Pending" : (existing?.payment_status||"Paid");
+        payload.paid_at = payload.payment_status==="Paid" ? (existing?.paid_at||new Date().toISOString()) : null;
+        payload.arrival_status = payload.payment_status==="Paid" ? (existing?.arrival_status==="Arrived"?"Arrived":"Arriving") : "Pending";
+        payload.arrived_at = payload.arrival_status==="Arrived" ? (existing?.arrived_at||null) : null;
+
         r=await sb.from("medifella_purchases").update(payload).eq("id",purchasingEditId);
       }else{
         payload.purchase_no="PUR-"+Date.now();
+        payload.payment_status=mode;
+        payload.paid_at=mode==="Paid" ? new Date().toISOString() : null;
+        payload.arrival_status=mode==="Paid" ? "Arriving" : "Pending";
+        payload.arrived_at=null;
         r=await sb.from("medifella_purchases").insert(payload);
       }
+
       if(r.error)throw r.error;
-      P("purchasingStatus").innerHTML='<div class="status">Purchasing saved successfully.</div>';
+
+      P("purchasingStatus").innerHTML=`<div class="status">${
+        mode==="Pending" ? "Purchasing saved as Pending to Pay." : "Purchasing saved successfully. Payment completed — status is Arriving."
+      }</div>`;
+
       await loadPurchasesP();
       resetFormP();
       P("purchasingFormPanel").classList.add("hidden");
-    }catch(e){P("purchasingStatus").innerHTML=`<div class="status error">${escP(e.message||"Could not save purchasing.")}</div>`}
-    finally{P("savePurchasing").disabled=false}
+      purchasingEditId=null;
+    }catch(e){
+      P("purchasingStatus").innerHTML=`<div class="status error">${escP(e.message||"Could not save purchasing.")}</div>`;
+    }finally{
+      P("savePurchasing").disabled=false;
+    }
   }
   function editPurchaseP(id){
     const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));if(!r)return;
@@ -20899,10 +20923,27 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     if(!P("purchasingManagement"))return;
     refreshStaffP();
     resetFormP();
-    P("togglePurchasingForm").onclick=()=>{P("purchasingFormPanel").classList.toggle("hidden");if(!P("purchasingFormPanel").classList.contains("hidden")){refreshStaffP();if(!P("purchasingDateTime").value)P("purchasingDateTime").value=nowLocalP()}};
+
+    P("togglePurchasingForm").onclick=()=>{
+      P("purchasingFormPanel").classList.toggle("hidden");
+      if(!P("purchasingFormPanel").classList.contains("hidden")){
+        refreshStaffP();
+        if(!P("purchasingDateTime").value)P("purchasingDateTime").value=nowLocalP();
+      }
+    };
+
     P("addPurchasingItem").onclick=()=>addRowP();
-    P("cancelPurchasing").onclick=()=>{resetFormP();P("purchasingFormPanel").classList.add("hidden")};
-    P("savePurchasing").onclick=savePurchaseP;
+    P("cancelPurchasing").onclick=()=>{
+      resetFormP();
+      P("purchasingFormPanel").classList.add("hidden");
+    };
+
+    // Save Purchasing means payment is already completed.
+    P("savePurchasing").onclick=()=>savePurchaseP("Paid");
+
+    // Pending means payment has NOT been made yet.
+    P("pendingPurchasing").onclick=()=>savePurchaseP("Pending");
+
     P("purchasingRefresh").onclick=loadPurchasesP;
     P("purchasingExcel").onclick=exportExcelP;
     P("purchasingPdf").onclick=exportPdfP;
@@ -21689,5 +21730,179 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
   else install();
+})();
+</script>
+
+
+<script id="purchasing-final-payment-flow-v2">
+(function(){
+  "use strict";
+
+  function finalStatusButton(r){
+    const paid=String(r.payment_status||"Paid")==="Paid";
+    const arrived=String(r.arrival_status||"")==="Arrived";
+
+    if(!paid){
+      return `<button type="button" class="purchasing-final-pending-pay" data-id="${String(r.id)}"
+        style="background:#1976d2;color:#fff;border:0;padding:7px 11px;border-radius:7px;font-weight:600;cursor:pointer">
+        Pending to Pay</button>`;
+    }
+
+    if(!arrived){
+      return `<button type="button" class="purchasing-final-arriving" data-id="${String(r.id)}"
+        style="background:#1976d2;color:#fff;border:0;padding:7px 11px;border-radius:7px;font-weight:600;cursor:pointer">
+        Arriving</button>`;
+    }
+
+    return `<button type="button" disabled
+      style="background:#2e7d32;color:#fff;border:0;padding:7px 11px;border-radius:7px;font-weight:600">
+      Arrived</button>`;
+  }
+
+  async function payAndArrive(id){
+    const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));
+    if(!r)return;
+
+    const result=await sb.from("medifella_purchases").update({
+      payment_status:"Paid",
+      paid_at:r.paid_at||new Date().toISOString(),
+      arrival_status:"Arriving",
+      arrived_at:null
+    }).eq("id",id);
+
+    if(result.error){alert("Could not make payment: "+result.error.message);return}
+    if(typeof window.loadPurchasingManagement==="function") await window.loadPurchasingManagement();
+  }
+
+  async function markArrivedFinal(id){
+    const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));
+    if(!r || String(r.payment_status||"Paid")!=="Paid")return;
+    if(!confirm("Mark this purchase as Arrived?"))return;
+
+    const result=await sb.from("medifella_purchases").update({
+      arrival_status:"Arrived",
+      arrived_at:new Date().toISOString()
+    }).eq("id",id);
+
+    if(result.error){alert("Could not update arrival status: "+result.error.message);return}
+    if(typeof window.loadPurchasingManagement==="function") await window.loadPurchasingManagement();
+  }
+
+  function renderFinal(){
+    const box=document.getElementById("purchasingList");
+    if(!box)return;
+
+    const records=Array.isArray(window.purchasingRecords)?window.purchasingRecords:[];
+    const from=document.getElementById("purchasingFromDate")?.value||"";
+    const to=document.getElementById("purchasingToDate")?.value||"";
+    const q=(document.getElementById("purchasingSearch")?.value||"").trim().toLowerCase();
+
+    const rows=records.filter(r=>{
+      const d=String(r.purchase_datetime||r.created_at||"").slice(0,10);
+      if(from&&d<from)return false;
+      if(to&&d>to)return false;
+      if(q&&!JSON.stringify(r).toLowerCase().includes(q))return false;
+      return true;
+    });
+
+    if(!rows.length){
+      box.innerHTML='<p class="muted">No purchasing records found.</p>';
+      return;
+    }
+
+    const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+    const money=v=>"$"+Number(v||0).toFixed(2);
+    const short=v=>{
+      const s=String(v??"");
+      return s.length>15?s.slice(0,11)+"…"+s.slice(-4):s;
+    };
+    const date=v=>{
+      const d=new Date(v);
+      if(Number.isNaN(d.getTime()))return String(v||"").replace("T"," ").replace(/\+00:00$/,"");
+      return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+    };
+
+    box.innerHTML=`<div class="table-wrap"><table class="table">
+      <thead><tr>
+        <th>Purchase ID</th><th>Date &amp; Time</th><th>Purchasing Staff</th><th>Items</th><th>Total</th><th>Status</th><th>Action</th>
+      </tr></thead>
+      <tbody>${rows.map(r=>`
+        <tr>
+          <td title="${esc(r.purchase_no||r.id||"")}"><strong>${esc(short(r.purchase_no||r.id||""))}</strong></td>
+          <td title="${esc(r.purchase_datetime||"")}">${esc(date(r.purchase_datetime))}</td>
+          <td>${esc(r.purchasing_staff_name||"")}</td>
+          <td><button type="button" class="light purchasing-final-view" data-id="${esc(r.id)}">View</button></td>
+          <td><strong>${money(r.total)}</strong></td>
+          <td>${finalStatusButton(r)}</td>
+          <td><div class="actions">
+            <button type="button" class="light purchasing-final-edit" data-id="${esc(r.id)}">Edit</button>
+            <button type="button" class="danger purchasing-final-delete" data-id="${esc(r.id)}">Delete</button>
+          </div></td>
+        </tr>`).join("")}</tbody>
+    </table></div>`;
+
+    box.querySelectorAll(".purchasing-final-pending-pay").forEach(b=>{
+      b.onclick=()=>payAndArrive(b.dataset.id);
+    });
+    box.querySelectorAll(".purchasing-final-arriving").forEach(b=>{
+      b.onclick=()=>markArrivedFinal(b.dataset.id);
+    });
+    box.querySelectorAll(".purchasing-final-view").forEach(b=>{
+      b.onclick=()=>{
+        if(typeof window.showDetails2==="function")window.showDetails2(b.dataset.id);
+      };
+    });
+    box.querySelectorAll(".purchasing-final-edit").forEach(b=>{
+      b.onclick=()=>{
+        const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(b.dataset.id));
+        if(typeof window.editPurchaseP==="function")window.editPurchaseP(b.dataset.id);
+        else if(r)alert("Edit this purchasing record from the Edit button.");
+      };
+    });
+    box.querySelectorAll(".purchasing-final-delete").forEach(b=>{
+      b.onclick=async()=>{
+        if(!confirm("Delete this purchasing record?"))return;
+        const rr=await sb.from("medifella_purchases").delete().eq("id",b.dataset.id);
+        if(rr.error){alert("Delete failed: "+rr.error.message);return}
+        if(typeof window.loadPurchasingManagement==="function")await window.loadPurchasingManagement();
+      };
+    });
+  }
+
+  function installFinal(){
+    const pending=document.getElementById("pendingPurchasing");
+    const save=document.getElementById("savePurchasing");
+    if(pending)pending.textContent="Pending";
+    if(save)save.textContent="Save Purchasing";
+
+    ["purchasingFromDate","purchasingToDate","purchasingSearch"].forEach(id=>{
+      const e=document.getElementById(id);
+      if(e&&!e.dataset.finalStatusFlow){
+        e.dataset.finalStatusFlow="1";
+        e.addEventListener("input",()=>setTimeout(renderFinal,0));
+      }
+    });
+
+    renderFinal();
+    setTimeout(renderFinal,300);
+    setTimeout(renderFinal,1000);
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",installFinal,{once:true});
+  else installFinal();
+
+  // Keep the list in sync after normal refresh/save operations.
+  setTimeout(()=>{
+    if(typeof window.loadPurchasingManagement==="function"&&!window.loadPurchasingManagement.__finalFlow){
+      const original=window.loadPurchasingManagement;
+      const wrapped=async function(){
+        const result=await original.apply(this,arguments);
+        setTimeout(renderFinal,0);
+        return result;
+      };
+      wrapped.__finalFlow=true;
+      window.loadPurchasingManagement=wrapped;
+    }
+  },500);
 })();
 </script>
