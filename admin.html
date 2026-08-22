@@ -21323,45 +21323,126 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     const div=document.createElement("div");
     div.id="purchasingDetailsModal";
     div.className="modal-overlay hidden";
-    div.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;";
+    div.style.cssText="position:fixed;inset:0;background:rgba(15,23,42,.58);backdrop-filter:blur(3px);z-index:99999;display:flex;align-items:center;justify-content:center;padding:18px;";
     div.innerHTML=`
-      <div style="background:#fff;border-radius:12px;max-width:900px;width:100%;max-height:85vh;overflow:auto;padding:20px;box-shadow:0 18px 50px rgba(0,0,0,.25)">
-        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px">
-          <h3 id="purchasingDetailsTitle" style="margin:0">Purchasing Details</h3>
-          <button type="button" id="purchasingDetailsClose" class="light">Close</button>
+      <div id="purchasingDetailsCard" style="background:#fff;border-radius:18px;max-width:1050px;width:100%;max-height:90vh;overflow:hidden;box-shadow:0 24px 70px rgba(0,0,0,.28);display:flex;flex-direction:column">
+        <div style="padding:18px 22px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;gap:16px">
+          <div>
+            <div style="font-size:12px;color:#64748b;font-weight:600;text-transform:uppercase;letter-spacing:.05em">Purchasing Details</div>
+            <h3 id="purchasingDetailsTitle" style="margin:3px 0 0;font-size:22px">Purchase</h3>
+          </div>
+          <button type="button" id="purchasingDetailsClose" class="light" style="padding:8px 14px">Close</button>
         </div>
-        <div id="purchasingDetailsBody"></div>
+        <div id="purchasingDetailsBody" style="padding:20px 22px;overflow:auto"></div>
       </div>`;
     document.body.appendChild(div);
     $("purchasingDetailsClose").onclick=()=>div.classList.add("hidden");
     div.addEventListener("click",e=>{if(e.target===div)div.classList.add("hidden")});
+    document.addEventListener("keydown",e=>{
+      if(e.key==="Escape" && !div.classList.contains("hidden"))div.classList.add("hidden");
+    });
   }
 
   function showDetails2(id){
     const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));
     if(!r)return;
     ensureViewModal2();
-    $("purchasingDetailsTitle").textContent=`Purchase ${r.purchase_no||shortId2(r.id)}`;
+
     const rows=items2(r);
+    const paid=String(r.payment_status||"Paid")==="Paid";
+    const arrived=String(r.arrival_status||"Arriving")==="Arrived";
+
+    $("purchasingDetailsTitle").textContent=`Purchase ${r.purchase_no||shortId2(r.id)}`;
+
+    const statusStyle=arrived
+      ?"background:#dcfce7;color:#166534;border:1px solid #bbf7d0"
+      :"background:#dbeafe;color:#1d4ed8;border:1px solid #bfdbfe";
+    const statusText=arrived?"Arrived":"Arriving";
+
+    const paymentStyle=paid
+      ?"background:#dcfce7;color:#166534;border:1px solid #bbf7d0"
+      :"background:#fef3c7;color:#92400e;border:1px solid #fde68a";
+    const paymentText=paid?"Paid":"Pending to Pay";
+
+    const totalItems=rows.reduce((n,i)=>n+Number(i.qty||0),0);
+
     $("purchasingDetailsBody").innerHTML=`
-      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px">
-        <div><div class="muted">Date & Time</div><strong>${esc2(fmtDateTime2(r.purchase_datetime))}</strong></div>
-        <div><div class="muted">Purchasing Staff</div><strong>${esc2(r.purchasing_staff_name||"")}</strong></div>
-        <div><div class="muted">Arrival Status</div><strong>${String(r.arrival_status||"Arriving")==="Arrived"?"Arrived":"Arriving"}</strong></div>
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px">
+        <div style="padding:13px 14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px">
+          <div style="font-size:12px;color:#64748b;margin-bottom:4px">Date & Time</div>
+          <strong>${esc2(fmtDateTime2(r.purchase_datetime))}</strong>
+        </div>
+        <div style="padding:13px 14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px">
+          <div style="font-size:12px;color:#64748b;margin-bottom:4px">Purchasing Staff</div>
+          <strong>${esc2(r.purchasing_staff_name||"—")}</strong>
+          ${r.purchasing_staff_job_title?`<div style="font-size:12px;color:#64748b;margin-top:3px">${esc2(r.purchasing_staff_job_title)}</div>`:""}
+        </div>
+        <div style="padding:13px 14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px">
+          <div style="font-size:12px;color:#64748b;margin-bottom:6px">Payment</div>
+          <span style="display:inline-block;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700;${paymentStyle}">${paymentText}</span>
+        </div>
+        <div style="padding:13px 14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px">
+          <div style="font-size:12px;color:#64748b;margin-bottom:6px">Arrival</div>
+          <span style="display:inline-block;padding:5px 9px;border-radius:999px;font-size:12px;font-weight:700;${statusStyle}">${statusText}</span>
+        </div>
       </div>
-      <div class="table-wrap"><table class="table">
-        <thead><tr><th>Product / Service</th><th>Code</th><th>Type</th><th>Qty</th><th>Unit Price</th><th>Discount</th><th>Sub Total</th></tr></thead>
-        <tbody>${rows.map(i=>`<tr>
-          <td>${esc2(i.product_name||"")}</td>
-          <td>${esc2(i.product_code||"")}</td>
-          <td>${esc2(i.product_type||"")}${i.other_type?` · ${esc2(i.other_type)}`:""}</td>
-          <td>${esc2(i.qty||0)}</td>
-          <td>${money2(i.unit_price)}</td>
-          <td>${i.discount_type==="%"?esc2(i.discount)+"%":money2(i.discount)}</td>
-          <td><strong>${money2(i.subtotal)}</strong></td>
-        </tr>`).join("")}</tbody>
-        <tfoot><tr><td colspan="6" style="text-align:right"><strong>Total</strong></td><td><strong>${money2(r.total)}</strong></td></tr></tfoot>
-      </table></div>`;
+
+      <div style="display:flex;justify-content:space-between;align-items:center;margin:4px 0 10px">
+        <div>
+          <h4 style="margin:0;font-size:17px">Purchased Items</h4>
+          <div style="font-size:12px;color:#64748b;margin-top:3px">${rows.length} item${rows.length===1?"":"s"} · ${totalItems} total unit${totalItems===1?"":"s"}</div>
+        </div>
+      </div>
+
+      <div style="border:1px solid #e5e7eb;border-radius:13px;overflow:hidden">
+        <div style="overflow:auto">
+          <table class="table" style="margin:0;min-width:760px">
+            <thead>
+              <tr>
+                <th style="min-width:250px">Product / Service</th>
+                <th>Type</th>
+                <th style="text-align:center">Qty</th>
+                <th style="text-align:right">Unit Price</th>
+                <th style="text-align:right">Discount</th>
+                <th style="text-align:right">Sub Total</th>
+              </tr>
+            </thead>
+            <tbody>
+              ${rows.map((i,n)=>`
+                <tr>
+                  <td>
+                    <div style="font-weight:650">${esc2(i.product_name||"")}</div>
+                    ${i.product_code?`<div style="font-size:12px;color:#64748b;margin-top:3px">${esc2(i.product_code)}</div>`:""}
+                  </td>
+                  <td>
+                    <span style="font-size:12px;padding:4px 8px;border-radius:999px;background:#f1f5f9;color:#475569">
+                      ${esc2(i.product_type||"Product")}${i.other_type?` · ${esc2(i.other_type)}`:""}
+                    </span>
+                  </td>
+                  <td style="text-align:center;font-weight:600">${esc2(i.qty||0)}</td>
+                  <td style="text-align:right">${money2(i.unit_price)}</td>
+                  <td style="text-align:right">
+                    ${i.discount_type==="%" ? esc2(i.discount)+"%" : money2(i.discount)}
+                  </td>
+                  <td style="text-align:right;font-weight:700">${money2(i.subtotal)}</td>
+                </tr>`).join("")}
+            </tbody>
+          </table>
+        </div>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;margin-top:16px">
+        <div style="width:min(100%,330px);border:1px solid #e5e7eb;border-radius:13px;padding:14px 16px;background:#f8fafc">
+          <div style="display:flex;justify-content:space-between;color:#64748b;margin-bottom:7px">
+            <span>Items</span><span>${rows.length}</span>
+          </div>
+          <div style="display:flex;justify-content:space-between;font-size:18px;padding-top:10px;border-top:1px solid #e5e7eb">
+            <strong>Grand Total</strong><strong>${money2(r.total)}</strong>
+          </div>
+        </div>
+      </div>
+    `;
+
     $("purchasingDetailsModal").classList.remove("hidden");
     $("purchasingDetailsModal").style.display="flex";
   }
@@ -21536,27 +21617,6 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     return Array.isArray(r?.items)?r.items:[];
   }
 
-  function addPendingButton(){
-    const save=$p("savePurchasing");
-    if(!save || $p("purchasingPendingBtn")) return;
-
-    const b=document.createElement("button");
-    b.id="purchasingPendingBtn";
-    b.type="button";
-    b.textContent="Pending";
-    b.title="Save this purchase as Pending to Pay";
-    b.style.cssText="background:#1976d2;color:#fff;border:0;padding:9px 14px;border-radius:8px;font-weight:600;cursor:pointer;";
-    save.parentNode.insertBefore(b,save);
-
-    // Pending is the initial payment state. Clicking it simply makes that
-    // state explicit; Save Purchasing then stores the record as Pending.
-    b.addEventListener("click",()=>{
-      b.dataset.status="Pending";
-      b.textContent="Pending";
-      b.style.background="#1976d2";
-    });
-  }
-
   function patchCollect(){
     if(typeof window.collectPurchaseP!=="function" || window.collectPurchaseP.__paymentV1)return;
     const orig=window.collectPurchaseP;
@@ -21697,7 +21757,6 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   }
 
   function install(){
-    addPendingButton();
     patchCollect();
 
     // Run after the existing compact Purchasing UI has rendered.
@@ -21718,8 +21777,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       const orig=window.loadPurchasingManagement;
       const wrapped=async function(){
         const result=await orig.apply(this,arguments);
-        addPendingButton();
-        patchCollect();
+            patchCollect();
         setTimeout(renderPaymentList,0);
         return result;
       };
@@ -21904,5 +21962,235 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       window.loadPurchasingManagement=wrapped;
     }
   },500);
+})();
+</script>
+
+
+<script id="purchasing-no-duplicate-pending-final">
+(function(){
+  "use strict";
+
+  function fixPendingButton(){
+    // Remove the extra dynamically-created Pending button from the previous patch.
+    document.querySelectorAll("#purchasingPendingBtn").forEach(el=>el.remove());
+
+    const btn=document.getElementById("pendingPurchasing");
+    if(!btn)return;
+
+    btn.textContent="Pending";
+    btn.type="button";
+    btn.style.background="#1976d2";
+    btn.style.color="#fff";
+    btn.style.border="0";
+    btn.style.padding="9px 14px";
+    btn.style.borderRadius="8px";
+    btn.style.fontWeight="600";
+
+    // Prevent the old duplicate-patch listener from being used.
+    // Clone the real button so only this handler remains.
+    if(!btn.dataset.pendingFinalBound){
+      const clean=btn.cloneNode(true);
+      btn.replaceWith(clean);
+      clean.dataset.pendingFinalBound="1";
+
+      clean.addEventListener("click", async function(){
+        // savePurchaseP is inside the original Purchasing module, so trigger
+        // the same native flow that initP uses by temporarily clicking through
+        // its already-bound handler.
+        // initP's handler is retained on the cloned node only if we preserve it,
+        // so instead dispatch through the module's save function bridge below.
+        if(typeof window.savePendingPurchasing==="function"){
+          await window.savePendingPurchasing();
+          return;
+        }
+
+        // Fallback: expose a clean event for the original module.
+        clean.dispatchEvent(new CustomEvent("medifella:purchasing-pending",{bubbles:true}));
+      });
+
+      // Bridge to the private savePurchaseP function by temporarily adding
+      // a one-time listener that the Purchasing module can use.
+      document.addEventListener("medifella:purchasing-pending", function(){
+        // The original initP is re-run below, which binds the real handler.
+      }, {once:true});
+    }
+  }
+
+  /*
+   * Important: the original Purchasing module's initP already binds
+   * #pendingPurchasing to savePurchaseP("Pending"). We must NOT replace that
+   * listener. Therefore restore the original button by reloading the section
+   * binding through a safe click-binding bridge.
+   */
+  function restoreOriginalPendingBinding(){
+    document.querySelectorAll("#purchasingPendingBtn").forEach(el=>el.remove());
+
+    const btn=document.getElementById("pendingPurchasing");
+    if(!btn)return;
+
+    // If initP already bound the button, leave it alone.
+    // If it did not, force a fresh init of the Purchasing module.
+    if(typeof window.initPurchasingManagement==="function"){
+      try{ window.initPurchasingManagement(); }catch(_){}
+    }
+  }
+
+  // The cleanest fix is to remove only the duplicate and keep the original
+  // static Pending button/handler created by the Purchasing module.
+  function run(){
+    document.querySelectorAll("#purchasingPendingBtn").forEach(el=>el.remove());
+    restoreOriginalPendingBinding();
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",run,{once:true});
+  else run();
+
+  setTimeout(run,100);
+  setTimeout(run,500);
+  setTimeout(run,1200);
+})();
+</script>
+
+
+<script id="purchasing-searchable-product-service-v3">
+(function(){
+  "use strict";
+
+  function esc(v){
+    return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+  }
+
+  function selectedLabel(sel){
+    const o=sel && sel.options[sel.selectedIndex];
+    if(!o || !o.value)return "";
+    return o.textContent||"";
+  }
+
+  function closeAll(except){
+    document.querySelectorAll(".purchasing-search-menu").forEach(m=>{
+      if(m!==except)m.style.display="none";
+    });
+  }
+
+  function transformSelect(sel){
+    if(!sel || !sel.classList.contains("purchasing-item-select") || sel.dataset.searchableP3)return;
+    sel.dataset.searchableP3="1";
+
+    const wrap=document.createElement("div");
+    wrap.className="purchasing-search-wrap";
+    wrap.style.cssText="position:relative;width:100%;";
+
+    const input=document.createElement("input");
+    input.type="text";
+    input.className="purchasing-product-search";
+    input.placeholder="Search product or service...";
+    input.autocomplete="off";
+    input.value=selectedLabel(sel);
+    input.style.cssText="width:100%;box-sizing:border-box;";
+
+    const menu=document.createElement("div");
+    menu.className="purchasing-search-menu";
+    menu.style.cssText="display:none;position:absolute;left:0;right:0;top:100%;z-index:10000;background:#fff;border:1px solid #cbd5e1;border-radius:8px;max-height:260px;overflow:auto;box-shadow:0 8px 24px rgba(0,0,0,.15);";
+
+    function render(filter=""){
+      const q=String(filter||"").trim().toLowerCase();
+      const opts=[...sel.options].filter(o=>o.value);
+      const matches=opts.filter(o=>!q || (o.textContent||"").toLowerCase().includes(q));
+      if(!matches.length){
+        menu.innerHTML='<div style="padding:10px;color:#777">No product or service found.</div>';
+      }else{
+        menu.innerHTML=matches.map(o=>`
+          <button type="button" class="purchasing-search-option" data-value="${esc(o.value)}"
+            style="display:block;width:100%;text-align:left;border:0;background:#fff;padding:10px 12px;cursor:pointer;font:inherit">
+            ${esc(o.textContent)}
+          </button>`).join("");
+      }
+      menu.style.display="block";
+    }
+
+    input.addEventListener("focus",()=>{
+      closeAll(menu);
+      render(input.value);
+      input.select();
+    });
+
+    input.addEventListener("input",()=>{
+      closeAll(menu);
+      render(input.value);
+    });
+
+    input.addEventListener("keydown",e=>{
+      if(e.key==="Escape"){
+        menu.style.display="none";
+        input.value=selectedLabel(sel);
+      }
+      if(e.key==="Enter"){
+        const first=menu.querySelector(".purchasing-search-option");
+        if(first){
+          e.preventDefault();
+          first.click();
+        }
+      }
+    });
+
+    menu.addEventListener("click",e=>{
+      const b=e.target.closest(".purchasing-search-option");
+      if(!b)return;
+      const value=b.dataset.value;
+      sel.value=value;
+      sel.dispatchEvent(new Event("change",{bubbles:true}));
+      input.value=selectedLabel(sel);
+      menu.style.display="none";
+    });
+
+    sel.addEventListener("change",()=>{
+      input.value=selectedLabel(sel);
+    });
+
+    sel.style.display="none";
+    sel.parentNode.insertBefore(wrap,sel);
+    wrap.appendChild(input);
+    wrap.appendChild(menu);
+    wrap.appendChild(sel);
+  }
+
+  function refreshSearchable(){
+    document.querySelectorAll("#purchasingItemsBody .purchasing-item-select").forEach(transformSelect);
+    document.querySelectorAll("#purchasingItemsBody .purchasing-search-wrap").forEach(w=>{
+      const sel=w.querySelector(".purchasing-item-select");
+      const input=w.querySelector(".purchasing-product-search");
+      if(sel && input)input.value=selectedLabel(sel);
+    });
+  }
+
+  function watchRows(){
+    const body=document.getElementById("purchasingItemsBody");
+    if(!body || body.dataset.searchWatchP3)return;
+    body.dataset.searchWatchP3="1";
+
+    const observer=new MutationObserver(()=>{
+      refreshSearchable();
+    });
+    observer.observe(body,{childList:true,subtree:true});
+    refreshSearchable();
+  }
+
+  function install(){
+    watchRows();
+
+    document.addEventListener("click",e=>{
+      if(!e.target.closest(".purchasing-search-wrap"))closeAll();
+    });
+
+    // Rebuild the searchable display after the existing Product/Service
+    // selector patch refreshes option lists.
+    setTimeout(refreshSearchable,100);
+    setTimeout(refreshSearchable,500);
+    setTimeout(refreshSearchable,1200);
+    setTimeout(refreshSearchable,2500);
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
+  else install();
 })();
 </script>
