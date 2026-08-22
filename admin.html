@@ -12044,7 +12044,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const s=String(value||"").trim();
     if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
       const [y,m,d]=s.split("-");
-      return `${m}/${d}/${y}`;
+      return `${d}/${m}/${y}`;
     }
     return s;
   }
@@ -12052,8 +12052,8 @@ document.addEventListener("DOMContentLoaded",function(){
   function parseAppointmentDate(value){
     const s=String(value||"").trim();
     const m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if(!m)return {ok:false,message:"Use date format MM/DD/YYYY."};
-    const month=Number(m[1]), day=Number(m[2]), year=Number(m[3]);
+    if(!m)return {ok:false,message:"Use date format DD/MM/YYYY."};
+    const day=Number(m[1]), month=Number(m[2]), year=Number(m[3]);
     if(day<1||day>31)return {ok:false,message:"Day must be between 01 and 31."};
     if(month<1||month>12)return {ok:false,message:"Month must be between 01 and 12."};
     if(year<1000||year>9999)return {ok:false,message:"Year must have 4 digits."};
@@ -12069,10 +12069,10 @@ document.addEventListener("DOMContentLoaded",function(){
     el.dataset.ddmmyyyyBound="1";
     el.addEventListener("input",function(){
       let digits=String(el.value||"").replace(/\D/g,"").slice(0,8);
-      if(digits.length>=2 && Number(digits.slice(0,2))>12)
-        digits="12"+digits.slice(2);
-      if(digits.length>=4 && Number(digits.slice(2,4))>31)
-        digits=digits.slice(0,2)+"31"+digits.slice(4);
+      if(digits.length>=2 && Number(digits.slice(0,2))>31)
+        digits="31"+digits.slice(2);
+      if(digits.length>=4 && Number(digits.slice(2,4))>12)
+        digits=digits.slice(0,2)+"12"+digits.slice(4);
       if(digits.length>4)el.value=digits.slice(0,2)+"/"+digits.slice(2,4)+"/"+digits.slice(4);
       else if(digits.length>2)el.value=digits.slice(0,2)+"/"+digits.slice(2);
       else el.value=digits;
@@ -12329,6 +12329,21 @@ try{
       return true;
     });
   }
+  // Appointment List display formatter: MM/DD/YYYY ONLY.
+  // The database remains ISO YYYY-MM-DD. This changes presentation only and
+  // does not alter the saved appointment date or the appointment form format.
+  function formatAppointmentDisplayDate(value){
+    const raw=String(value||"").trim();
+    const iso=raw.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(iso) return `${iso[2]}/${iso[3]}/${iso[1]}`;
+    const slash=raw.match(/^(\d{1,2})\/(\d{1,2})\/(\d{4})$/);
+    if(slash){
+      // Legacy slash values in the appointment data are MM/DD/YYYY.
+      return `${String(Number(slash[1])).padStart(2,"0")}/${String(Number(slash[2])).padStart(2,"0")}/${slash[3]}`;
+    }
+    return raw||"—";
+  }
+
   function renderList(){
     const q=(A("appointmentListSearch").value||"").trim().toLowerCase();
     const rows=sortAppointments(uniqueAppointmentRows(appointments.filter(a=>!q||customerHay(a).includes(q)||String(a.date||"").includes(q))));
@@ -12336,7 +12351,7 @@ try{
       <thead><tr><th>Customer Information</th><th>Appointment Date & Time</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>${rows.map(a=>`<tr>
         <td><strong>${escA(a.customer_code||"—")}</strong><div>${escA(a.customer_name||"—")}</div><div class="muted">${escA(a.customer_phone||"—")}</div><span class="badge ${a.customer_type==="New Customer"?"pending":"verified"}" style="margin-top:5px">${escA(a.customer_type||"Old Customer")}</span>${a.note?`<div style="margin-top:6px;"><strong>Note:</strong> ${escA(a.note)}</div>`:""}</td>
-        <td>${escA(formatDate(a.date))}<div class="muted">${escA(formatTime(a.time))}</div></td>
+        <td>${escA(formatAppointmentDisplayDate(a.date))}<div class="muted">${escA(formatTime(a.time))}</div></td>
         <td>${a.status==="met"?'<span class="badge verified">Meet Already</span>':a.status==="confirmed"?'<span class="badge verified">Confirmed Coming</span>':a.status==="cancelled"?'<span class="badge rejected">Cancelled</span>':'<span class="badge pending">Pending</span>'}</td>
         <td><div class="actions">${appointmentActionButtons(a)}</div></td>
       </tr>`).join("")}</tbody></table></div>`:'<div class="appointment-empty">No appointments found.</div>';
@@ -12355,7 +12370,7 @@ try{
     }
     const byDay=days.map(date=>({date,rows:sortAppointments(uniqueAppointmentRows(appointments.filter(a=>a.date===date&&isActive(a))))}));
     A("appointmentUpcoming").innerHTML=byDay.length?byDay.map(day=>`<div class="appointment-day">
-      <div class="appointment-day-head"><strong>${escA(formatDate(day.date))}</strong><span class="muted">${day.rows.length} customer${day.rows.length===1?"":"s"}</span></div>
+      <div class="appointment-day-head"><strong>${escA(formatAppointmentDisplayDate(day.date))}</strong><span class="muted">${day.rows.length} customer${day.rows.length===1?"":"s"}</span></div>
       <div class="appointment-day-list">${day.rows.length?day.rows.map(a=>{
         const confirmed=a.status==="confirmed";
         return `<div class="appointment-ticket ${confirmed?"confirmed":""}">
@@ -21719,7 +21734,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       el.type="text";
       el.inputMode="numeric";
       el.autocomplete="off";
-      el.placeholder="mm/dd/yyyy";
+      el.placeholder="dd/mm/yyyy";
       el.maxLength=10;
     });
     if(typeof bindAppointmentDateInput==="function")bindAppointmentDateInput();
@@ -22548,44 +22563,11 @@ else install();
 })();
 </script>
 
-<!-- FINAL DISPLAY-ONLY APPOINTMENT LIST MM/DD -> DD/MM FIX -->
-<script id="appointment-list-ddmm-final-v2">
+<!-- FINAL DISPLAY-ONLY APPOINTMENT LIST MM/DD/YYYY -->
+<script id="appointment-list-mmdd-final-v3">
 (function(){
-  "use strict";
-  function swapDates(root){
-    if(!root)return;
-    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
-    const nodes=[];
-    let n;
-    while(n=walker.nextNode()) nodes.push(n);
-    nodes.forEach(node=>{
-      const p=node.parentElement;
-      if(!p || p.closest('input,textarea,select,script,style')) return;
-      const s=node.nodeValue||"";
-      const out=s.replace(/\b(\d{2})\/(\d{2})\/(\d{4})\b/g,function(_,mm,dd,yyyy){
-        return dd+'/'+mm+'/'+yyyy;
-      });
-      if(out!==s) node.nodeValue=out;
-    });
-  }
-  function run(){
-    swapDates(document.getElementById('appointmentList'));
-    swapDates(document.getElementById('appointmentUpcoming'));
-  }
-  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});
-  else run();
-  const obs=new MutationObserver(function(){
-    clearTimeout(window.__apptDDMMPatchTimer);
-    window.__apptDDMMPatchTimer=setTimeout(run,20);
-  });
-  function start(){
-    const a=document.getElementById('appointmentList');
-    const b=document.getElementById('appointmentUpcoming');
-    if(a)obs.observe(a,{childList:true,subtree:true,characterData:true});
-    if(b)obs.observe(b,{childList:true,subtree:true,characterData:true});
-    run();
-  }
-  setTimeout(start,300);
-  [1000,2500,5000].forEach(function(ms){setTimeout(run,ms)});
+  // Intentionally empty: the authoritative Appointment List formatter above
+  // renders MM/DD/YYYY directly. No post-render swapping is performed,
+  // preventing day/month vibration or reversal.
 })();
 </script>
