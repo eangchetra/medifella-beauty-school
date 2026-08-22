@@ -2480,6 +2480,7 @@ script { display:none !important; }
 <button class="nav" data-section="saleStaffManagement">👤 Sale Staff Management</button>
 <button class="nav" data-section="appointments">📅 Appointment Management</button>
 <button class="nav" data-section="products">📦 Product Management</button>
+<button class="nav" data-section="purchasingManagement" data-permission="purchasing">🛒 Purchasing Management</button>
 <button class="nav" data-section="services">🧴 Services Management</button>
 <button class="nav" data-section="staffManagement">👥 Staff Management</button>
 <button class="nav" data-section="customers">👤 Customer Management</button>
@@ -3347,6 +3348,76 @@ script { display:none !important; }
 </select><button id="dermedSalesRefresh" class="light">Refresh</button><button id="appointmentReturnClose" class="gold" type="button" style="display:none">Close</button></div>
 <div id="dermedSalesList">Loading...</div>
 </div>
+</section>
+
+
+<section id="purchasingManagement" class="section">
+  <div class="sale-page-title">
+    <h1>Purchasing Management</h1>
+    <button id="togglePurchasingForm" class="gold" type="button">+ Add Purchasing</button>
+  </div>
+
+  <div id="purchasingFormPanel" class="card hidden">
+    <h2>New Purchasing</h2>
+    <div class="row">
+      <div>
+        <label>Purchasing Staff</label>
+        <select id="purchasingStaff">
+          <option value="">Select purchasing staff</option>
+        </select>
+      </div>
+      <div>
+        <label>Date &amp; Time</label>
+        <input id="purchasingDateTime" type="datetime-local">
+      </div>
+    </div>
+
+    <div class="table-wrap" style="margin-top:18px">
+      <table class="table" id="purchasingEntryTable">
+        <thead>
+          <tr>
+            <th style="min-width:300px">Product Name</th>
+            <th style="min-width:130px">Product Type</th>
+            <th style="min-width:90px">Qty</th>
+            <th style="min-width:130px">Unit Price</th>
+            <th style="min-width:170px">Discount</th>
+            <th style="min-width:130px">Sub Total</th>
+            <th style="width:55px"></th>
+          </tr>
+        </thead>
+        <tbody id="purchasingItemsBody"></tbody>
+      </table>
+    </div>
+
+    <div style="display:flex;justify-content:flex-end;align-items:center;gap:28px;margin-top:16px;font-size:18px">
+      <span><strong>Total</strong></span>
+      <strong id="purchasingGrandTotal" style="font-size:26px;color:var(--teal)">0.00</strong>
+    </div>
+
+    <div class="actions" style="justify-content:flex-end;margin-top:16px">
+      <button id="addPurchasingItem" class="light" type="button">+ Add Item</button>
+      <button id="savePurchasing" class="gold" type="button">Save Purchasing</button>
+      <button id="cancelPurchasing" class="light" type="button">Cancel</button>
+    </div>
+    <div id="purchasingStatus"></div>
+  </div>
+
+  <div class="card" style="margin-top:18px">
+    <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;flex-wrap:wrap">
+      <h2 style="margin:0">Purchasing List</h2>
+      <div class="actions">
+        <button id="purchasingRefresh" class="light" type="button">Refresh</button>
+        <button id="purchasingExcel" class="light" type="button">Download Excel</button>
+        <button id="purchasingPdf" class="light" type="button">Download PDF</button>
+      </div>
+    </div>
+    <div class="toolbar" style="margin-top:14px">
+      <label>Start Date <input id="purchasingFromDate" type="date"></label>
+      <label>To Date <input id="purchasingToDate" type="date"></label>
+      <input id="purchasingSearch" placeholder="Search purchasing staff, product or purchase ID">
+    </div>
+    <div id="purchasingList">Loading...</div>
+  </div>
 </section>
 
 <section id="services" class="section">
@@ -7288,7 +7359,8 @@ function normalizeStaffPermissions(raw){
     posts:["posts","newsFeed","news"],
     courses:["courses","courseManagement","course"],
     staff:["staff","staffAccounts","staffManagementAccounts"],
-    admins:["admins","adminUsers","adminUsersManagement"]
+    admins:["admins","adminUsers","adminUsersManagement"],
+    purchasing:["purchasing","purchasingManagement","purchases"]
   };
   const out={};
   Object.keys(aliases).forEach(key=>{
@@ -7302,7 +7374,7 @@ const STAFF_PERMISSION_KEYS = [
 ["mtsSale","permMtsSale"],["dermedSale","permDermedSale"],["saleCommission","permSaleCommission"],["saleStaffManagement","permSaleStaffManagement"],["appointments","permAppointments"],
 ["products","permProducts"],["services","permServices"],["staffManagement","permStaffManagement"],
 ["customers","permCustomers"],["certificates","permCertificates"],["posts","permPosts"],
-["courses","permCourses"],["staff","permStaffAccounts"],["admins","permAdmins"]
+["courses","permCourses"],["staff","permStaffAccounts"],["admins","permAdmins"],["purchasing","permPurchasing"]
 ];
 
 let editingAccountId=null;
@@ -7334,7 +7406,7 @@ function renderStaff(){
     const labels=[
       ["dashboard","Dashboard"],["students","Students"],["sales","Medi Fella Sale"],
       ["mtsSale","MTS Sale"],["dermedSale","Dermed Sale"],["saleCommission","Sale Commission Management"],["saleStaffManagement","Sale Staff Management"],["appointments","Appointment Management"],
-      ["products","Product Management"],["services","Services Management"],
+      ["products","Product Management"],["purchasing","Purchasing Management"],["services","Services Management"],
       ["staffManagement","Staff Management"],["customers","Customer Management"],
       ["certificates","Certificate Verification"],["posts","News Feed"],
       ["courses","Course Management"],["staff","Staff Accounts"],["admins","Admin / Users"]
@@ -20521,6 +20593,328 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 })();
 </script>
 
+
+<script id="purchasing-management-v1">
+(function(){
+  "use strict";
+  const P=id=>document.getElementById(id);
+  const escP=v=>typeof esc==="function"?esc(v):String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]));
+  const attrP=v=>typeof attr==="function"?attr(v):escP(v);
+  const moneyP=v=>Number(v||0).toLocaleString(undefined,{minimumFractionDigits:2,maximumFractionDigits:2});
+  const nowLocalP=()=>{
+    const d=new Date(), z=n=>String(n).padStart(2,"0");
+    return d.getFullYear()+"-"+z(d.getMonth()+1)+"-"+z(d.getDate())+"T"+z(d.getHours())+":"+z(d.getMinutes());
+  };
+
+  window.purchasingRecords=window.purchasingRecords||[];
+  let purchasingEditId=null;
+
+  function allProductsP(){
+    return Array.isArray(window.products)?window.products:
+      (typeof products!=="undefined"&&Array.isArray(products)?products:[]);
+  }
+  function allServicesP(){
+    return Array.isArray(window.services)?window.services:
+      (typeof services!=="undefined"&&Array.isArray(services)?services:[]);
+  }
+  function staffRowsP(){
+    const rows=Array.isArray(window.staffInfoRecords)?window.staffInfoRecords:
+      (typeof staffInfoRecords!=="undefined"&&Array.isArray(staffInfoRecords)?staffInfoRecords:[]);
+    return rows;
+  }
+  function allowedPurchasingStaffP(x){
+    const t=String(x?.job_title??x?.jobTitle??x?.job??"").replace(/\s+/g," ").trim().toLowerCase();
+    return ["purchasing","sale","counter","cashier"].includes(t);
+  }
+  function staffLabelP(x){
+    return x?.name_en||x?.name_kh||x?.name||x?.full_name||x?.username||"Staff";
+  }
+  function productPriceP(x){
+    const v=x?.cost??x?.unit_cost??x?.purchase_price??x?.price??0;
+    return Number(v||0);
+  }
+  function itemTypeP(item){
+    const t=String(item?.product_type||item?.type||"").toLowerCase();
+    if(t.includes("machine"))return "Machine";
+    if(item?.service_id)return "Other";
+    return "Product";
+  }
+  function itemOptionsP(selected){
+    const out=['<option value="">Select product or service</option>'];
+    allProductsP().forEach(x=>{
+      const id="product:"+String(x.id);
+      const label=(x.product_code?x.product_code+" · ":"")+String(x.name||"Product");
+      out.push(`<option value="${attrP(id)}" ${selected===id?"selected":""}>${escP(label)}</option>`);
+    });
+    allServicesP().forEach(x=>{
+      const id="service:"+String(x.id);
+      const label=(x.service_code?x.service_code+" · ":"")+String(x.name||x.service_name||"Service");
+      out.push(`<option value="${attrP(id)}" ${selected===id?"selected":""}>${escP(label)} (Service)</option>`);
+    });
+    return out.join("");
+  }
+  function selectedSourceP(value){
+    const [kind,id]=String(value||"").split(":");
+    if(kind==="product")return {kind,id,raw:allProductsP().find(x=>String(x.id)===id)};
+    if(kind==="service")return {kind,id,raw:allServicesP().find(x=>String(x.id)===id)};
+    return {kind:"",id:"",raw:null};
+  }
+  function addRowP(data){
+    const d=data||{};
+    const tr=document.createElement("tr");
+    tr.className="purchasing-item-row";
+    tr.innerHTML=`
+      <td>
+        <select class="purchasing-item-select">${itemOptionsP(String(d.source||""))}</select>
+      </td>
+      <td>
+        <select class="purchasing-type">
+          <option ${String(d.product_type||"Product")==="Machine"?"selected":""}>Machine</option>
+          <option ${String(d.product_type||"Product")==="Product"?"selected":""}>Product</option>
+          <option ${String(d.product_type||"Product")==="Other"?"selected":""}>Other</option>
+        </select>
+        <input class="purchasing-other-type" style="margin-top:5px;display:none" placeholder="Write type" value="${attrP(d.other_type||"")}">
+      </td>
+      <td><input class="purchasing-qty" type="number" min="0" step="any" value="${attrP(d.qty??1)}"></td>
+      <td><input class="purchasing-unit" type="number" min="0" step="0.01" value="${attrP(d.unit_price??"")}"></td>
+      <td>
+        <div style="display:grid;grid-template-columns:65px 1fr;gap:5px">
+          <select class="purchasing-discount-type"><option value="USD" ${d.discount_type==="%"?"":"selected"}>USD</option><option value="%" ${d.discount_type==="%"?"selected":""}>%</option></select>
+          <input class="purchasing-discount" type="number" min="0" step="0.01" value="${attrP(d.discount??0)}">
+        </div>
+      </td>
+      <td><input class="purchasing-subtotal" readonly style="font-weight:800;color:var(--teal);background:#f5fbfc" value="0.00"></td>
+      <td><button type="button" class="danger purchasing-remove" title="Delete item">×</button></td>`;
+    P("purchasingItemsBody").appendChild(tr);
+    bindRowP(tr);
+    if(d.source) updateRowP(tr);
+    else calcRowP(tr);
+  }
+  function calcRowP(tr){
+    const qty=Math.max(0,Number(tr.querySelector(".purchasing-qty")?.value||0));
+    const unit=Math.max(0,Number(tr.querySelector(".purchasing-unit")?.value||0));
+    const base=qty*unit;
+    const type=tr.querySelector(".purchasing-discount-type")?.value||"USD";
+    const disc=Math.max(0,Number(tr.querySelector(".purchasing-discount")?.value||0));
+    const discount=type==="%"?base*Math.min(100,disc)/100:Math.min(base,disc);
+    const sub=Math.max(0,base-discount);
+    const el=tr.querySelector(".purchasing-subtotal"); if(el)el.value=moneyP(sub);
+    const total=[...P("purchasingItemsBody").querySelectorAll(".purchasing-subtotal")].reduce((a,x)=>a+Number(String(x.value).replace(/,/g,""))||0,0);
+    if(P("purchasingGrandTotal"))P("purchasingGrandTotal").textContent=moneyP(total);
+  }
+  function updateRowP(tr){
+    const src=selectedSourceP(tr.querySelector(".purchasing-item-select")?.value);
+    const unit=tr.querySelector(".purchasing-unit");
+    const type=tr.querySelector(".purchasing-type");
+    if(src.raw){
+      if(unit && (!unit.dataset.userEdited || !unit.value))unit.value=productPriceP(src.raw).toFixed(2);
+      if(type){
+        if(src.kind==="service")type.value="Other";
+        else type.value=String(src.raw.type||src.raw.product_type||src.raw.category||"").toLowerCase().includes("machine")?"Machine":"Product";
+      }
+    }
+    toggleOtherTypeP(tr);
+    calcRowP(tr);
+  }
+  function toggleOtherTypeP(tr){
+    const type=tr.querySelector(".purchasing-type")?.value;
+    const el=tr.querySelector(".purchasing-other-type");
+    if(el)el.style.display=type==="Other"?"block":"none";
+  }
+  function bindRowP(tr){
+    tr.querySelector(".purchasing-item-select").addEventListener("change",()=>updateRowP(tr));
+    tr.querySelector(".purchasing-type").addEventListener("change",()=>{toggleOtherTypeP(tr);calcRowP(tr)});
+    tr.querySelector(".purchasing-qty").addEventListener("input",()=>calcRowP(tr));
+    tr.querySelector(".purchasing-unit").addEventListener("input",e=>{e.target.dataset.userEdited="1";calcRowP(tr)});
+    tr.querySelector(".purchasing-discount").addEventListener("input",()=>calcRowP(tr));
+    tr.querySelector(".purchasing-discount-type").addEventListener("change",()=>calcRowP(tr));
+    tr.querySelector(".purchasing-remove").addEventListener("click",()=>{tr.remove();if(!P("purchasingItemsBody").children.length)addRowP();else calcAllP()});
+  }
+  function calcAllP(){P("purchasingItemsBody").querySelectorAll(".purchasing-item-row").forEach(calcRowP)}
+  function resetFormP(){
+    purchasingEditId=null;
+    P("purchasingStaff").value="";
+    P("purchasingDateTime").value=nowLocalP();
+    P("purchasingItemsBody").innerHTML="";
+    addRowP();
+    P("savePurchasing").textContent="Save Purchasing";
+    if(P("purchasingStatus"))P("purchasingStatus").innerHTML="";
+    calcAllP();
+  }
+  function refreshStaffP(){
+    const el=P("purchasingStaff"); if(!el)return;
+    const old=el.value;
+    const rows=staffRowsP().filter(allowedPurchasingStaffP);
+    el.innerHTML='<option value="">Select purchasing staff</option>'+rows.map(x=>{
+      return `<option value="${attrP(x.id)}">${escP(staffLabelP(x))} · ${escP(x.job_title||"")}</option>`;
+    }).join("");
+    if(rows.some(x=>String(x.id)===String(old)))el.value=old;
+  }
+  function recordDateP(r){return String(r.purchase_datetime||r.created_at||"").slice(0,10)}
+  function filteredPurchasesP(){
+    const from=P("purchasingFromDate")?.value||"",to=P("purchasingToDate")?.value||"",q=(P("purchasingSearch")?.value||"").trim().toLowerCase();
+    return (window.purchasingRecords||[]).filter(r=>{
+      const d=recordDateP(r); if(from&&d<from)return false;if(to&&d>to)return false;
+      if(q){
+        const text=JSON.stringify(r).toLowerCase();
+        if(!text.includes(q))return false;
+      } return true;
+    });
+  }
+  function renderPurchasesP(){
+    const rows=filteredPurchasesP();
+    if(!rows.length){P("purchasingList").innerHTML='<p class="muted">No purchasing records found.</p>';return}
+    P("purchasingList").innerHTML=`<div class="table-wrap"><table class="table">
+      <thead><tr><th>Purchase ID</th><th>Date &amp; Time</th><th>Purchasing Staff</th><th>Items</th><th>Total</th><th>Action</th></tr></thead>
+      <tbody>${rows.map(r=>{
+        const items=Array.isArray(r.items)?r.items:[];
+        return `<tr>
+          <td>${escP(r.purchase_no||r.id||"")}</td>
+          <td>${escP(String(r.purchase_datetime||"").replace("T"," "))}</td>
+          <td>${escP(r.purchasing_staff_name||"")}</td>
+          <td>${items.map(i=>`${escP(i.product_name||"")} × ${escP(i.qty)} <span class="muted">(${moneyP(i.subtotal)})</span>`).join("<br>")}</td>
+          <td><strong>${moneyP(r.total)}</strong></td>
+          <td><div class="actions"><button class="light purchasing-edit" data-id="${attrP(r.id)}">Edit</button><button class="danger purchasing-delete" data-id="${attrP(r.id)}">Delete</button></div></td>
+        </tr>`;
+      }).join("")}</tbody></table></div>`;
+    P("purchasingList").querySelectorAll(".purchasing-edit").forEach(b=>b.addEventListener("click",()=>editPurchaseP(b.dataset.id)));
+    P("purchasingList").querySelectorAll(".purchasing-delete").forEach(b=>b.addEventListener("click",()=>deletePurchaseP(b.dataset.id)));
+  }
+  async function loadPurchasesP(){
+    const r=await sb.from("medifella_purchases").select("*").order("purchase_datetime",{ascending:false});
+    if(r.error){
+      window.purchasingRecords=[];
+      P("purchasingList").innerHTML=`<div class="status error">Could not load Purchasing Management. ${escP(r.error.message)}<br><span class="muted">Create the medifella_purchases table in Supabase first.</span></div>`;
+      return;
+    }
+    window.purchasingRecords=Array.isArray(r.data)?r.data:[];
+    renderPurchasesP();
+  }
+  function collectPurchaseP(){
+    const staffId=P("purchasingStaff").value;
+    const staff=staffRowsP().find(x=>String(x.id)===String(staffId));
+    const rows=[...P("purchasingItemsBody").querySelectorAll(".purchasing-item-row")];
+    if(!staffId)throw new Error("Please choose Purchasing Staff.");
+    if(!P("purchasingDateTime").value)throw new Error("Please enter Date & Time.");
+    const items=rows.map(tr=>{
+      const src=selectedSourceP(tr.querySelector(".purchasing-item-select").value);
+      if(!src.raw)throw new Error("Please choose a Product or Service for every purchasing row.");
+      const qty=Number(tr.querySelector(".purchasing-qty").value||0);
+      const unit=Number(tr.querySelector(".purchasing-unit").value||0);
+      if(qty<=0)throw new Error("Quantity must be greater than 0.");
+      if(unit<0)throw new Error("Unit Price cannot be negative.");
+      const dtype=tr.querySelector(".purchasing-discount-type").value;
+      const discount=Number(tr.querySelector(".purchasing-discount").value||0);
+      const base=qty*unit, disc=dtype==="%"?base*Math.min(100,Math.max(0,discount))/100:Math.min(base,Math.max(0,discount));
+      const subtotal=Math.max(0,base-disc);
+      const ptype=tr.querySelector(".purchasing-type").value;
+      return {
+        source_type:src.kind==="service"?"service":"product",
+        source_id:src.raw.id,
+        product_name:src.raw.name||src.raw.service_name||src.raw.title||"Item",
+        product_code:src.raw.product_code||src.raw.service_code||"",
+        product_type:ptype,
+        other_type:tr.querySelector(".purchasing-other-type")?.value.trim()||"",
+        qty,unit_price:unit,discount_type:dtype,discount,subtotal
+      };
+    });
+    if(!items.length)throw new Error("Add at least one purchasing item.");
+    return {
+      purchasing_staff_id:staff.id,
+      purchasing_staff_name:staffLabelP(staff),
+      purchasing_staff_job_title:staff.job_title||"",
+      purchase_datetime:P("purchasingDateTime").value,
+      items,total:items.reduce((a,x)=>a+Number(x.subtotal||0),0)
+    };
+  }
+  async function savePurchaseP(){
+    if(!P("savePurchasing"))return;
+    try{
+      const payload=collectPurchaseP();
+      P("savePurchasing").disabled=true;
+      let r;
+      if(purchasingEditId){
+        r=await sb.from("medifella_purchases").update(payload).eq("id",purchasingEditId);
+      }else{
+        payload.purchase_no="PUR-"+Date.now();
+        r=await sb.from("medifella_purchases").insert(payload);
+      }
+      if(r.error)throw r.error;
+      P("purchasingStatus").innerHTML='<div class="status">Purchasing saved successfully.</div>';
+      await loadPurchasesP();
+      resetFormP();
+      P("purchasingFormPanel").classList.add("hidden");
+    }catch(e){P("purchasingStatus").innerHTML=`<div class="status error">${escP(e.message||"Could not save purchasing.")}</div>`}
+    finally{P("savePurchasing").disabled=false}
+  }
+  function editPurchaseP(id){
+    const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));if(!r)return;
+    purchasingEditId=r.id;P("purchasingStaff").value=r.purchasing_staff_id||"";
+    P("purchasingDateTime").value=String(r.purchase_datetime||"").slice(0,16);
+    P("purchasingItemsBody").innerHTML="";
+    (Array.isArray(r.items)?r.items:[]).forEach(i=>{
+      addRowP({source:(i.source_type||"product")+":"+i.source_id,product_type:i.product_type,other_type:i.other_type,qty:i.qty,unit_price:i.unit_price,discount_type:i.discount_type,discount:i.discount});
+      const tr=P("purchasingItemsBody").lastElementChild;
+      updateRowP(tr);
+      if(i.unit_price!==undefined)tr.querySelector(".purchasing-unit").value=i.unit_price;
+      calcRowP(tr);
+    });
+    if(!P("purchasingItemsBody").children.length)addRowP();
+    P("savePurchasing").textContent="Update Purchasing";
+    P("purchasingFormPanel").classList.remove("hidden");
+    P("purchasingFormPanel").scrollIntoView({behavior:"smooth",block:"start"});
+  }
+  async function deletePurchaseP(id){
+    if(!confirm("Delete this purchasing record?"))return;
+    const r=await sb.from("medifella_purchases").delete().eq("id",id);
+    if(r.error){alert("Delete failed: "+r.error.message);return}
+    await loadPurchasesP();
+  }
+  function exportExcelP(){
+    const rows=filteredPurchasesP().flatMap(r=>(Array.isArray(r.items)?r.items:[]).map(i=>({
+      "Purchase ID":r.purchase_no||r.id,"Date & Time":r.purchase_datetime||"",
+      "Purchasing Staff":r.purchasing_staff_name||"","Product Name":i.product_name||"",
+      "Product Type":i.product_type||"","Other Type":i.other_type||"","Qty":i.qty||0,
+      "Unit Price":i.unit_price||0,"Discount":i.discount_type==="%"?`${i.discount}%`:Number(i.discount||0),
+      "Sub Total":i.subtotal||0
+    })));
+    if(!rows.length){alert("No purchasing records to export.");return}
+    const ws=XLSX.utils.json_to_sheet(rows),wb=XLSX.utils.book_new();XLSX.utils.book_append_sheet(wb,ws,"Purchasing");
+    XLSX.writeFile(wb,"Medi-Fella-Purchasing.xlsx");
+  }
+  function exportPdfP(){
+    const rows=filteredPurchasesP();if(!rows.length){alert("No purchasing records to export.");return}
+    const {jsPDF}=window.jspdf,doc=new jsPDF({orientation:"landscape",unit:"mm",format:"a4"});
+    doc.setFontSize(16);doc.text("Medi Fella Purchasing List",14,14);
+    const body=[];
+    rows.forEach(r=>(Array.isArray(r.items)?r.items:[]).forEach(i=>body.push([
+      r.purchase_no||r.id,String(r.purchase_datetime||"").replace("T"," "),r.purchasing_staff_name||"",
+      i.product_name||"",i.product_type||"",i.qty||0,moneyP(i.unit_price),i.discount_type==="%"?`${i.discount}%`:moneyP(i.discount),moneyP(i.subtotal)
+    ])));
+    doc.autoTable({startY:20,head:[["Purchase ID","Date & Time","Staff","Product","Type","Qty","Unit Price","Discount","Sub Total"]],body,styles:{fontSize:7}});
+    doc.save("Medi-Fella-Purchasing.pdf");
+  }
+
+  function initP(){
+    if(!P("purchasingManagement"))return;
+    refreshStaffP();
+    resetFormP();
+    P("togglePurchasingForm").onclick=()=>{P("purchasingFormPanel").classList.toggle("hidden");if(!P("purchasingFormPanel").classList.contains("hidden")){refreshStaffP();if(!P("purchasingDateTime").value)P("purchasingDateTime").value=nowLocalP()}};
+    P("addPurchasingItem").onclick=()=>addRowP();
+    P("cancelPurchasing").onclick=()=>{resetFormP();P("purchasingFormPanel").classList.add("hidden")};
+    P("savePurchasing").onclick=savePurchaseP;
+    P("purchasingRefresh").onclick=loadPurchasesP;
+    P("purchasingExcel").onclick=exportExcelP;
+    P("purchasingPdf").onclick=exportPdfP;
+    ["purchasingFromDate","purchasingToDate","purchasingSearch"].forEach(id=>P(id)?.addEventListener("input",renderPurchasesP));
+    loadPurchasesP();
+  }
+  window.refreshPurchasingStaff=refreshStaffP;
+  window.loadPurchasingManagement=loadPurchasesP;
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initP,{once:true});else initP();
+  setTimeout(refreshStaffP,1000);
+})();
+</script>
 </body>
 </html>
 
