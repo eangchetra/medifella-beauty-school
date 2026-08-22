@@ -2436,6 +2436,14 @@ script { display:none !important; }
 }
 </style>
 
+<style id="mts-factory-warning-english-only">
+#invoiceOverlay .mf-mts-risk-notice .kh,
+#invoicePrint .mf-mts-risk-notice .kh,
+#invoiceExportContent .mf-mts-risk-notice .kh{
+  display:none!important;
+}
+</style>
+
 </head>
 <body>
 
@@ -5567,7 +5575,6 @@ function showSaleInvoice(id,size="A4"){
        </div>
        ${isMtsSale ? `
        <div class="mf-mts-risk-notice">
-         <div class="kh">ការកម្ម៉ង់របស់លោកអ្នកគឺពីរោងចក្រកូរ៉េផ្ទាល់។ យើងមិនមែនជាក្រុមហ៊ុនចែកចាយក្នុងប្រទេសកម្ពុជាទេ! រាល់ហានិភ័យទាំងឡាយ អតិថិជនត្រូវទទួលខុសត្រូវដោយខ្លួនឯង!</div>
          <div class="en">Your order is directly from a Korean factory; we are not a distributor in Cambodia! Customers are responsible for all risks themselves!</div>
        </div>` : ""}
      </div>
