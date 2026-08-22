@@ -7834,12 +7834,60 @@ function renderProductList(){
 function renderStockList(){
  if(!$("stockList"))return;
  const q=($("stockSearch")?.value||"").trim().toLowerCase();
- const rows=stockMovements.filter(m=>String(m.movement_type)==="stock_in").filter(m=>{
+
+ // Stock History shows BOTH directions:
+ //   stock_in / stockin / in  -> Stock In
+ //   sale / stock_out / stockout / out -> Stock Out
+ // Dermed Sale and MTS Sale already create movement_type="sale".
+ const rows=stockMovements.filter(m=>{
+   const type=String(m?.movement_type||"").trim().toLowerCase();
+   const isIn=type==="stock_in"||type==="stockin"||type==="in";
+   const isOut=type==="sale"||type==="stock_out"||type==="stockout"||type==="out";
+   if(!isIn && !isOut)return false;
+
    const p=products.find(x=>String(x.id)===String(m.product_id));
-   return (`${p?.product_code||""} ${p?.name||""}`).toLowerCase().includes(q)
+   const productText=`${p?.product_code||""} ${p?.name||""}`.toLowerCase();
+
+   return productText.includes(q)
      && inDateRange(m.stock_time||m.created_at,"stockFromDate","stockToDate");
  });
- $("stockList").innerHTML=rows.length?`<div class="table-wrap"><table class="table" id="stockListTable"><tr><th>Product ID</th><th>Product</th><th>Amount</th><th>Staff</th><th>Note</th><th>In Stock Time</th><th>Action</th></tr>${rows.map(m=>{const p=products.find(x=>String(x.id)===String(m.product_id));const st=staffInfoRecords.find(x=>String(x.id)===String(m.staff_id));return `<tr><td>${esc(p?.product_code||"")}</td><td>${esc(p?.name||"")}</td><td>${esc(m.quantity)}</td><td>${esc(st?.name_en||m.staff_name||"")}</td><td>${esc(m.note||m.notes||"")}</td><td>${esc(m.stock_time||m.created_at||"")}</td><td><div class="actions"><button type="button" class="light" onclick="editStock('${attr(m.id)}')">Edit</button><button type="button" class="danger" onclick="deleteStock('${attr(m.id)}')">Delete</button></div></td></tr>`}).join("")}</table></div>`:'<p class="muted">No stock records found.</p>';
+
+ $("stockList").innerHTML=rows.length
+ ? `<div class="table-wrap"><table class="table" id="stockListTable">
+      <tr>
+        <th>Product ID</th>
+        <th>Product</th>
+        <th>Amount</th>
+        <th>Staff</th>
+        <th>Type</th>
+        <th>Time</th>
+        <th>Action</th>
+      </tr>
+      ${rows.map(m=>{
+        const p=products.find(x=>String(x.id)===String(m.product_id));
+        const st=staffInfoRecords.find(x=>String(x.id)===String(m.staff_id));
+        const type=String(m?.movement_type||"").trim().toLowerCase();
+        const isOut=type==="sale"||type==="stock_out"||type==="stockout"||type==="out";
+        const movementLabel=isOut?"Stock Out":"Stock In";
+        const movementStyle=isOut
+          ? "display:inline-block;padding:4px 9px;border-radius:999px;background:#fee2e2;color:#b91c1c;font-weight:800"
+          : "display:inline-block;padding:4px 9px;border-radius:999px;background:#dcfce7;color:#15803d;font-weight:800";
+
+        return `<tr>
+          <td>${esc(p?.product_code||"")}</td>
+          <td>${esc(p?.name||"")}</td>
+          <td>${esc(m.quantity)}</td>
+          <td>${esc(st?.name_en||m.staff_name||"")}</td>
+          <td><span style="${movementStyle}">${movementLabel}</span></td>
+          <td>${esc(m.stock_time||m.created_at||"")}</td>
+          <td><div class="actions">
+            <button type="button" class="light" onclick="editStock('${attr(m.id)}')">Edit</button>
+            <button type="button" class="danger" onclick="deleteStock('${attr(m.id)}')">Delete</button>
+          </div></td>
+        </tr>`;
+      }).join("")}
+    </table></div>`
+ : '<p class="muted">No stock history found.</p>';
 }
 function renderStaffInfoList(){
  if(!$("staffInfoList"))return;
