@@ -20744,24 +20744,57 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       input.value=label(o);
       close();
     }
-    function render(){
+    function sourceMatches(){
       const q=String(input.value||"").trim().toLowerCase();
-      const opts=[...select.options].filter(o=>o.value);
-      const matches=opts.filter(o=>label(o).toLowerCase().includes(q));
+      const out=[];
+      allProductsP().forEach(x=>{
+        const code=String(x?.product_code||"");
+        const name=String(x?.name||"");
+        const hay=(code+" "+name).toLowerCase();
+        if(!q || hay.includes(q)){
+          out.push({value:"product:"+String(x.id),label:(code?code+" · ":"")+name+" · Product"});
+        }
+      });
+      allServicesP().forEach(x=>{
+        const code=String(x?.service_code||"");
+        const name=String(x?.name||x?.service_name||"");
+        const hay=(code+" "+name).toLowerCase();
+        if(!q || hay.includes(q)){
+          out.push({value:"service:"+String(x.id),label:(code?code+" · ":"")+name+" · Service"});
+        }
+      });
+      return out.slice(0,100);
+    }
+    function chooseSource(item){
+      if(!item)return;
+      let opt=[...select.options].find(o=>o.value===item.value);
+      if(!opt){
+        opt=document.createElement("option");
+        opt.value=item.value;
+        opt.textContent=item.label;
+        select.appendChild(opt);
+      }
+      select.value=item.value;
+      select.dispatchEvent(new Event("change",{bubbles:true}));
+      input.value=item.label;
+      close();
+    }
+    function render(){
+      const matches=sourceMatches();
       results.innerHTML="";
       if(!matches.length){
         const e=document.createElement("div");
-        e.style.cssText="padding:12px;color:#64748b;text-align:center";
+        e.style.cssText="padding:12px;color:#64748b;text-align:center;background:#fff";
         e.textContent="No product or service found";
         results.appendChild(e);
       }else{
-        matches.slice(0,100).forEach(o=>{
+        matches.forEach(item=>{
           const b=document.createElement("button");
           b.type="button";
-          b.style.cssText="display:block;width:100%;padding:11px 13px;border:0;border-bottom:1px solid #e5e7eb;background:#fff;text-align:left;cursor:pointer";
-          b.textContent=label(o);
-          b.addEventListener("pointerdown",e=>{e.preventDefault();e.stopPropagation();choose(o)},true);
-          b.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();choose(o)},true);
+          b.style.cssText="display:block;width:100%;padding:12px 14px;border:0;border-bottom:1px solid #e5e7eb;background:#fff;text-align:left;cursor:pointer;color:#203a3d";
+          b.textContent=item.label;
+          b.addEventListener("pointerdown",e=>{e.preventDefault();e.stopPropagation();chooseSource(item)},true);
+          b.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();chooseSource(item)},true);
           results.appendChild(b);
         });
       }
