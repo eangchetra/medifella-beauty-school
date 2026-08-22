@@ -21216,3 +21216,101 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
 })();
 </script>
+
+
+<style id="purchasing-search-select-fix-v12">
+.pc-results{
+  pointer-events:auto !important;
+  z-index:2147483647 !important;
+}
+.pc-result{
+  pointer-events:auto !important;
+  cursor:pointer !important;
+  user-select:none !important;
+  -webkit-user-select:none !important;
+}
+</style>
+<script id="purchasing-search-select-fix-v12">
+(function(){
+  "use strict";
+
+  function selectPurchasingResult(result){
+    if(!result)return false;
+
+    const wrap=result.closest(".pc-search-wrap");
+    if(!wrap)return false;
+
+    // The original hidden <select> is immediately after the search wrapper.
+    const sel=wrap.nextElementSibling?.matches?.(".purchasing-item-select")
+      ? wrap.nextElementSibling
+      : document.querySelector(
+          `#purchasingItemsBody .purchasing-item-select[data-pc-search-for="${CSS.escape(result.dataset.id||"")}"]`
+        );
+
+    if(!sel)return false;
+
+    const value=String(result.dataset.id||"");
+    const option=[...sel.options].find(o=>String(o.value)===value);
+    if(!option)return false;
+
+    sel.value=value;
+
+    // Trigger the existing Purchasing row logic.
+    sel.dispatchEvent(new Event("input",{bubbles:true}));
+    sel.dispatchEvent(new Event("change",{bubbles:true}));
+
+    const row=sel.closest(".purchasing-item-row");
+    if(row && typeof window.updateRowP==="function"){
+      try{window.updateRowP(row)}catch(_){}
+    }
+
+    const input=wrap.querySelector(".pc-search-input");
+    if(input){
+      const code=option.textContent.split(" · ")[0]||"";
+      const name=option.textContent.split(" · ").slice(1).join(" · ").replace(/\s+\(Service\)\s*$/,"");
+      input.value=code && name ? code+" · "+name : option.textContent;
+    }
+
+    const results=wrap.querySelector(".pc-results");
+    if(results)results.style.display="none";
+
+    return true;
+  }
+
+  function install(){
+    if(document.documentElement.dataset.pcSearchSelectFixV12)return;
+    document.documentElement.dataset.pcSearchSelectFixV12="1";
+
+    // pointerdown is used because Safari can blur/repaint the search overlay
+    // before a normal click reaches the result.
+    document.addEventListener("pointerdown",function(e){
+      const result=e.target.closest(".pc-result");
+      if(!result)return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      selectPurchasingResult(result);
+    },true);
+
+    // Also support older browsers that don't deliver pointer events.
+    document.addEventListener("mousedown",function(e){
+      const result=e.target.closest(".pc-result");
+      if(!result)return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      selectPurchasingResult(result);
+    },true);
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else{
+    install();
+  }
+})();
+</script>
