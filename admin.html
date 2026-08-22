@@ -20063,423 +20063,147 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   "use strict";
 
   /*
-   * FINAL PDF CONTROLLER
-   * - Save PDF never calls window.print()
-   * - Save PDF sends the exact invoice HTML/CSS to the server renderer.
-   * - Print opens the browser print dialog from the exact invoice HTML.
-   * - Existing legacy canvas/jsPDF functions are left in place for compatibility,
-   *   but the public entry points are overridden here.
-   *
-   * If the website is on GitHub Pages, set:
-   *   window.INVOICE_PDF_ENDPOINT = "https://YOUR-VERCEL-PROJECT.vercel.app/api/invoice-pdf";
-   * before this script runs, or replace the placeholder below.
+   * FINAL DIRECT PDF CONTROLLER
+   * Save PDF is completely client-side.
+   * It does NOT open Print, does NOT open a new window, and does NOT need
+   * /api/invoice-pdf, Vercel, Cloudflare Workers, or another PDF server.
+   * It captures the invoice already displayed in the dashboard and saves it
+   * directly as an A4 PDF using the existing html2canvas + jsPDF libraries.
    */
 
-  window.INVOICE_PDF_ENDPOINT =
-    window.INVOICE_PDF_ENDPOINT ||
-    "/api/invoice-pdf";
+  async function saveInvoicePDFDirect(){
+    const overlay=document.getElementById("invoiceOverlay");
+    const source=document.querySelector("#invoicePrint .mf-invoice") ||
+                  document.querySelector("#invoiceOverlay .mf-invoice") ||
+                  document.querySelector(".invoice-overlay .mf-invoice") ||
+                  document.querySelector(".mf-invoice");
 
-  function invoiceNode(){
-    return document.querySelector("#invoiceOverlay .mf-invoice") ||
-           document.querySelector("#invoicePrint .mf-invoice") ||
-           document.querySelector(".invoice-overlay .mf-invoice") ||
-           document.querySelector(".mf-invoice");
-  }
+    if(!source){
+      alert("Please open the invoice first.");
+      return;
+    }
 
-  function invoiceFileName(){
-    try{
-      if(typeof window.invoiceFileName==="function"){
-        const n=window.invoiceFileName();
-        if(n)return String(n).replace(/\.pdf$/i,"");
-      }
-    }catch(_){}
-
-    const ref =
-      document.querySelector("#invoicePrint [data-invoice-reference]")?.textContent ||
-      document.querySelector("#invoicePrint .invoice-reference")?.textContent ||
-      "invoice";
-
-    return String(ref).trim().replace(/[^a-z0-9_-]+/gi,"_") || "invoice";
-  }
-
-  async function waitForInvoice(node){
-    if(!node)throw new Error("Invoice preview is not available.");
+    const btns=[...document.querySelectorAll(
+      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button"
+    )].filter(btn=>String(btn.textContent||"").toLowerCase().includes("save pdf"));
+    btns.forEach(btn=>btn.disabled=true);
 
     try{
-      if(document.fonts && document.fonts.ready){
-        await document.fonts.ready;
+      /* Use the existing invoice renderer so the PDF keeps the same layout,
+         Khmer fonts, logo, totals, tables and invoice information shown in
+         the dashboard. */
+      if(typeof window.buildInvoicePaperCanvas!=="function"){
+        throw new Error("Invoice PDF renderer is not available.");
       }
-    }catch(_){}
 
-    try{
-      if(document.fonts){
-        await Promise.allSettled([
-          document.fonts.load('20px "KhmerOSMuolUploaded"'),
-          document.fonts.load('13px "KhmerOSBattambangUploaded"')
-        ]);
+      const result=await window.buildInvoicePaperCanvas("A4");
+
+      if(!result || !result.canvas){
+        throw new Error("Could not render the invoice.");
       }
-    }catch(_){}
 
-    const images=[...node.querySelectorAll("img")];
-    await Promise.all(images.map(img=>{
-      if(img.complete)return Promise.resolve();
-      return new Promise(resolve=>{
-        img.addEventListener("load",resolve,{once:true});
-        img.addEventListener("error",resolve,{once:true});
+      let jsPDF=window.jspdf && window.jspdf.jsPDF;
+      if(!jsPDF){
+        await new Promise((resolve,reject)=>{
+          const existing=[...document.scripts].find(x=>
+            String(x.src||"").includes("jspdf.umd.min.js")
+          );
+          if(existing){
+            existing.addEventListener("load",resolve,{once:true});
+            existing.addEventListener("error",reject,{once:true});
+            setTimeout(()=>{
+              if(window.jspdf && window.jspdf.jsPDF) resolve();
+              else reject(new Error("jsPDF did not load."));
+            },3000);
+            return;
+          }
+          const script=document.createElement("script");
+          script.src="https://cdn.jsdelivr.net/npm/jspdf@2.5.1/dist/jspdf.umd.min.js";
+          script.onload=resolve;
+          script.onerror=reject;
+          document.head.appendChild(script);
+        });
+        jsPDF=window.jspdf && window.jspdf.jsPDF;
+      }
+
+      if(!jsPDF)throw new Error("jsPDF is not available.");
+
+      const pdf=new jsPDF({
+        unit:"mm",
+        format:"a4",
+        orientation:"portrait",
+        compress:true
       });
-    }));
 
-    await new Promise(r=>requestAnimationFrame(
-      ()=>requestAnimationFrame(r)
-    ));
-  }
+      const image=result.canvas.toDataURL("image/png");
+      pdf.addImage(
+        image,
+        "PNG",
+        0,
+        0,
+        result.paper?.widthMm || 210,
+        result.paper?.heightMm || 297,
+        undefined,
+        "FAST"
+      );
 
-  function collectPageStyles(){
-    return [...document.querySelectorAll("style,link[rel='stylesheet']")]
-      .map(el=>el.outerHTML)
-      .join("\n");
-  }
+      let filename="Invoice.pdf";
+      try{
+        const sale=Array.isArray(window.salesRecords)
+          ? window.salesRecords.find(x=>String(x.id)===String(window.currentInvoiceId))
+          : null;
+        const ref=typeof window.saleRef==="function"
+          ? window.saleRef(sale)
+          : (sale?.reference_no || sale?.invoice_no || "Invoice");
+        filename=(String(ref||"Invoice")
+          .replace(/[^a-z0-9_-]/gi,"_") || "Invoice") + ".pdf";
+      }catch(_){ }
 
-  function buildExportHTML(node){
-    const clone=node.cloneNode(true);
+      /* jsPDF.save() downloads the file directly. No print dialog/window. */
+      pdf.save(filename);
 
-    clone.querySelectorAll(
-      ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,[data-no-print='true']"
-    ).forEach(el=>el.remove());
-
-    /*
-     * The invoice already contains absolute Supabase font URLs in its
-     * @font-face declarations. The <base> tag also makes any relative image
-     * or stylesheet URLs resolve from the live website.
-     */
-    const base=document.createElement("base");
-    base.href=location.href;
-    clone.insertBefore(base,clone.firstChild);
-
-    return `<!doctype html>
-<html lang="km">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-${collectPageStyles()}
-<style>
-@page{
-  size:A4 portrait;
-  margin:0;
-}
-html,body{
-  margin:0!important;
-  padding:0!important;
-  width:210mm!important;
-  min-width:210mm!important;
-  height:297mm!important;
-  min-height:297mm!important;
-  background:#fff!important;
-  overflow:hidden!important;
-  -webkit-print-color-adjust:exact!important;
-  print-color-adjust:exact!important;
-}
-#mfPdfPage{
-  position:relative!important;
-  width:210mm!important;
-  height:297mm!important;
-  overflow:hidden!important;
-  margin:0!important;
-  padding:0!important;
-  background:#fff!important;
-}
-#mfPdfScale{
-  position:absolute!important;
-  left:0!important;
-  top:0!important;
-  width:210mm!important;
-  transform-origin:top left!important;
-}
-#mfPdfScale .mf-invoice{
-  width:210mm!important;
-  max-width:210mm!important;
-  margin:0!important;
-  box-sizing:border-box!important;
-}
-#mfPdfScale table{
-  width:100%!important;
-  border-collapse:collapse!important;
-}
-#mfPdfScale tr,
-#mfPdfScale td,
-#mfPdfScale th{
-  break-inside:avoid!important;
-  page-break-inside:avoid!important;
-}
-</style>
-</head>
-<body>
-<div id="mfPdfPage"><div id="mfPdfScale">${clone.outerHTML}</div></div>
-</body>
-</html>`;
-  }
-
-  async function saveInvoicePDFDirectServer(){
-    const node=invoiceNode();
-    if(!node){
-      alert("Please open the invoice first.");
-      return;
-    }
-
-    await waitForInvoice(node);
-
-    const payload={
-      html:buildExportHTML(node),
-      filename:invoiceFileName()+".pdf",
-      paper:"A4",
-      onePage:true
-    };
-
-    const endpoint=String(window.INVOICE_PDF_ENDPOINT||"").trim();
-
-    if(!endpoint){
-      throw new Error("Invoice PDF endpoint is not configured.");
-    }
-
-    const response=await fetch(endpoint,{
-      method:"POST",
-      headers:{
-        "Content-Type":"application/json",
-        "Accept":"application/pdf"
-      },
-      body:JSON.stringify(payload)
-    });
-
-    if(!response.ok){
-      const body=await response.text().catch(()=> "");
-      throw new Error(body || ("PDF server returned HTTP "+response.status));
-    }
-
-    const blob=await response.blob();
-
-    if(!String(blob.type||"").toLowerCase().includes("pdf")){
-      throw new Error("The PDF server did not return a PDF file.");
-    }
-
-    const url=URL.createObjectURL(blob);
-    const a=document.createElement("a");
-    a.href=url;
-    a.download=payload.filename;
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-
-    setTimeout(()=>URL.revokeObjectURL(url),30000);
-  }
-
-  async function printInvoiceExact(id,size="A4"){
-    const node=invoiceNode();
-    if(!node){
-      alert("Please open the invoice first.");
-      return;
-    }
-
-    const printWin=window.open(
-      "about:blank",
-      "_blank",
-      "width=1000,height=1300"
-    );
-
-    if(!printWin){
-      alert("Please allow pop-ups for this website, then click Print again.");
-      return;
-    }
-
-    try{
-      await waitForInvoice(node);
-
-      const clone=node.cloneNode(true);
-
-      clone.querySelectorAll(
-        ".invoice-actions,#invoiceActions,.mf-actions,.invoice-buttons,[data-no-print='true']"
-      ).forEach(el=>el.remove());
-
-      const base=document.createElement("base");
-      base.href=location.href;
-      clone.insertBefore(base,clone.firstChild);
-
-      const html=`<!doctype html>
-<html lang="km">
-<head>
-<meta charset="utf-8">
-<meta name="viewport" content="width=device-width,initial-scale=1">
-${collectPageStyles()}
-<style>
-@page{
-  size:A4 portrait;
-  margin:0;
-}
-html,body{
-  margin:0!important;
-  padding:0!important;
-  background:#fff!important;
-  -webkit-print-color-adjust:exact!important;
-  print-color-adjust:exact!important;
-}
-#mfPrintPage{
-  width:210mm!important;
-  height:297mm!important;
-  min-height:297mm!important;
-  overflow:hidden!important;
-  margin:0!important;
-  padding:0!important;
-  background:#fff!important;
-}
-#mfPrintScale{
-  width:210mm!important;
-  transform-origin:top left!important;
-}
-#mfPrintScale .mf-invoice{
-  width:210mm!important;
-  max-width:210mm!important;
-  margin:0!important;
-  box-sizing:border-box!important;
-}
-#mfPrintScale table{
-  width:100%!important;
-  border-collapse:collapse!important;
-}
-#mfPrintScale tr,
-#mfPrintScale td,
-#mfPrintScale th{
-  break-inside:avoid!important;
-  page-break-inside:avoid!important;
-}
-</style>
-</head>
-<body>
-<div id="mfPrintPage"><div id="mfPrintScale">${clone.outerHTML}</div></div>
-<script>
-(async function(){
-  try{
-    if(document.fonts && document.fonts.ready){
-      await document.fonts.ready;
-    }
-  }catch(_){}
-
-  const imgs=[...document.images];
-  await Promise.all(imgs.map(img=>{
-    if(img.complete)return Promise.resolve();
-    return new Promise(resolve=>{
-      img.addEventListener("load",resolve,{once:true});
-      img.addEventListener("error",resolve,{once:true});
-    });
-  }));
-
-  await new Promise(r=>requestAnimationFrame(
-    ()=>requestAnimationFrame(r)
-  ));
-
-  const scaleRoot=document.getElementById("mfPrintScale");
-  const invoice=scaleRoot?.querySelector(".mf-invoice");
-
-  if(invoice){
-    const height=Math.max(
-      invoice.scrollHeight||0,
-      invoice.getBoundingClientRect().height||0,
-      invoice.offsetHeight||0
-    );
-
-    const pageHeight=1122.52;
-    const scale=Math.min(1,pageHeight/height);
-
-    scaleRoot.style.transform="scale("+scale+")";
-    scaleRoot.style.width=(210/scale)+"mm";
-  }
-
-  setTimeout(()=>window.print(),150);
-})();
-<\/script>
-</body>
-</html>`;
-
-      printWin.document.open();
-      printWin.document.write(html);
-      printWin.document.close();
     }catch(error){
-      console.error("Invoice print error:",error);
-      try{printWin.close();}catch(_){}
-      alert("Could not prepare the invoice for printing.");
+      console.error("Direct PDF generation failed:",error);
+      alert("PDF could not be generated. Please try again.");
+    }finally{
+      btns.forEach(btn=>btn.disabled=false);
     }
   }
 
-  /*
-   * Override the legacy entry points. This is deliberate:
-   * the old file contains a canvas/jsPDF implementation and several later
-   * click handlers. These public functions are now the single final entry.
-   */
-  window.saveInvoicePDFDirectServer=saveInvoicePDFDirectServer;
-  window.downloadInvoicePDF=saveInvoicePDFDirectServer;
-  window.printInvoice=printInvoiceExact;
-  window.exactInvoicePrint=printInvoiceExact;
+  /* Keep the old public name available so any existing invoice button code
+     continues to work, but now it always performs a direct download. */
+  window.saveInvoicePDFDirectServer=saveInvoicePDFDirect;
+  window.downloadInvoicePDF=saveInvoicePDFDirect;
 
-  /*
-   * Capture Save PDF before target/bubble handlers. The inline onclick on
-   * dynamically rendered buttons is also removed so the old function cannot
-   * run afterward.
-   */
-  function bindSaveButtons(){
+  function bindSavePDFButtons(){
     document.querySelectorAll(
       "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button,button"
     ).forEach(btn=>{
-      const label=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
-
+      const label=String(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
       if(!label.includes("save pdf"))return;
 
+      /* Remove old inline handlers that could redirect Save PDF to Print. */
       btn.removeAttribute("onclick");
 
-      if(btn.dataset.mfDirectPdfBound==="1")return;
-      btn.dataset.mfDirectPdfBound="1";
+      if(btn.dataset.directPdfBound==="1")return;
+      btn.dataset.directPdfBound="1";
 
       btn.addEventListener("click",function(e){
         e.preventDefault();
         e.stopPropagation();
         if(e.stopImmediatePropagation)e.stopImmediatePropagation();
-
-        saveInvoicePDFDirectServer().catch(error=>{
-          console.error("Direct PDF generation failed:",error);
-          alert(
-            "Direct PDF is not connected yet.\n\n" +
-            "The invoice code is ready, but the /api/invoice-pdf " +
-            "server function must be deployed."
-          );
-        });
+        saveInvoicePDFDirect();
       },true);
     });
   }
 
-  document.addEventListener("click",function(e){
-    const btn=e.target.closest(
-      "#invoiceOverlay button,#invoicePrint button,.invoice-overlay button"
-    );
-    if(!btn)return;
+  bindSavePDFButtons();
 
-    const label=(btn.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
-    if(!label.includes("save pdf"))return;
-
-    e.preventDefault();
-    e.stopPropagation();
-    if(e.stopImmediatePropagation)e.stopImmediatePropagation();
-
-    saveInvoicePDFDirectServer().catch(error=>{
-      console.error("Direct PDF generation failed:",error);
-      alert(
-        "Direct PDF is not connected yet.\n\n" +
-        "Please deploy the /api/invoice-pdf function."
-      );
-    });
-  },true);
-
-  bindSaveButtons();
-
-  new MutationObserver(bindSaveButtons).observe(document.body,{
-    subtree:true,
-    childList:true
+  /* Invoice previews are generated dynamically, so bind again whenever the
+     invoice area changes. */
+  new MutationObserver(bindSavePDFButtons).observe(document.body,{
+    childList:true,
+    subtree:true
   });
 })();
 </script>
