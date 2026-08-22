@@ -20832,28 +20832,18 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     try{
       const payload=collectPurchaseP();
       P("savePurchasing").disabled=true;
-      payload.payment_status="Paid";
-      payload.paid_at=new Date().toISOString();
-      payload.arrival_status="Arriving";
-      payload.arrived_at=null;
       let r;
       if(purchasingEditId){
-        const existing=(window.purchasingRecords||[]).find(x=>String(x.id)===String(purchasingEditId));
-        payload.payment_status=existing?.payment_status||"Paid";
-        payload.paid_at=existing?.paid_at||payload.paid_at;
-        payload.arrival_status=existing?.arrival_status||"Arriving";
-        payload.arrived_at=existing?.arrived_at||null;
         r=await sb.from("medifella_purchases").update(payload).eq("id",purchasingEditId);
       }else{
         payload.purchase_no="PUR-"+Date.now();
         r=await sb.from("medifella_purchases").insert(payload);
       }
       if(r.error)throw r.error;
-      P("purchasingStatus").innerHTML='<div class="status">Purchasing saved successfully. Payment completed — status is Arriving.</div>';
+      P("purchasingStatus").innerHTML='<div class="status">Purchasing saved successfully.</div>';
       await loadPurchasesP();
       resetFormP();
       P("purchasingFormPanel").classList.add("hidden");
-      purchasingEditId=null;
     }catch(e){P("purchasingStatus").innerHTML=`<div class="status error">${escP(e.message||"Could not save purchasing.")}</div>`}
     finally{P("savePurchasing").disabled=false}
   }
@@ -20921,8 +20911,6 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   }
   window.refreshPurchasingStaff=refreshStaffP;
   window.loadPurchasingManagement=loadPurchasesP;
-  window.__purchasingCollect=collectPurchaseP;
-  window.__purchasingEdit=editPurchaseP;
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",initP,{once:true});else initP();
   setTimeout(refreshStaffP,1000);
 })();
@@ -21066,711 +21054,84 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 
 </script>
 
-
-
-<script id="purchasing-clean-final-20260822">
+<script id="inventory-stock-refresh-after-sale-final-v1">
 (function(){
   "use strict";
-  const $=id=>document.getElementById(id);
-  const esc=v=>typeof window.esc==="function"?window.esc(v):String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;", "'":"&#039;"}[c]));
-  const attr=v=>String(v??"").replace(/&/g,"&amp;").replace(/"/g,"&quot;").replace(/</g,"&lt;").replace(/>/g,"&gt;");
-  const money=v=>"$"+Number(v||0).toFixed(2);
-  const fmt=v=>{const d=new Date(v);if(Number.isNaN(d.getTime()))return String(v||"").replace("T"," ").replace(/\+00:00$/i,"");const p=n=>String(n).padStart(2,"0");return `${p(d.getDate())}/${p(d.getMonth()+1)}/${d.getFullYear()} ${p(d.getHours())}:${p(d.getMinutes())}`};
-  const items=r=>{let a=r?.items;if(typeof a==="string"){try{a=JSON.parse(a)}catch(_){a=[]}}return Array.isArray(a)?a:[]};
-  const records=()=>Array.isArray(window.purchasingRecords)?window.purchasingRecords:[];
 
-  function statusButton(r){
-    const paid=String(r.payment_status||"").toLowerCase()==="paid";
-    const arrived=String(r.arrival_status||"").toLowerCase()==="arrived";
-    if(!paid) return `<button type="button" class="pc-status pc-pending" data-id="${attr(r.id)}">Pending to Pay</button>`;
-    if(!arrived) return `<button type="button" class="pc-status pc-arriving" data-id="${attr(r.id)}">Arriving</button>`;
-    return `<button type="button" class="pc-status pc-arrived" disabled>Arrived</button>`;
-  }
-
-  function style(){
-    if($("pc-style"))return;
-    const s=document.createElement("style");s.id="pc-style";s.textContent=`
-      .pc-status{border:0;padding:8px 12px;border-radius:8px;font-weight:700;cursor:pointer;white-space:nowrap}
-      .pc-pending,.pc-arriving{background:#1976d2;color:#fff}.pc-arrived{background:#2e7d32;color:#fff;cursor:default}
-      .pc-view{background:#f1f5f9;color:#334155;border:0;padding:8px 12px;border-radius:8px;font-weight:700;cursor:pointer}
-      .pc-search-wrap{position:relative;width:100%;min-width:240px}.pc-search-input{width:100%;height:42px;box-sizing:border-box;padding:10px 12px;border:1px solid #94a3b8;border-radius:8px;background:#fff;font-size:14px;outline:none}.pc-search-input:focus{border-color:#0f766e;box-shadow:0 0 0 3px rgba(15,118,110,.12)}
-      .pc-results{position:fixed;left:0;top:0;width:320px;z-index:2147483647;background:#fff;border:1px solid #94a3b8;border-radius:10px;box-shadow:0 18px 45px rgba(15,23,42,.28);max-height:420px;overflow-y:auto;overflow-x:hidden;display:none}
-      .pc-result{display:block;padding:12px 14px;min-height:62px;box-sizing:border-box;cursor:pointer;border-bottom:1px solid #e5e7eb;line-height:1.35;background:#fff;white-space:normal}.pc-result:last-child{border-bottom:0}.pc-result:hover,.pc-result.active{background:#eff6ff}
-      .pc-code{display:block;font-weight:800;font-size:12px;color:#475569;margin-bottom:3px}.pc-name{display:block;color:#0f172a;font-size:14px;font-weight:600;white-space:normal;word-break:break-word}.pc-kind{display:inline-block;font-size:10px;color:#64748b;margin-top:5px;padding:2px 6px;border-radius:999px;background:#f1f5f9}
-      .pc-empty{padding:16px;color:#64748b;text-align:center}.pc-modal{position:fixed;inset:0;background:rgba(15,23,42,.58);z-index:100001;display:none;align-items:center;justify-content:center;padding:18px}
-      .pc-card{width:min(1050px,100%);max-height:92vh;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 28px 80px rgba(0,0,0,.28);display:flex;flex-direction:column}
-      .pc-head{padding:18px 22px;border-bottom:1px solid #e5e7eb;display:flex;justify-content:space-between;align-items:center;gap:14px}.pc-body{padding:20px 22px;overflow:auto}
-      .pc-grid{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}.pc-info{padding:13px 14px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px}.pc-label{font-size:12px;color:#64748b;margin-bottom:4px}.pc-items{border:1px solid #e5e7eb;border-radius:12px;overflow:hidden}.pc-item{display:grid;grid-template-columns:1fr 90px 120px 120px;gap:10px;padding:12px 14px;border-bottom:1px solid #eef2f7}.pc-item:last-child{border-bottom:0}.pc-item-head{font-weight:800;background:#f8fafc}.pc-close{border:0;background:#f1f5f9;color:#334155;border-radius:9px;padding:9px 14px;font-weight:700;cursor:pointer}
-      @media(max-width:800px){.pc-grid{grid-template-columns:repeat(2,minmax(0,1fr))}.pc-item{grid-template-columns:1fr 70px 100px}.pc-item>div:last-child{display:none}}
-    `;document.head.appendChild(s);
-  }
-
-  function addPendingButton(){
-    const save=$("savePurchasing");if(!save||$("pendingPurchasingClean"))return;
-    const b=document.createElement("button");b.id="pendingPurchasingClean";b.type="button";b.textContent="Pending";b.style.cssText="background:#1976d2;color:#fff;border:0;padding:9px 14px;border-radius:8px;font-weight:700;cursor:pointer";
-    save.parentNode.insertBefore(b,save);
-    b.addEventListener("click",savePending);
-  }
-
-  async function savePending(){
-    const collect=window.__purchasingCollect;if(typeof collect!=="function"){alert("Purchasing form is not ready. Please refresh the page.");return}
-    const b=$("pendingPurchasingClean");if(b)b.disabled=true;
+  async function refreshInventoryDisplayAfterSale(){
     try{
-      const payload=collect();
-      payload.payment_status="Pending";payload.paid_at=null;payload.arrival_status="Pending";payload.arrived_at=null;
-      const edit=window.__purchasingEditingId;
-      let r;
-      if(edit){r=await sb.from("medifella_purchases").update(payload).eq("id",edit)}
-      else{payload.purchase_no="PUR-"+Date.now();r=await sb.from("medifella_purchases").insert(payload)}
-      if(r.error)throw r.error;
-      if($("purchasingStatus"))$("purchasingStatus").innerHTML='<div class="status">Purchasing saved as Pending to Pay.</div>';
-      await window.loadPurchasingManagement();
-      if(typeof window.__purchasingReset==="function")window.__purchasingReset();
-      if($("purchasingFormPanel"))$("purchasingFormPanel").classList.add("hidden");
-      window.__purchasingEditingId=null;
-    }catch(e){if($("purchasingStatus"))$("purchasingStatus").innerHTML=`<div class="status error">${esc(e.message||"Could not save purchasing.")}</div>`}
-    finally{if(b)b.disabled=false}
-  }
+      // Always reload the authoritative inventory movement rows from Supabase
+      // before recalculating Product Management stock.
+      const r=await sb.from("medifella_inventory_movements").select("*");
+      if(r.error) throw r.error;
 
-  function render(){
-    const box=$("purchasingList");if(!box)return;
-    const from=$("purchasingFromDate")?.value||"",to=$("purchasingToDate")?.value||"",q=($("purchasingSearch")?.value||"").trim().toLowerCase();
-    const rows=records().filter(r=>{const d=String(r.purchase_datetime||r.created_at||"").slice(0,10);if(from&&d<from)return false;if(to&&d>to)return false;return !q||JSON.stringify(r).toLowerCase().includes(q)});
-    if(!rows.length){box.innerHTML='<p class="muted">No purchasing records found.</p>';return}
-    box.innerHTML=`<div class="table-wrap"><table class="table"><thead><tr><th>Purchase ID</th><th>Date &amp; Time</th><th>Purchasing Staff</th><th>Items</th><th>Total</th><th>Payment / Arrival</th><th>Action</th></tr></thead><tbody>${rows.map(r=>`<tr>
-      <td title="${attr(r.purchase_no||r.id||"")}"><strong>${esc((r.purchase_no||String(r.id||"")).length>18?(r.purchase_no||String(r.id)).slice(0,12)+"…"+String(r.purchase_no||r.id).slice(-4):(r.purchase_no||r.id||""))}</strong></td>
-      <td title="${attr(r.purchase_datetime||"")}">${esc(fmt(r.purchase_datetime))}</td>
-      <td>${esc(r.purchasing_staff_name||"")}</td>
-      <td><button type="button" class="pc-view" data-id="${attr(r.id)}">View</button></td>
-      <td><strong>${money(r.total)}</strong></td>
-      <td>${statusButton(r)}</td>
-      <td><div class="actions"><button type="button" class="light pc-edit" data-id="${attr(r.id)}">Edit</button><button type="button" class="danger pc-delete" data-id="${attr(r.id)}">Delete</button></div></td>
-    </tr>`).join("")}</tbody></table></div>`;
-    box.querySelectorAll(".pc-view").forEach(b=>b.onclick=()=>showDetails(b.dataset.id));
-    box.querySelectorAll(".pc-pending").forEach(b=>b.onclick=()=>payPending(b.dataset.id));
-    box.querySelectorAll(".pc-arriving").forEach(b=>b.onclick=()=>markArrived(b.dataset.id));
-    box.querySelectorAll(".pc-edit").forEach(b=>b.onclick=()=>edit(b.dataset.id));
-    box.querySelectorAll(".pc-delete").forEach(b=>b.onclick=async()=>{if(!confirm("Delete this purchasing record?"))return;const r=await sb.from("medifella_purchases").delete().eq("id",b.dataset.id);if(r.error){alert("Delete failed: "+r.error.message);return}await window.loadPurchasingManagement()});
-  }
+      const fresh=Array.isArray(r.data)?r.data:[];
+      if(typeof stockMovements!=="undefined") stockMovements=fresh;
+      window.stockMovements=fresh;
 
-  async function payPending(id){
-    const r=records().find(x=>String(x.id)===String(id));if(!r)return;
-    if(String(r.payment_status||"Pending")!=="Pending")return;
-    if(!confirm("Make payment for this purchasing and mark it as Arriving?"))return;
-    const x=await sb.from("medifella_purchases").update({payment_status:"Paid",paid_at:new Date().toISOString(),arrival_status:"Arriving",arrived_at:null}).eq("id",id);
-    if(x.error){alert("Could not make payment: "+x.error.message);return}await window.loadPurchasingManagement();
-  }
-  async function markArrived(id){
-    const r=records().find(x=>String(x.id)===String(id));if(!r||String(r.payment_status||"")!=="Paid")return;
-    if(!confirm("Mark this purchase as Arrived?"))return;
-    const x=await sb.from("medifella_purchases").update({arrival_status:"Arrived",arrived_at:new Date().toISOString()}).eq("id",id);
-    if(x.error){alert("Could not update arrival status: "+x.error.message);return}await window.loadPurchasingManagement();
-  }
-  function edit(id){
-    const r=records().find(x=>String(x.id)===String(id));if(!r)return;
-    window.__purchasingEditingId=r.id;
-    if(typeof window.__purchasingEdit==="function")window.__purchasingEdit(id);
-    setTimeout(()=>{if($("savePurchasing"))$("savePurchasing").textContent="Update Purchasing";addPendingButton()},30);
-  }
-  function ensureModal(){
-    if($("pcModal"))return;const m=document.createElement("div");m.id="pcModal";m.className="pc-modal";m.innerHTML=`<div class="pc-card"><div class="pc-head"><div><div class="pc-label">PURCHASING DETAILS</div><div id="pcTitle" style="font-size:22px;font-weight:800"></div></div><button type="button" class="pc-close" id="pcClose">Close</button></div><div id="pcBody" class="pc-body"></div></div>`;document.body.appendChild(m);$("pcClose").onclick=()=>m.style.display="none";m.onclick=e=>{if(e.target===m)m.style.display="none"};window.addEventListener("keydown",e=>{if(e.key==="Escape"&&m.style.display!=="none")m.style.display="none"});
-  }
-  function showDetails(id){
-    const r=records().find(x=>String(x.id)===String(id));if(!r)return;ensureModal();const its=items(r);const paid=String(r.payment_status||"")==="Paid",arr=String(r.arrival_status||"")==="Arrived";
-    $("pcTitle").textContent=r.purchase_no||"Purchase";
-    $("pcBody").innerHTML=`<div class="pc-grid"><div class="pc-info"><div class="pc-label">Purchase ID</div><strong>${esc(r.purchase_no||r.id||"")}</strong></div><div class="pc-info"><div class="pc-label">Date & Time</div><strong>${esc(fmt(r.purchase_datetime))}</strong></div><div class="pc-info"><div class="pc-label">Purchasing Staff</div><strong>${esc(r.purchasing_staff_name||"")}</strong></div><div class="pc-info"><div class="pc-label">Status</div><strong>${paid?(arr?"Arrived":"Arriving"):"Pending to Pay"}</strong></div></div><div class="pc-items"><div class="pc-item pc-item-head"><div>Product / Service</div><div>Qty</div><div>Unit Price</div><div>Subtotal</div></div>${its.map(i=>`<div class="pc-item"><div><strong>${esc(i.product_name||"Item")}</strong><div class="pc-label">${esc(i.product_code||i.product_type||"")}</div></div><div>${esc(i.qty||0)}</div><div>${money(i.unit_price)}</div><div><strong>${money(i.subtotal)}</strong></div></div>`).join("")}<div class="pc-item" style="background:#f8fafc"><div style="text-align:right;grid-column:1/-2;font-weight:800">Total</div><div><strong>${money(r.total)}</strong></div></div></div>`;
-    $("pcModal").style.display="flex";
-  }
+      if(typeof rebuildDermedSearchStockCacheIfAvailable==="function"){
+        try{rebuildDermedSearchStockCacheIfAvailable()}catch(_){ }
+      }
+      if(typeof renderProductList==="function") renderProductList();
+      if(typeof renderStockList==="function") renderStockList();
+      if(typeof renderStockReport==="function") renderStockReport();
 
-  function sourceList(){
-    const ps=Array.isArray(window.products)?window.products:[];const ss=Array.isArray(window.services)?window.services:[];const a=[];
-    ps.forEach(x=>a.push({id:"product:"+x.id,kind:"Product",code:x.product_code||"",name:x.name||"Product"}));
-    ss.forEach(x=>a.push({id:"service:"+x.id,kind:"Service",code:x.service_code||"",name:x.name||x.service_name||"Service"}));return a;
-  }
-  function installSearchFor(sel){
-    if(!sel||sel.dataset.pcSearch)return;sel.dataset.pcSearch="1";sel.style.display="none";
-    const wrap=document.createElement("div");wrap.className="pc-search-wrap";const input=document.createElement("input");input.className="pc-search-input";input.type="text";input.placeholder="Search product or service...";const results=document.createElement("div");results.className="pc-results";wrap.append(input,results);sel.parentNode.insertBefore(wrap,sel);
-    function current(){const src=sourceList().find(x=>x.id===sel.value);return src?(src.code?src.code+" · ":"")+src.name:""}
-    function draw(){const q=input.value.trim().toLowerCase();const all=sourceList().filter(x=>!q||((x.code+" "+x.name+" "+x.kind).toLowerCase().includes(q)));results.innerHTML=all.length?all.slice(0,100).map(x=>`<div class="pc-result" data-id="${attr(x.id)}"><span class="pc-code">${esc(x.code||"")}</span><span class="pc-name">${esc(x.name)}</span><span class="pc-kind">${esc(x.kind)}</span></div>`).join(""):'<div class="pc-empty">No matching product or service.</div>';const rr=input.getBoundingClientRect();const width=Math.max(320,Math.min(520,rr.width+120));const above=Math.max(120,rr.top-10);const below=Math.max(120,window.innerHeight-rr.bottom-10);const h=Math.min(420,above>=180?above:below);results.style.width=width+"px";results.style.left=Math.max(8,Math.min(rr.left,window.innerWidth-width-8))+"px";results.style.height=h+"px";results.style.maxHeight=h+"px";results.style.top=(above>=180?(rr.top-h-6):(rr.bottom+6))+"px";results.style.display="block";results.scrollTop=0;results.querySelectorAll(".pc-result").forEach(r=>r.onclick=()=>{sel.value=r.dataset.id;input.value=current();sel.dispatchEvent(new Event("change",{bubbles:true}));results.style.display="none"})}
-    input.value=current();input.addEventListener("focus",draw);input.addEventListener("input",draw);input.addEventListener("keydown",e=>{if(e.key==="Escape"){results.style.display="none"}else if(e.key==="Enter"){const first=results.querySelector(".pc-result");if(first){e.preventDefault();first.click()}}});window.addEventListener("resize",()=>{if(results.style.display!=="none")draw()});window.addEventListener("scroll",()=>{if(results.style.display!=="none")draw()},true);document.addEventListener("click",e=>{if(!wrap.contains(e.target))results.style.display="none"});
-    new MutationObserver(()=>{if(sel.value)input.value=current()}).observe(sel,{attributes:true,attributeFilter:["value"]});
-  }
-  function installSearch(){document.querySelectorAll("#purchasingItemsBody .purchasing-item-select").forEach(installSearchFor);const body=$("purchasingItemsBody");if(!body||body.dataset.pcObs)return;body.dataset.pcObs="1";new MutationObserver(()=>setTimeout(()=>body.querySelectorAll(".purchasing-item-select").forEach(installSearchFor),0)).observe(body,{childList:true})}
-
-  function init(){
-    if(!$("purchasingManagement"))return;style();addPendingButton();
-    const reset=window.__purchasingReset;
-    if(!reset && $("cancelPurchasing")){
-      window.__purchasingReset=()=>{if($("savePurchasing"))$("savePurchasing").textContent="Save Purchasing";window.__purchasingEditingId=null;addPendingButton()};
+      // Refresh the currently selected product hint too.
+      const selectedId=document.getElementById("stockProductId")?.value||"";
+      const selected=Array.isArray(window.products)?window.products.find(x=>String(x.id)===String(selectedId)):null;
+      const hint=document.getElementById("stockProductHint");
+      if(selected && hint && typeof productStock==="function"){
+        hint.textContent=`Selected: ${selected.name} · Current In Stock: ${Number(productStock(selected.id)||0)}`;
+      }
+    }catch(err){
+      console.error("Post-sale inventory refresh failed:",err);
     }
-    if($("purchasingRefresh"))$("purchasingRefresh").addEventListener("click",()=>setTimeout(render,50));
-    ["purchasingFromDate","purchasingToDate","purchasingSearch"].forEach(id=>$(id)?.addEventListener("input",()=>setTimeout(render,0)));
-    const originalLoad=window.loadPurchasingManagement;
-    if(typeof originalLoad==="function"&&!originalLoad.__pcClean){
-      const wrapped=async function(){const r=await originalLoad.apply(this,arguments);setTimeout(()=>{render();installSearch();addPendingButton()},0);return r};wrapped.__pcClean=true;window.loadPurchasingManagement=wrapped;
-    }
-    installSearch();render();setTimeout(()=>{render();installSearch();addPendingButton()},400);setTimeout(()=>{render();installSearch()},1200);
-    $("addPurchasingItem")?.addEventListener("click",()=>setTimeout(installSearch,0));
-    $("togglePurchasingForm")?.addEventListener("click",()=>setTimeout(()=>{addPendingButton();installSearch()},0));
   }
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
-})();
-</script>
 
+  window.refreshInventoryDisplayAfterSale=refreshInventoryDisplayAfterSale;
 
-<style id="purchasing-search-select-fix-v12">
-.pc-results{
-  pointer-events:auto !important;
-  z-index:2147483647 !important;
-}
-.pc-result{
-  pointer-events:auto !important;
-  cursor:pointer !important;
-  user-select:none !important;
-  -webkit-user-select:none !important;
-}
-</style>
-<script id="purchasing-search-select-fix-v12">
-(function(){
-  "use strict";
-
-  function selectPurchasingResult(result){
-    if(!result)return false;
-
-    const wrap=result.closest(".pc-search-wrap");
-    if(!wrap)return false;
-
-    // The original hidden <select> is immediately after the search wrapper.
-    const sel=wrap.nextElementSibling?.matches?.(".purchasing-item-select")
-      ? wrap.nextElementSibling
-      : document.querySelector(
-          `#purchasingItemsBody .purchasing-item-select[data-pc-search-for="${CSS.escape(result.dataset.id||"")}"]`
-        );
-
-    if(!sel)return false;
-
-    const value=String(result.dataset.id||"");
-    const option=[...sel.options].find(o=>String(o.value)===value);
-    if(!option)return false;
-
-    sel.value=value;
-
-    // Trigger the existing Purchasing row logic.
-    sel.dispatchEvent(new Event("input",{bubbles:true}));
-    sel.dispatchEvent(new Event("change",{bubbles:true}));
-
-    const row=sel.closest(".purchasing-item-row");
-    if(row && typeof window.updateRowP==="function"){
-      try{window.updateRowP(row)}catch(_){}
-    }
-
-    const input=wrap.querySelector(".pc-search-input");
-    if(input){
-      const code=option.textContent.split(" · ")[0]||"";
-      const name=option.textContent.split(" · ").slice(1).join(" · ").replace(/\s+\(Service\)\s*$/,"");
-      input.value=code && name ? code+" · "+name : option.textContent;
-    }
-
-    const results=wrap.querySelector(".pc-results");
-    if(results)results.style.display="none";
-
-    return true;
+  // Save functions already create the inventory movement. This wrapper only
+  // refreshes the visible stock after a successful save; it does not alter
+  // the sale, invoice, payment, commission, or inventory movement logic.
+  function wrapSave(name){
+    const fn=window[name];
+    if(typeof fn!=="function" || fn.__stockRefreshWrapped)return;
+    const wrapped=async function(){
+      const beforeCount=Array.isArray(window.stockMovements)?window.stockMovements.length:0;
+      const result=await fn.apply(this,arguments);
+      setTimeout(refreshInventoryDisplayAfterSale,0);
+      setTimeout(refreshInventoryDisplayAfterSale,500);
+      return result;
+    };
+    wrapped.__stockRefreshWrapped=true;
+    window[name]=wrapped;
   }
 
   function install(){
-    if(document.documentElement.dataset.pcSearchSelectFixV12)return;
-    document.documentElement.dataset.pcSearchSelectFixV12="1";
-
-    // pointerdown is used because Safari can blur/repaint the search overlay
-    // before a normal click reaches the result.
-    document.addEventListener("pointerdown",function(e){
-      const result=e.target.closest(".pc-result");
-      if(!result)return;
-
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-
-      selectPurchasingResult(result);
-    },true);
-
-    // Also support older browsers that don't deliver pointer events.
-    document.addEventListener("mousedown",function(e){
-      const result=e.target.closest(".pc-result");
-      if(!result)return;
-
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-
-      selectPurchasingResult(result);
-    },true);
+    wrapSave("saveDermed");
+    wrapSave("saveMts");
+    wrapSave("saveMtsFinal");
   }
 
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",install,{once:true});
-  }else{
-    install();
-  }
-})();
-</script>
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
+  else install();
+  setTimeout(install,500);
+  setTimeout(install,1500);
 
-
-<style id="purchasing-search-selection-definitive-v13">
-.pc-results,.pc-result{
-  pointer-events:auto !important;
-}
-.pc-result{
-  touch-action:manipulation !important;
-  cursor:pointer !important;
-}
-</style>
-<script id="purchasing-search-selection-definitive-v13">
-(function(){
-  "use strict";
-
-  function getSelect(wrap){
-    if(!wrap)return null;
-    // The search wrapper and its hidden select belong to the same table cell.
-    const cell=wrap.closest("td") || wrap.parentElement;
-    return cell ? cell.querySelector("select.purchasing-item-select") : null;
-  }
-
-  function choose(result){
-    const wrap=result.closest(".pc-search-wrap");
-    const sel=getSelect(wrap);
-    if(!wrap || !sel)return false;
-
-    const value=String(result.getAttribute("data-id")||"");
-    const option=[...sel.options].find(o=>String(o.value)===value);
-    if(!option){
-      console.warn("Purchasing search: matching option not found",value);
-      return false;
-    }
-
-    // Set the real select first. The existing Purchasing code listens to
-    // this select and fills price/type/subtotal from the selected source.
-    sel.value=value;
-
-    const input=wrap.querySelector(".pc-search-input");
-    if(input){
-      input.value=option.textContent
-        .replace(/\s+\(Service\)\s*$/,"")
-        .trim();
-    }
-
-    // Use the native change event so the original row handler runs.
-    sel.dispatchEvent(new Event("change",{bubbles:true}));
-
-    const row=sel.closest(".purchasing-item-row");
-    if(row){
-      if(typeof window.updateRowP==="function"){
-        try{window.updateRowP(row)}catch(err){console.warn(err)}
+  // After deleting an invoice, the existing delete function removes its
+  // inventory movement. Refresh the visible stock immediately afterward.
+  setTimeout(function(){
+    const fn=window.deleteCompleteSaleRecord;
+    if(typeof fn!=="function" || fn.__stockRefreshWrapped)return;
+    const wrapped=async function(){
+      const result=await fn.apply(this,arguments);
+      if(result!==false){
+        await refreshInventoryDisplayAfterSale();
       }
-      if(typeof window.calcAllP==="function"){
-        try{window.calcAllP()}catch(_){}
-      }
-    }
-
-    const results=wrap.querySelector(".pc-results");
-    if(results){
-      results.style.display="none";
-      results.innerHTML="";
-    }
-
-    // Keep focus in the search box after selection.
-    if(input)input.focus();
-    return true;
-  }
-
-  function install(){
-    if(document.documentElement.dataset.pcSelectionDefinitiveV13)return;
-    document.documentElement.dataset.pcSelectionDefinitiveV13="1";
-
-    document.addEventListener("pointerdown",function(e){
-      const result=e.target.closest?.(".pc-result");
-      if(!result)return;
-
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-
-      choose(result);
-    },true);
-
-    document.addEventListener("touchstart",function(e){
-      const result=e.target.closest?.(".pc-result");
-      if(!result)return;
-
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-
-      choose(result);
-    },{capture:true,passive:false});
-
-    document.addEventListener("click",function(e){
-      const result=e.target.closest?.(".pc-result");
-      if(!result)return;
-
-      e.preventDefault();
-      e.stopPropagation();
-      e.stopImmediatePropagation();
-      choose(result);
-    },true);
-  }
-
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",install,{once:true});
-  }else{
-    install();
-  }
-})();
-</script>
-
-
-<style id="purchasing-search-definitive-clean-v14">
-.purchasing-def-search{
-  position:relative;
-  width:100%;
-  min-width:240px;
-}
-.purchasing-def-search-input{
-  width:100%;
-  height:42px;
-  box-sizing:border-box;
-  padding:10px 12px;
-  border:1px solid #94a3b8;
-  border-radius:8px;
-  background:#fff;
-  font-size:14px;
-  outline:none;
-}
-.purchasing-def-search-input:focus{
-  border-color:#0f766e;
-  box-shadow:0 0 0 3px rgba(15,118,110,.12);
-}
-#purchasingDefResults{
-  position:fixed !important;
-  z-index:2147483647 !important;
-  display:none;
-  width:420px;
-  max-height:430px;
-  overflow-y:auto;
-  background:#fff;
-  border:1px solid #94a3b8;
-  border-radius:10px;
-  box-shadow:0 18px 45px rgba(15,23,42,.28);
-  pointer-events:auto !important;
-}
-.purchasing-def-result{
-  display:block;
-  width:100%;
-  box-sizing:border-box;
-  padding:12px 14px;
-  border:0;
-  border-bottom:1px solid #e5e7eb;
-  background:#fff;
-  text-align:left;
-  cursor:pointer !important;
-  pointer-events:auto !important;
-  user-select:none;
-  -webkit-user-select:none;
-}
-.purchasing-def-result:hover,
-.purchasing-def-result:focus{
-  background:#eff6ff;
-  outline:none;
-}
-.purchasing-def-code{
-  display:block;
-  font-size:12px;
-  font-weight:800;
-  color:#475569;
-  margin-bottom:3px;
-}
-.purchasing-def-name{
-  display:block;
-  font-size:14px;
-  font-weight:650;
-  line-height:1.35;
-  color:#0f172a;
-  white-space:normal;
-  overflow-wrap:anywhere;
-}
-.purchasing-def-kind{
-  display:inline-block;
-  margin-top:5px;
-  padding:2px 7px;
-  border-radius:999px;
-  background:#f1f5f9;
-  color:#64748b;
-  font-size:10px;
-}
-.purchasing-def-empty{
-  padding:16px;
-  color:#64748b;
-  text-align:center;
-}
-</style>
-
-<script id="purchasing-search-definitive-clean-v14">
-(function(){
-  "use strict";
-
-  let activeInput=null;
-  let activeSelect=null;
-  let activeWrap=null;
-
-  function esc(v){
-    return String(v??"").replace(/[&<>"']/g,c=>({
-      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
-    }[c]));
-  }
-
-  function ensureResults(){
-    let box=document.getElementById("purchasingDefResults");
-    if(!box){
-      box=document.createElement("div");
-      box.id="purchasingDefResults";
-      document.body.appendChild(box);
-    }
-    return box;
-  }
-
-  function optionInfo(o){
-    const text=(o?.textContent||"").trim();
-    const service=/\s+\(Service\)\s*$/i.test(text);
-    const clean=text.replace(/\s+\(Service\)\s*$/i,"").trim();
-    const parts=clean.split(" · ");
-    const code=parts.length>1?parts.shift():"";
-    const name=parts.join(" · ")||clean;
-    return {code,name,kind:service?"Service":"Product",text};
-  }
-
-  function position(box,input){
-    const r=input.getBoundingClientRect();
-    const width=Math.max(360,Math.min(560,Math.max(r.width,420)));
-    const above=r.top-8;
-    const below=window.innerHeight-r.bottom-8;
-    const h=Math.min(430,Math.max(120,above>=180?above:below));
-    const top=above>=180 ? r.top-h-6 : r.bottom+6;
-
-    box.style.width=width+"px";
-    box.style.left=Math.max(8,Math.min(r.left,window.innerWidth-width-8))+"px";
-    box.style.top=Math.max(8,Math.min(top,window.innerHeight-h-8))+"px";
-    box.style.maxHeight=h+"px";
-  }
-
-  function close(){
-    const box=document.getElementById("purchasingDefResults");
-    if(box)box.style.display="none";
-    activeInput=null;
-    activeSelect=null;
-    activeWrap=null;
-  }
-
-  function choose(option,input,sel){
-    if(!option || !sel)return;
-
-    // This uses the exact value from the real select's option list.
-    // Therefore the value can never differ from what Purchasing expects.
-    sel.value=option.value;
-
-    // Trigger the original Purchasing row handler.
-    sel.dispatchEvent(new Event("change",{bubbles:true}));
-
-    const row=sel.closest(".purchasing-item-row");
-    if(row && typeof window.updateRowP==="function"){
-      try{window.updateRowP(row)}catch(err){console.warn(err)}
-    }
-    if(typeof window.calcAllP==="function"){
-      try{window.calcAllP()}catch(_){}
-    }
-
-    const info=optionInfo(option);
-    input.value=info.text;
-
-    close();
-    input.focus();
-  }
-
-  function show(input,sel,query){
-    const box=ensureResults();
-    const q=String(query||"").trim().toLowerCase();
-
-    const options=[...sel.options].filter(o=>o.value);
-    const matches=options.filter(o=>{
-      const t=(o.textContent||"").toLowerCase();
-      return !q || t.includes(q);
-    });
-
-    if(!matches.length){
-      box.innerHTML='<div class="purchasing-def-empty">No product or service found</div>';
-    }else{
-      box.innerHTML="";
-      matches.slice(0,100).forEach(option=>{
-        const info=optionInfo(option);
-        const b=document.createElement("button");
-        b.type="button";
-        b.className="purchasing-def-result";
-        b.innerHTML=
-          `<span class="purchasing-def-code">${esc(info.code||"")}</span>`+
-          `<span class="purchasing-def-name">${esc(info.name)}</span>`+
-          `<span class="purchasing-def-kind">${esc(info.kind)}</span>`;
-
-        // Direct handler on a real button. No document click delegation.
-        b.addEventListener("click",function(e){
-          e.preventDefault();
-          e.stopPropagation();
-          choose(option,input,sel);
-        });
-
-        // Also select on pointerdown so Safari cannot lose the result before click.
-        b.addEventListener("pointerdown",function(e){
-          e.preventDefault();
-          e.stopPropagation();
-          choose(option,input,sel);
-        },{passive:false});
-
-        box.appendChild(b);
-      });
-    }
-
-    activeInput=input;
-    activeSelect=sel;
-    position(box,input);
-    box.style.display="block";
-    box.scrollTop=0;
-  }
-
-  function build(sel){
-    if(!sel || !sel.classList.contains("purchasing-item-select"))return;
-
-    // Do not rebuild our own control.
-    if(sel.dataset.purchasingDefSearch==="1")return;
-    sel.dataset.purchasingDefSearch="1";
-
-    // Remove the old search wrapper created by all previous patches.
-    const old=sel.parentElement?.querySelector(".pc-search-wrap");
-    if(old){
-      old.remove();
-    }
-
-    sel.style.display="none";
-
-    const wrap=document.createElement("div");
-    wrap.className="purchasing-def-search";
-
-    const input=document.createElement("input");
-    input.type="text";
-    input.className="purchasing-def-search-input";
-    input.placeholder="Search product or service...";
-    input.autocomplete="off";
-
-    wrap.appendChild(input);
-    sel.parentNode.insertBefore(wrap,sel);
-
-    function current(){
-      const option=sel.options[sel.selectedIndex];
-      return option?.value ? option.textContent.trim() : "";
-    }
-
-    input.value=current();
-
-    input.addEventListener("focus",function(){
-      show(input,sel,input.value);
-    });
-
-    input.addEventListener("input",function(){
-      show(input,sel,input.value);
-    });
-
-    input.addEventListener("keydown",function(e){
-      const box=document.getElementById("purchasingDefResults");
-
-      if(e.key==="Escape"){
-        e.preventDefault();
-        close();
-        input.value=current();
-        return;
-      }
-
-      if(e.key==="Enter"){
-        const first=box?.querySelector(".purchasing-def-result");
-        if(first){
-          e.preventDefault();
-          first.click();
-        }
-      }
-
-      if(e.key==="ArrowDown"){
-        const first=box?.querySelector(".purchasing-def-result");
-        if(first){
-          e.preventDefault();
-          first.focus();
-        }
-      }
-    });
-
-    sel.addEventListener("change",function(){
-      input.value=current();
-    });
-  }
-
-  function clean(){
-    document.querySelectorAll(
-      "#purchasingItemsBody select.purchasing-item-select"
-    ).forEach(build);
-  }
-
-  function install(){
-    clean();
-
-    const body=document.getElementById("purchasingItemsBody");
-    if(body && !body.dataset.purchasingDefSearchObserver){
-      body.dataset.purchasingDefSearchObserver="1";
-      const ob=new MutationObserver(function(){
-        setTimeout(clean,0);
-      });
-      ob.observe(body,{childList:true,subtree:true});
-    }
-
-    if(!document.documentElement.dataset.purchasingDefSearchGlobal){
-      document.documentElement.dataset.purchasingDefSearchGlobal="1";
-
-      document.addEventListener("mousedown",function(e){
-        const box=document.getElementById("purchasingDefResults");
-        if(!box || box.style.display==="none")return;
-
-        if(e.target.closest("#purchasingDefResults"))return;
-        if(activeInput && e.target===activeInput)return;
-
-        close();
-      },true);
-
-      window.addEventListener("resize",function(){
-        if(activeInput && activeSelect){
-          position(ensureResults(),activeInput);
-        }
-      });
-
-      window.addEventListener("scroll",function(){
-        if(activeInput && activeSelect){
-          position(ensureResults(),activeInput);
-        }
-      },true);
-    }
-  }
-
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",install,{once:true});
-  }else{
-    install();
-  }
-
-  setTimeout(clean,200);
-  setTimeout(clean,700);
-  setTimeout(clean,1500);
+      return result;
+    };
+    wrapped.__stockRefreshWrapped=true;
+    window.deleteCompleteSaleRecord=wrapped;
+  },800);
 })();
 </script>
