@@ -8361,6 +8361,8 @@ function updateMtsStableTotals(){
 function addSaleProduct(type,pid){
  const p=products.find(x=>String(x.id)===String(pid)); if(!p)return;
  if(type==="mts"){
+   const stock=typeof window.__currentProductStock==="function"?Number(window.__currentProductStock(pid)||0):(typeof productStock==="function"?Number(productStock(pid)||0):0);
+   if(stock<=0){alert("This product is out of stock and cannot be added to MTS Sale.");return false;}
    const arr=window.mtsSaleItems||(window.mtsSaleItems=[]);
    const existing=arr.find(x=>String(x.product_id)===String(pid));
    if(existing){
@@ -10242,6 +10244,8 @@ document.addEventListener("DOMContentLoaded",function(){
     const productsArr=Array.isArray(window.products)?window.products:[];
     const p=productsArr.find(x=>String(x.id)===String(pid));
     if(!p)return;
+    const liveStock=typeof window.__currentProductStock==="function"?Number(window.__currentProductStock(pid)||0):(typeof productStock==="function"?Number(productStock(pid)||0):0);
+    if(liveStock<=0){alert("This product is out of stock and cannot be added to MTS Sale.");return false;}
 
     const arr=window.mtsSaleItems||(window.mtsSaleItems=[]);
     if(arr.some(x=>String(x.product_id)===String(pid))){
@@ -10408,6 +10412,8 @@ document.addEventListener("DOMContentLoaded",function(){
       const productsArr=Array.isArray(window.products)?window.products:[];
       const p=productsArr.find(x=>String(x.id)===String(pid));
       if(!p)return;
+      const liveStock=typeof window.__currentProductStock==="function"?Number(window.__currentProductStock(pid)||0):(typeof productStock==="function"?Number(productStock(pid)||0):0);
+      if(liveStock<=0){alert("This product is out of stock and cannot be added to MTS Sale.");return false;}
       const arr=window.mtsSaleItems||(window.mtsSaleItems=[]);
       if(arr.some(x=>String(x.product_id)===String(pid)))return;
       arr.push({
@@ -21331,6 +21337,83 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 })();
 </script>
 </body>
+<script id="final-ddmmyyyy-list-and-mts-guard-20260822">
+(function(){
+  "use strict";
+  function E(id){return document.getElementById(id)}
+  function ddmmyyyy(v){
+    const s=String(v||"").trim();
+    let m=s.match(/^(\d{4})-(\d{2})-(\d{2})/);
+    if(m)return `${m[3]}/${m[2]}/${m[1]}`;
+    m=s.match(/^(\d{2})[\/-](\d{2})[\/-](\d{4})$/);
+    if(m)return `${m[1]}/${m[2]}/${m[3]}`;
+    const d=new Date(s);
+    if(!Number.isNaN(d.getTime()))return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()}`;
+    return s;
+  }
+  function fixAppointmentList(){
+    const list=E("appointmentList");
+    if(!list)return;
+    list.querySelectorAll("tbody tr").forEach(tr=>{
+      const cell=tr.children[1];
+      if(!cell)return;
+      const nodes=[...cell.childNodes].filter(n=>n.nodeType===3);
+      if(nodes.length){
+        const f=ddmmyyyy(nodes[0].textContent);
+        if(/^\d{2}\/\d{2}\/\d{4}$/.test(f))nodes[0].textContent=f+" ";
+      }
+    });
+    E("appointmentUpcoming")?.querySelectorAll(".appointment-day-head strong").forEach(el=>{
+      const f=ddmmyyyy(el.textContent);
+      if(/^\d{2}\/\d{2}\/\d{4}$/.test(f))el.textContent=f;
+    });
+  }
+  const obs=new MutationObserver(()=>fixAppointmentList());
+  function start(){
+    fixAppointmentList();
+    const root=E("appointmentList")||document.body;
+    obs.observe(root,{childList:true,subtree:true});
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",start,{once:true});else start();
+  [250,700,1500,3000].forEach(ms=>setTimeout(fixAppointmentList,ms));
+
+  // Final MTS guard for any older handler that may be installed after the
+  // earlier zero-stock checks. This does not affect other sale types.
+  function stock(pid){
+    try{
+      if(typeof window.__currentProductStock==="function")return Math.max(0,Number(window.__currentProductStock(pid)||0));
+      if(typeof window.productStock==="function")return Math.max(0,Number(window.productStock(pid)||0));
+    }catch(e){}
+    return 0;
+  }
+  function guard(){
+    const fn=window.addSaleProduct;
+    if(typeof fn!=="function" || fn.__mtsZeroStockGuard)return;
+    const wrapped=function(type,pid){
+      if(type==="mts" && stock(pid)<=0){
+        alert("This product is out of stock and cannot be added to MTS Sale.");
+        return false;
+      }
+      return fn.apply(this,arguments);
+    };
+    wrapped.__mtsZeroStockGuard=true;
+    window.addSaleProduct=wrapped;
+  }
+  guard();
+  [100,300,700,1500,3000,5000].forEach(ms=>setTimeout(guard,ms));
+  document.addEventListener("click",function(e){
+    const b=e.target.closest?.("#mtsProductResults button[data-product-id],#mtsProductResults button[data-mts-final-product-id]");
+    if(!b)return;
+    const pid=b.getAttribute("data-product-id")||b.getAttribute("data-mts-final-product-id");
+    if(pid && stock(pid)<=0){
+      e.preventDefault();e.stopImmediatePropagation();
+      b.disabled=true;
+      alert("This product is out of stock and cannot be added to MTS Sale.");
+    }
+  },true);
+})();
+</script>
+
 </html>
 
 
