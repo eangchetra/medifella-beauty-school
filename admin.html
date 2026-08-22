@@ -9602,8 +9602,16 @@ document.addEventListener("DOMContentLoaded",function(){
         // (for example, another browser/admin created the previous invoice).
         let attempt=0;
         let candidateRef=reference;
+        const newSaleId=(typeof crypto!=="undefined" && typeof crypto.randomUUID==="function")
+          ? crypto.randomUUID()
+          : null;
         while(attempt<12){
-          const insertPayload={...payload,reference_no:candidateRef,created_by:(adminUser?.id||currentProfile?.id||null)};
+          const insertPayload={
+            ...payload,
+            ...(newSaleId ? {id:newSaleId} : {}),
+            reference_no:candidateRef,
+            created_by:(adminUser?.id||currentProfile?.id||null)
+          };
           r=await sb.from("medifella_sales").insert(insertPayload).select().single();
 
           if(r.error && /sale_time|column .* does not exist/i.test(r.error.message||"")){
@@ -9624,9 +9632,17 @@ document.addEventListener("DOMContentLoaded",function(){
           throw r.error;
         }
         if(r.error)throw r.error;
-        if(!r.data || !r.data.id){
-          throw new Error("Dermed invoice was saved but the saved invoice ID was not returned. Please try again.");
+
+        // Some Supabase RLS setups allow INSERT but do not return the inserted
+        // row from .select().single().  The client-generated UUID lets us
+        // continue safely without depending on returned row data.
+        if(!r.data && newSaleId){
+          r.data={...insertPayload,id:newSaleId,reference_no:candidateRef};
         }
+        if(!r.data || !r.data.id){
+          throw new Error("Dermed invoice could not be confirmed after saving. Please check Supabase INSERT/SELECT policies.");
+        }
+
         if(paid>0){
           const pr=await sb.from("medifella_sale_payments").insert({sale_id:String(r.data.id),amount:paid,payment_method:E("dermedPaymentMethod").value,payment_date:now.slice(0,10),note:status==="Partial"?"Partial Payment":"Paid in Full",created_by:adminUser.id});
           if(pr.error)throw pr.error;
@@ -21318,5 +21334,250 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   else install();
   setTimeout(install,300);
   setTimeout(install,900);
+})();
+</script>
+
+
+<style id="purchasing-search-final-v16">
+.purchasing-final-search-results{
+  position:fixed !important;
+  z-index:2147483647 !important;
+  display:none;
+  background:#fff !important;
+  border:1px solid #94a3b8 !important;
+  border-radius:10px !important;
+  box-shadow:0 18px 45px rgba(15,23,42,.30) !important;
+  overflow-y:auto !important;
+  pointer-events:auto !important;
+}
+.purchasing-final-search-result{
+  display:block !important;
+  width:100% !important;
+  padding:12px 14px !important;
+  box-sizing:border-box !important;
+  border:0 !important;
+  border-bottom:1px solid #e5e7eb !important;
+  background:#fff !important;
+  text-align:left !important;
+  cursor:pointer !important;
+  pointer-events:auto !important;
+}
+.purchasing-final-search-result:hover{background:#eff6ff !important}
+</style>
+<script id="purchasing-search-final-v16">
+(function(){
+"use strict";
+
+let input=null, select=null, results=null;
+
+function box(){
+  if(results)return results;
+  results=document.createElement("div");
+  results.className="purchasing-final-search-results";
+  document.body.appendChild(results);
+  return results;
+}
+
+function position(){
+  if(!input || !results)return;
+  const r=input.getBoundingClientRect();
+  const w=Math.max(380,Math.min(600,Math.max(420,r.width)));
+  const h=Math.min(420,Math.max(120,window.innerHeight-r.bottom-12));
+  results.style.width=w+"px";
+  results.style.left=Math.max(8,Math.min(r.left,window.innerWidth-w-8))+"px";
+  results.style.top=Math.max(8,r.bottom+5)+"px";
+  results.style.maxHeight=h+"px";
+}
+
+function closeResults(){
+  if(results)results.style.display="none";
+}
+
+function sourceFromValue(v){
+  const parts=String(v||"").split(":");
+  const kind=parts[0], id=parts.slice(1).join(":");
+  if(kind==="product"){
+    return (Array.isArray(window.products)?window.products:[]).find(x=>String(x.id)===id) || null;
+  }
+  if(kind==="service"){
+    return (Array.isArray(window.services)?window.services:[]).find(x=>String(x.id)===id) || null;
+  }
+  return null;
+}
+
+function priceOf(x){
+  return Number(x?.cost ?? x?.unit_cost ?? x?.purchase_price ?? x?.price ?? 0) || 0;
+}
+
+function selectOption(option){
+  if(!option || !select || !input)return;
+
+  const value=String(option.value);
+
+  // Set the actual hidden SELECT using the native setter.
+  const setter=Object.getOwnPropertyDescriptor(
+    HTMLSelectElement.prototype,"value"
+  )?.set;
+  if(setter)setter.call(select,value);
+  else select.value=value;
+
+  // Fire the real change event used by the original Purchasing row.
+  select.dispatchEvent(new Event("change",{bubbles:true}));
+
+  const row=select.closest(".purchasing-item-row");
+  const src=sourceFromValue(value);
+
+  // Direct fallback: update the visible fields too, so selection does not
+  // depend on any search-patch-specific function.
+  if(row && src){
+    const unit=row.querySelector(".purchasing-unit");
+    const type=row.querySelector(".purchasing-type");
+
+    if(unit && !unit.dataset.userEdited){
+      unit.value=priceOf(src).toFixed(2);
+    }
+
+    if(type){
+      const isMachine=String(src.type||src.product_type||src.category||"")
+        .toLowerCase().includes("machine");
+      type.value = value.startsWith("service:") ? "Other" : (isMachine ? "Machine" : "Product");
+      type.dispatchEvent(new Event("change",{bubbles:true}));
+    }
+
+    const qty=Number(row.querySelector(".purchasing-qty")?.value||0);
+    const unitPrice=Number(row.querySelector(".purchasing-unit")?.value||0);
+    const dt=row.querySelector(".purchasing-discount-type")?.value||"USD";
+    const dv=Number(row.querySelector(".purchasing-discount")?.value||0);
+    const base=qty*unitPrice;
+    const discount=dt==="%" ? base*Math.min(100,dv)/100 : Math.min(base,dv);
+    const subtotal=Math.max(0,base-discount);
+    const sub=row.querySelector(".purchasing-subtotal");
+    if(sub)sub.value=subtotal.toFixed(2);
+
+    const total=[...document.querySelectorAll("#purchasingItemsBody .purchasing-subtotal")]
+      .reduce((a,e)=>a+(Number(e.value)||0),0);
+    const grand=document.getElementById("purchasingGrandTotal");
+    if(grand)grand.textContent=total.toFixed(2);
+  }
+
+  input.value=(option.textContent||"").trim();
+  closeResults();
+  setTimeout(()=>input && input.focus(),0);
+}
+
+function show(){
+  if(!input || !select)return;
+  const q=input.value.trim().toLowerCase();
+  const opts=[...select.options].filter(o=>o.value);
+  const matches=opts.filter(o=>(o.textContent||"").toLowerCase().includes(q));
+  const b=box();
+
+  b.innerHTML="";
+  if(!matches.length){
+    const empty=document.createElement("div");
+    empty.style.cssText="padding:16px;text-align:center;color:#64748b";
+    empty.textContent="No product or service found";
+    b.appendChild(empty);
+  }else{
+    matches.slice(0,100).forEach(option=>{
+      const item=document.createElement("div");
+      item.className="purchasing-final-search-result";
+      item.setAttribute("role","option");
+
+      const txt=(option.textContent||"").trim();
+      const parts=txt.split(" · ");
+      const code=parts.length>1?parts[0]:"";
+      const name=parts.length>1?parts.slice(1).join(" · "):txt;
+      item.innerHTML=
+        `<div style="font-size:11px;font-weight:800;color:#64748b">${String(code).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>`+
+        `<div style="font-size:14px;font-weight:650;color:#111827;line-height:1.4">${String(name).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>`;
+
+      // Use multiple native mouse events. No preventDefault on the first
+      // event, so Safari can complete the interaction normally.
+      const activate=e=>{
+        e.preventDefault();
+        e.stopPropagation();
+        selectOption(option);
+      };
+      item.onmousedown=activate;
+      item.onmouseup=activate;
+      item.onclick=activate;
+      item.ontouchend=activate;
+
+      b.appendChild(item);
+    });
+  }
+
+  position();
+  b.style.display="block";
+}
+
+function build(sel){
+  if(!sel || !sel.classList.contains("purchasing-item-select"))return;
+  if(sel.dataset.finalSearchV16)return;
+  sel.dataset.finalSearchV16="1";
+
+  sel.style.display="none";
+
+  const wrap=document.createElement("div");
+  wrap.style.cssText="width:100%;position:relative";
+  const inp=document.createElement("input");
+  inp.type="text";
+  inp.className="purchasing-final-search-input";
+  inp.placeholder="Search product or service...";
+  inp.autocomplete="off";
+  inp.style.cssText="width:100%;height:40px;box-sizing:border-box;padding:9px 12px;border:1px solid #94a3b8;border-radius:8px;background:#fff;font-size:14px;outline:none";
+
+  const current=()=>{
+    const o=sel.options[sel.selectedIndex];
+    return o?.value ? (o.textContent||"").trim() : "";
+  };
+  inp.value=current();
+
+  wrap.appendChild(inp);
+  sel.parentNode.insertBefore(wrap,sel);
+
+  inp.addEventListener("focus",function(){
+    input=inp; select=sel; show();
+  });
+  inp.addEventListener("input",function(){
+    input=inp; select=sel; show();
+  });
+  inp.addEventListener("keydown",function(e){
+    if(e.key==="Escape"){e.preventDefault();closeResults();inp.value=current();return;}
+    if(e.key==="Enter"){
+      const first=box().querySelector(".purchasing-final-search-result");
+      if(first){e.preventDefault();first.click();}
+    }
+  });
+}
+
+function install(){
+  document.querySelectorAll("#purchasingItemsBody select.purchasing-item-select").forEach(build);
+  const body=document.getElementById("purchasingItemsBody");
+  if(body && !body.dataset.finalSearchObserverV16){
+    body.dataset.finalSearchObserverV16="1";
+    new MutationObserver(()=>setTimeout(()=>{
+      document.querySelectorAll("#purchasingItemsBody select.purchasing-item-select").forEach(build);
+    },0)).observe(body,{childList:true,subtree:true});
+  }
+}
+
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
+else install();
+setTimeout(install,300);
+setTimeout(install,1000);
+
+document.addEventListener("mousedown",function(e){
+  if(results && results.style.display!=="none" &&
+     !e.target.closest(".purchasing-final-search-results") &&
+     e.target!==input){
+    closeResults();
+  }
+},true);
+
+window.addEventListener("resize",position);
+window.addEventListener("scroll",position,true);
+
 })();
 </script>
