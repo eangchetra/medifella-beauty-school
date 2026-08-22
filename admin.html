@@ -20744,6 +20744,34 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       input.value=label(o);
       close();
     }
+    let directSearchLoadP=null;
+    async function ensurePurchasingSourcesP(){
+      const haveProducts=Array.isArray(window.products) && window.products.length>0;
+      const haveServices=Array.isArray(window.services) && window.services.length>0;
+      if(haveProducts && haveServices)return;
+      if(directSearchLoadP)return directSearchLoadP;
+      if(typeof sb==="undefined" || !sb)return;
+      directSearchLoadP=(async()=>{
+        try{
+          if(!haveProducts){
+            const r=await sb.from("medifella_products").select("*").order("created_at",{ascending:false});
+            if(!r.error){
+              window.products=Array.isArray(r.data)?r.data:[];
+              try{ products=window.products; }catch(_){}
+            }
+          }
+          if(!haveServices){
+            const r=await sb.from("medifella_services").select("*").order("created_at",{ascending:false});
+            if(!r.error){
+              window.services=Array.isArray(r.data)?r.data:[];
+              try{ services=window.services; }catch(_){}
+            }
+          }
+        }catch(_){}
+        directSearchLoadP=null;
+      })();
+      return directSearchLoadP;
+    }
     function sourceMatches(){
       const q=String(input.value||"").trim().toLowerCase();
       const out=[];
@@ -20779,7 +20807,10 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       input.value=item.label;
       close();
     }
-    function render(){
+    async function render(){
+      results.innerHTML='<div style="padding:12px;color:#64748b;text-align:center;background:#fff">Searching products and services…</div>';
+      results.style.display="block";
+      await ensurePurchasingSourcesP();
       const matches=sourceMatches();
       results.innerHTML="";
       if(!matches.length){
