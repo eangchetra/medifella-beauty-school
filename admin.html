@@ -20705,7 +20705,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
         <div class="purchasing-direct-search" style="position:relative;width:100%">
           <input type="text" class="purchasing-direct-input" autocomplete="off"
             placeholder="Search product or service..." value="">
-          <div class="purchasing-direct-results" style="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:99999;max-height:360px;overflow:auto;background:#fff;border:1px solid #94a3b8;border-radius:10px;box-shadow:0 15px 35px rgba(15,23,42,.22)"></div>
+          <div class="purchasing-direct-results" style="display:none;position:fixed;z-index:2147483647;max-height:360px;overflow:auto;background:#fff;border:1px solid #94a3b8;border-radius:10px;box-shadow:0 15px 35px rgba(15,23,42,.22);box-sizing:border-box"></div>
           <select class="purchasing-item-select" style="display:none">${itemOptionsP(String(d.source||""))}</select>
         </div>
       </td>
@@ -20737,6 +20737,15 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     const results=tr.querySelector(".purchasing-direct-results");
 
     function label(o){return String(o?.textContent||"").trim();}
+    function positionResults(){
+      if(results.style.display==="none")return;
+      const r=input.getBoundingClientRect();
+      results.style.left=Math.max(8,r.left)+"px";
+      results.style.top=(r.bottom+4)+"px";
+      results.style.width=Math.max(r.width,320)+"px";
+      results.style.maxWidth="min(520px, calc(100vw - 16px))";
+    }
+    function openResults(){results.style.display="block";positionResults();}
     function close(){results.style.display="none";}
     function choose(o){
       select.value=o.value;
@@ -20832,6 +20841,12 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       results.style.display="block";
     }
 
+    // Portal the results outside the Purchasing card/table stacking context.
+    // This keeps the dropdown visually in front of the white row/background.
+    if(results.parentElement!==document.body)document.body.appendChild(results);
+    window.addEventListener("resize",positionResults);
+    window.addEventListener("scroll",positionResults,true);
+
     input.addEventListener("focus",render);
     input.addEventListener("input",render);
     input.addEventListener("keydown",e=>{
@@ -20842,7 +20857,10 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       }
     });
     document.addEventListener("pointerdown",function outside(e){
-      if(!tr.contains(e.target)){close();document.removeEventListener("pointerdown",outside,true);}
+      if(!tr.contains(e.target) && !results.contains(e.target)){
+        close();
+        document.removeEventListener("pointerdown",outside,true);
+      }
     },true);
 
     if(d.source){
