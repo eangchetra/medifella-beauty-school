@@ -11767,23 +11767,37 @@ document.addEventListener("DOMContentLoaded",function(){
     }
   }
   async function insertAppointment(row){
-    // Compatibility with the current medifella_appointments schema.
-    // Some older versions of this page used customer_source, but that column
-    // does not exist in the current table. Never send it to Supabase.
+    // Use a valid UUID for the appointment ID so the same ID works whether
+    // the current table uses uuid or text for its primary key.
     const clean=Object.assign({},row);
     delete clean.customer_source;
     delete clean.customerSource;
-    let result=await sb.from("medifella_appointments").insert(clean).select("*").single();
-    // If an older cached handler somehow adds customer_source, retry once
-    // with that unsupported field removed.
-    if(result.error && /customer_source/i.test(String(result.error.message||""))){
-      const retry=Object.assign({},clean);
-      delete retry.customer_source;
-      delete retry.customerSource;
-      result=await sb.from("medifella_appointments").insert(retry).select("*").single();
+
+    if(!clean.id || !/^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i.test(String(clean.id))){
+      clean.id=(typeof crypto!=="undefined" && typeof crypto.randomUUID==="function")
+        ?crypto.randomUUID()
+        :("00000000-0000-4000-8000-"+String(Date.now()).slice(-12).padStart(12,"0"));
     }
-    if(result.error)throw result.error;
-    return result.data;
+
+    // Do not require SELECT permission after INSERT. Some RLS policies allow
+    // INSERT but do not allow the inserted row to be returned.
+    const result=await sb.from("medifella_appointments").insert(clean);
+
+    if(result.error){
+      // A few older deployments may still reject customer_source; retry only
+      // after removing it, never by changing any other appointment field.
+      if(/customer_source/i.test(String(result.error.message||""))){
+        const retry=Object.assign({},clean);
+        delete retry.customer_source;
+        delete retry.customerSource;
+        const r2=await sb.from("medifella_appointments").insert(retry);
+        if(r2.error)throw r2.error;
+        return retry;
+      }
+      throw result.error;
+    }
+
+    return clean;
   }
   // Make the shared appointment writer available to the Dermed Sale
   // appointment modal, which is initialized in a separate script scope.
@@ -11945,7 +11959,9 @@ document.addEventListener("DOMContentLoaded",function(){
     const date=parsedAppointmentDate.value;
     const data=appointmentCustomer(c,customerSource);
     const row={
-      id:"APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
+      id:(typeof crypto!=="undefined" && typeof crypto.randomUUID==="function")
+        ?crypto.randomUUID()
+        :"00000000-0000-4000-8000-"+String(Date.now()).slice(-12).padStart(12,"0"),
       customer_id:data.id||null,
       customer_name:data.name,
       customer_phone:data.phone,
@@ -17715,7 +17731,9 @@ async function loadCommissionRecords(retry=0){
       };
 
     const row={
-      id:"APT-"+Date.now()+"-"+Math.random().toString(36).slice(2,8),
+      id:(typeof crypto!=="undefined" && typeof crypto.randomUUID==="function")
+        ?crypto.randomUUID()
+        :"00000000-0000-4000-8000-"+String(Date.now()).slice(-12).padStart(12,"0"),
       customer_id:data.id,
       customer_name:data.name,
       customer_phone:data.phone,
@@ -21579,5 +21597,76 @@ document.addEventListener("mousedown",function(e){
 window.addEventListener("resize",position);
 window.addEventListener("scroll",position,true);
 
+})();
+</script>
+
+
+<script id="appointments-all-entrypoints-final-v17">
+(function(){
+  "use strict";
+
+  function E(id){return document.getElementById(id);}
+
+  function openMain(){
+    const card=E("appointmentAddCard"), toggle=E("appointmentAddToggle");
+    if(!card)return false;
+    card.style.display="";
+    if(toggle){
+      toggle.textContent="− Hide Appointment";
+      toggle.setAttribute("aria-expanded","true");
+    }
+    card.scrollIntoView({behavior:"smooth",block:"start"});
+    return true;
+  }
+
+  function openDermed(){
+    const modal=E("dermedAppointmentModal");
+    if(!modal)return false;
+    modal.classList.add("show");
+    modal.setAttribute("aria-hidden","false");
+    modal.style.display="block";
+    const date=E("dermedAppointmentDate");
+    if(date && !String(date.value||"").trim()){
+      const d=new Date();
+      date.value=String(d.getDate()).padStart(2,"0")+"/"+String(d.getMonth()+1).padStart(2,"0")+"/"+d.getFullYear();
+    }
+    return true;
+  }
+
+  // Make the Appointment Management button work even after section re-render.
+  document.addEventListener("click",function(e){
+    const main=e.target.closest("#appointmentAddToggle");
+    if(main){
+      // The original handler already toggles. Do not interfere with a normal
+      // click; this fallback only runs if the card is still hidden afterward.
+      setTimeout(function(){
+        const card=E("appointmentAddCard");
+        if(card && card.style.display==="none")openMain();
+      },60);
+      return;
+    }
+
+    const dermed=e.target.closest("#dermedAddAppointment");
+    if(dermed){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      openDermed();
+      return;
+    }
+
+    const list=e.target.closest(".dermed-list-add-appointment");
+    if(list){
+      // The existing list handler fills the customer fields. Keep that data,
+      // then ensure the modal is visible after the other handler runs.
+      setTimeout(function(){openDermed();},80);
+    }
+  },true);
+
+  // Ensure dynamically-created Dermed list buttons remain usable.
+  new MutationObserver(function(){
+    document.querySelectorAll(".dermed-list-add-appointment").forEach(function(b){
+      b.type="button";
+    });
+  }).observe(document.body,{subtree:true,childList:true});
 })();
 </script>
