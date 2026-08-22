@@ -5293,7 +5293,7 @@ async function recordSalePayment(id){
 function showSaleInvoice(id,size="A4"){
  window.currentInvoiceId = id;
  const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
- let total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
+ const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
  const rate=4150;
  let items=[];try{items=typeof saleItemsValue(s)==="string"?JSON.parse(saleItemsValue(s)):saleItemsValue(s)||[]}catch(_){items=[]}
  if(!Array.isArray(items))items=[];
@@ -5559,7 +5559,7 @@ function showSaleInvoice(id,size="A4"){
        ${isMtsSale ? `
        <div class="mf-mts-risk-notice">
          <div class="kh">ការកម្ម៉ង់របស់លោកអ្នកគឺពីរោងចក្រកូរ៉េផ្ទាល់។ យើងមិនមែនជាក្រុមហ៊ុនចែកចាយក្នុងប្រទេសកម្ពុជាទេ! រាល់ហានិភ័យទាំងឡាយ អតិថិជនត្រូវទទួលខុសត្រូវដោយខ្លួនឯង!</div>
-         <div class="en">Your order is directly from a Korean factory; we are not a distributor in Cambodia!Customers are responsible for all risks themselves!</div>
+         <div class="en">Your order is directly from a Korean factory; we are not a distributor in Cambodia! Customers are responsible for all risks themselves!</div>
        </div>` : ""}
      </div>
 
@@ -5777,6 +5777,48 @@ async function buildInvoicePaperCanvas(size){
         .mf-invoice .mf-invoice-label .kh,
         .mf-invoice .mf-refund-box .kh{
           ${m?'font-family:"KhmerOSMuolPDF","KhmerOSMuolUploaded","Khmer OS Moul","Khmer OS MOUL Regular",serif !important;':'font-family:"KhmerOSMuolUploaded","Khmer OS Moul","Khmer OS MOUL Regular",serif !important;'}
+        }
+
+        /* MTS Korean-factory warning: match the live invoice preview exactly. */
+        .mf-invoice .mf-mts-risk-notice{
+          ${b?'font-family:"KhmerOSBattambangPDF","KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif !important;':'font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif !important;'}
+          font-size:10.5px !important;
+          line-height:1.55 !important;
+          font-weight:400 !important;
+          text-align:left !important;
+          white-space:normal !important;
+          overflow-wrap:break-word !important;
+          word-break:normal !important;
+          letter-spacing:0 !important;
+          max-width:100% !important;
+          min-width:0 !important;
+          box-sizing:border-box !important;
+        }
+        .mf-invoice .mf-mts-risk-notice .kh{
+          display:block !important;
+          ${b?'font-family:"KhmerOSBattambangPDF","KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif !important;':'font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif !important;'}
+          font-size:10.5px !important;
+          line-height:1.55 !important;
+          font-weight:400 !important;
+          white-space:normal !important;
+          overflow-wrap:break-word !important;
+          word-break:normal !important;
+          text-align:left !important;
+          color:#111 !important;
+          margin:0 !important;
+        }
+        .mf-invoice .mf-mts-risk-notice .en{
+          display:block !important;
+          margin-top:4px !important;
+          font-family:Arial,"Noto Sans",sans-serif !important;
+          font-size:9.5px !important;
+          line-height:1.4 !important;
+          font-weight:400 !important;
+          white-space:normal !important;
+          overflow-wrap:break-word !important;
+          word-break:normal !important;
+          text-align:left !important;
+          color:#111 !important;
         }
 
         /* Keep invoice tables stable while Khmer glyphs are rasterized. */
