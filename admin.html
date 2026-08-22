@@ -3396,7 +3396,7 @@ script { display:none !important; }
 
     <div class="actions" style="justify-content:flex-end;margin-top:16px">
       <button id="addPurchasingItem" class="light" type="button">+ Add Item</button>
-      <button id="savePurchasing" class="gold" type="button">Save Purchasing</button>
+      <button id="savePurchasing" class="gold" type="button">Save Purchasing</button> <button id="pendingPurchasingFinal" class="light" type="button">Pending</button>
       <button id="cancelPurchasing" class="light" type="button">Cancel</button>
     </div>
     <div id="purchasingStatus"></div>
@@ -20802,20 +20802,52 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     const rows=filteredPurchasesP();
     if(!rows.length){P("purchasingList").innerHTML='<p class="muted">No purchasing records found.</p>';return}
     P("purchasingList").innerHTML=`<div class="table-wrap"><table class="table">
-      <thead><tr><th>Purchase ID</th><th>Date &amp; Time</th><th>Purchasing Staff</th><th>Items</th><th>Total</th><th>Action</th></tr></thead>
+      <thead><tr><th>Purchase ID</th><th>Date &amp; Time</th><th>Purchasing Staff</th><th>Items</th><th>Total</th><th>Payment / Arrival</th><th>Action</th></tr></thead>
       <tbody>${rows.map(r=>{
         const items=Array.isArray(r.items)?r.items:[];
+        const paid=String(r.payment_status||"Paid")==="Paid";
+        const arrived=String(r.arrival_status||"")=="Arrived";
+        let statusBtn;
+        if(!paid){
+          statusBtn=`<button type="button" class="light purchasing-pay-final" data-id="${attrP(r.id)}">Pending to Pay</button>`;
+        }else if(!arrived){
+          statusBtn=`<button type="button" class="light purchasing-arrive-final" data-id="${attrP(r.id)}">Arriving</button>`;
+        }else{
+          statusBtn=`<button type="button" disabled style="background:#2e7d32;color:#fff;border:0;border-radius:7px;padding:7px 10px;font-weight:700">Arrived</button>`;
+        }
         return `<tr>
           <td>${escP(r.purchase_no||r.id||"")}</td>
           <td>${escP(String(r.purchase_datetime||"").replace("T"," "))}</td>
           <td>${escP(r.purchasing_staff_name||"")}</td>
-          <td>${items.map(i=>`${escP(i.product_name||"")} × ${escP(i.qty)} <span class="muted">(${moneyP(i.subtotal)})</span>`).join("<br>")}</td>
+          <td><button type="button" class="light purchasing-view-final" data-id="${attrP(r.id)}">View</button></td>
           <td><strong>${moneyP(r.total)}</strong></td>
+          <td>${statusBtn}</td>
           <td><div class="actions"><button class="light purchasing-edit" data-id="${attrP(r.id)}">Edit</button><button class="danger purchasing-delete" data-id="${attrP(r.id)}">Delete</button></div></td>
         </tr>`;
       }).join("")}</tbody></table></div>`;
+
     P("purchasingList").querySelectorAll(".purchasing-edit").forEach(b=>b.addEventListener("click",()=>editPurchaseP(b.dataset.id)));
     P("purchasingList").querySelectorAll(".purchasing-delete").forEach(b=>b.addEventListener("click",()=>deletePurchaseP(b.dataset.id)));
+
+    P("purchasingList").querySelectorAll(".purchasing-pay-final").forEach(b=>b.addEventListener("click",async()=>{
+      if(!confirm("Make payment for this purchase and change it to Arriving?"))return;
+      const r=await sb.from("medifella_purchases").update({payment_status:"Paid",paid_at:new Date().toISOString(),arrival_status:"Arriving",arrived_at:null}).eq("id",b.dataset.id);
+      if(r.error){alert(r.error.message);return}
+      await loadPurchasesP();
+    }));
+    P("purchasingList").querySelectorAll(".purchasing-arrive-final").forEach(b=>b.addEventListener("click",async()=>{
+      if(!confirm("Mark this purchase as Arrived?"))return;
+      const r=await sb.from("medifella_purchases").update({arrival_status:"Arrived",arrived_at:new Date().toISOString()}).eq("id",b.dataset.id);
+      if(r.error){alert(r.error.message);return}
+      await loadPurchasesP();
+    }));
+    P("purchasingList").querySelectorAll(".purchasing-view-final").forEach(b=>b.addEventListener("click",()=>{
+      const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(b.dataset.id));
+      const items=Array.isArray(r?.items)?r.items:[];
+      alert(`Purchase: ${r?.purchase_no||""}\nDate: ${r?.purchase_datetime||""}\nStaff: ${r?.purchasing_staff_name||""}\n\n`+
+        items.map((i,n)=>`${n+1}. ${i.product_name||"Item"} × ${i.qty||0} — ${moneyP(i.subtotal)}`).join("\n")+
+        `\n\nTotal: ${moneyP(r?.total)}`);
+    }));
   }
   async function loadPurchasesP(){
     const r=await sb.from("medifella_purchases").select("*").order("purchase_datetime",{ascending:false});
@@ -20864,11 +20896,19 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       items,total:items.reduce((a,x)=>a+Number(x.subtotal||0),0)
     };
   }
-  async function savePurchaseP(){
-    if(!P("savePurchasing"))return;
+  async function savePurchaseP(paymentStatus="Paid"){
+    const saveBtn=P("savePurchasing"), pendingBtn=P("pendingPurchasingFinal");
+    if(!saveBtn)return;
     try{
       const payload=collectPurchaseP();
-      P("savePurchasing").disabled=true;
+      payload.payment_status=paymentStatus==="Pending"?"Pending":"Paid";
+      payload.arrival_status=paymentStatus==="Pending"?"Pending":"Arriving";
+      payload.paid_at=paymentStatus==="Pending"?null:new Date().toISOString();
+      payload.arrived_at=null;
+
+      saveBtn.disabled=true;
+      if(pendingBtn)pendingBtn.disabled=true;
+
       let r;
       if(purchasingEditId){
         r=await sb.from("medifella_purchases").update(payload).eq("id",purchasingEditId);
@@ -20877,12 +20917,17 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
         r=await sb.from("medifella_purchases").insert(payload);
       }
       if(r.error)throw r.error;
-      P("purchasingStatus").innerHTML='<div class="status">Purchasing saved successfully.</div>';
+
+      P("purchasingStatus").innerHTML=`<div class="status">Purchasing saved successfully.</div>`;
       await loadPurchasesP();
       resetFormP();
       P("purchasingFormPanel").classList.add("hidden");
-    }catch(e){P("purchasingStatus").innerHTML=`<div class="status error">${escP(e.message||"Could not save purchasing.")}</div>`}
-    finally{P("savePurchasing").disabled=false}
+    }catch(e){
+      P("purchasingStatus").innerHTML=`<div class="status error">${escP(e.message||"Could not save purchasing.")}</div>`;
+    }finally{
+      saveBtn.disabled=false;
+      if(pendingBtn)pendingBtn.disabled=false;
+    }
   }
   function editPurchaseP(id){
     const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));if(!r)return;
@@ -21668,5 +21713,82 @@ window.addEventListener("scroll",position,true);
       b.type="button";
     });
   }).observe(document.body,{subtree:true,childList:true});
+})();
+</script>
+
+<script id="purchasing-pending-search-definitive-v18">
+(function(){
+"use strict";
+function init(){
+ const save=document.getElementById("savePurchasing");
+ const pending=document.getElementById("pendingPurchasingFinal");
+ if(pending&&!pending.dataset.bound){
+   pending.dataset.bound="1";
+   pending.onclick=()=>window.__finalPendingPurchasing?.();
+ }
+ window.__finalPendingPurchasing=async function(){
+   if(typeof savePurchaseP==="function") await savePurchaseP("Pending");
+ };
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",init,{once:true});else init();
+[100,400,1000].forEach(x=>setTimeout(init,x));
+})();
+</script>
+
+<style id="purchasing-search-authoritative-v18">
+.purchasing-auth-results{position:fixed!important;z-index:2147483647!important;display:none;background:#fff;border:1px solid #94a3b8;border-radius:10px;box-shadow:0 18px 45px rgba(15,23,42,.28);max-height:360px;overflow:auto;width:460px}
+.purchasing-auth-result{display:block;width:100%;padding:12px 14px;border:0;border-bottom:1px solid #e5e7eb;background:#fff;text-align:left;cursor:pointer}
+.purchasing-auth-result:hover{background:#eff6ff}
+</style>
+<script id="purchasing-search-authoritative-v18">
+(function(){
+"use strict";
+let box=null,activeInput=null,activeSelect=null;
+function getBox(){if(box)return box;box=document.createElement("div");box.className="purchasing-auth-results";document.body.appendChild(box);return box}
+function place(){if(!activeInput)return;const r=activeInput.getBoundingClientRect(),b=getBox();b.style.left=Math.max(8,r.left)+"px";b.style.top=Math.max(8,r.bottom+5)+"px";b.style.width=Math.max(420,r.width)+"px"}
+function close(){if(box)box.style.display="none"}
+function build(sel){
+ if(!sel||!sel.classList.contains("purchasing-item-select")||sel.dataset.authV18)return;
+ sel.dataset.authV18="1";sel.style.display="none";
+ const wrap=document.createElement("div");wrap.style.width="100%";
+ const input=document.createElement("input");input.type="text";input.placeholder="Search product or service...";input.style.cssText="width:100%;height:40px;box-sizing:border-box;padding:9px 12px;border:1px solid #94a3b8;border-radius:8px;font-size:14px";
+ const cur=()=>{const o=sel.options[sel.selectedIndex];return o?.value?(o.textContent||"").trim():""};
+ input.value=cur();wrap.appendChild(input);sel.parentNode.insertBefore(wrap,sel);
+ function show(){activeInput=input;activeSelect=sel;const q=input.value.trim().toLowerCase(),b=getBox();b.innerHTML="";
+  [...sel.options].filter(o=>o.value&&(o.textContent||"").toLowerCase().includes(q)).slice(0,100).forEach(o=>{
+   const x=document.createElement("button");x.type="button";x.className="purchasing-auth-result";x.innerHTML=`<b>${(o.textContent||"").split(" · ")[0]}</b><br>${(o.textContent||"").split(" · ").slice(1).join(" · ")||o.textContent}`;
+   x.onclick=e=>{e.preventDefault();e.stopPropagation();sel.value=o.value;sel.dispatchEvent(new Event("change",{bubbles:true}));input.value=o.textContent.trim();close();input.focus()};
+   b.appendChild(x);
+  });place();b.style.display="block"}
+ input.onfocus=show;input.oninput=show;input.onkeydown=e=>{if(e.key==="Escape"){close();input.value=cur()}if(e.key==="Enter"){const f=getBox().querySelector(".purchasing-auth-result");if(f){e.preventDefault();f.click()}}};
+ sel.addEventListener("change",()=>{if(document.activeElement!==input)input.value=cur()});
+}
+function install(){document.querySelectorAll("#purchasingItemsBody select.purchasing-item-select").forEach(build);const body=document.getElementById("purchasingItemsBody");if(body&&!body.dataset.authObsV18){body.dataset.authObsV18="1";new MutationObserver(()=>setTimeout(install,0)).observe(body,{childList:true,subtree:true})}}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();setTimeout(install,300);setTimeout(install,900);
+})();
+</script>
+
+<script id="appointments-authoritative-v18">
+(function(){
+"use strict";
+const E=id=>document.getElementById(id);
+function uuid(){return crypto?.randomUUID?crypto.randomUUID():"00000000-0000-4000-8000-"+String(Date.now()).slice(-12).padStart(12,"0")}
+async function saveMain(){
+ const cid=E("appointmentCustomerId")?.value||"", src=E("appointmentCustomerSource")?.value||"customer";
+ const c=(src==="student"?window.students:window.customers||[]).find(x=>String(x.id)===String(cid));
+ const date=E("appointmentDate")?.value||"",time=E("appointmentTime")?.value||"";
+ if(!c){alert("Please search and select a student or customer.");return}
+ if(!date||!time){alert("Please select appointment date and time.");return}
+ const data=src==="student"?{id:c.id,name:c.full_name||c.full_name_km||"Student",phone:c.phone||"",code:c.student_id||""}:{id:c.id,name:c.name||"Customer",phone:c.phone||"",code:c.customer_code||""};
+ const row={id:uuid(),customer_id:String(data.id),customer_name:data.name,customer_phone:data.phone,customer_code:data.code,customer_type:E("appointmentCustomerType")?.value||"Old Customer",date,time,note:E("appointmentNote")?.value||"",status:"pending",created_at:new Date().toISOString(),confirmed_at:null,cancelled_at:null,met_at:null};
+ const b=E("saveAppointment");if(b)b.disabled=true;
+ try{await window.insertAppointment(row);alert("Appointment saved successfully.");if(typeof window.refreshAppointments==="function")await window.refreshAppointments();location.hash="appointments";}catch(e){alert("Could not save appointment: "+(e.message||e))}finally{if(b)b.disabled=false}
+}
+function install(){
+ const add=E("appointmentAddToggle"),save=E("saveAppointment");
+ if(add&&!add.dataset.authV18){add.dataset.authV18="1";add.onclick=()=>{const c=E("appointmentAddCard");const open=c.style.display!=="none";c.style.display=open?"none":"";add.textContent=open?"+ Add Appointment":"− Hide Appointment"}}
+ if(save&&!save.dataset.authV18){save.dataset.authV18="1";save.onclick=saveMain}
+}
+if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();[300,1000,2000].forEach(x=>setTimeout(install,x));
 })();
 </script>
