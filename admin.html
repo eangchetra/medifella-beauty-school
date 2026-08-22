@@ -5293,7 +5293,7 @@ async function recordSalePayment(id){
 function showSaleInvoice(id,size="A4"){
  window.currentInvoiceId = id;
  const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
- const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
+ let total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
  const rate=4150;
  let items=[];try{items=typeof saleItemsValue(s)==="string"?JSON.parse(saleItemsValue(s)):saleItemsValue(s)||[]}catch(_){items=[]}
  if(!Array.isArray(items))items=[];
