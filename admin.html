@@ -11841,9 +11841,13 @@ document.addEventListener("DOMContentLoaded",function(){
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   }
   function formatDate(dateStr){
-    const s=String(dateStr||"").slice(0,10);
-    const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    return m?`${m[3]}/${m[2]}/${m[1]}`:(dateStr||"—");
+    const s=String(dateStr||"").trim().slice(0,10);
+    const iso=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(iso)return `${iso[3]}/${iso[2]}/${iso[1]}`;
+    // Legacy rows may contain MM/DD/YYYY text. Display as DD/MM/YYYY.
+    const slash=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(slash)return `${slash[2]}/${slash[1]}/${slash[3]}`;
+    return dateStr||"—";
   }
   function formatTime(t){
     if(!t)return "—";
@@ -22318,8 +22322,12 @@ else install();
      appointment immediately visible in Upcoming Appointments.
      ------------------------------------------------------------- */
   function formatAppointmentDateFinal(dateStr){
-    const m=String(dateStr||"").slice(0,10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
-    return m?`${m[3]}/${m[2]}/${m[1]}`:String(dateStr||"—");
+    const s=String(dateStr||"").trim().slice(0,10);
+    const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    if(m)return `${m[3]}/${m[2]}/${m[1]}`;
+    const slash=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(slash)return `${slash[2]}/${slash[1]}/${slash[3]}`;
+    return String(dateStr||"—");
   }
 
   function patchAppointmentDateDisplay(){
