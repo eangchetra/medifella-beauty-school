@@ -21053,3 +21053,197 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   });
 
 </script>
+
+
+<script id="purchasing-product-service-selector-final-fix-v2">
+(function(){
+  "use strict";
+
+  /*
+   * FINAL PURCHASING FIX
+   * Keep the existing Purchasing Management design and calculations.
+   * The only purpose of this patch is to make the Product/Service selector
+   * reliably use the same Product Management and Services Management data,
+   * even when Purchasing initializes before those lists finish loading.
+   */
+
+  const byId = id => document.getElementById(id);
+
+  function escP2(v){
+    if(typeof window.esc==="function") return window.esc(v);
+    return String(v??"").replace(/[&<>"']/g,c=>({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[c]));
+  }
+
+  function attrP2(v){
+    if(typeof window.attr==="function") return window.attr(v);
+    return String(v??"").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+  }
+
+  function productsP2(){
+    return Array.isArray(window.products) ? window.products : [];
+  }
+
+  function servicesP2(){
+    return Array.isArray(window.services) ? window.services : [];
+  }
+
+  async function loadPurchasingSourcesP2(){
+    const jobs=[];
+
+    if(!productsP2().length){
+      jobs.push(
+        sb.from("medifella_products")
+          .select("*")
+          .order("created_at",{ascending:false})
+          .then(r=>{
+            if(!r.error){
+              window.products=Array.isArray(r.data)?r.data:[];
+              try{ products=window.products; }catch(_){}
+            }
+          })
+          .catch(e=>console.warn("Purchasing product source load:",e))
+      );
+    }
+
+    if(!servicesP2().length){
+      jobs.push(
+        sb.from("medifella_services")
+          .select("*")
+          .order("created_at",{ascending:false})
+          .then(r=>{
+            if(!r.error){
+              window.services=Array.isArray(r.data)?r.data:[];
+              try{ services=window.services; }catch(_){}
+            }
+          })
+          .catch(e=>console.warn("Purchasing service source load:",e))
+      );
+    }
+
+    if(jobs.length) await Promise.all(jobs);
+    refreshPurchasingSelectorsP2();
+  }
+
+  function selectorOptionsP2(selected){
+    let html='<option value="">Select product or service</option>';
+
+    const ps=productsP2();
+    if(ps.length){
+      html+='<optgroup label="Products">';
+      ps.forEach(x=>{
+        const id="product:"+String(x.id);
+        const label=(x.product_code?x.product_code+" · ":"")+String(x.name||"Product");
+        html+=`<option value="${attrP2(id)}" ${String(selected||"")===id?"selected":""}>${escP2(label)}</option>`;
+      });
+      html+="</optgroup>";
+    }
+
+    const ss=servicesP2();
+    if(ss.length){
+      html+='<optgroup label="Services">';
+      ss.forEach(x=>{
+        const id="service:"+String(x.id);
+        const label=(x.service_code?x.service_code+" · ":"")+String(x.name||x.service_name||"Service");
+        html+=`<option value="${attrP2(id)}" ${String(selected||"")===id?"selected":""}>${escP2(label)}</option>`;
+      });
+      html+="</optgroup>";
+    }
+
+    return html;
+  }
+
+  function refreshPurchasingSelectorsP2(){
+    const body=byId("purchasingItemsBody");
+    if(!body)return;
+
+    body.querySelectorAll(".purchasing-item-select").forEach(el=>{
+      const selected=el.value;
+      el.innerHTML=selectorOptionsP2(selected);
+      if(selected)el.value=selected;
+    });
+  }
+
+  window.refreshPurchasingProductServiceOptions=refreshPurchasingSelectorsP2;
+
+  async function refreshWhenPurchasingOpensP2(){
+    refreshPurchasingSelectorsP2();
+    if(!productsP2().length || !servicesP2().length){
+      await loadPurchasingSourcesP2();
+    }else{
+      refreshPurchasingSelectorsP2();
+    }
+  }
+
+  function wrapSourceLoaderP2(name){
+    const original=window[name];
+    if(typeof original!=="function" || original.__purchasingSourceWrappedV2)return;
+
+    const wrapped=async function(){
+      const result=await original.apply(this,arguments);
+      try{ refreshPurchasingSelectorsP2(); }catch(_){}
+      return result;
+    };
+
+    wrapped.__purchasingSourceWrappedV2=true;
+    window[name]=wrapped;
+  }
+
+  function bindP2(){
+    const management=byId("purchasingManagement");
+    if(!management)return;
+
+    wrapSourceLoaderP2("loadProducts");
+    wrapSourceLoaderP2("loadServices");
+
+    const toggle=byId("togglePurchasingForm");
+    if(toggle && !toggle.dataset.purchasingSelectorFixV2){
+      toggle.dataset.purchasingSelectorFixV2="1";
+      toggle.addEventListener("click",function(){
+        setTimeout(refreshWhenPurchasingOpensP2,0);
+      });
+    }
+
+    const add=byId("addPurchasingItem");
+    if(add && !add.dataset.purchasingSelectorFixV2){
+      add.dataset.purchasingSelectorFixV2="1";
+      add.addEventListener("click",function(){
+        setTimeout(refreshPurchasingSelectorsP2,0);
+      });
+    }
+
+    const body=byId("purchasingItemsBody");
+    if(body && !body.dataset.purchasingSelectorFixV2){
+      body.dataset.purchasingSelectorFixV2="1";
+
+      body.addEventListener("focusin",function(e){
+        if(e.target && e.target.classList.contains("purchasing-item-select")){
+          refreshPurchasingSelectorsP2();
+        }
+      });
+    }
+
+    document.querySelectorAll('.nav[data-section="purchasing"]').forEach(btn=>{
+      if(btn.dataset.purchasingSelectorFixV2)return;
+      btn.dataset.purchasingSelectorFixV2="1";
+      btn.addEventListener("click",function(){
+        setTimeout(refreshWhenPurchasingOpensP2,50);
+      });
+    });
+
+    refreshPurchasingSelectorsP2();
+    loadPurchasingSourcesP2();
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",bindP2,{once:true});
+  }else{
+    bindP2();
+  }
+
+  setTimeout(bindP2,500);
+  setTimeout(refreshWhenPurchasingOpensP2,1200);
+  setTimeout(refreshPurchasingSelectorsP2,2500);
+})();
+</script>
