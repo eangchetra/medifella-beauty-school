@@ -21247,3 +21247,211 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   setTimeout(refreshPurchasingSelectorsP2,2500);
 })();
 </script>
+
+
+<script id="purchasing-list-ui-improvements-v1">
+(function(){
+  "use strict";
+
+  const $=id=>document.getElementById(id);
+  const esc2=v=>typeof window.escP==="function"?window.escP(v):String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+  const attr2=v=>typeof window.attrP==="function"?window.attrP(v):String(v??"").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+  const money2=v=>typeof window.moneyP==="function"?window.moneyP(v):Number(v||0).toFixed(2);
+
+  function fmtDateTime2(v){
+    const d=new Date(v);
+    if(Number.isNaN(d.getTime())) return String(v||"");
+    const pad=n=>String(n).padStart(2,"0");
+    return `${pad(d.getDate())}/${pad(d.getMonth()+1)}/${d.getFullYear()} ${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  }
+
+  function shortId2(v){
+    const x=String(v||"");
+    if(x.length<=18)return x;
+    return x.slice(0,10)+"…"+x.slice(-5);
+  }
+
+  function items2(r){
+    let a=r?.items;
+    if(typeof a==="string"){try{a=JSON.parse(a)}catch(_){a=[]}}
+    return Array.isArray(a)?a:[];
+  }
+
+  function ensureViewModal2(){
+    if($("purchasingDetailsModal"))return;
+    const div=document.createElement("div");
+    div.id="purchasingDetailsModal";
+    div.className="modal-overlay hidden";
+    div.style.cssText="position:fixed;inset:0;background:rgba(0,0,0,.45);z-index:99999;display:flex;align-items:center;justify-content:center;padding:20px;";
+    div.innerHTML=`
+      <div style="background:#fff;border-radius:12px;max-width:900px;width:100%;max-height:85vh;overflow:auto;padding:20px;box-shadow:0 18px 50px rgba(0,0,0,.25)">
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:12px;margin-bottom:14px">
+          <h3 id="purchasingDetailsTitle" style="margin:0">Purchasing Details</h3>
+          <button type="button" id="purchasingDetailsClose" class="light">Close</button>
+        </div>
+        <div id="purchasingDetailsBody"></div>
+      </div>`;
+    document.body.appendChild(div);
+    $("purchasingDetailsClose").onclick=()=>div.classList.add("hidden");
+    div.addEventListener("click",e=>{if(e.target===div)div.classList.add("hidden")});
+  }
+
+  function showDetails2(id){
+    const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));
+    if(!r)return;
+    ensureViewModal2();
+    $("purchasingDetailsTitle").textContent=`Purchase ${r.purchase_no||shortId2(r.id)}`;
+    const rows=items2(r);
+    $("purchasingDetailsBody").innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(3,minmax(0,1fr));gap:10px;margin-bottom:16px">
+        <div><div class="muted">Date & Time</div><strong>${esc2(fmtDateTime2(r.purchase_datetime))}</strong></div>
+        <div><div class="muted">Purchasing Staff</div><strong>${esc2(r.purchasing_staff_name||"")}</strong></div>
+        <div><div class="muted">Arrival Status</div><strong>${String(r.arrival_status||"Arriving")==="Arrived"?"Arrived":"Arriving"}</strong></div>
+      </div>
+      <div class="table-wrap"><table class="table">
+        <thead><tr><th>Product / Service</th><th>Code</th><th>Type</th><th>Qty</th><th>Unit Price</th><th>Discount</th><th>Sub Total</th></tr></thead>
+        <tbody>${rows.map(i=>`<tr>
+          <td>${esc2(i.product_name||"")}</td>
+          <td>${esc2(i.product_code||"")}</td>
+          <td>${esc2(i.product_type||"")}${i.other_type?` · ${esc2(i.other_type)}`:""}</td>
+          <td>${esc2(i.qty||0)}</td>
+          <td>${money2(i.unit_price)}</td>
+          <td>${i.discount_type==="%"?esc2(i.discount)+"%":money2(i.discount)}</td>
+          <td><strong>${money2(i.subtotal)}</strong></td>
+        </tr>`).join("")}</tbody>
+        <tfoot><tr><td colspan="6" style="text-align:right"><strong>Total</strong></td><td><strong>${money2(r.total)}</strong></td></tr></tfoot>
+      </table></div>`;
+    $("purchasingDetailsModal").classList.remove("hidden");
+    $("purchasingDetailsModal").style.display="flex";
+  }
+
+  async function markArrived2(id){
+    const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));
+    if(!r)return;
+    if(String(r.arrival_status||"Arriving")==="Arrived")return;
+    if(!confirm("Mark this purchase as Arrived?"))return;
+    const result=await sb.from("medifella_purchases").update({
+      arrival_status:"Arrived",
+      arrived_at:new Date().toISOString()
+    }).eq("id",id);
+    if(result.error){alert("Could not update arrival status: "+result.error.message);return}
+    if(window.loadPurchasingManagement)await window.loadPurchasingManagement();
+  }
+
+  function renderImproved2(){
+    const box=$("purchasingList");
+    if(!box)return;
+    const from=$("purchasingFromDate")?.value||"", to=$("purchasingToDate")?.value||"", q=($("purchasingSearch")?.value||"").trim().toLowerCase();
+    const source=(window.purchasingRecords||[]).filter(r=>{
+      const d=String(r.purchase_datetime||r.created_at||"").slice(0,10);
+      if(from && d<from) return false;
+      if(to && d>to) return false;
+      if(q && !JSON.stringify(r).toLowerCase().includes(q)) return false;
+      return true;
+    });
+    const rows=Array.isArray(source)?source:[];
+    if(!rows.length){box.innerHTML='<p class="muted">No purchasing records found.</p>';return}
+    box.innerHTML=`<div class="table-wrap"><table class="table">
+      <thead><tr>
+        <th>Purchase ID</th><th>Date &amp; Time</th><th>Purchasing Staff</th><th>Items</th><th>Total</th><th>Action</th>
+      </tr></thead>
+      <tbody>${rows.map(r=>{
+        const its=items2(r);
+        const arrived=String(r.arrival_status||"Arriving")==="Arrived";
+        const statusBtn=arrived
+          ? `<button type="button" class="purchasing-arrival-arrived" disabled style="background:#2e7d32;color:#fff;border:0;padding:7px 11px;border-radius:7px;font-weight:600">Arrived</button>`
+          : `<button type="button" class="purchasing-arrival-arriving" data-id="${attr2(r.id)}" style="background:#1976d2;color:#fff;border:0;padding:7px 11px;border-radius:7px;font-weight:600">Arriving</button>`;
+        return `<tr>
+          <td title="${attr2(r.purchase_no||r.id||"")}"><strong>${esc2(shortId2(r.purchase_no||r.id||""))}</strong></td>
+          <td title="${attr2(String(r.purchase_datetime||""))}">${esc2(fmtDateTime2(r.purchase_datetime))}</td>
+          <td>${esc2(r.purchasing_staff_name||"")}</td>
+          <td><button type="button" class="light purchasing-view" data-id="${attr2(r.id)}">View</button></td>
+          <td><strong>${money2(r.total)}</strong></td>
+          <td><div class="actions">
+            ${statusBtn}
+            <button type="button" class="light purchasing-edit-ui" data-id="${attr2(r.id)}">Edit</button>
+            <button type="button" class="danger purchasing-delete-ui" data-id="${attr2(r.id)}">Delete</button>
+          </div></td>
+        </tr>`;
+      }).join("")}</tbody></table></div>`;
+
+    box.querySelectorAll(".purchasing-view").forEach(b=>b.addEventListener("click",()=>showDetails2(b.dataset.id)));
+    box.querySelectorAll(".purchasing-arrival-arriving").forEach(b=>b.addEventListener("click",()=>markArrived2(b.dataset.id)));
+    box.querySelectorAll(".purchasing-edit-ui").forEach(b=>b.addEventListener("click",()=>{
+      const fn=window.__purchasingEditBridge;
+      if(fn)fn(b.dataset.id);
+    }));
+    box.querySelectorAll(".purchasing-delete-ui").forEach(b=>b.addEventListener("click",async()=>{
+      if(!confirm("Delete this purchasing record?"))return;
+      const rr=await sb.from("medifella_purchases").delete().eq("id",b.dataset.id);
+      if(rr.error){alert("Delete failed: "+rr.error.message);return}
+      if(window.loadPurchasingManagement)await window.loadPurchasingManagement();
+    }));
+  }
+
+  function install2(){
+    ensureViewModal2();
+
+    // Capture the original internal Edit function through the existing DOM
+    // buttons before replacing the renderer.
+    const oldList=$("purchasingList");
+    if(oldList){
+      const oldEdit=oldList.querySelector(".purchasing-edit");
+      if(oldEdit){
+        oldEdit.click = oldEdit.click || function(){};
+      }
+    }
+
+    // The original purchasing module keeps editPurchaseP private, so use the
+    // same edit flow by finding the original button after a temporary render.
+    // We preserve a small bridge by delegating to the original renderer once,
+    // then extracting its button listener is not possible; therefore the bridge
+    // below recreates the original edit form directly.
+    window.__purchasingEditBridge=async function(id){
+      const originalLoad=window.__purchasingOriginalLoad;
+      if(!originalLoad)return;
+      // Let the original Purchasing renderer create its real Edit button and
+      // listener, click it, then restore the compact/detail list.
+      await originalLoad();
+      const buttons=[...document.querySelectorAll("#purchasingList .purchasing-edit")];
+      const b=buttons.find(x=>String(x.dataset.id)===String(id));
+      if(b){
+        b.click();
+        setTimeout(renderImproved2,50);
+      }
+    };
+
+    // Keep the original renderer available through the global refresh hook by
+    // wrapping the current load function. The original renderer runs first,
+    // then our compact/detail renderer replaces only the visible list.
+    if(window.loadPurchasingManagement && !window.loadPurchasingManagement.__uiV1){
+      const origLoad=window.loadPurchasingManagement;
+      window.__purchasingOriginalLoad=origLoad;
+      const wrapped=async function(){
+        const result=await origLoad.apply(this,arguments);
+        renderImproved2();
+        return result;
+      };
+      wrapped.__uiV1=true;
+      window.loadPurchasingManagement=wrapped;
+    }
+
+    // Search/date filters in the original module call its private renderer.
+    // Re-render our compact list after those inputs change.
+    ["purchasingFromDate","purchasingToDate","purchasingSearch"].forEach(id=>{
+      const el=$(id);
+      if(el && !el.dataset.uiV1){
+        el.dataset.uiV1="1";
+        el.addEventListener("input",()=>setTimeout(renderImproved2,0));
+      }
+    });
+
+    // Existing Refresh/initial load.
+    setTimeout(renderImproved2,300);
+    setTimeout(renderImproved2,1000);
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install2,{once:true});
+  else install2();
+})();
+</script>
