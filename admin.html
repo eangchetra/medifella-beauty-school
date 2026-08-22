@@ -6089,6 +6089,70 @@ function openPrintFromCanvas(canvas,paper,sale){
 
 
 
+
+<script id="appointment-upcoming-refresh-final-fix-v1">
+(function(){
+  "use strict";
+  function E(id){return document.getElementById(id)}
+  function pad(n){return String(n).padStart(2,"0")}
+  function localDate(){
+    const p=new Intl.DateTimeFormat("en-CA",{timeZone:"Asia/Phnom_Penh",year:"numeric",month:"2-digit",day:"2-digit"}).formatToParts(new Date());
+    const g=t=>p.find(x=>x.type===t)?.value||"00";
+    return `${g("year")}-${g("month")}-${g("day")}`;
+  }
+  function activeFutureRows(){
+    const today=localDate();
+    const rows=Array.isArray(window.appointments)?window.appointments:[];
+    return rows.filter(a=>a && a.status!=="cancelled" && String(a.date||"")>=today)
+      .sort((a,b)=>String(a.date||"").localeCompare(String(b.date||"")) || String(a.time||"").localeCompare(String(b.time||"")));
+  }
+  async function refreshUpcomingView(){
+    try{
+      if(typeof window.refreshAppointments==="function") await window.refreshAppointments();
+    }catch(e){console.warn("Upcoming appointment refresh:",e)}
+    const rows=activeFutureRows();
+    const month=E("appointmentMonth");
+    if(!month)return;
+
+    const current=localDate().slice(0,7);
+    const currentRows=rows.filter(a=>String(a.date||"").slice(0,7)===current);
+    // If there are no remaining appointments this month, automatically open
+    // the month containing the nearest upcoming appointment.
+    if(!currentRows.length && rows.length){
+      const target=String(rows[0].date||"").slice(0,7);
+      if(/^\d{4}-\d{2}$/.test(target)) month.value=target;
+    }
+
+    // Force the existing Appointment Management renderer to redraw after the
+    // database refresh. It remains the original renderer; this only refreshes
+    // its data and selected month.
+    try{
+      const tab=E("appointmentUpcomingTab");
+      if(tab && document.getElementById("appointmentUpcomingPanel")?.classList.contains("hidden")){
+        tab.click();
+      }else if(typeof window.refreshAppointments==="function"){
+        // refreshAppointments already calls the original renderAll().
+      }
+    }catch(e){console.warn("Upcoming appointment redraw:",e)}
+  }
+
+  function bind(){
+    const tab=E("appointmentUpcomingTab");
+    if(!tab || tab.dataset.upcomingRefreshFix==="1")return;
+    tab.dataset.upcomingRefreshFix="1";
+    tab.addEventListener("click",function(){
+      // Let the original click handler run first, then refresh the database.
+      setTimeout(refreshUpcomingView,120);
+    });
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",function(){bind();setTimeout(bind,500);setTimeout(bind,1500)},{once:true});
+  }else{
+    bind();setTimeout(bind,500);setTimeout(bind,1500);
+  }
+})();
+</script>
 </body>
 </html>`;
 
