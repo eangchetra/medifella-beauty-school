@@ -21427,3 +21427,350 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   }
 })();
 </script>
+
+
+<style id="purchasing-search-definitive-clean-v14">
+.purchasing-def-search{
+  position:relative;
+  width:100%;
+  min-width:240px;
+}
+.purchasing-def-search-input{
+  width:100%;
+  height:42px;
+  box-sizing:border-box;
+  padding:10px 12px;
+  border:1px solid #94a3b8;
+  border-radius:8px;
+  background:#fff;
+  font-size:14px;
+  outline:none;
+}
+.purchasing-def-search-input:focus{
+  border-color:#0f766e;
+  box-shadow:0 0 0 3px rgba(15,118,110,.12);
+}
+#purchasingDefResults{
+  position:fixed !important;
+  z-index:2147483647 !important;
+  display:none;
+  width:420px;
+  max-height:430px;
+  overflow-y:auto;
+  background:#fff;
+  border:1px solid #94a3b8;
+  border-radius:10px;
+  box-shadow:0 18px 45px rgba(15,23,42,.28);
+  pointer-events:auto !important;
+}
+.purchasing-def-result{
+  display:block;
+  width:100%;
+  box-sizing:border-box;
+  padding:12px 14px;
+  border:0;
+  border-bottom:1px solid #e5e7eb;
+  background:#fff;
+  text-align:left;
+  cursor:pointer !important;
+  pointer-events:auto !important;
+  user-select:none;
+  -webkit-user-select:none;
+}
+.purchasing-def-result:hover,
+.purchasing-def-result:focus{
+  background:#eff6ff;
+  outline:none;
+}
+.purchasing-def-code{
+  display:block;
+  font-size:12px;
+  font-weight:800;
+  color:#475569;
+  margin-bottom:3px;
+}
+.purchasing-def-name{
+  display:block;
+  font-size:14px;
+  font-weight:650;
+  line-height:1.35;
+  color:#0f172a;
+  white-space:normal;
+  overflow-wrap:anywhere;
+}
+.purchasing-def-kind{
+  display:inline-block;
+  margin-top:5px;
+  padding:2px 7px;
+  border-radius:999px;
+  background:#f1f5f9;
+  color:#64748b;
+  font-size:10px;
+}
+.purchasing-def-empty{
+  padding:16px;
+  color:#64748b;
+  text-align:center;
+}
+</style>
+
+<script id="purchasing-search-definitive-clean-v14">
+(function(){
+  "use strict";
+
+  let activeInput=null;
+  let activeSelect=null;
+  let activeWrap=null;
+
+  function esc(v){
+    return String(v??"").replace(/[&<>"']/g,c=>({
+      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"
+    }[c]));
+  }
+
+  function ensureResults(){
+    let box=document.getElementById("purchasingDefResults");
+    if(!box){
+      box=document.createElement("div");
+      box.id="purchasingDefResults";
+      document.body.appendChild(box);
+    }
+    return box;
+  }
+
+  function optionInfo(o){
+    const text=(o?.textContent||"").trim();
+    const service=/\s+\(Service\)\s*$/i.test(text);
+    const clean=text.replace(/\s+\(Service\)\s*$/i,"").trim();
+    const parts=clean.split(" · ");
+    const code=parts.length>1?parts.shift():"";
+    const name=parts.join(" · ")||clean;
+    return {code,name,kind:service?"Service":"Product",text};
+  }
+
+  function position(box,input){
+    const r=input.getBoundingClientRect();
+    const width=Math.max(360,Math.min(560,Math.max(r.width,420)));
+    const above=r.top-8;
+    const below=window.innerHeight-r.bottom-8;
+    const h=Math.min(430,Math.max(120,above>=180?above:below));
+    const top=above>=180 ? r.top-h-6 : r.bottom+6;
+
+    box.style.width=width+"px";
+    box.style.left=Math.max(8,Math.min(r.left,window.innerWidth-width-8))+"px";
+    box.style.top=Math.max(8,Math.min(top,window.innerHeight-h-8))+"px";
+    box.style.maxHeight=h+"px";
+  }
+
+  function close(){
+    const box=document.getElementById("purchasingDefResults");
+    if(box)box.style.display="none";
+    activeInput=null;
+    activeSelect=null;
+    activeWrap=null;
+  }
+
+  function choose(option,input,sel){
+    if(!option || !sel)return;
+
+    // This uses the exact value from the real select's option list.
+    // Therefore the value can never differ from what Purchasing expects.
+    sel.value=option.value;
+
+    // Trigger the original Purchasing row handler.
+    sel.dispatchEvent(new Event("change",{bubbles:true}));
+
+    const row=sel.closest(".purchasing-item-row");
+    if(row && typeof window.updateRowP==="function"){
+      try{window.updateRowP(row)}catch(err){console.warn(err)}
+    }
+    if(typeof window.calcAllP==="function"){
+      try{window.calcAllP()}catch(_){}
+    }
+
+    const info=optionInfo(option);
+    input.value=info.text;
+
+    close();
+    input.focus();
+  }
+
+  function show(input,sel,query){
+    const box=ensureResults();
+    const q=String(query||"").trim().toLowerCase();
+
+    const options=[...sel.options].filter(o=>o.value);
+    const matches=options.filter(o=>{
+      const t=(o.textContent||"").toLowerCase();
+      return !q || t.includes(q);
+    });
+
+    if(!matches.length){
+      box.innerHTML='<div class="purchasing-def-empty">No product or service found</div>';
+    }else{
+      box.innerHTML="";
+      matches.slice(0,100).forEach(option=>{
+        const info=optionInfo(option);
+        const b=document.createElement("button");
+        b.type="button";
+        b.className="purchasing-def-result";
+        b.innerHTML=
+          `<span class="purchasing-def-code">${esc(info.code||"")}</span>`+
+          `<span class="purchasing-def-name">${esc(info.name)}</span>`+
+          `<span class="purchasing-def-kind">${esc(info.kind)}</span>`;
+
+        // Direct handler on a real button. No document click delegation.
+        b.addEventListener("click",function(e){
+          e.preventDefault();
+          e.stopPropagation();
+          choose(option,input,sel);
+        });
+
+        // Also select on pointerdown so Safari cannot lose the result before click.
+        b.addEventListener("pointerdown",function(e){
+          e.preventDefault();
+          e.stopPropagation();
+          choose(option,input,sel);
+        },{passive:false});
+
+        box.appendChild(b);
+      });
+    }
+
+    activeInput=input;
+    activeSelect=sel;
+    position(box,input);
+    box.style.display="block";
+    box.scrollTop=0;
+  }
+
+  function build(sel){
+    if(!sel || !sel.classList.contains("purchasing-item-select"))return;
+
+    // Do not rebuild our own control.
+    if(sel.dataset.purchasingDefSearch==="1")return;
+    sel.dataset.purchasingDefSearch="1";
+
+    // Remove the old search wrapper created by all previous patches.
+    const old=sel.parentElement?.querySelector(".pc-search-wrap");
+    if(old){
+      old.remove();
+    }
+
+    sel.style.display="none";
+
+    const wrap=document.createElement("div");
+    wrap.className="purchasing-def-search";
+
+    const input=document.createElement("input");
+    input.type="text";
+    input.className="purchasing-def-search-input";
+    input.placeholder="Search product or service...";
+    input.autocomplete="off";
+
+    wrap.appendChild(input);
+    sel.parentNode.insertBefore(wrap,sel);
+
+    function current(){
+      const option=sel.options[sel.selectedIndex];
+      return option?.value ? option.textContent.trim() : "";
+    }
+
+    input.value=current();
+
+    input.addEventListener("focus",function(){
+      show(input,sel,input.value);
+    });
+
+    input.addEventListener("input",function(){
+      show(input,sel,input.value);
+    });
+
+    input.addEventListener("keydown",function(e){
+      const box=document.getElementById("purchasingDefResults");
+
+      if(e.key==="Escape"){
+        e.preventDefault();
+        close();
+        input.value=current();
+        return;
+      }
+
+      if(e.key==="Enter"){
+        const first=box?.querySelector(".purchasing-def-result");
+        if(first){
+          e.preventDefault();
+          first.click();
+        }
+      }
+
+      if(e.key==="ArrowDown"){
+        const first=box?.querySelector(".purchasing-def-result");
+        if(first){
+          e.preventDefault();
+          first.focus();
+        }
+      }
+    });
+
+    sel.addEventListener("change",function(){
+      input.value=current();
+    });
+  }
+
+  function clean(){
+    document.querySelectorAll(
+      "#purchasingItemsBody select.purchasing-item-select"
+    ).forEach(build);
+  }
+
+  function install(){
+    clean();
+
+    const body=document.getElementById("purchasingItemsBody");
+    if(body && !body.dataset.purchasingDefSearchObserver){
+      body.dataset.purchasingDefSearchObserver="1";
+      const ob=new MutationObserver(function(){
+        setTimeout(clean,0);
+      });
+      ob.observe(body,{childList:true,subtree:true});
+    }
+
+    if(!document.documentElement.dataset.purchasingDefSearchGlobal){
+      document.documentElement.dataset.purchasingDefSearchGlobal="1";
+
+      document.addEventListener("mousedown",function(e){
+        const box=document.getElementById("purchasingDefResults");
+        if(!box || box.style.display==="none")return;
+
+        if(e.target.closest("#purchasingDefResults"))return;
+        if(activeInput && e.target===activeInput)return;
+
+        close();
+      },true);
+
+      window.addEventListener("resize",function(){
+        if(activeInput && activeSelect){
+          position(ensureResults(),activeInput);
+        }
+      });
+
+      window.addEventListener("scroll",function(){
+        if(activeInput && activeSelect){
+          position(ensureResults(),activeInput);
+        }
+      },true);
+    }
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else{
+    install();
+  }
+
+  setTimeout(clean,200);
+  setTimeout(clean,700);
+  setTimeout(clean,1500);
+})();
+</script>
