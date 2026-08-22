@@ -2427,6 +2427,32 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 script { display:none !important; }
 </style>
 
+
+<style id="INITIAL-TOTAL-RED-DEFINITIVE-FIX">
+/* DEFINITIVE: Initial Total only — red in preview AND PDF export.
+   Overall Discount remains normal black. */
+#invoiceOverlay .mf-invoice .mf-totals-table tr.initial td,
+#invoiceOverlay .mf-invoice .mf-totals-table tr.initial td:first-child,
+#invoiceOverlay .mf-invoice .mf-totals-table tr.initial td:not(:first-child),
+#invoiceExportContent .mf-invoice .mf-totals-table tr.initial td,
+#invoiceExportContent .mf-invoice .mf-totals-table tr.initial td:first-child,
+#invoiceExportContent .mf-invoice .mf-totals-table tr.initial td:not(:first-child),
+#invoicePrint .mf-invoice .mf-totals-table tr.initial td,
+#invoicePrint .mf-invoice .mf-totals-table tr.initial td:first-child,
+#invoicePrint .mf-invoice .mf-totals-table tr.initial td:not(:first-child){
+  color:#d00000!important;
+  font-weight:900!important;
+  background:#fff!important;
+}
+
+/* Do not color the Overall Discount row red. */
+#invoiceOverlay .mf-invoice .mf-totals-table tr:not(.initial) td,
+#invoiceExportContent .mf-invoice .mf-totals-table tr:not(.initial) td,
+#invoicePrint .mf-invoice .mf-totals-table tr:not(.initial) td{
+  /* leave existing colors unchanged */
+}
+</style>
+
 </head>
 <body>
 
@@ -5293,7 +5319,7 @@ async function recordSalePayment(id){
 function showSaleInvoice(id,size="A4"){
  window.currentInvoiceId = id;
  const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
- let total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
+ const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
  const rate=4150;
  let items=[];try{items=typeof saleItemsValue(s)==="string"?JSON.parse(saleItemsValue(s)):saleItemsValue(s)||[]}catch(_){items=[]}
  if(!Array.isArray(items))items=[];
