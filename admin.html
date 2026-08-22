@@ -21314,3 +21314,116 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   }
 })();
 </script>
+
+
+<style id="purchasing-search-selection-definitive-v13">
+.pc-results,.pc-result{
+  pointer-events:auto !important;
+}
+.pc-result{
+  touch-action:manipulation !important;
+  cursor:pointer !important;
+}
+</style>
+<script id="purchasing-search-selection-definitive-v13">
+(function(){
+  "use strict";
+
+  function getSelect(wrap){
+    if(!wrap)return null;
+    // The search wrapper and its hidden select belong to the same table cell.
+    const cell=wrap.closest("td") || wrap.parentElement;
+    return cell ? cell.querySelector("select.purchasing-item-select") : null;
+  }
+
+  function choose(result){
+    const wrap=result.closest(".pc-search-wrap");
+    const sel=getSelect(wrap);
+    if(!wrap || !sel)return false;
+
+    const value=String(result.getAttribute("data-id")||"");
+    const option=[...sel.options].find(o=>String(o.value)===value);
+    if(!option){
+      console.warn("Purchasing search: matching option not found",value);
+      return false;
+    }
+
+    // Set the real select first. The existing Purchasing code listens to
+    // this select and fills price/type/subtotal from the selected source.
+    sel.value=value;
+
+    const input=wrap.querySelector(".pc-search-input");
+    if(input){
+      input.value=option.textContent
+        .replace(/\s+\(Service\)\s*$/,"")
+        .trim();
+    }
+
+    // Use the native change event so the original row handler runs.
+    sel.dispatchEvent(new Event("change",{bubbles:true}));
+
+    const row=sel.closest(".purchasing-item-row");
+    if(row){
+      if(typeof window.updateRowP==="function"){
+        try{window.updateRowP(row)}catch(err){console.warn(err)}
+      }
+      if(typeof window.calcAllP==="function"){
+        try{window.calcAllP()}catch(_){}
+      }
+    }
+
+    const results=wrap.querySelector(".pc-results");
+    if(results){
+      results.style.display="none";
+      results.innerHTML="";
+    }
+
+    // Keep focus in the search box after selection.
+    if(input)input.focus();
+    return true;
+  }
+
+  function install(){
+    if(document.documentElement.dataset.pcSelectionDefinitiveV13)return;
+    document.documentElement.dataset.pcSelectionDefinitiveV13="1";
+
+    document.addEventListener("pointerdown",function(e){
+      const result=e.target.closest?.(".pc-result");
+      if(!result)return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      choose(result);
+    },true);
+
+    document.addEventListener("touchstart",function(e){
+      const result=e.target.closest?.(".pc-result");
+      if(!result)return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      choose(result);
+    },{capture:true,passive:false});
+
+    document.addEventListener("click",function(e){
+      const result=e.target.closest?.(".pc-result");
+      if(!result)return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+      choose(result);
+    },true);
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else{
+    install();
+  }
+})();
+</script>
