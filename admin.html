@@ -20942,7 +20942,8 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     P("savePurchasing").onclick=()=>savePurchaseP("Paid");
 
     // Pending means payment has NOT been made yet.
-    P("pendingPurchasing").onclick=()=>savePurchaseP("Pending");
+    window.savePendingPurchasing = ()=>savePurchaseP("Pending");
+    P("pendingPurchasing").onclick=()=>window.savePendingPurchasing();
 
     P("purchasingRefresh").onclick=loadPurchasesP;
     P("purchasingExcel").onclick=exportExcelP;
@@ -22959,5 +22960,251 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   setTimeout(install,100);
   setTimeout(install,500);
   setTimeout(install,1200);
+})();
+</script>
+
+
+<script id="purchasing-final-list-render-v10">
+(function(){
+  "use strict";
+
+  const $=id=>document.getElementById(id);
+
+  function esc(v){
+    return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+  }
+  function attr(v){return esc(v).replace(/`/g,"&#096;");}
+  function money(v){return "$"+Number(v||0).toFixed(2)}
+  function shortId(v){
+    const s=String(v||"");
+    return s.length>19?s.slice(0,13)+"…"+s.slice(-4):s;
+  }
+  function fmt(v){
+    const d=new Date(v);
+    if(Number.isNaN(d.getTime()))return String(v||"").replace("T"," ").replace(/\+00:00$/,"");
+    return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  }
+  function items(r){
+    let a=r?.items;
+    if(typeof a==="string"){try{a=JSON.parse(a)}catch(_){a=[]}}
+    return Array.isArray(a)?a:[];
+  }
+
+  function render(){
+    const box=$("purchasingList");
+    if(!box)return;
+
+    const from=$("purchasingFromDate")?.value||"";
+    const to=$("purchasingToDate")?.value||"";
+    const q=($("purchasingSearch")?.value||"").trim().toLowerCase();
+
+    let rows=(Array.isArray(window.purchasingRecords)?window.purchasingRecords:[]).filter(r=>{
+      const d=String(r.purchase_datetime||r.created_at||"").slice(0,10);
+      if(from && d<from)return false;
+      if(to && d>to)return false;
+      if(q && !JSON.stringify(r).toLowerCase().includes(q))return false;
+      return true;
+    });
+
+    // Newest purchase first.
+    rows.sort((a,b)=>new Date(b.purchase_datetime||b.created_at||0)-new Date(a.purchase_datetime||a.created_at||0));
+
+    if(!rows.length){
+      box.innerHTML='<p class="muted">No purchasing records found.</p>';
+      return;
+    }
+
+    box.innerHTML=`
+      <div class="table-wrap">
+        <table class="table">
+          <thead>
+            <tr>
+              <th>Purchase ID</th>
+              <th>Date &amp; Time</th>
+              <th>Purchasing Staff</th>
+              <th>Items</th>
+              <th>Total</th>
+              <th>Payment / Arrival</th>
+              <th>Action</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${rows.map(r=>{
+              const paid=String(r.payment_status||"Paid")==="Paid";
+              const arrived=String(r.arrival_status||"Arriving")==="Arrived";
+
+              let status;
+              if(!paid){
+                status=`<button type="button" class="purchasing-final-status"
+                  data-status="payment" data-id="${attr(r.id)}"
+                  style="background:#1976d2;color:#fff;border:0;padding:7px 11px;border-radius:7px;font-weight:700;cursor:pointer">
+                  Pending to Pay
+                </button>`;
+              }else if(!arrived){
+                status=`<button type="button" class="purchasing-final-status"
+                  data-status="arrival" data-id="${attr(r.id)}"
+                  style="background:#1976d2;color:#fff;border:0;padding:7px 11px;border-radius:7px;font-weight:700;cursor:pointer">
+                  Arriving
+                </button>`;
+              }else{
+                status=`<button type="button" disabled
+                  style="background:#2e7d32;color:#fff;border:0;padding:7px 11px;border-radius:7px;font-weight:700">
+                  Arrived
+                </button>`;
+              }
+
+              return `<tr>
+                <td title="${attr(r.purchase_no||r.id||"")}">
+                  <strong>${esc(shortId(r.purchase_no||r.id||""))}</strong>
+                </td>
+                <td title="${attr(r.purchase_datetime||"")}">${esc(fmt(r.purchase_datetime))}</td>
+                <td>${esc(r.purchasing_staff_name||"")}</td>
+                <td><button type="button" class="light purchasing-final-view" data-id="${attr(r.id)}">View</button></td>
+                <td><strong>${money(r.total)}</strong></td>
+                <td>${status}</td>
+                <td>
+                  <div class="actions">
+                    <button type="button" class="light purchasing-final-edit" data-id="${attr(r.id)}">Edit</button>
+                    <button type="button" class="danger purchasing-final-delete" data-id="${attr(r.id)}">Delete</button>
+                  </div>
+                </td>
+              </tr>`;
+            }).join("")}
+          </tbody>
+        </table>
+      </div>`;
+
+    box.querySelectorAll(".purchasing-final-view").forEach(b=>{
+      b.addEventListener("click",()=>{
+        if(typeof window.showDetails2==="function") window.showDetails2(b.dataset.id);
+        else if(typeof window.showDetails==="function") window.showDetails(b.dataset.id);
+        else {
+          const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(b.dataset.id));
+          alert(items(r).map(i=>`${i.product_name||"Item"} × ${i.qty||0} — ${money(i.subtotal)}`).join("\n")+"\n\nTotal: "+money(r?.total));
+        }
+      });
+    });
+
+    box.querySelectorAll(".purchasing-final-status").forEach(b=>{
+      b.addEventListener("click",async()=>{
+        const id=b.dataset.id;
+        const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));
+        if(!r)return;
+
+        if(b.dataset.status==="payment"){
+          if(!confirm("Make payment for this purchasing and change it to Arriving?"))return;
+          const result=await sb.from("medifella_purchases").update({
+            payment_status:"Paid",
+            paid_at:new Date().toISOString(),
+            arrival_status:"Arriving",
+            arrived_at:null
+          }).eq("id",id);
+          if(result.error){alert("Could not make payment: "+result.error.message);return}
+          r.payment_status="Paid";
+          r.paid_at=new Date().toISOString();
+          r.arrival_status="Arriving";
+          r.arrived_at=null;
+        }else{
+          if(!confirm("Mark this purchase as Arrived?"))return;
+          const now=new Date().toISOString();
+          const result=await sb.from("medifella_purchases").update({
+            arrival_status:"Arrived",
+            arrived_at:now
+          }).eq("id",id);
+          if(result.error){alert("Could not mark as Arrived: "+result.error.message);return}
+          r.arrival_status="Arrived";
+          r.arrived_at=now;
+        }
+        render();
+      });
+    });
+
+    box.querySelectorAll(".purchasing-final-edit").forEach(b=>{
+      b.addEventListener("click",()=>{
+        if(typeof window.__purchasingEditBridge==="function") window.__purchasingEditBridge(b.dataset.id);
+      });
+    });
+
+    box.querySelectorAll(".purchasing-final-delete").forEach(b=>{
+      b.addEventListener("click",async()=>{
+        if(!confirm("Delete this purchasing record?"))return;
+        const result=await sb.from("medifella_purchases").delete().eq("id",b.dataset.id);
+        if(result.error){alert("Delete failed: "+result.error.message);return}
+        if(Array.isArray(window.purchasingRecords))
+          window.purchasingRecords=window.purchasingRecords.filter(x=>String(x.id)!==String(b.dataset.id));
+        render();
+      });
+    });
+  }
+
+  function install(){
+    // Make this renderer the final visible renderer after all previous patches.
+    if(window.loadPurchasingManagement && !window.loadPurchasingManagement.__finalListV10){
+      const original=window.loadPurchasingManagement;
+      const wrapped=async function(){
+        const result=await original.apply(this,arguments);
+        setTimeout(render,0);
+        return result;
+      };
+      wrapped.__finalListV10=true;
+      window.loadPurchasingManagement=wrapped;
+    }
+
+    ["purchasingFromDate","purchasingToDate","purchasingSearch"].forEach(id=>{
+      const el=$(id);
+      if(el && !el.dataset.finalListV10){
+        el.dataset.finalListV10="1";
+        el.addEventListener("input",()=>setTimeout(render,0));
+        el.addEventListener("change",()=>setTimeout(render,0));
+      }
+    });
+
+    setTimeout(render,100);
+    setTimeout(render,500);
+    setTimeout(render,1200);
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
+  else install();
+})();
+</script>
+
+
+<script id="purchasing-pending-flow-final-v11">
+(function(){
+  "use strict";
+
+  function install(){
+    const btn=document.getElementById("pendingPurchasing");
+    if(!btn || btn.dataset.pendingFlowV11)return;
+    btn.dataset.pendingFlowV11="1";
+
+    // Keep exactly one Pending action and ensure it uses the real Purchasing
+    // save function from the Purchasing module.
+    btn.onclick=null;
+    btn.addEventListener("click",async function(e){
+      e.preventDefault();
+      e.stopPropagation();
+      if(typeof window.savePendingPurchasing!=="function"){
+        alert("Purchasing save function is not ready. Please refresh the page.");
+        return;
+      }
+      await window.savePendingPurchasing();
+    });
+
+    btn.textContent="Pending";
+    btn.style.background="#1976d2";
+    btn.style.color="#fff";
+    btn.style.border="0";
+    btn.style.borderRadius="8px";
+    btn.style.padding="9px 14px";
+    btn.style.fontWeight="700";
+    btn.type="button";
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
+  else install();
+  setTimeout(install,300);
+  setTimeout(install,1000);
 })();
 </script>
