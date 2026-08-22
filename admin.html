@@ -22159,7 +22159,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     document.querySelectorAll("#purchasingItemsBody .purchasing-search-wrap").forEach(w=>{
       const sel=w.querySelector(".purchasing-item-select");
       const input=w.querySelector(".purchasing-product-search");
-      if(sel && input)input.value=selectedLabel(sel);
+      if(sel && input && document.activeElement!==input)input.value=selectedLabel(sel);
     });
   }
 
@@ -22168,10 +22168,15 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     if(!body || body.dataset.searchWatchP3)return;
     body.dataset.searchWatchP3="1";
 
-    const observer=new MutationObserver(()=>{
-      refreshSearchable();
+    const observer=new MutationObserver((mutations)=>{
+      // Only react when Purchasing rows themselves are added/removed.
+      // Do not react to dropdown-menu typing, otherwise every keystroke
+      // resets the search input.
+      if(mutations.some(m=>m.target===body || [...m.addedNodes,...m.removedNodes].some(n=>n.nodeType===1 && (n.classList?.contains("purchasing-item-row") || n.querySelector?.(".purchasing-item-row"))))){
+        refreshSearchable();
+      }
     });
-    observer.observe(body,{childList:true,subtree:true});
+    observer.observe(body,{childList:true});
     refreshSearchable();
   }
 
@@ -22192,5 +22197,493 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
   else install();
+})();
+</script>
+
+
+<script id="purchasing-final-search-and-view-v4">
+(function(){
+  "use strict";
+
+  const $ = id => document.getElementById(id);
+
+  function esc(v){
+    return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+  }
+  function money(v){return "$"+Number(v||0).toFixed(2)}
+  function items(r){
+    let a=r?.items;
+    if(typeof a==="string"){try{a=JSON.parse(a)}catch(_){a=[]}}
+    return Array.isArray(a)?a:[];
+  }
+  function fmt(v){
+    const d=new Date(v);
+    if(Number.isNaN(d.getTime()))return String(v||"").replace("T"," ").replace(/\+00:00$/,"");
+    return `${String(d.getDate()).padStart(2,"0")}/${String(d.getMonth()+1).padStart(2,"0")}/${d.getFullYear()} ${String(d.getHours()).padStart(2,"0")}:${String(d.getMinutes()).padStart(2,"0")}`;
+  }
+
+  // ---------- Searchable Product / Service ----------
+  function makeSearchable(sel){
+    if(!sel || !sel.classList.contains("purchasing-item-select") || sel.dataset.finalSearchV4)return;
+    sel.dataset.finalSearchV4="1";
+
+    const wrap=document.createElement("div");
+    wrap.className="purchasing-final-search-wrap";
+    wrap.style.cssText="position:relative;width:100%;min-width:220px";
+
+    const input=document.createElement("input");
+    input.type="text";
+    input.className="purchasing-final-search-input";
+    input.placeholder="Search product or service";
+    input.autocomplete="off";
+    input.style.cssText="width:100%;height:38px;box-sizing:border-box;padding:8px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;outline:none;font:inherit";
+
+    const menu=document.createElement("div");
+    menu.className="purchasing-final-search-menu";
+    menu.style.cssText="display:none;position:absolute;left:0;right:0;top:calc(100% + 4px);z-index:100000;background:#fff;border:1px solid #cbd5e1;border-radius:10px;max-height:340px;overflow:auto;box-shadow:0 14px 35px rgba(15,23,42,.18)";
+
+    function currentText(){
+      const o=sel.options[sel.selectedIndex];
+      return o&&o.value?(o.textContent||""):"";
+    }
+
+    function open(filter){
+      const q=String(filter||"").trim().toLowerCase();
+      const opts=[...sel.options].filter(o=>o.value);
+      const matches=opts.filter(o=>(o.textContent||"").toLowerCase().includes(q));
+
+      menu.innerHTML=matches.length ? matches.map((o,i)=>{
+        const raw=o.textContent||"";
+        const parts=raw.split(" · ");
+        const code=parts.length>1?parts.shift():"";
+        const name=parts.join(" · ");
+        return `<button type="button" class="purchasing-final-search-option" data-value="${esc(o.value)}"
+          style="display:block;width:100%;padding:10px 12px;border:0;border-bottom:1px solid #eef2f7;background:#fff;text-align:left;cursor:pointer">
+          ${code?`<div style="font-size:11px;color:#64748b;font-weight:700">${esc(code)}</div>`:""}
+          <div style="font-size:14px;color:#111827;font-weight:600;white-space:normal;line-height:1.35">${esc(name)}</div>
+        </button>`;
+      }).join("") : `<div style="padding:14px;color:#64748b;text-align:center">No product or service found</div>`;
+
+      menu.style.display="block";
+    }
+
+    input.value=currentText();
+    sel.style.display="none";
+    sel.parentNode.insertBefore(wrap,sel);
+    wrap.appendChild(input);
+    wrap.appendChild(menu);
+    wrap.appendChild(sel);
+
+    input.addEventListener("focus",()=>{
+      input.style.borderColor="#0f766e";
+      open("");
+    });
+
+    input.addEventListener("input",()=>{
+      open(input.value);
+    });
+
+    input.addEventListener("keydown",e=>{
+      if(e.key==="Escape"){
+        menu.style.display="none";
+        input.value=currentText();
+      }else if(e.key==="Enter"){
+        const first=menu.querySelector(".purchasing-final-search-option");
+        if(first){e.preventDefault();first.click()}
+      }
+    });
+
+    menu.addEventListener("mousedown",e=>{
+      const b=e.target.closest(".purchasing-final-search-option");
+      if(!b)return;
+      e.preventDefault();
+      sel.value=b.dataset.value;
+      sel.dispatchEvent(new Event("change",{bubbles:true}));
+      input.value=currentText();
+      menu.style.display="none";
+      input.focus();
+    });
+
+    input.addEventListener("blur",()=>setTimeout(()=>{
+      input.style.borderColor="#cbd5e1";
+    },150));
+
+    sel.addEventListener("change",()=>{
+      if(document.activeElement!==input)input.value=currentText();
+    });
+  }
+
+  function installSearch(){
+    document.querySelectorAll("#purchasingItemsBody .purchasing-item-select").forEach(makeSearchable);
+
+    const body=$("purchasingItemsBody");
+    if(body && !body.dataset.finalSearchObserver){
+      body.dataset.finalSearchObserver="1";
+      const ob=new MutationObserver(muts=>{
+        muts.forEach(m=>{
+          [...m.addedNodes].forEach(n=>{
+            if(n.nodeType===1){
+              if(n.matches?.(".purchasing-item-row"))makeSearchable(n.querySelector(".purchasing-item-select"));
+              n.querySelectorAll?.(".purchasing-item-select").forEach(makeSearchable);
+            }
+          });
+        });
+      });
+      ob.observe(body,{childList:true});
+    }
+  }
+
+  // ---------- Professional View Details ----------
+  function ensureModal(){
+    let modal=$("purchasingFinalDetails");
+    if(modal)return modal;
+
+    modal=document.createElement("div");
+    modal.id="purchasingFinalDetails";
+    modal.style.cssText="display:none;position:fixed;inset:0;z-index:100001;background:rgba(15,23,42,.58);padding:18px;align-items:center;justify-content:center";
+    modal.innerHTML=`
+      <div style="width:min(1100px,100%);max-height:92vh;background:#fff;border-radius:18px;overflow:hidden;box-shadow:0 28px 80px rgba(0,0,0,.28);display:flex;flex-direction:column">
+        <div style="padding:18px 22px;border-bottom:1px solid #e5e7eb;display:flex;align-items:center;justify-content:space-between;gap:14px">
+          <div>
+            <div style="font-size:12px;color:#64748b;font-weight:700;letter-spacing:.06em;text-transform:uppercase">Purchasing Details</div>
+            <div id="purchasingFinalTitle" style="font-size:22px;font-weight:800;margin-top:3px"></div>
+          </div>
+          <button type="button" id="purchasingFinalClose" style="border:0;background:#f1f5f9;color:#334155;border-radius:9px;padding:9px 14px;font-weight:700;cursor:pointer">Close</button>
+        </div>
+        <div id="purchasingFinalBody" style="overflow:auto;padding:20px 22px"></div>
+      </div>`;
+    document.body.appendChild(modal);
+
+    $("purchasingFinalClose").onclick=()=>modal.style.display="none";
+    modal.addEventListener("click",e=>{if(e.target===modal)modal.style.display="none"});
+    return modal;
+  }
+
+  function showDetails(id){
+    const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));
+    if(!r)return;
+    const modal=ensureModal();
+    const its=items(r);
+    const paid=String(r.payment_status||"Paid")==="Paid";
+    const arrived=String(r.arrival_status||"Arriving")==="Arrived";
+
+    $("purchasingFinalTitle").textContent=r.purchase_no||"Purchase";
+    $("purchasingFinalBody").innerHTML=`
+      <div style="display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:20px">
+        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:13px">
+          <div style="font-size:12px;color:#64748b">Purchase ID</div>
+          <strong style="display:block;margin-top:5px;word-break:break-all">${esc(r.purchase_no||r.id||"")}</strong>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:13px">
+          <div style="font-size:12px;color:#64748b">Date & Time</div>
+          <strong style="display:block;margin-top:5px">${esc(fmt(r.purchase_datetime))}</strong>
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:13px">
+          <div style="font-size:12px;color:#64748b">Purchasing Staff</div>
+          <strong style="display:block;margin-top:5px">${esc(r.purchasing_staff_name||"—")}</strong>
+          ${r.purchasing_staff_job_title?`<span style="font-size:12px;color:#64748b">${esc(r.purchasing_staff_job_title)}</span>`:""}
+        </div>
+        <div style="background:#f8fafc;border:1px solid #e5e7eb;border-radius:12px;padding:13px">
+          <div style="font-size:12px;color:#64748b">Status</div>
+          <div style="margin-top:7px;display:flex;gap:6px;flex-wrap:wrap">
+            <span style="padding:5px 9px;border-radius:999px;background:${paid?"#dcfce7":"#fef3c7"};color:${paid?"#166534":"#92400e"};font-size:12px;font-weight:800">${paid?"Paid":"Pending to Pay"}</span>
+            <span style="padding:5px 9px;border-radius:999px;background:${arrived?"#dcfce7":"#dbeafe"};color:${arrived?"#166534":"#1d4ed8"};font-size:12px;font-weight:800">${arrived?"Arrived":"Arriving"}</span>
+          </div>
+        </div>
+      </div>
+
+      <div style="font-size:18px;font-weight:800;margin-bottom:10px">Purchased Items</div>
+      <div style="border:1px solid #e5e7eb;border-radius:13px;overflow:auto">
+        <table style="width:100%;min-width:780px;border-collapse:collapse">
+          <thead>
+            <tr style="background:#f8fafc">
+              <th style="padding:12px;text-align:left;border-bottom:1px solid #e5e7eb">#</th>
+              <th style="padding:12px;text-align:left;border-bottom:1px solid #e5e7eb">Product / Service</th>
+              <th style="padding:12px;text-align:left;border-bottom:1px solid #e5e7eb">Type</th>
+              <th style="padding:12px;text-align:center;border-bottom:1px solid #e5e7eb">Qty</th>
+              <th style="padding:12px;text-align:right;border-bottom:1px solid #e5e7eb">Unit Price</th>
+              <th style="padding:12px;text-align:right;border-bottom:1px solid #e5e7eb">Discount</th>
+              <th style="padding:12px;text-align:right;border-bottom:1px solid #e5e7eb">Subtotal</th>
+            </tr>
+          </thead>
+          <tbody>
+            ${its.map((i,n)=>`
+              <tr>
+                <td style="padding:12px;border-bottom:1px solid #eef2f7;color:#64748b">${n+1}</td>
+                <td style="padding:12px;border-bottom:1px solid #eef2f7">
+                  <div style="font-weight:750">${esc(i.product_name||"")}</div>
+                  ${i.product_code?`<div style="font-size:12px;color:#64748b;margin-top:3px">${esc(i.product_code)}</div>`:""}
+                </td>
+                <td style="padding:12px;border-bottom:1px solid #eef2f7">${esc(i.product_type||"Product")}${i.other_type?` · ${esc(i.other_type)}`:""}</td>
+                <td style="padding:12px;text-align:center;border-bottom:1px solid #eef2f7;font-weight:700">${esc(i.qty||0)}</td>
+                <td style="padding:12px;text-align:right;border-bottom:1px solid #eef2f7">${money(i.unit_price)}</td>
+                <td style="padding:12px;text-align:right;border-bottom:1px solid #eef2f7">${i.discount_type==="%"?esc(i.discount)+"%":money(i.discount)}</td>
+                <td style="padding:12px;text-align:right;border-bottom:1px solid #eef2f7;font-weight:800">${money(i.subtotal)}</td>
+              </tr>`).join("")}
+          </tbody>
+        </table>
+      </div>
+
+      <div style="display:flex;justify-content:flex-end;margin-top:18px">
+        <div style="width:320px;background:#f8fafc;border:1px solid #e5e7eb;border-radius:13px;padding:15px">
+          <div style="display:flex;justify-content:space-between;color:#64748b"><span>Total Items</span><strong>${its.length}</strong></div>
+          <div style="display:flex;justify-content:space-between;margin-top:10px;padding-top:10px;border-top:1px solid #e5e7eb;font-size:20px"><strong>Grand Total</strong><strong>${money(r.total)}</strong></div>
+        </div>
+      </div>`;
+
+    modal.style.display="flex";
+  }
+
+  // Capture View clicks before older alert-based listeners.
+  function installView(){
+    const box=$("purchasingList");
+    if(box && !box.dataset.finalViewCapture){
+      box.dataset.finalViewCapture="1";
+      box.addEventListener("click",e=>{
+        const b=e.target.closest(".purchasing-view, .purchasing-view-payment");
+        if(!b)return;
+        e.preventDefault();
+        e.stopPropagation();
+        e.stopImmediatePropagation();
+        showDetails(b.dataset.id);
+      },true);
+    }
+
+    document.addEventListener("keydown",e=>{
+      if(e.key==="Escape"){
+        const m=$("purchasingFinalDetails");
+        if(m)m.style.display="none";
+      }
+    });
+  }
+
+  function install(){
+    installSearch();
+    installView();
+    setTimeout(installSearch,200);
+    setTimeout(installSearch,700);
+    setTimeout(installSearch,1500);
+    setTimeout(installView,300);
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
+  else install();
+})();
+</script>
+
+
+<script id="purchasing-arriving-final-working-fix-v5">
+(function(){
+  "use strict";
+
+  let busy=false;
+
+  async function markArrivedWorking(id, button){
+    if(busy)return;
+    busy=true;
+    if(button){
+      button.disabled=true;
+      button.textContent="Updating...";
+    }
+
+    try{
+      const result=await sb.from("medifella_purchases").update({
+        arrival_status:"Arrived",
+        arrived_at:new Date().toISOString()
+      }).eq("id",id);
+
+      if(result.error)throw result.error;
+
+      // Update the local record immediately so the UI changes even if a
+      // different Purchasing refresh function is active.
+      const local=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));
+      if(local){
+        local.arrival_status="Arrived";
+        local.arrived_at=new Date().toISOString();
+      }
+
+      // Refresh through the existing function if available.
+      if(typeof window.loadPurchasingManagement==="function"){
+        try{ await window.loadPurchasingManagement(); }catch(_){}
+      }
+
+      // Also refresh the currently rendered list after all older render
+      // patches have finished.
+      setTimeout(()=>{
+        const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));
+        document.querySelectorAll(
+          `.purchasing-final-arriving[data-id="${CSS.escape(String(id))}"],
+           .purchasing-arrival-arriving[data-id="${CSS.escape(String(id))}"]`
+        ).forEach(b=>{
+          b.textContent="Arrived";
+          b.disabled=true;
+          b.style.background="#2e7d32";
+          b.style.color="#fff";
+          b.style.cursor="default";
+          b.classList.remove("purchasing-final-arriving","purchasing-arrival-arriving");
+          b.classList.add("purchasing-final-arrived");
+        });
+      },250);
+
+    }catch(e){
+      alert("Could not update arrival status: "+(e.message||"Unknown error"));
+      if(button){
+        button.disabled=false;
+        button.textContent="Arriving";
+      }
+    }finally{
+      busy=false;
+    }
+  }
+
+  function install(){
+    // Capture the click before any of the multiple older Purchasing patches.
+    if(document.documentElement.dataset.arrivalCaptureV5)return;
+    document.documentElement.dataset.arrivalCaptureV5="1";
+
+    document.addEventListener("click",function(e){
+      const button=e.target.closest(
+        ".purchasing-final-arriving, .purchasing-arrival-arriving"
+      );
+      if(!button)return;
+
+      const id=button.dataset.id;
+      if(!id)return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));
+      if(r && String(r.arrival_status||"Arriving")==="Arrived"){
+        button.textContent="Arrived";
+        button.disabled=true;
+        button.style.background="#2e7d32";
+        return;
+      }
+
+      if(!confirm("Mark this purchase as Arrived?"))return;
+      markArrivedWorking(id,button);
+    },true);
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else{
+    install();
+  }
+})();
+</script>
+
+
+<script id="purchasing-arriving-definitive-fix-v6">
+(function(){
+  "use strict";
+
+  window.markPurchasingArrived = async function(id, button){
+    if(!id || !window.sb) {
+      alert("Purchasing connection is not ready. Please refresh the page and try again.");
+      return;
+    }
+
+    const b=button || null;
+    if(b){
+      b.disabled=true;
+      b.textContent="Updating...";
+    }
+
+    const arrivedAt=new Date().toISOString();
+
+    try{
+      const result=await window.sb
+        .from("medifella_purchases")
+        .update({
+          arrival_status:"Arrived",
+          arrived_at:arrivedAt
+        })
+        .eq("id",id);
+
+      if(result.error) throw result.error;
+
+      // Update local state immediately.
+      const recs=Array.isArray(window.purchasingRecords)?window.purchasingRecords:[];
+      const rec=recs.find(r=>String(r.id)===String(id));
+      if(rec){
+        rec.arrival_status="Arrived";
+        rec.arrived_at=arrivedAt;
+      }
+
+      // Update every visible Arriving button for this record.
+      document.querySelectorAll("button").forEach(btn=>{
+        if(String(btn.dataset.id||"")===String(id) &&
+           String(btn.textContent||"").trim()==="Arriving"){
+          btn.textContent="Arrived";
+          btn.disabled=true;
+          btn.style.background="#2e7d32";
+          btn.style.color="#fff";
+          btn.style.cursor="default";
+        }
+      });
+
+      // Refresh the list after the DB update.
+      if(typeof window.loadPurchasingManagement==="function"){
+        try{ await window.loadPurchasingManagement(); }catch(_){}
+      }
+
+      // Some older render patches may redraw the list after the refresh.
+      setTimeout(()=>{
+        document.querySelectorAll("button").forEach(btn=>{
+          if(String(btn.dataset.id||"")===String(id) &&
+             String(btn.textContent||"").trim()==="Arriving"){
+            btn.textContent="Arrived";
+            btn.disabled=true;
+            btn.style.background="#2e7d32";
+            btn.style.color="#fff";
+            btn.style.cursor="default";
+          }
+        });
+      },400);
+
+    }catch(err){
+      if(b){
+        b.disabled=false;
+        b.textContent="Arriving";
+      }
+      alert("Could not mark this purchase as Arrived.\n\n"+(err?.message||String(err)));
+    }
+  };
+
+  function install(){
+    if(document.documentElement.dataset.arrivingDefinitiveV6)return;
+    document.documentElement.dataset.arrivingDefinitiveV6="1";
+
+    /*
+     * Capture ANY visible button whose label is exactly "Arriving".
+     * This intentionally does not depend on which of the older Purchasing
+     * render functions created the button.
+     */
+    document.addEventListener("click",function(e){
+      const button=e.target.closest("button");
+      if(!button)return;
+
+      const label=String(button.textContent||"").trim();
+      if(label!=="Arriving")return;
+
+      const id=button.dataset.id;
+      if(!id)return;
+
+      e.preventDefault();
+      e.stopPropagation();
+      e.stopImmediatePropagation();
+
+      window.markPurchasingArrived(id,button);
+    },true);
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else{
+    install();
+  }
 })();
 </script>
