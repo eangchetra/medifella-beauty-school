@@ -20819,10 +20819,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       input.value=item.label;
       close();
     }
-    async function render(){
-      results.innerHTML='<div style="padding:12px;color:#64748b;text-align:center;background:#fff">Searching products and services…</div>';
-      results.style.display="block";
-      await ensurePurchasingSourcesP();
+    function renderFastP(){
       const matches=sourceMatches();
       results.innerHTML="";
       if(!matches.length){
@@ -20831,17 +20828,28 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
         e.textContent="No product or service found";
         results.appendChild(e);
       }else{
+        const frag=document.createDocumentFragment();
         matches.forEach(item=>{
           const b=document.createElement("button");
           b.type="button";
           b.style.cssText="display:block;width:100%;padding:12px 14px;border:0;border-bottom:1px solid #e5e7eb;background:#fff;text-align:left;cursor:pointer;color:#203a3d";
           b.textContent=item.label;
           b.addEventListener("pointerdown",e=>{e.preventDefault();e.stopPropagation();chooseSource(item)},true);
-          b.addEventListener("click",e=>{e.preventDefault();e.stopPropagation();chooseSource(item)},true);
-          results.appendChild(b);
+          frag.appendChild(b);
         });
+        results.appendChild(frag);
       }
       results.style.display="block";
+      positionResults();
+    }
+
+    async function render(){
+      results.innerHTML='<div style="padding:12px;color:#64748b;text-align:center;background:#fff">Loading…</div>';
+      results.style.display="block";
+      await ensurePurchasingSourcesP();
+      purchasingSearchIndexP=null;
+      buildPurchasingSearchIndexP();
+      renderFastP();
     }
 
     // Portal the results outside the Purchasing card/table stacking context.
@@ -20852,22 +20860,35 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 
     let searchTimer=null;
     let searchGeneration=0;
-    async function fastRender(){
-      const gen=++searchGeneration;
-      // If data is already available, render immediately with no async delay.
-      if(allProductsP().length || allServicesP().length){
-        purchasingSearchIndexP=purchasingSearchIndexP||buildPurchasingSearchIndexP();
-        render();
+    let sourceLoadStartedP=false;
+
+    function fastRender(){
+      searchGeneration++;
+      clearTimeout(searchTimer);
+
+      // Once products/services are loaded, typing is completely synchronous:
+      // no network call, no await, no loading screen, and no debounce.
+      if((allProductsP().length || allServicesP().length)){
+        if(!purchasingSearchIndexP)buildPurchasingSearchIndexP();
+        renderFastP();
         return;
       }
-      clearTimeout(searchTimer);
-      searchTimer=setTimeout(async()=>{
-        await ensurePurchasingSourcesP();
-        if(gen!==searchGeneration)return;
-        purchasingSearchIndexP=null;
-        render();
-      },80);
+
+      // Only the very first use needs to load the source lists.
+      if(!sourceLoadStartedP){
+        sourceLoadStartedP=true;
+        results.innerHTML='<div style="padding:12px;color:#64748b;text-align:center;background:#fff">Loading products and services…</div>';
+        results.style.display="block";
+        ensurePurchasingSourcesP().then(()=>{
+          purchasingSearchIndexP=null;
+          buildPurchasingSearchIndexP();
+          if(input.value.trim()) renderFastP();
+          else renderFastP();
+          sourceLoadStartedP=false;
+        });
+      }
     }
+
     input.addEventListener("focus",fastRender);
     input.addEventListener("input",fastRender);
     input.addEventListener("keydown",e=>{
