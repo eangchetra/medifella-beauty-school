@@ -2724,6 +2724,7 @@ script { display:none !important; }
         <option value="Paid">Paid</option>
         <option value="Partial">Partial Payment</option>
         <option value="Due">Due</option>
+        <option value="Pending">Pending</option>
       </select>
     </div>
     <div>
@@ -3231,6 +3232,7 @@ script { display:none !important; }
    <option value="Paid">Paid</option>
    <option value="Partial">Partial Payment</option>
    <option value="Due">Due</option>
+   <option value="Pending">Pending</option>
   </select>
  </div>
  <div id="mtsPartialPaidWrap" class="hidden">
@@ -3249,7 +3251,7 @@ script { display:none !important; }
 <div class="actions" style="justify-content:flex-end;margin-top:14px"><button id="saveMtsSale" class="gold">Save MTS Sale & Generate Invoice</button><button id="clearMtsSale" class="light">Clear</button></div>
 <div id="mtsStatus"></div>
 </div>
-<div class="card" style="margin-top:18px"><h2>MTS Sales</h2><div class="toolbar"><input id="mtsSaleSearch" placeholder="Search invoice, buyer or product"><select id="mtsPaymentFilter"><option value="all">All Payment Status</option><option value="Paid">Paid</option><option value="Partial">Partial Payment</option><option value="Due">Due</option></select><button id="mtsSalesRefresh" class="light">Refresh</button></div><div id="mtsSalesList">Loading...</div></div>
+<div class="card" style="margin-top:18px"><h2>MTS Sales</h2><div class="toolbar"><input id="mtsSaleSearch" placeholder="Search invoice, buyer or product"><select id="mtsPaymentFilter"><option value="all">All Payment Status</option><option value="Paid">Paid</option><option value="Partial">Partial Payment</option><option value="Due">Due</option><option value="Pending">Pending</option></select><button id="mtsSalesRefresh" class="light">Refresh</button></div><div id="mtsSalesList">Loading...</div></div>
 </section>
 
 <section id="dermedSale" class="section">
@@ -3303,7 +3305,7 @@ script { display:none !important; }
 <div>
 <label>Payment Status *</label>
 <select id="dermedPaymentStatus">
-<option value="Paid">Paid</option><option value="Partial">Partial Payment</option><option value="Due">Due</option>
+<option value="Paid">Paid</option><option value="Partial">Partial Payment</option><option value="Due">Due</option><option value="Pending">Pending</option>
 </select>
 </div>
 <div>
@@ -4578,7 +4580,7 @@ function calculateSaleTotal(){
  const status=String($("salePaymentStatus")?.value||"Due");
  let paidNow=parseMoneyInput($("saleAmountPaidNow")?.value);
  if(status==="Paid") paidNow=initialTotal;
- if(status==="Due") paidNow=0;
+ if(status==="Due" || status==="Pending") paidNow=0;
  paidNow=Math.min(initialTotal,Math.max(0,paidNow));
 
  const due=Math.max(0,initialTotal-paidNow);
@@ -4622,10 +4624,19 @@ function setSaleEditMode(isEditing){
   if(title) title.textContent = isEditing ? "Edit Invoice / Sale" : "Add Sale";
   if(saveBtn) saveBtn.textContent = isEditing ? "Update Invoice" : "Save Sale";
   if(cancelBtn) cancelBtn.textContent = isEditing ? "Cancel Edit" : "Cancel";
-  ["salePaymentMethod","salePaymentStatus","saleAmountPaidNow"].forEach(id=>{
+  ["salePaymentMethod","saleAmountPaidNow"].forEach(id=>{
     const el=$(id);
     if(el) el.disabled=!!isEditing;
   });
+  const paymentStatusEl=$("salePaymentStatus");
+  if(paymentStatusEl){
+    const editingRecord=isEditing && editingSaleId
+      ? salesRecords.find(x=>String(x.id)===String(editingSaleId))
+      : null;
+    // Pending invoices may be finalized while editing.
+    // Paid / Due / Partial invoices are never editable.
+    paymentStatusEl.disabled=!!isEditing && String(editingRecord?.payment_status||"")!=="Pending";
+  }
 }
 
 function clearSaleEditMode(){
@@ -4647,6 +4658,10 @@ function editSaleFromInvoice(id){
  const s=salesRecords.find(x=>String(x.id)===String(id));
  if(!s){
    alert("Medi Fella Sale invoice not found.");
+   return;
+ }
+ if(String(s.payment_status||"").trim()!=="Pending"){
+   alert("Only Pending invoices can be edited.");
    return;
  }
 
@@ -4732,7 +4747,8 @@ function editSaleFromInvoice(id){
 
  const total=saleTotal(s);
  const paid=Math.min(editingSaleOriginalPaid,total);
- const status=saleStatus(total,paid);
+ const storedStatus=String(s.payment_status||"").trim();
+ const status=storedStatus==="Pending" ? "Pending" : saleStatus(total,paid);
 
  $("salePaymentStatus").value=status;
  $("saleAmountPaidNow").value=paid.toFixed(2);
@@ -4741,7 +4757,7 @@ function editSaleFromInvoice(id){
 
  // Payment fields are locked while editing; Update Invoice keeps the
  // original paid amount and recalculates the new balance.
- $("salePaymentStatus").disabled=true;
+ $("salePaymentStatus").disabled=(status!=="Pending");
  $("saleAmountPaidNow").readOnly=true;
  $("saleAmountPaidNow").disabled=false;
 
@@ -5487,6 +5503,8 @@ function showSaleInvoice(id,size="A4"){
  const khr=v=>Math.round(Number(v||0)*rate).toLocaleString("en-US")+" ៛";
  const usd=v=>money(v);
  const note=saleField(s,["notes","note"],"");
+ const invoicePaymentStatus=String(s.payment_status||"").trim();
+ const invoiceCanEdit=invoicePaymentStatus==="Pending";
  const itemDiscountTotal=mtsInvoiceCalc
    ? mtsInvoiceCalc.itemDiscount
    : items.reduce((a,x)=>a+(Number(x.discount_amount)||0),0);
@@ -5675,7 +5693,7 @@ function showSaleInvoice(id,size="A4"){
    </div>
 
    <div class="invoice-actions" id="invoiceActions">
-  <button type="button" class="mf-action-btn" id="invoiceEditButton" onclick="window.mtsInvoiceEditClick(window.currentInvoiceId); return false;">✏️ Edit</button>
+  ${invoiceCanEdit ? `<button type="button" class="mf-action-btn" id="invoiceEditButton" onclick="window.editSaleFromInvoiceRouter(window.currentInvoiceId); return false;">✏️ Edit</button>` : ""}
   <button type="button" class="mf-action-btn" onclick="printInvoice(window.currentInvoiceId,'A4')">🖨️ Print</button>
   <button type="button" class="mf-action-btn" onclick="downloadInvoicePDF(window.currentInvoiceId,'A4')">⬇️ Save PDF</button>
   <button type="button" class="mf-action-btn" onclick="closeInvoicePreview()">✕ Close</button>
@@ -6576,7 +6594,7 @@ async function saveMediFellaSale(){
 
    const selectedStatus=String($("salePaymentStatus")?.value||"Due");
    let paid=0;
-   if(isEdit){
+   if(isEdit && originalEditingStatus!=="Pending"){
      paid=Math.min(Math.max(0,editingSaleOriginalPaid),total);
    }else if(selectedStatus==="Paid"){
      paid=total;
@@ -6590,7 +6608,12 @@ async function saveMediFellaSale(){
      }
    }
 
-   const paymentStatus=isEdit?saleStatus(total,paid):selectedStatus;
+   const originalEditingStatus=isEdit
+     ? String((salesRecords.find(x=>String(x.id)===String(editingSaleId))||{}).payment_status||"")
+     : "";
+   const paymentStatus=isEdit
+     ? (originalEditingStatus==="Pending" ? selectedStatus : saleStatus(total,paid))
+     : selectedStatus;
    const reference=String($("saleReference")?.value||"").trim()||nextSaleReference();
    const saleDate=saleDateTime.slice(0,10);
    const saleTime=saleDateTime.length>=19?saleDateTime.slice(11,19):saleDateTime.slice(11,16);
@@ -8692,7 +8715,7 @@ async function saveInventorySale(type){
   };
   const r=await sb.from("medifella_sales").insert({...payload,created_by:adminUser.id}).select().single();if(r.error)throw r.error;
   const movements=items.map(x=>({product_id:x.product_id,movement_type:"sale",quantity:Number(x.quantity),staff_id:staffId,staff_name:staff?.name_en||"",stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));
-  if(movements.length){const mr=await sb.from("medifella_inventory_movements").insert(movements);if(mr.error)throw mr.error}
+  if(movements.length && status!=="Pending"){const mr=await sb.from("medifella_inventory_movements").insert(movements);if(mr.error)throw mr.error}
   msg($(type+"Status"),`${code} sale saved. Invoice ${reference}.`);
   resetNewInventorySale(type);await loadSales();await loadStockMovements();showSaleInvoice(r.data.id);
  }catch(e){msg($(type+"Status"),e.message||"Could not save sale.",true)}
@@ -8770,8 +8793,8 @@ function renderMtsSales(){
  box.innerHTML=rows.length?`<div class="table-wrap"><table class="table">
  <tr><th>Date / Time</th><th>Reference</th><th>Buyer</th><th>Products</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>
  ${rows.map(x=>{
-   const total=saleTotal(x),paid=salePaid(x),bal=Math.max(0,total-paid),status=saleStatus(total,paid);
-   const badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
+   const total=saleTotal(x),paid=salePaid(x),bal=Math.max(0,total-paid),status=String(x.payment_status||"")==="Pending"?"Pending":saleStatus(total,paid);
+   const badge=status==="Paid"?"verified":status==="Pending"?"pending":status==="Partial"?"pending":"rejected";
    const dt=saleDateValue(x),time=saleField(x,["sale_time","time"],"");
    return `<tr>
      <td>${esc(String(dt).slice(0,10))}${time?`<div class="muted">${esc(String(time).slice(0,5))}</div>`:""}</td>
@@ -8839,8 +8862,8 @@ function renderDermedSales(){
  box.innerHTML=rows.length?`<div class="table-wrap"><table class="table">
  <tr><th>Date / Time</th><th>Reference</th><th>Buyer</th><th>Products / Services</th><th>Total</th><th>Paid Balance</th><th>Due</th><th>Payment Status</th><th>Actions</th></tr>
  ${rows.map(x=>{
-   const total=saleTotal(x),paid=salePaid(x),bal=Math.max(0,total-paid),status=saleStatus(total,paid);
-   const badge=status==="Paid"?"verified":status==="Partial"?"pending":"rejected";
+   const total=saleTotal(x),paid=salePaid(x),bal=Math.max(0,total-paid),status=String(x.payment_status||"")==="Pending"?"Pending":saleStatus(total,paid);
+   const badge=status==="Paid"?"verified":status==="Pending"?"pending":status==="Partial"?"pending":"rejected";
    const dt=saleDateValue(x),time=saleField(x,["sale_time","time"],"");
    const items=[...(x.items||[]).map(i=>i.name),...(x.service_items||[]).map(i=>i.name)].join(", ");
    return `<tr>
@@ -9007,6 +9030,10 @@ function showDermedSaleInvoice(id,size="A4"){
 function editDermedSaleFromInvoice(id){
  const s=salesRecords.find(x=>String(x.id)===String(id)&&String(x.sale_type||"").toUpperCase()==="DERMED");
  if(!s){alert("Dermed sale not found.");return;}
+ if(String(s.payment_status||"").trim()!=="Pending"){
+   alert("Only Pending invoices can be edited.");
+   return;
+ }
  closeInvoicePreview();
 
  document.querySelectorAll(".nav").forEach(x=>x.classList.remove("active"));
@@ -9488,7 +9515,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const status=E("dermedPaymentStatus")?.value||"Paid";
     let paid=num(E("dermedAmountPaidNow")?.value);
     if(status==="Paid") paid=initial;
-    else if(status==="Due") paid=0;
+    else if(status==="Due" || status==="Pending") paid=0;
     else paid=Math.min(initial,Math.max(0,paid));
     const due=Math.max(0,initial-paid);
     let existingDue=0;
@@ -9532,7 +9559,7 @@ document.addEventListener("DOMContentLoaded",function(){
     if(status==="Paid")input.value=total.toFixed(2);
     else if(status==="Due")input.value="0.00";
     else input.value=Math.min(num(input.value),total).toFixed(2);
-    input.readOnly=status!=="Partial";
+    input.readOnly=!(status==="Partial");
     input.style.background=status==="Partial"?"#fff":"#f3f7f7";
     updateTotals();
   }
@@ -9696,7 +9723,7 @@ document.addEventListener("DOMContentLoaded",function(){
           if(pr.error)throw pr.error;
           }
         const movements=items.map(x=>({product_id:x.product_id,movement_type:"sale",quantity:Math.max(1,num(x.quantity)),staff_id:staffId,staff_name:staff?.name_en||"",stock_time:now,created_by:adminUser.id,sale_id:r.data.id,notes:code}));
-        if(movements.length){const mr=await sb.from("medifella_inventory_movements").insert(movements);if(mr.error)throw mr.error}
+        if(movements.length && status!=="Pending"){const mr=await sb.from("medifella_inventory_movements").insert(movements);if(mr.error)throw mr.error}
       }
       // Create commission only when a new Dermed sale is created.
       // Editing an old invoice never changes the commission already recorded for that sale.
@@ -11062,7 +11089,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const od=ot==="usd"?Math.min(subtotal,ov):Math.min(subtotal,subtotal*ov/100);
     const total=Math.max(0,subtotal-od);
     const st=E("mtsPaymentStatus")?.value||"Paid";
-    const paid=st==="Paid"?total:st==="Due"?0:Math.min(total,num(E("mtsAmountPaidNow")?.value||0));
+    const paid=st==="Paid"?total:(st==="Due" || st==="Pending")?0:Math.min(total,num(E("mtsAmountPaidNow")?.value||0));
     return {subtotal,od,total,status:st,paid,due:Math.max(0,total-paid)};
   }
 
@@ -11294,7 +11321,7 @@ document.addEventListener("DOMContentLoaded",function(){
         sale_id:saleId,
         notes:"MTS"
       }));
-      if(movements.length){
+      if(movements.length && c.status!=="Pending"){
         const mr=await sb.from("medifella_inventory_movements").insert(movements);
         if(mr.error)throw mr.error;
       }
@@ -11493,6 +11520,10 @@ document.addEventListener("DOMContentLoaded",function(){
   /* MTS edit: open the MTS Sale form, not Medi Fella Sale. */
   async function editMtsSaleFromInvoice(id){
     const s=(salesRecords||[]).find(x=>String(x.id)===String(id));
+    if(s && String(s.payment_status||"").trim()!=="Pending"){
+      alert("Only Pending invoices can be edited.");
+      return;
+    }
     if(!s || !isMtsListRecord(s)){alert("MTS Sale invoice not found.");return;}
 
     if(typeof closeInvoicePreview==="function")closeInvoicePreview();
@@ -13870,7 +13901,7 @@ async function loadCommissionRecords(retry=0){
     const status=$("dermedPaymentStatus")?.value||"Paid";
     let paid=N($("dermedAmountPaidNow")?.value);
     if(status==="Paid") paid=total;
-    else if(status==="Due") paid=0;
+    else if(status==="Due" || status==="Pending") paid=0;
     else paid=Math.min(total,Math.max(0,paid));
     return {productTotal,serviceTotal,total,paid,due:Math.max(0,total-paid)};
   }
