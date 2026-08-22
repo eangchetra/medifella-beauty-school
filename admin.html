@@ -2253,6 +2253,174 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 })();
 </script>
 
+
+<style id="final-a4-table-and-mts-khmer-clarity-fix">
+/* FINAL FIX:
+   1) Keep the calculation/totals table completely inside the A4 invoice.
+   2) Make the MTS Korean-factory Khmer warning wrap cleanly and remain readable.
+   3) Do not change the sale calculations or other dashboard functions.
+*/
+#invoiceOverlay .mf-lower-grid,
+#invoicePrint .mf-lower-grid,
+#invoiceExportContent .mf-lower-grid{
+  display:grid!important;
+  grid-template-columns:minmax(0,38fr) minmax(0,62fr)!important;
+  gap:8px!important;
+  width:100%!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+  min-width:0!important;
+  align-items:start!important;
+}
+
+#invoiceOverlay .mf-lower-grid > *,
+#invoicePrint .mf-lower-grid > *,
+#invoiceExportContent .mf-lower-grid > *{
+  min-width:0!important;
+  max-width:100%!important;
+  box-sizing:border-box!important;
+}
+
+#invoiceOverlay .mf-totals-table,
+#invoicePrint .mf-totals-table,
+#invoiceExportContent .mf-totals-table{
+  width:100%!important;
+  max-width:100%!important;
+  min-width:0!important;
+  table-layout:fixed!important;
+  box-sizing:border-box!important;
+  border-collapse:collapse!important;
+}
+
+#invoiceOverlay .mf-totals-table th,
+#invoiceOverlay .mf-totals-table td,
+#invoicePrint .mf-totals-table th,
+#invoicePrint .mf-totals-table td,
+#invoiceExportContent .mf-totals-table th,
+#invoiceExportContent .mf-totals-table td{
+  box-sizing:border-box!important;
+  padding:5px 6px!important;
+  font-size:10.5px!important;
+  line-height:1.25!important;
+  vertical-align:middle!important;
+  overflow-wrap:break-word!important;
+  word-break:normal!important;
+  white-space:normal!important;
+}
+
+#invoiceOverlay .mf-totals-table th:nth-child(1),
+#invoiceOverlay .mf-totals-table td:nth-child(1),
+#invoicePrint .mf-totals-table th:nth-child(1),
+#invoicePrint .mf-totals-table td:nth-child(1),
+#invoiceExportContent .mf-totals-table th:nth-child(1),
+#invoiceExportContent .mf-totals-table td:nth-child(1){
+  width:53%!important;
+}
+
+#invoiceOverlay .mf-totals-table th:nth-child(2),
+#invoiceOverlay .mf-totals-table td:nth-child(2),
+#invoicePrint .mf-totals-table th:nth-child(2),
+#invoicePrint .mf-totals-table td:nth-child(2),
+#invoiceExportContent .mf-totals-table th:nth-child(2),
+#invoiceExportContent .mf-totals-table td:nth-child(2){
+  width:22%!important;
+}
+
+#invoiceOverlay .mf-totals-table th:nth-child(3),
+#invoiceOverlay .mf-totals-table td:nth-child(3),
+#invoicePrint .mf-totals-table th:nth-child(3),
+#invoicePrint .mf-totals-table td:nth-child(3),
+#invoiceExportContent .mf-totals-table th:nth-child(3),
+#invoiceExportContent .mf-totals-table td:nth-child(3){
+  width:25%!important;
+}
+
+/* MTS factory warning: clear Khmer OS Battambang, normal weight, natural wrapping. */
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-mts-risk-notice,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-mts-risk-notice,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-mts-risk-notice{
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
+  font-size:10.5px!important;
+  line-height:1.55!important;
+  font-weight:400!important;
+  text-align:left!important;
+  white-space:normal!important;
+  overflow-wrap:break-word!important;
+  word-break:normal!important;
+  letter-spacing:0!important;
+  max-width:100%!important;
+  min-width:0!important;
+  box-sizing:border-box!important;
+}
+
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-mts-risk-notice .kh,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-mts-risk-notice .kh,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-mts-risk-notice .kh{
+  display:block!important;
+  font-family:"KhmerOSBattambangUploaded","Khmer OS Battambang","Battambang",Arial,sans-serif!important;
+  font-size:10.5px!important;
+  line-height:1.55!important;
+  font-weight:400!important;
+  white-space:normal!important;
+  overflow-wrap:break-word!important;
+  word-break:normal!important;
+  text-align:left!important;
+  color:#111!important;
+}
+
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-mts-risk-notice .en,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-mts-risk-notice .en,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-mts-risk-notice .en{
+  display:block!important;
+  margin-top:4px!important;
+  font-family:Arial,"Noto Sans",sans-serif!important;
+  font-size:9.5px!important;
+  line-height:1.4!important;
+  font-weight:400!important;
+  white-space:normal!important;
+  overflow-wrap:break-word!important;
+  word-break:normal!important;
+  text-align:left!important;
+  color:#111!important;
+}
+
+/* The PDF renderer captures #invoicePrint; keep the same compact A4 proportions. */
+@media print{
+  #invoicePrint.invoice-print-a4 .mf-lower-grid{
+    grid-template-columns:minmax(0,38fr) minmax(0,62fr)!important;
+    gap:7px!important;
+  }
+  #invoicePrint.invoice-print-a4 .mf-totals-table th,
+  #invoicePrint.invoice-print-a4 .mf-totals-table td{
+    padding:4px 5px!important;
+    font-size:10px!important;
+    line-height:1.2!important;
+  }
+}
+</style>
+
+
+<style id="mts-invoice-calculation-match-sale-table-final">
+/* MTS invoice totals are calculated from the same line-item values as MTS Sale. */
+#invoiceOverlay .mf-invoice[data-sale-type="MTS"] .mf-totals-table,
+#invoicePrint .mf-invoice[data-sale-type="MTS"] .mf-totals-table,
+#invoiceExportContent .mf-invoice[data-sale-type="MTS"] .mf-totals-table{
+  table-layout:fixed!important;
+}
+</style>
+
+
+<style id="initial-total-red-highlight">
+/* Make Initial Total highly visible for customers. */
+.mf-totals-table tr.initial-total-row td,
+.mf-totals-table tr.initial-total-row th,
+.mf-totals-table tr:has(td:first-child) td.initial-total,
+.mf-totals-table tr:has(td:first-child) th.initial-total {
+  color:#d00000!important;
+  font-weight:800!important;
+}
+</style>
+
 </head>
 <body>
 
@@ -4206,6 +4374,42 @@ function studentOutstanding(studentId){
  * MTS and Dermed NEVER contribute to each other's Grand Total Due.
  * Fully-paid invoices contribute $0.
  */
+
+/*
+ * FINAL MTS INVOICE CALCULATION SOURCE OF TRUTH
+ * Matches the MTS Sale table:
+ *   gross = qty × unit price
+ *   USD item discount = entered USD amount once
+ *   % item discount = percentage of line total
+ *   initial total = gross - item discounts - overall discount
+ */
+function calculateMtsStoredSaleTotals(sale){
+  let raw=[];
+  try{
+    raw=typeof saleItemsValue(sale)==="string"
+      ? JSON.parse(saleItemsValue(sale))
+      : (saleItemsValue(sale)||[]);
+  }catch(_){raw=[]}
+  if(!Array.isArray(raw))raw=[];
+
+  let gross=0, itemDiscount=0;
+  raw.forEach(x=>{
+    const q=Math.max(1,Number(x?.quantity ?? x?.qty ?? 1)||1);
+    const p=Math.max(0,Number(x?.unit_price ?? x?.price ?? 0)||0);
+    const base=q*p;
+    const type=String(x?.discount_type||"percent").toLowerCase()==="usd" ? "usd" : "percent";
+    const value=Math.max(0,Number(x?.discount_value||0)||0);
+    const d=type==="usd" ? Math.min(base,value) : Math.min(base,base*value/100);
+    gross+=base;
+    itemDiscount+=d;
+  });
+
+  const savedOverall=Math.max(0,Number(saleField(sale,["discount"],0))||0);
+  const overall=Math.min(Math.max(0,gross-itemDiscount),savedOverall);
+  const total=Math.max(0,gross-itemDiscount-overall);
+  return {gross,itemDiscount,overall,total};
+}
+
 function buyerOutstandingByInvoiceType(sale){
  if(!sale)return 0;
 
@@ -4230,7 +4434,10 @@ function buyerOutstandingByInvoiceType(sale){
 
    if(!sameBuyer)return sum;
 
-   return sum + Math.max(0, Number(saleTotal(s)||0)-Number(salePaid(s)||0));
+   const correctedTotal = rowType==="MTS"
+     ? calculateMtsStoredSaleTotals(s).total
+     : Number(saleTotal(s)||0);
+   return sum + Math.max(0, correctedTotal-Number(salePaid(s)||0));
  },0);
 }
 
@@ -4948,7 +5155,7 @@ function updateSalesMetrics(){
 
 async function recordSalePayment(id){
  const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
- const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
+ let total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
  if(balance<=0.005){alert("This invoice has no remaining Due amount.");return}
 
  // Use a proper payment box instead of browser prompts.
@@ -5114,6 +5321,13 @@ function showSaleInvoice(id,size="A4"){
    discount_amount:Number(x.discount_amount ?? 0)
  }));
 
+ const invoiceSaleType=String(s.sale_type||"").trim().toUpperCase();
+ const mtsInvoiceCalc=invoiceSaleType==="MTS" ? calculateMtsStoredSaleTotals(s) : null;
+ if(mtsInvoiceCalc){
+   total=mtsInvoiceCalc.total;
+   balance=Math.max(0,total-paid);
+ }
+
  const rawDateValue=String(saleField(s,["sale_date"],"")||"");
  const rawTimeValue=String(saleField(s,["sale_time","time"],"")||"");
  let dateObj=null;
@@ -5160,10 +5374,13 @@ function showSaleInvoice(id,size="A4"){
  const invoiceBuyerId=buyerType==="customer" ? customerId : studentId;
  const phone=saleField(s,["student_phone","customer_phone","phone"],"—");
  const student=saleCustomer(s)||"—";
- const subInitial=Number(saleField(s,["subtotal"],total))||0;
- const invoiceSaleType=String(s.sale_type||"").trim().toUpperCase();
+ const subInitial=mtsInvoiceCalc
+   ? mtsInvoiceCalc.gross
+   : (Number(saleField(s,["subtotal"],total))||0);
  const isDermedSale=invoiceSaleType==="DERMED";
- const overallDiscount=isDermedSale ? 0 : (Number(saleField(s,["discount"],0))||0);
+ const overallDiscount=mtsInvoiceCalc
+   ? mtsInvoiceCalc.overall
+   : (isDermedSale ? 0 : (Number(saleField(s,["discount"],0))||0));
  /*
   * MTS and Dermed are separate account ledgers.
   * An MTS invoice sees only outstanding MTS invoices.
@@ -5176,7 +5393,9 @@ function showSaleInvoice(id,size="A4"){
  const khr=v=>Math.round(Number(v||0)*rate).toLocaleString("en-US")+" ៛";
  const usd=v=>money(v);
  const note=saleField(s,["notes","note"],"");
- const itemDiscountTotal=items.reduce((a,x)=>a+(Number(x.discount_amount)||0),0);
+ const itemDiscountTotal=mtsInvoiceCalc
+   ? mtsInvoiceCalc.itemDiscount
+   : items.reduce((a,x)=>a+(Number(x.discount_amount)||0),0);
 
  const saleReference=String(saleRef(s)||"");
  const invoiceNumber=saleReference
@@ -5210,7 +5429,16 @@ function showSaleInvoice(id,size="A4"){
    const x=items[i];
    if(x){
      const qty=x.quantity ?? 1;
-     // MTS stores item discounts as discount_type / discount_value and
+     const qtyNum=Math.max(1,Number(qty)||1);
+     const priceNum=Math.max(0,Number(x.unit_price ?? x.price ?? 0)||0);
+     const baseNum=qtyNum*priceNum;
+     const rowDiscountType=String(x.discount_type||"percent").toLowerCase()==="usd" ? "usd" : "percent";
+     const rowDiscountValue=Math.max(0,Number(x.discount_value||0)||0);
+     const rowDiscountAmount=rowDiscountType==="usd"
+       ? Math.min(baseNum,rowDiscountValue)
+       : Math.min(baseNum,baseNum*rowDiscountValue/100);
+     const rowSubtotal=Math.max(0,baseNum-rowDiscountAmount);
+     // MTS invoice rows are recalculated with the exact same rule as the sale table.
      // discount_amount. Show the ACTUAL USD discount amount in the
      // invoice Discount column.
      let discountText = "";
@@ -5238,9 +5466,9 @@ function showSaleInvoice(id,size="A4"){
        <td>${i+1}</td>
        <td style="text-align:left;font-weight:600;padding:4px 6px">${esc(x.name||"")}${String(x.type||"").toLowerCase()==="service" ? `<div class="muted" style="font-size:8px">Service</div>` : ""}</td>
        <td>${esc(qty)}</td>
-       <td>${usd(x.unit_price)}</td>
+       <td>${usd(priceNum)}</td>
        <td>${discountText}</td>
-       <td>${usd(x.subtotal)}</td>
+       <td>${usd(rowSubtotal)}</td>
      </tr>`;
    }
    return `<tr>
@@ -5324,7 +5552,7 @@ function showSaleInvoice(id,size="A4"){
        </div>
        ${isMtsSale ? `
        <div class="mf-mts-risk-notice">
-         <div class="kh">ការកម្ម៉ង់របស់លោកអ្នកគឺពីរោងចក្រកូរ៉េផ្ទាល់ យើងមិនមែនជាក្រុមហ៊ុនចែកចាយក្នុងប្រទេសកម្ពុជាទេ!រាល់ហានិភ័យទាំងឡាយអតិជនទទួលខុសត្រូវដោយខ្លួនឯង!</div>
+         <div class="kh">ការកម្ម៉ង់របស់លោកអ្នកគឺពីរោងចក្រកូរ៉េផ្ទាល់។ យើងមិនមែនជាក្រុមហ៊ុនចែកចាយក្នុងប្រទេសកម្ពុជាទេ! រាល់ហានិភ័យទាំងឡាយ អតិថិជនត្រូវទទួលខុសត្រូវដោយខ្លួនឯង!</div>
          <div class="en">Your order is directly from a Korean factory; we are not a distributor in Cambodia!Customers are responsible for all risks themselves!</div>
        </div>` : ""}
      </div>
@@ -5746,6 +5974,39 @@ function openPrintFromCanvas(canvas,paper,sale){
   setTimeout(applyAdminReportVisibility,2000);
 });
 <\/script>
+
+<script id="initial-total-red-runtime">
+(function(){
+  function highlightInitialTotal(){
+    const roots = [
+      document.getElementById("invoiceOverlay"),
+      document.getElementById("invoicePrint"),
+      document.getElementById("invoiceExportContent"),
+      document
+    ].filter(Boolean);
+
+    roots.forEach(root=>{
+      root.querySelectorAll("tr").forEach(tr=>{
+        const label=(tr.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
+        if(label.includes("initial total") || label.includes("សរុបដំបូង")){
+          tr.classList.add("initial-total-row");
+          tr.querySelectorAll("td,th").forEach(cell=>{
+            cell.style.color="#d00000";
+            cell.style.fontWeight="800";
+          });
+        }
+      });
+    });
+  }
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",highlightInitialTotal);
+  }else{
+    highlightInitialTotal();
+  }
+  new MutationObserver(highlightInitialTotal).observe(document.body,{childList:true,subtree:true});
+})();
+</script>
+
 </body>
 
 </html>`;
