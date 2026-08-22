@@ -12044,7 +12044,7 @@ document.addEventListener("DOMContentLoaded",function(){
     const s=String(value||"").trim();
     if(/^\d{4}-\d{2}-\d{2}$/.test(s)){
       const [y,m,d]=s.split("-");
-      return `${d}/${m}/${y}`;
+      return `${m}/${d}/${y}`;
     }
     return s;
   }
@@ -12052,8 +12052,8 @@ document.addEventListener("DOMContentLoaded",function(){
   function parseAppointmentDate(value){
     const s=String(value||"").trim();
     const m=s.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
-    if(!m)return {ok:false,message:"Use date format DD/MM/YYYY."};
-    const day=Number(m[1]), month=Number(m[2]), year=Number(m[3]);
+    if(!m)return {ok:false,message:"Use date format MM/DD/YYYY."};
+    const month=Number(m[1]), day=Number(m[2]), year=Number(m[3]);
     if(day<1||day>31)return {ok:false,message:"Day must be between 01 and 31."};
     if(month<1||month>12)return {ok:false,message:"Month must be between 01 and 12."};
     if(year<1000||year>9999)return {ok:false,message:"Year must have 4 digits."};
@@ -12069,10 +12069,10 @@ document.addEventListener("DOMContentLoaded",function(){
     el.dataset.ddmmyyyyBound="1";
     el.addEventListener("input",function(){
       let digits=String(el.value||"").replace(/\D/g,"").slice(0,8);
-      if(digits.length>=2 && Number(digits.slice(0,2))>31)
-        digits="31"+digits.slice(2);
-      if(digits.length>=4 && Number(digits.slice(2,4))>12)
-        digits=digits.slice(0,2)+"12"+digits.slice(4);
+      if(digits.length>=2 && Number(digits.slice(0,2))>12)
+        digits="12"+digits.slice(2);
+      if(digits.length>=4 && Number(digits.slice(2,4))>31)
+        digits=digits.slice(0,2)+"31"+digits.slice(4);
       if(digits.length>4)el.value=digits.slice(0,2)+"/"+digits.slice(2,4)+"/"+digits.slice(4);
       else if(digits.length>2)el.value=digits.slice(0,2)+"/"+digits.slice(2);
       else el.value=digits;
@@ -21719,7 +21719,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       el.type="text";
       el.inputMode="numeric";
       el.autocomplete="off";
-      el.placeholder="dd/mm/yyyy";
+      el.placeholder="mm/dd/yyyy";
       el.maxLength=10;
     });
     if(typeof bindAppointmentDateInput==="function")bindAppointmentDateInput();
