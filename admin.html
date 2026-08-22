@@ -9604,7 +9604,7 @@ document.addEventListener("DOMContentLoaded",function(){
         let candidateRef=reference;
         while(attempt<12){
           const insertPayload={...payload,reference_no:candidateRef,created_by:(adminUser?.id||currentProfile?.id||null)};
-          r=await sb.from("medifella_sales").insert(insertPayload);
+          r=await sb.from("medifella_sales").insert(insertPayload).select().single();
 
           if(r.error && /sale_time|column .* does not exist/i.test(r.error.message||"")){
             const p2={...insertPayload};delete p2.sale_time;
@@ -9624,6 +9624,9 @@ document.addEventListener("DOMContentLoaded",function(){
           throw r.error;
         }
         if(r.error)throw r.error;
+        if(!r.data || !r.data.id){
+          throw new Error("Dermed invoice was saved but the saved invoice ID was not returned. Please try again.");
+        }
         if(paid>0){
           const pr=await sb.from("medifella_sale_payments").insert({sale_id:String(r.data.id),amount:paid,payment_method:E("dermedPaymentMethod").value,payment_date:now.slice(0,10),note:status==="Partial"?"Partial Payment":"Paid in Full",created_by:adminUser.id});
           if(pr.error)throw pr.error;
