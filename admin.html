@@ -20766,6 +20766,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
             const r=await sb.from("medifella_products").select("*").order("created_at",{ascending:false});
             if(!r.error){
               window.products=Array.isArray(r.data)?r.data:[];
+              purchasingSearchIndexP=null;
               try{ products=window.products; }catch(_){}
             }
           }
@@ -20773,6 +20774,7 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
             const r=await sb.from("medifella_services").select("*").order("created_at",{ascending:false});
             if(!r.error){
               window.services=Array.isArray(r.data)?r.data:[];
+              purchasingSearchIndexP=null;
               try{ services=window.services; }catch(_){}
             }
           }
@@ -20781,26 +20783,27 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
       })();
       return directSearchLoadP;
     }
-    function sourceMatches(){
-      const q=String(input.value||"").trim().toLowerCase();
+    let purchasingSearchIndexP=null;
+    function buildPurchasingSearchIndexP(){
       const out=[];
       allProductsP().forEach(x=>{
         const code=String(x?.product_code||"");
         const name=String(x?.name||"");
-        const hay=(code+" "+name).toLowerCase();
-        if(!q || hay.includes(q)){
-          out.push({value:"product:"+String(x.id),label:(code?code+" · ":"")+name+" · Product"});
-        }
+        out.push({value:"product:"+String(x.id),label:(code?code+" · ":"")+name+" · Product",hay:(code+" "+name).toLowerCase()});
       });
       allServicesP().forEach(x=>{
         const code=String(x?.service_code||"");
         const name=String(x?.name||x?.service_name||"");
-        const hay=(code+" "+name).toLowerCase();
-        if(!q || hay.includes(q)){
-          out.push({value:"service:"+String(x.id),label:(code?code+" · ":"")+name+" · Service"});
-        }
+        out.push({value:"service:"+String(x.id),label:(code?code+" · ":"")+name+" · Service",hay:(code+" "+name).toLowerCase()});
       });
-      return out.slice(0,100);
+      purchasingSearchIndexP=out;
+      return out;
+    }
+    function sourceMatches(){
+      const q=String(input.value||"").trim().toLowerCase();
+      const index=purchasingSearchIndexP||buildPurchasingSearchIndexP();
+      if(!q)return index.slice(0,100);
+      return index.filter(x=>x.hay.includes(q)).slice(0,100);
     }
     function chooseSource(item){
       if(!item)return;
@@ -20847,8 +20850,26 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     window.addEventListener("resize",positionResults);
     window.addEventListener("scroll",positionResults,true);
 
-    input.addEventListener("focus",render);
-    input.addEventListener("input",render);
+    let searchTimer=null;
+    let searchGeneration=0;
+    async function fastRender(){
+      const gen=++searchGeneration;
+      // If data is already available, render immediately with no async delay.
+      if(allProductsP().length || allServicesP().length){
+        purchasingSearchIndexP=purchasingSearchIndexP||buildPurchasingSearchIndexP();
+        render();
+        return;
+      }
+      clearTimeout(searchTimer);
+      searchTimer=setTimeout(async()=>{
+        await ensurePurchasingSourcesP();
+        if(gen!==searchGeneration)return;
+        purchasingSearchIndexP=null;
+        render();
+      },80);
+    }
+    input.addEventListener("focus",fastRender);
+    input.addEventListener("input",fastRender);
     input.addEventListener("keydown",e=>{
       if(e.key==="Escape"){input.value=select.value?label(select.options[select.selectedIndex]):"";close();}
       if(e.key==="Enter"){
@@ -21127,7 +21148,8 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
     P("togglePurchasingForm").onclick=()=>{P("purchasingFormPanel").classList.toggle("hidden");if(!P("purchasingFormPanel").classList.contains("hidden")){refreshStaffP();if(!P("purchasingDateTime").value)P("purchasingDateTime").value=nowLocalP()}};
     P("addPurchasingItem").onclick=()=>addRowP();
     P("cancelPurchasing").onclick=()=>{resetFormP();P("purchasingFormPanel").classList.add("hidden")};
-    P("savePurchasing").onclick=savePurchaseP;
+    P("savePurchasing").onclick=()=>savePurchaseP("Paid");
+    P("pendingPurchasingFinal").onclick=()=>savePurchaseP("Pending");
     P("purchasingRefresh").onclick=loadPurchasesP;
     P("purchasingExcel").onclick=exportExcelP;
     P("purchasingPdf").onclick=exportPdfP;
