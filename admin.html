@@ -2421,6 +2421,12 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 }
 </style>
 
+
+<style id="login-js-visibility-guard">
+/* Defensive: script elements must never participate in page layout. */
+script { display:none !important; }
+</style>
+
 </head>
 <body>
 
@@ -5910,7 +5916,7 @@ function openPrintFromCanvas(canvas,paper,sale){
    window.onload=()=>{
      setTimeout(()=>window.print(),300);
    };
- <\/script>
+ </script>
 
 
 
@@ -5973,7 +5979,7 @@ function openPrintFromCanvas(canvas,paper,sale){
   setTimeout(applyAdminReportVisibility,1000);
   setTimeout(applyAdminReportVisibility,2000);
 });
-<\/script>
+</script>
 
 <script id="initial-total-red-runtime">
 (function(){
@@ -9060,7 +9066,7 @@ const _oldUpdateMetrics=updateMetrics; updateMetrics=function(){_oldUpdateMetric
 boot();
 
 
-</script>
+<\/script>
 <script id="dermed-final-search-only">
 (function(){
   function el(id){return document.getElementById(id)}
