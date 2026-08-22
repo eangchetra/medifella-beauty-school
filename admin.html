@@ -22687,3 +22687,198 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   }
 })();
 </script>
+
+
+<script id="purchasing-search-definitive-clean-v7">
+(function(){
+  "use strict";
+
+  function esc(v){
+    return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+  }
+
+  function removeOldWrappers(sel){
+    // Remove every older custom-search wrapper while preserving the original
+    // select element and its existing change listeners.
+    let parent=sel.parentElement;
+    while(parent && parent!==document.body){
+      if(parent.classList.contains("purchasing-search-wrap") ||
+         parent.classList.contains("purchasing-final-search-wrap")){
+        const holder=parent.parentElement;
+        if(!holder)break;
+        holder.insertBefore(sel,parent);
+        parent.remove();
+        parent=sel.parentElement;
+      }else{
+        break;
+      }
+    }
+  }
+
+  function build(sel){
+    if(!sel || !sel.classList.contains("purchasing-item-select"))return;
+    if(sel.dataset.cleanSearchV7==="1")return;
+
+    removeOldWrappers(sel);
+    sel.dataset.cleanSearchV7="1";
+    sel.style.display="none";
+
+    const wrap=document.createElement("div");
+    wrap.className="purchasing-clean-search";
+    wrap.style.cssText="position:relative;width:100%;min-width:240px";
+
+    const input=document.createElement("input");
+    input.type="text";
+    input.placeholder="Search product or service";
+    input.autocomplete="off";
+    input.className="purchasing-clean-search-input";
+    input.style.cssText="width:100%;height:40px;box-sizing:border-box;padding:9px 12px;border:1px solid #cbd5e1;border-radius:8px;background:#fff;font-size:14px;outline:none";
+
+    const menu=document.createElement("div");
+    menu.className="purchasing-clean-search-menu";
+    menu.style.cssText="display:none;position:absolute;left:0;right:0;top:44px;z-index:999999;background:#fff;border:1px solid #cbd5e1;border-radius:10px;box-shadow:0 12px 30px rgba(15,23,42,.18);max-height:300px;overflow-y:auto";
+
+    function current(){
+      const o=sel.options[sel.selectedIndex];
+      return o&&o.value?(o.textContent||""):"";
+    }
+    function options(){
+      return [...sel.options].filter(o=>o.value);
+    }
+    function render(q){
+      const query=String(q||"").trim().toLowerCase();
+      const matches=options().filter(o=>(o.textContent||"").toLowerCase().includes(query));
+      if(!matches.length){
+        menu.innerHTML='<div style="padding:14px;text-align:center;color:#64748b">No product or service found</div>';
+      }else{
+        menu.innerHTML=matches.map(o=>{
+          const txt=o.textContent||"";
+          const parts=txt.split(" · ");
+          const code=parts.length>1?parts.shift():"";
+          const name=parts.join(" · ");
+          return `<div class="purchasing-clean-option" data-value="${esc(o.value)}"
+             style="padding:10px 12px;border-bottom:1px solid #eef2f7;cursor:pointer;background:#fff">
+             ${code?`<div style="font-size:11px;font-weight:700;color:#64748b;margin-bottom:2px">${esc(code)}</div>`:""}
+             <div style="font-size:14px;font-weight:600;color:#111827;line-height:1.35;white-space:normal">${esc(name)}</div>
+          </div>`;
+        }).join("");
+      }
+      menu.style.display="block";
+    }
+
+    input.value=current();
+
+    input.addEventListener("focus",()=>{
+      input.style.borderColor="#0f766e";
+      render(input.value);
+    });
+    input.addEventListener("input",()=>render(input.value));
+    input.addEventListener("keydown",e=>{
+      if(e.key==="Escape"){
+        menu.style.display="none";
+        input.value=current();
+      }else if(e.key==="Enter"){
+        const first=menu.querySelector(".purchasing-clean-option");
+        if(first){e.preventDefault();first.click();}
+      }
+    });
+
+    menu.addEventListener("mousedown",e=>{
+      const item=e.target.closest(".purchasing-clean-option");
+      if(!item)return;
+      e.preventDefault();
+      sel.value=item.dataset.value;
+      sel.dispatchEvent(new Event("change",{bubbles:true}));
+      input.value=current();
+      menu.style.display="none";
+      input.style.borderColor="#cbd5e1";
+    });
+
+    input.addEventListener("blur",()=>setTimeout(()=>{
+      menu.style.display="none";
+      input.style.borderColor="#cbd5e1";
+    },180));
+
+    sel.addEventListener("change",()=>{
+      if(document.activeElement!==input)input.value=current();
+    });
+
+    wrap.appendChild(input);
+    wrap.appendChild(menu);
+    sel.parentElement.insertBefore(wrap,sel);
+    wrap.appendChild(sel);
+  }
+
+  function cleanAll(){
+    document.querySelectorAll("#purchasingItemsBody select.purchasing-item-select").forEach(build);
+  }
+
+  function install(){
+    cleanAll();
+    const body=document.getElementById("purchasingItemsBody");
+    if(body && !body.dataset.cleanSearchObserverV7){
+      body.dataset.cleanSearchObserverV7="1";
+      const ob=new MutationObserver(muts=>{
+        let changed=false;
+        for(const m of muts){
+          for(const n of m.addedNodes||[]){
+            if(n.nodeType===1 && (n.matches?.("select.purchasing-item-select") || n.querySelector?.("select.purchasing-item-select"))){
+              changed=true;
+            }
+          }
+        }
+        if(changed)setTimeout(cleanAll,0);
+      });
+      ob.observe(body,{childList:true,subtree:true});
+    }
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
+  else install();
+
+  setTimeout(cleanAll,200);
+  setTimeout(cleanAll,700);
+  setTimeout(cleanAll,1500);
+})();
+</script>
+
+
+<style id="purchasing-all-results-clear-v8">
+/* Purchasing Product/Service search: make the result panel large and readable. */
+.purchasing-clean-search-menu{
+  max-height:520px !important;
+  overflow-y:auto !important;
+  background:#fff !important;
+  border:1px solid #cbd5e1 !important;
+  border-radius:10px !important;
+  box-shadow:0 16px 36px rgba(15,23,42,.20) !important;
+}
+.purchasing-clean-option{
+  min-height:58px !important;
+  padding:12px 14px !important;
+  box-sizing:border-box !important;
+  white-space:normal !important;
+}
+.purchasing-clean-option:hover{
+  background:#f1f5f9 !important;
+}
+</style>
+<script id="purchasing-all-results-clear-v8">
+(function(){
+  "use strict";
+  function improve(){
+    document.querySelectorAll(".purchasing-clean-search-menu").forEach(menu=>{
+      menu.style.maxHeight="520px";
+      menu.style.overflowY="auto";
+    });
+    document.querySelectorAll(".purchasing-clean-option").forEach(item=>{
+      item.style.minHeight="58px";
+      item.style.padding="12px 14px";
+      item.style.whiteSpace="normal";
+    });
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",improve,{once:true});
+  else improve();
+  setInterval(improve,800);
+})();
+</script>
