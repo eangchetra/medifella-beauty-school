@@ -22547,3 +22547,45 @@ else install();
   else installMtsHardGuard();
 })();
 </script>
+
+<!-- FINAL DISPLAY-ONLY APPOINTMENT LIST MM/DD -> DD/MM FIX -->
+<script id="appointment-list-ddmm-final-v2">
+(function(){
+  "use strict";
+  function swapDates(root){
+    if(!root)return;
+    const walker=document.createTreeWalker(root,NodeFilter.SHOW_TEXT);
+    const nodes=[];
+    let n;
+    while(n=walker.nextNode()) nodes.push(n);
+    nodes.forEach(node=>{
+      const p=node.parentElement;
+      if(!p || p.closest('input,textarea,select,script,style')) return;
+      const s=node.nodeValue||"";
+      const out=s.replace(/\b(\d{2})\/(\d{2})\/(\d{4})\b/g,function(_,mm,dd,yyyy){
+        return dd+'/'+mm+'/'+yyyy;
+      });
+      if(out!==s) node.nodeValue=out;
+    });
+  }
+  function run(){
+    swapDates(document.getElementById('appointmentList'));
+    swapDates(document.getElementById('appointmentUpcoming'));
+  }
+  if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',run,{once:true});
+  else run();
+  const obs=new MutationObserver(function(){
+    clearTimeout(window.__apptDDMMPatchTimer);
+    window.__apptDDMMPatchTimer=setTimeout(run,20);
+  });
+  function start(){
+    const a=document.getElementById('appointmentList');
+    const b=document.getElementById('appointmentUpcoming');
+    if(a)obs.observe(a,{childList:true,subtree:true,characterData:true});
+    if(b)obs.observe(b,{childList:true,subtree:true,characterData:true});
+    run();
+  }
+  setTimeout(start,300);
+  [1000,2500,5000].forEach(function(ms){setTimeout(run,ms)});
+})();
+</script>
