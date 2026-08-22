@@ -5742,7 +5742,21 @@ async function buildInvoicePaperCanvas(size){
   const captureW=Math.max(1,Math.ceil(rect.width));
   const captureH=Math.max(1,Math.ceil(rect.height));
 
-  const invoiceCanvas=await html2canvas(source,{
+  /* Preload the same Khmer fonts used by the invoice preview before
+    html2canvas clones/captures the invoice. */
+ try{
+   if(document.fonts){
+     await Promise.all([
+       document.fonts.load('400 16px "KhmerOSBattambangPDF"','សរុប ប្រាក់ ការកម្ម៉ង់ អតិថិជន'),
+       document.fonts.load('400 16px "KhmerOSMuolPDF"','វិក្កយបត្រ')
+     ]);
+     await document.fonts.ready;
+   }
+ }catch(fontError){
+   console.warn("Khmer PDF font preload warning:",fontError);
+ }
+
+ const invoiceCanvas=await html2canvas(source,{
     scale:3,
     useCORS:true,
     allowTaint:false,
@@ -5849,14 +5863,12 @@ async function buildInvoicePaperCanvas(size){
       `;
       clonedDoc.head.appendChild(style);
 
-      /* Wait for embedded Khmer fonts before html2canvas captures the invoice. */
+      /* Fonts are preloaded before html2canvas. onclone is synchronous,
+         so do not use await here. */
       try{
         if(clonedDoc.fonts){
-          await Promise.all([
-            clonedDoc.fonts.load('400 16px "KhmerOSBattambangPDF"','សរុប ប្រាក់ ការកម្ម៉ង់ អតិថិជន'),
-            clonedDoc.fonts.load('400 16px "KhmerOSMuolPDF"','វិក្កយបត្រ')
-          ]);
-          await clonedDoc.fonts.ready;
+          clonedDoc.fonts.load('400 16px "KhmerOSBattambangPDF"','សរុប ប្រាក់ ការកម្ម៉ង់ អតិថិជន');
+          clonedDoc.fonts.load('400 16px "KhmerOSMuolPDF"','វិក្កយបត្រ');
         }
       }catch(fontError){
         console.warn("Khmer PDF font load warning:",fontError);
