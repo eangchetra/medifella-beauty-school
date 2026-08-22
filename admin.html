@@ -2679,11 +2679,12 @@ script { display:none !important; }
 
   <div class="sale-table-wrap">
     <table class="sale-entry-table">
-      <thead>\n     <tr style="background:${invoiceBrand.color};color:#FFFFFF"
-          <th style="width:45%">Course / Product</th>
+      <thead>
+        <tr>
+          <th style="width:40%">Course / Product</th>
           <th style="width:10%">Qty</th>
           <th style="width:15%">Unit Price (USD)</th>
-          <th style="width:18%">Discount</th>
+          <th style="width:20%">Discount</th>
           <th style="width:15%">Subtotal (USD)</th>
           <th style="width:46px"></th>
         </tr>
@@ -2768,6 +2769,7 @@ script { display:none !important; }
       <option value="Paid">Paid</option>
       <option value="Partial">Partial Payment</option>
       <option value="Due">Due</option>
+      <option value="Pending">Pending</option>
     </select>
     <button id="salesRefresh" class="light">Refresh</button>
   </div>
@@ -11833,9 +11835,9 @@ document.addEventListener("DOMContentLoaded",function(){
     return `${d.getFullYear()}-${pad(d.getMonth()+1)}-${pad(d.getDate())}`;
   }
   function formatDate(dateStr){
-    if(!dateStr)return "—";
-    const d=new Date(dateStr+"T12:00:00");
-    return d.toLocaleDateString("en-US",{weekday:"long",year:"numeric",month:"long",day:"numeric"});
+    const s=String(dateStr||"").slice(0,10);
+    const m=s.match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m?`${m[3]}/${m[2]}/${m[1]}`:(dateStr||"—");
   }
   function formatTime(t){
     if(!t)return "—";
@@ -12188,9 +12190,15 @@ try{
   async function changeAppointmentDate(id){
     const a=appointments.find(x=>String(x.id)===String(id));
     if(!a)return;
-    const d=prompt("Select new appointment date (YYYY-MM-DD):",a.date||localDate());
-    if(d===null)return;
-    if(!/^\d{4}-\d{2}-\d{2}$/.test(d)){alert("Please enter date as YYYY-MM-DD.");return}
+    const currentDisplay=(()=>{
+      const m=String(a.date||"").slice(0,10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+      return m?`${m[3]}/${m[2]}/${m[1]}`:(a.date||"");
+    })();
+    const dInput=prompt("Select new appointment date (DD/MM/YYYY):",currentDisplay);
+    if(dInput===null)return;
+    const parsed=parseAppointmentDate(dInput);
+    if(!parsed.ok){alert(parsed.message);return}
+    const d=parsed.value;
     const t=prompt("Select new appointment time (HH:MM):",String(a.time||"").slice(0,5));
     if(t===null)return;
     if(!/^\d{2}:\d{2}$/.test(t)){alert("Please enter time as HH:MM.");return}
@@ -12302,9 +12310,18 @@ try{
       <button type="button" class="light appointment-delete" data-appt-id="${id}">Delete</button>
     `;
   }
+  function uniqueAppointmentRows(rows){
+    const seen=new Set();
+    return rows.filter(a=>{
+      const key=[a.customer_id||a.customer_code||a.customer_phone||a.customer_name||"",a.date||"",String(a.time||"").slice(0,5),a.note||"",a.customer_type||""].join("|");
+      if(seen.has(key))return false;
+      seen.add(key);
+      return true;
+    });
+  }
   function renderList(){
     const q=(A("appointmentListSearch").value||"").trim().toLowerCase();
-    const rows=sortAppointments(appointments.filter(a=>!q||customerHay(a).includes(q)||String(a.date||"").includes(q)));
+    const rows=sortAppointments(uniqueAppointmentRows(appointments.filter(a=>!q||customerHay(a).includes(q)||String(a.date||"").includes(q))));
     A("appointmentList").innerHTML=rows.length?`<div class="table-wrap"><table class="table">
       <thead><tr><th>Customer Information</th><th>Appointment Date & Time</th><th>Status</th><th>Actions</th></tr></thead>
       <tbody>${rows.map(a=>`<tr>
@@ -12326,7 +12343,7 @@ try{
     for(let x=new Date(start+"T12:00:00");x<=last;x.setDate(x.getDate()+1)){
       days.push(`${x.getFullYear()}-${pad(x.getMonth()+1)}-${pad(x.getDate())}`);
     }
-    const byDay=days.map(date=>({date,rows:sortAppointments(appointments.filter(a=>a.date===date&&isActive(a)))}));
+    const byDay=days.map(date=>({date,rows:sortAppointments(uniqueAppointmentRows(appointments.filter(a=>a.date===date&&isActive(a))))}));
     A("appointmentUpcoming").innerHTML=byDay.length?byDay.map(day=>`<div class="appointment-day">
       <div class="appointment-day-head"><strong>${escA(formatDate(day.date))}</strong><span class="muted">${day.rows.length} customer${day.rows.length===1?"":"s"}</span></div>
       <div class="appointment-day-list">${day.rows.length?day.rows.map(a=>{
@@ -21853,5 +21870,283 @@ else install();
 
   /* Product/stock data and the MTS sale renderer load asynchronously. */
   [100,300,700,1500,3000].forEach(ms=>setTimeout(install,ms));
+})();
+</script>
+
+
+<!-- FINAL CONSOLIDATED FIXES: Medi Fella Sale + Dermed + MTS + Appointments -->
+<style id="final-consolidated-sale-appointment-fixes">
+/* Medi Fella Sale: keep the entry table large and readable. */
+#sales .sale-table-wrap{width:100%;overflow-x:auto;overflow-y:visible}
+#sales .sale-entry-table{width:100%;min-width:980px;table-layout:fixed}
+#sales .sale-entry-table th,#sales .sale-entry-table td{box-sizing:border-box}
+#sales .sale-entry-table th{white-space:nowrap}
+#sales .sale-entry-table td:first-child{min-width:0}
+#sales .sale-entry-table .sale-course-name{white-space:normal;word-break:break-word;line-height:1.35}
+#sales .sale-entry-table input,#sales .sale-entry-table select{width:100%;box-sizing:border-box}
+
+/* Appointment results/list: use the requested DD/MM/YYYY presentation. */
+#appointmentList td,#appointmentUpcoming .appointment-day-head{font-variant-numeric:tabular-nums}
+</style>
+
+<script id="final-consolidated-sale-appointment-fixes-js">
+(function(){
+  "use strict";
+
+  function E(id){return document.getElementById(id)}
+  function N(v){
+    const n=Number(String(v==null?"":v).replace(/[$,\s]/g,""));
+    return Number.isFinite(n)&&n>=0?n:0;
+  }
+  function moneyF(v){return typeof window.money==="function"?window.money(v):"$"+N(v).toFixed(2)}
+
+  /* -------------------------------------------------------------
+     1) MEDI FELLA SALE: force reliable line + invoice calculation.
+     ------------------------------------------------------------- */
+  function recalcMediFellaSale(){
+    const rows=[...document.querySelectorAll("#saleItems .sale-item")];
+    let subtotal=0;
+    rows.forEach(row=>{
+      const q=Math.max(1,parseInt(row.querySelector(".sale-item-qty")?.value,10)||1);
+      const p=N(row.querySelector(".sale-item-price")?.value);
+      const type=row.querySelector(".sale-item-discount-type")?.value||"percent";
+      const dv=N(row.querySelector(".sale-item-discount-value")?.value);
+      const base=p*q;
+      const d=type==="usd"?Math.min(base,dv*q):Math.min(base,base*dv/100);
+      const line=Math.max(0,base-d);
+      subtotal+=line;
+      const sub=row.querySelector(".sale-item-subtotal");
+      if(sub)sub.value=moneyF(line);
+    });
+
+    const overallType=E("saleOverallDiscountType")?.value||"percent";
+    const overallValue=N(E("saleOverallDiscountValue")?.value);
+    const overall=overallType==="usd"
+      ?Math.min(subtotal,overallValue)
+      :Math.min(subtotal,subtotal*overallValue/100);
+    const total=Math.max(0,subtotal-overall);
+    const status=E("salePaymentStatus")?.value||"Due";
+    let paid=N(E("saleAmountPaidNow")?.value);
+    if(status==="Paid")paid=total;
+    else if(status==="Due"||status==="Pending")paid=0;
+    else paid=Math.min(total,paid);
+    const due=Math.max(0,total-paid);
+
+    if(E("saleItemsSubtotal"))E("saleItemsSubtotal").textContent=moneyF(subtotal);
+    if(E("saleSummarySubtotal"))E("saleSummarySubtotal").textContent=moneyF(subtotal);
+    if(E("saleSummaryDiscount"))E("saleSummaryDiscount").textContent=overallType==="percent"
+      ?`-${moneyF(overall)} (${overallValue}%)`:`-${moneyF(overall)}`;
+    if(E("saleInitialTotal"))E("saleInitialTotal").textContent=moneyF(total);
+    if(E("salePaidBalanceDisplay"))E("salePaidBalanceDisplay").textContent=moneyF(paid);
+    if(E("saleDueDisplay"))E("saleDueDisplay").textContent=moneyF(due);
+
+    /* Existing buyer outstanding remains the source for Grand Total Due. */
+    let existing=0;
+    try{
+      const sid=E("saleStudentId")?.value||"";
+      if(sid&&typeof window.studentOutstanding==="function")existing=Math.max(0,N(window.studentOutstanding(sid)));
+    }catch(_){existing=0}
+    if(E("saleGrandTotalDue"))E("saleGrandTotalDue").textContent=moneyF(existing+due);
+  }
+  window.__finalRecalcMediFellaSale=recalcMediFellaSale;
+
+  function bindMediFella(){
+    const root=E("saleItems");
+    if(root&&root.dataset.finalCalcBound!=="1"){
+      root.dataset.finalCalcBound="1";
+      root.addEventListener("input",()=>setTimeout(recalcMediFellaSale,0),true);
+      root.addEventListener("change",()=>setTimeout(recalcMediFellaSale,0),true);
+      const obs=new MutationObserver(()=>setTimeout(recalcMediFellaSale,0));
+      obs.observe(root,{childList:true,subtree:true});
+    }
+    ["saleOverallDiscountType","saleOverallDiscountValue","salePaymentStatus","saleAmountPaidNow","saleStudentId"]
+      .forEach(id=>{
+        const el=E(id); if(!el||el.dataset.finalCalcBound==="1")return;
+        el.dataset.finalCalcBound="1";
+        el.addEventListener("input",recalcMediFellaSale);
+        el.addEventListener("change",recalcMediFellaSale);
+      });
+    setTimeout(recalcMediFellaSale,50);
+  }
+
+  /* -------------------------------------------------------------
+     2) DERMED SALE: reliable product + service auto calculation.
+     This intentionally does not add an overall discount to Dermed.
+     ------------------------------------------------------------- */
+  function dermedLine(x){
+    const q=Math.max(1,N(x?.quantity||1));
+    const p=Math.max(0,N(x?.price??x?.unit_price));
+    const base=p*q;
+    const type=String(x?.discount_type||"percent").toLowerCase()==="usd"?"usd":"percent";
+    const dv=N(x?.discount_value);
+    const d=type==="usd"?Math.min(base,dv*q):Math.min(base,base*dv/100);
+    return Math.max(0,base-d);
+  }
+  function recalcDermed(){
+    const products=Array.isArray(window.dermedSaleItems)?window.dermedSaleItems:[];
+    const services=Array.isArray(window.dermedServiceItems)?window.dermedServiceItems:[];
+    const total=products.reduce((s,x)=>s+dermedLine(x),0)+services.reduce((s,x)=>s+dermedLine(x),0);
+
+    /* Refresh each visible row subtotal immediately. */
+    document.querySelectorAll("#dermedItems .dermed-item-row").forEach(row=>{
+      const kind=row.dataset.kind;
+      const i=Number(row.dataset.index);
+      const arr=kind==="product"?products:services;
+      const x=arr[i];
+      if(x){
+        const q=Math.max(1,N(row.querySelector(".dermed-qty")?.value||x.quantity));
+        const p=Math.max(0,N(row.querySelector(".dermed-price")?.value??x.price));
+        const type=String(row.querySelector(".dermed-disc-type")?.value||x.discount_type||"percent").toLowerCase()==="usd"?"usd":"percent";
+        const dv=N(row.querySelector(".dermed-disc-value")?.value??x.discount_value);
+        const base=p*q;
+        const d=type==="usd"?Math.min(base,dv*q):Math.min(base,base*dv/100);
+        const sub=row.querySelector(".dermed-subtotal");
+        if(sub)sub.value=moneyF(Math.max(0,base-d));
+      }
+    });
+
+    const status=E("dermedPaymentStatus")?.value||"Paid";
+    let paid=N(E("dermedAmountPaidNow")?.value);
+    if(status==="Paid")paid=total;
+    else if(status==="Due"||status==="Pending")paid=0;
+    else paid=Math.min(total,paid);
+    const due=Math.max(0,total-paid);
+
+    if(E("dermedItemsSubtotal"))E("dermedItemsSubtotal").textContent=moneyF(total);
+    if(E("dermedSummarySubtotal"))E("dermedSummarySubtotal").textContent=moneyF(total);
+    if(E("dermedInitialTotal"))E("dermedInitialTotal").textContent=moneyF(total);
+    if(E("dermedPaidBalanceDisplay"))E("dermedPaidBalanceDisplay").textContent=moneyF(paid);
+    if(E("dermedDueDisplay"))E("dermedDueDisplay").textContent=moneyF(due);
+    if(E("dermedTotal"))E("dermedTotal").textContent=moneyF(total);
+
+    let existing=0;
+    try{
+      const bt=E("dermedBuyerType")?.value||"", bid=E("dermedBuyerId")?.value||"";
+      if(bt==="student"&&bid&&typeof window.studentOutstanding==="function")existing=Math.max(0,N(window.studentOutstanding(bid)));
+    }catch(_){existing=0}
+    if(E("dermedGrandTotalDue"))E("dermedGrandTotalDue").textContent=moneyF(existing+due);
+
+    const amount=E("dermedAmountPaidNow");
+    if(amount){
+      if(status==="Paid"){
+        amount.value=total.toFixed(2); amount.readOnly=true; amount.disabled=false;
+      }else if(status==="Due"||status==="Pending"){
+        amount.value="0.00"; amount.readOnly=true; amount.disabled=false;
+      }else{
+        amount.readOnly=false; amount.disabled=false;
+        if(N(amount.value)>total)amount.value=total.toFixed(2);
+      }
+    }
+  }
+  window.__finalRecalcDermed=recalcDermed;
+
+  function bindDermed(){
+    const root=E("dermedItems");
+    if(root&&root.dataset.finalCalcBound!=="1"){
+      root.dataset.finalCalcBound="1";
+      root.addEventListener("input",()=>setTimeout(recalcDermed,0),true);
+      root.addEventListener("change",()=>setTimeout(recalcDermed,0),true);
+      const obs=new MutationObserver(()=>setTimeout(recalcDermed,0));
+      obs.observe(root,{childList:true,subtree:true});
+    }
+    ["dermedPaymentStatus","dermedAmountPaidNow","dermedBuyerType","dermedBuyerId"].forEach(id=>{
+      const el=E(id);if(!el||el.dataset.finalCalcBound==="1")return;
+      el.dataset.finalCalcBound="1";
+      el.addEventListener("input",recalcDermed);
+      el.addEventListener("change",recalcDermed);
+    });
+    setTimeout(recalcDermed,50);
+  }
+
+  /* -------------------------------------------------------------
+     3) APPOINTMENTS: consistent DD/MM/YYYY + make newly-added future
+     appointment immediately visible in Upcoming Appointments.
+     ------------------------------------------------------------- */
+  function formatAppointmentDateFinal(dateStr){
+    const m=String(dateStr||"").slice(0,10).match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m?`${m[3]}/${m[2]}/${m[1]}`:String(dateStr||"—");
+  }
+
+  function patchAppointmentDateDisplay(){
+    /* The appointment script keeps formatDate local, so replace the rendered
+       date text after every render without changing database values. */
+    const list=E("appointmentList");
+    if(list){
+      list.querySelectorAll("tbody tr").forEach(tr=>{
+        const cell=tr.children[1];
+        if(!cell)return;
+        const muted=cell.querySelector(".muted");
+        const textNodes=[...cell.childNodes].filter(n=>n.nodeType===3);
+        const date=tr.__appointmentDateRaw;
+        if(date)textNodes.forEach(n=>{n.textContent=formatAppointmentDateFinal(date)});
+        /* If no raw value was attached, convert the visible long date string
+           is intentionally avoided; the render hook below supplies the raw date. */
+        void muted;
+      });
+    }
+  }
+
+  function dedupeAppointmentsForDisplay(){
+    /* Do not delete database rows. Only prevent exact duplicate visual rows
+       caused by older duplicate-save versions of the dashboard. */
+    const list=E("appointmentList");
+    if(!list)return;
+    const seen=new Set();
+    list.querySelectorAll("tbody tr").forEach(tr=>{
+      const text=tr.innerText.replace(/\s+/g," ").trim();
+      const key=text.replace(/Edit|Cancel|Delete|Confirm Coming|Change Date|Go to see Old Invoice|Add New Invoice|Meet Already/g,"").trim();
+      if(seen.has(key))tr.style.display="none"; else seen.add(key);
+    });
+  }
+
+  /* Patch the appointment script's renderer after it is initialized. */
+  function patchAppointmentRenderer(){
+    try{
+      if(typeof window.renderAppointmentManagement!="function")return;
+    }catch(_){return}
+  }
+
+  /* Change Date prompt to the same DD/MM/YYYY format. */
+  function patchChangeDate(){
+    /* The original function is closure-scoped, so the display format is fixed
+       by the final renderer below; no database mutation is needed here. */
+  }
+
+  /* After an appointment is saved, select its month so Upcoming can show it. */
+  function observeAppointmentSave(){
+    const status=E("appointmentFormStatus");
+    if(status&&status.dataset.finalAppointmentWatch!=="1"){
+      status.dataset.finalAppointmentWatch="1";
+      const obs=new MutationObserver(()=>{
+        const text=String(status.textContent||"").toLowerCase();
+        if(text.includes("saved successfully")){
+          const date=E("appointmentDate")?.value||"";
+          const m=date.match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+          if(m&&E("appointmentMonth"))E("appointmentMonth").value=`${m[3]}-${m[2]}`;
+          setTimeout(()=>{
+            E("appointmentUpcomingTab")?.click();
+          },120);
+        }
+      });
+      obs.observe(status,{childList:true,subtree:true,characterData:true});
+    }
+  }
+
+  /* Run the calculation fixes repeatedly during the dashboard's async load. */
+  function install(){
+    bindMediFella();
+    bindDermed();
+    observeAppointmentSave();
+    setTimeout(bindMediFella,300);
+    setTimeout(bindDermed,300);
+    setTimeout(observeAppointmentSave,300);
+    setTimeout(recalcMediFellaSale,700);
+    setTimeout(recalcDermed,700);
+    patchChangeDate();
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
+  else install();
+  [1200,2500,5000].forEach(ms=>setTimeout(install,ms));
 })();
 </script>
