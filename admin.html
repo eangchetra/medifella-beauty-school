@@ -21414,6 +21414,178 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 })();
 </script>
 
+
+<script id="final-zero-stock-guard-mts-dermed-v3">
+(function(){
+  "use strict";
+
+  function reliableStock(pid){
+    try{
+      // The authoritative stock is calculated from inventory movements.
+      // Do NOT prefer a stale search cache over this value.
+      if(typeof window.productStock==="function"){
+        const n=Number(window.productStock(pid));
+        return Number.isFinite(n) && n>=0 ? n : 0;
+      }
+    }catch(e){}
+    try{
+      if(typeof window.__currentProductStock==="function"){
+        const n=Number(window.__currentProductStock(pid));
+        return Number.isFinite(n) && n>=0 ? n : 0;
+      }
+    }catch(e){}
+    return 0;
+  }
+
+  function productName(pid){
+    const list=Array.isArray(window.products)?window.products:[];
+    const p=list.find(x=>String(x.id)===String(pid));
+    return p?.name || p?.product_code || "Product";
+  }
+
+  function blocked(pid, saleType){
+    const stock=reliableStock(pid);
+    if(stock>0) return false;
+    alert(`Cannot add "${productName(pid)}" to ${saleType} Sale. It is out of stock (0 available).`);
+    return true;
+  }
+
+  function wrapFunctions(){
+    // MTS direct hard-search add
+    if(typeof window.addMtsProduct==="function" && !window.addMtsProduct.__v3StockGuard){
+      const old=window.addMtsProduct;
+      const fn=function(pid){
+        if(blocked(pid,"MTS")) return false;
+        const before=Array.isArray(window.mtsSaleItems)?window.mtsSaleItems.length:0;
+        const r=old.apply(this,arguments);
+        // If an existing item was already at its available quantity, don't
+        // allow the old handler to silently increase it.
+        const items=Array.isArray(window.mtsSaleItems)?window.mtsSaleItems:[];
+        const item=items.find(x=>String(x.product_id)===String(pid));
+        const stock=reliableStock(pid);
+        if(item && Number(item.quantity)>stock){
+          item.quantity=stock;
+          if(typeof window.renderMtsItems==="function")window.renderMtsItems();
+          else if(typeof window.renderSaleProductRows==="function")window.renderSaleProductRows("mts");
+        }
+        return r;
+      };
+      fn.__v3StockGuard=true;
+      window.addMtsProduct=fn;
+    }
+
+    // MTS final add function, if present
+    if(typeof window.mtsAddProductFinal==="function" && !window.mtsAddProductFinal.__v3StockGuard){
+      const old=window.mtsAddProductFinal;
+      const fn=function(pid){
+        if(blocked(pid,"MTS")) return false;
+        return old.apply(this,arguments);
+      };
+      fn.__v3StockGuard=true;
+      window.mtsAddProductFinal=fn;
+    }
+
+    // Dermed search add function
+    if(typeof window.__addDermedProductFromSearch==="function" && !window.__addDermedProductFromSearch.__v3StockGuard){
+      const old=window.__addDermedProductFromSearch;
+      const fn=function(pid){
+        if(blocked(pid,"Dermed")) return false;
+        const r=old.apply(this,arguments);
+        const items=Array.isArray(window.dermedSaleItems)?window.dermedSaleItems:[];
+        const item=items.find(x=>String(x.product_id)===String(pid));
+        const stock=reliableStock(pid);
+        if(item && Number(item.quantity)>stock){
+          item.quantity=stock;
+          if(typeof window.renderDermedCombinedItems==="function")window.renderDermedCombinedItems();
+          else if(typeof window.__renderDermedItems==="function")window.__renderDermedItems();
+        }
+        return r;
+      };
+      fn.__v3StockGuard=true;
+      window.__addDermedProductFromSearch=fn;
+    }
+
+    // Generic sale-product function. Preserve all non-product/service logic.
+    if(typeof window.addSaleProduct==="function" && !window.addSaleProduct.__v3StockGuard){
+      const old=window.addSaleProduct;
+      const fn=function(type,pid){
+        const t=String(type||"").toLowerCase();
+        if(t==="mts" && blocked(pid,"MTS")) return false;
+        if(t==="dermed" && blocked(pid,"Dermed")) return false;
+        return old.apply(this,arguments);
+      };
+      fn.__v3StockGuard=true;
+      window.addSaleProduct=fn;
+    }
+  }
+
+  function clickGuard(e){
+    const target=e.target?.closest?.(
+      '#mtsSale button[data-product-id],' +
+      '#mtsSale button[data-mts-hard-product],' +
+      '#mtsSale button[data-mts-final-product-id],' +
+      '#mtsSale button[data-mts-product-id],' +
+      '#dermedSale button[data-product-id],' +
+      '#dermedSale button[data-latest-product-id]'
+    );
+    if(!target) return;
+
+    const pid=
+      target.getAttribute("data-product-id") ||
+      target.getAttribute("data-mts-hard-product") ||
+      target.getAttribute("data-mts-final-product-id") ||
+      target.getAttribute("data-mts-product-id") ||
+      target.getAttribute("data-latest-product-id");
+
+    if(!pid) return;
+
+    const saleType=target.closest("#dermedSale") ? "Dermed" : "MTS";
+    if(blocked(pid,saleType)){
+      e.preventDefault();
+      e.stopImmediatePropagation();
+      e.stopPropagation();
+      return false;
+    }
+  }
+
+  // Capture phase runs before the older search-result click handlers.
+  document.addEventListener("click",clickGuard,true);
+  document.addEventListener("mousedown",clickGuard,true);
+
+  wrapFunctions();
+  [50,150,300,700,1200,2000,3500,5000].forEach(ms=>setTimeout(wrapFunctions,ms));
+
+  // Also protect the final Save action for both sale screens.
+  document.addEventListener("click",function(e){
+    const b=e.target?.closest?.(
+      '#mtsSale button, #dermedSale button'
+    );
+    if(!b) return;
+    const label=(b.textContent||"").toLowerCase();
+    if(!/save.*sale|generate invoice|save.*invoice/.test(label)) return;
+
+    const isMts=!!b.closest("#mtsSale");
+    const items=isMts
+      ? (Array.isArray(window.mtsSaleItems)?window.mtsSaleItems:[])
+      : (Array.isArray(window.dermedSaleItems)?window.dermedSaleItems:[]);
+
+    for(const item of items){
+      if(!item?.product_id) continue;
+      const stock=reliableStock(item.product_id);
+      const qty=Math.max(1,Number(item.quantity)||1);
+      if(stock<=0 || qty>stock){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        alert(
+          `Cannot save ${isMts?"MTS":"Dermed"} Sale: "${item.name||"Product"}" ` +
+          (stock<=0 ? "is out of stock." : `has only ${stock} in stock.`)
+        );
+        return false;
+      }
+    }
+  },true);
+})();
+</script>
 </html>
 
 
@@ -22231,5 +22403,139 @@ else install();
   if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
   else install();
   [1200,2500,5000].forEach(ms=>setTimeout(install,ms));
+})();
+</script>
+
+
+<!-- FINAL APPOINTMENT DD/MM/YYYY AUTHORITATIVE SAVE + MTS ZERO-STOCK GUARD -->
+<script id="final-appointment-date-and-mts-zero-stock-v2">
+(function(){
+  "use strict";
+  const E=id=>document.getElementById(id);
+
+  function parseDMY(v){
+    const m=String(v||"").trim().match(/^(\d{2})\/(\d{2})\/(\d{4})$/);
+    if(!m)return null;
+    const d=Number(m[1]), mo=Number(m[2]), y=Number(m[3]);
+    const dt=new Date(Date.UTC(y,mo-1,d));
+    if(dt.getUTCFullYear()!==y||dt.getUTCMonth()!==mo-1||dt.getUTCDate()!==d)return null;
+    return `${y}-${String(mo).padStart(2,"0")}-${String(d).padStart(2,"0")}`;
+  }
+  function toDMY(v){
+    const m=String(v||"").trim().match(/^(\d{4})-(\d{2})-(\d{2})$/);
+    return m?`${m[3]}/${m[2]}/${m[1]}`:String(v||"");
+  }
+
+  // The existing appointment form uses DD/MM/YYYY. For edit mode only,
+  // temporarily provide the original handler with ISO YYYY-MM-DD so the
+  // database always receives an unambiguous date. New appointments already
+  // pass through the DD/MM/YYYY parser in the appointment controller.
+  function installAppointmentSaveGuard(){
+    const b=E("saveAppointment");
+    if(!b || b.dataset.finalDateSaveGuard==="1")return;
+    b.dataset.finalDateSaveGuard="1";
+    b.addEventListener("click",function(){
+      const input=E("appointmentDate");
+      if(!input)return;
+      const raw=String(input.value||"").trim();
+      const iso=parseDMY(raw);
+      if(!iso)return;
+      const editId=b.dataset.editId;
+      if(editId){
+        // Original saveOrUpdate() stores the field value directly in edit mode.
+        input.value=iso;
+        setTimeout(()=>{ input.value=toDMY(iso); },0);
+      }else{
+        // Keep DD/MM/YYYY for addAppointment(), which parses it itself.
+        input.value=toDMY(iso);
+      }
+    },true);
+  }
+
+  // Also normalize an edited record immediately when it is loaded into the form.
+  function installAppointmentEditObserver(){
+    const input=E("appointmentDate");
+    if(!input || input.dataset.finalEditObserver==="1")return;
+    input.dataset.finalEditObserver="1";
+    const obs=new MutationObserver(()=>{
+      const v=String(input.value||"");
+      if(/^\d{4}-\d{2}-\d{2}$/.test(v))input.value=toDMY(v);
+    });
+    obs.observe(input,{attributes:true,attributeFilter:["value"]});
+  }
+
+  function installAppointment(){installAppointmentSaveGuard();installAppointmentEditObserver();}
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",installAppointment,{once:true});
+  else installAppointment();
+  [100,300,700,1500,3000].forEach(ms=>setTimeout(installAppointment,ms));
+
+  // MTS: catch BOTH normal search-result buttons and the later hard-search
+  // buttons (data-mts-hard-product). The previous guard only covered
+  // data-product-id, which allowed the hard-search handler to bypass it.
+  function mtsStock(pid){
+    try{
+      if(typeof productStock==="function")return Math.max(0,Number(productStock(pid))||0);
+    }catch(_){ }
+    const p=(Array.isArray(window.products)?window.products:[]).find(x=>String(x.id)===String(pid));
+    if(p){
+      const n=Number(p.current_stock ?? p.stock ?? p.quantity ?? 0);
+      return Number.isFinite(n)&&n>=0?n:0;
+    }
+    return 0;
+  }
+  function mtsName(pid){
+    const p=(Array.isArray(window.products)?window.products:[]).find(x=>String(x.id)===String(pid));
+    return p?.name||p?.product_code||"Product";
+  }
+  function mtsBlocked(pid){
+    if(mtsStock(pid)>0)return false;
+    const text=`Cannot add "${mtsName(pid)}" to MTS Sale. It is out of stock (0 available).`;
+    const box=E("mtsStatus");
+    if(box&&typeof window.msg==="function")window.msg(box,text,true);else alert(text);
+    return true;
+  }
+  function installMtsHardGuard(){
+    if(document.documentElement.dataset.finalMtsZeroStockV2==="1")return;
+    document.documentElement.dataset.finalMtsZeroStockV2="1";
+
+    document.addEventListener("click",function(e){
+      const b=e.target?.closest?.("#mtsSale button[data-mts-hard-product],#mtsSale button[data-product-id]");
+      if(!b)return;
+      const pid=b.getAttribute("data-mts-hard-product")||b.getAttribute("data-product-id");
+      if(!pid)return;
+      if(mtsBlocked(pid)){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        return false;
+      }
+    },true);
+
+    // Guard the hard-search add function itself, which can otherwise push
+    // directly into window.mtsSaleItems without going through addSaleProduct.
+    const wrapHard=()=>{
+      if(typeof window.addMtsProduct!=="function")return;
+      if(window.__finalMtsHardOriginal===window.addMtsProduct)return;
+      const original=window.addMtsProduct;
+      window.__finalMtsHardOriginal=original;
+      window.addMtsProduct=function(pid){
+        if(mtsBlocked(pid))return false;
+        return original.apply(this,arguments);
+      };
+    };
+    const wrapAddSale=()=>{
+      if(typeof window.addSaleProduct!=="function")return;
+      if(window.__finalMtsSaleOriginal===window.addSaleProduct)return;
+      const original=window.addSaleProduct;
+      window.__finalMtsSaleOriginal=original;
+      window.addSaleProduct=function(type,pid){
+        if(String(type||"").toLowerCase()==="mts" && mtsBlocked(pid))return false;
+        return original.apply(this,arguments);
+      };
+    };
+    const run=()=>{wrapHard();wrapAddSale();};
+    run();[100,300,700,1500,3000].forEach(ms=>setTimeout(run,ms));
+  }
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",installMtsHardGuard,{once:true});
+  else installMtsHardGuard();
 })();
 </script>
