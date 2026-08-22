@@ -2427,43 +2427,10 @@ label{display:block;font-weight:700;margin:12px 0 6px}input,textarea,select{widt
 script { display:none !important; }
 </style>
 
-
-<style id="INITIAL-TOTAL-RED-DEFINITIVE-FIX">
-/* DEFINITIVE: Initial Total only — red in preview AND PDF export.
-   Overall Discount remains normal black. */
-#invoiceOverlay .mf-invoice .mf-totals-table tr.initial td,
-#invoiceOverlay .mf-invoice .mf-totals-table tr.initial td:first-child,
-#invoiceOverlay .mf-invoice .mf-totals-table tr.initial td:not(:first-child),
-#invoiceExportContent .mf-invoice .mf-totals-table tr.initial td,
-#invoiceExportContent .mf-invoice .mf-totals-table tr.initial td:first-child,
-#invoiceExportContent .mf-invoice .mf-totals-table tr.initial td:not(:first-child),
-#invoicePrint .mf-invoice .mf-totals-table tr.initial td,
-#invoicePrint .mf-invoice .mf-totals-table tr.initial td:first-child,
-#invoicePrint .mf-invoice .mf-totals-table tr.initial td:not(:first-child){
-  color:#d00000!important;
-  font-weight:900!important;
-  background:#fff!important;
-}
-
-/* Do not color the Overall Discount row red. */
-#invoiceOverlay .mf-invoice .mf-totals-table tr:not(.initial) td,
-#invoiceExportContent .mf-invoice .mf-totals-table tr:not(.initial) td,
-#invoicePrint .mf-invoice .mf-totals-table tr:not(.initial) td{
-  /* leave existing colors unchanged */
-}
-</style>
-
-
-<style id="initial-total-final-direct-red">
+<style id="initial-total-final-red">
 #invoiceOverlay .mf-totals-table tr.initial > td,
 #invoicePrint .mf-totals-table tr.initial > td,
 #invoiceExportContent .mf-totals-table tr.initial > td{
-  color:#d00000!important;
-  font-weight:900!important;
-}
-#invoiceOverlay .mf-totals-table tr.initial > td:first-child,
-#invoicePrint .mf-totals-table tr.initial > td:first-child,
-#invoiceExportContent .mf-totals-table tr.initial > td:first-child{
   color:#d00000!important;
   font-weight:900!important;
 }
@@ -5863,14 +5830,6 @@ async function buildInvoicePaperCanvas(size){
           color:#111 !important;
         }
 
-
-        /* Force the embedded Khmer font on the warning itself. */
-        .mf-invoice .mf-mts-risk-notice,
-        .mf-invoice .mf-mts-risk-notice .kh{
-          font-synthesis:none !important;
-          text-rendering:geometricPrecision !important;
-        }
-
         /* Keep invoice tables stable while Khmer glyphs are rasterized. */
         .mf-invoice .mf-invoice-table{
           font-size:13px !important;
@@ -5890,28 +5849,17 @@ async function buildInvoicePaperCanvas(size){
       `;
       clonedDoc.head.appendChild(style);
 
-      /* CRITICAL: html2canvas must not capture until the embedded Khmer
-         fonts have actually finished loading in the cloned document. */
+      /* Wait for embedded Khmer fonts before html2canvas captures the invoice. */
       try{
         if(clonedDoc.fonts){
-          const waits=[];
-          if(b){
-            waits.push(clonedDoc.fonts.load(
-              '400 16px "KhmerOSBattambangPDF"',
-              'សរុប ប្រាក់ ការកម្ម៉ង់ អតិថិជន'
-            ));
-          }
-          if(m){
-            waits.push(clonedDoc.fonts.load(
-              '400 16px "KhmerOSMuolPDF"',
-              'វិក្កយបត្រ'
-            ));
-          }
-          await Promise.all(waits);
+          await Promise.all([
+            clonedDoc.fonts.load('400 16px "KhmerOSBattambangPDF"','សរុប ប្រាក់ ការកម្ម៉ង់ អតិថិជន'),
+            clonedDoc.fonts.load('400 16px "KhmerOSMuolPDF"','វិក្កយបត្រ')
+          ]);
           await clonedDoc.fonts.ready;
         }
       }catch(fontError){
-        console.warn("PDF Khmer font load warning:",fontError);
+        console.warn("Khmer PDF font load warning:",fontError);
       }
     }
   });
@@ -6098,40 +6046,6 @@ function openPrintFromCanvas(canvas,paper,sale){
   setTimeout(applyAdminReportVisibility,2000);
 });
 </script>
-
-<script id="initial-total-red-runtime">
-(function(){
-  function highlightInitialTotal(){
-    const roots = [
-      document.getElementById("invoiceOverlay"),
-      document.getElementById("invoicePrint"),
-      document.getElementById("invoiceExportContent"),
-      document
-    ].filter(Boolean);
-
-    roots.forEach(root=>{
-      root.querySelectorAll("tr").forEach(tr=>{
-        const label=(tr.textContent||"").replace(/\s+/g," ").trim().toLowerCase();
-        if(label.includes("initial total") || label.includes("សរុបដំបូង")){
-          tr.classList.add("initial-total-row");
-          tr.querySelectorAll("td,th").forEach(cell=>{
-            cell.style.color="#d00000";
-            cell.style.fontWeight="800";
-          });
-        }
-      });
-    });
-  }
-  if(document.readyState==="loading"){
-    document.addEventListener("DOMContentLoaded",highlightInitialTotal);
-  }else{
-    highlightInitialTotal();
-  }
-  new MutationObserver(highlightInitialTotal).observe(document.body,{childList:true,subtree:true});
-})();
-</script>
-
-
 <script id="recovered-core-dashboard-script">
 async function printInvoice(id,size="A4"){
  const sale=salesRecords.find(x=>String(x.id)===String(id));
@@ -8823,7 +8737,7 @@ window.renderDermedSales=renderDermedSales;
 async function recordDermedSalePayment(id){
  const s=salesRecords.find(x=>String(x.id)===String(id)&&String(x.sale_type||"").toUpperCase()==="DERMED");
  if(!s){alert("Dermed sale not found.");return;}
- const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
+ let total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
  if(balance<=0.005){alert("This invoice has no remaining Due amount.");return;}
 
  let o=$("dermedPaymentOverlay");
