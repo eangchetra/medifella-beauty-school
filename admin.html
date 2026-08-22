@@ -3331,7 +3331,7 @@ script { display:none !important; }
 <textarea id="dermedSaleNote" rows="4" placeholder="Enter note here..."></textarea>
 
 <div class="sale-actions">
-<button id="dermedAddAppointment" class="gold" type="button">+ Appointment</button>
+
 <button id="saveDermedSale" class="gold" type="button">Save Dermed Sale & Generate Invoice</button>
 <button id="clearDermedSale" class="light" type="button">Clear</button>
 </div>
@@ -21401,15 +21401,17 @@ function optionLabel(option){
   return (option?.textContent||"").trim();
 }
 
-function selectResult(option){
-  if(!option || !activeSelect || !activeInput)return;
+function selectResult(option, forcedInput=null, forcedSelect=null){
+  const input=forcedInput||activeInput;
+  const select=forcedSelect||activeSelect;
+  if(!option || !select || !input)return;
 
   // Directly select the real option belonging to this Purchasing row.
-  activeSelect.value=option.value;
-  activeSelect.dispatchEvent(new Event("change",{bubbles:true}));
+  select.value=option.value;
+  select.dispatchEvent(new Event("change",{bubbles:true}));
 
   // The original Purchasing Management handler fills price/type/subtotal.
-  const row=activeSelect.closest(".purchasing-item-row");
+  const row=select.closest(".purchasing-item-row");
   if(row && typeof window.updateRowP==="function"){
     try{window.updateRowP(row)}catch(err){console.error(err)}
   }
@@ -21417,7 +21419,7 @@ function selectResult(option){
     try{window.calcAllP()}catch(err){console.error(err)}
   }
 
-  activeInput.value=optionLabel(option);
+  input.value=optionLabel(option);
   closeResults();
 }
 
@@ -21441,6 +21443,7 @@ function showResults(input,select){
       const item=document.createElement("button");
       item.type="button";
       item.className="purchasing-single-result";
+      item.dataset.value=String(option.value);
 
       const label=optionLabel(option);
       const service=/\(Service\)\s*$/i.test(label);
@@ -21463,7 +21466,13 @@ function showResults(input,select){
 
       item.append(c,n,k);
 
-      // One direct click handler. No delegated pointer/mousedown handlers.
+      // Pointerdown selects before Safari's follow-up focus/mousedown events can
+      // close the floating result list. The click handler remains as fallback.
+      item.addEventListener("pointerdown",function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        selectResult(option);
+      },true);
       item.addEventListener("click",function(e){
         e.preventDefault();
         e.stopPropagation();
@@ -21549,9 +21558,18 @@ if(document.readyState==="loading")
   document.addEventListener("DOMContentLoaded",start,{once:true});
 else start();
 
+document.addEventListener("pointerdown",function(e){
+  const item=e.target.closest && e.target.closest("#purchasingSingleResults .purchasing-single-result");
+  if(!item || !activeSelect || !activeInput)return;
+  e.preventDefault();
+  e.stopPropagation();
+  const option=[...activeSelect.options].find(o=>String(o.value)===String(item.dataset.value));
+  if(option)selectResult(option,activeInput,activeSelect);
+},true);
+
 document.addEventListener("mousedown",function(e){
   if(resultsBox && resultsBox.style.display!=="none" &&
-     !e.target.closest("#purchasingSingleResults") &&
+     !resultsBox.contains(e.target) &&
      e.target!==activeInput){
     closeResults();
   }
