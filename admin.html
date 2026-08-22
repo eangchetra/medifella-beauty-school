@@ -21710,3 +21710,148 @@ else install();
 </script>
 
 
+
+
+<!-- FINAL MTS ZERO-STOCK ADD PROTECTION
+     MTS only: products with Current Stock = 0 cannot be added to the sale table. -->
+<script id="final-mts-zero-stock-add-protection-v1">
+(function(){
+  "use strict";
+
+  function E(id){ return document.getElementById(id); }
+
+  function getMtsStock(pid){
+    try{
+      if(typeof productStock === "function"){
+        return Math.max(0, Number(productStock(pid)) || 0);
+      }
+    }catch(_){ }
+    return 0;
+  }
+
+  function productName(pid){
+    const arr=Array.isArray(window.products)?window.products:[];
+    const p=arr.find(x=>String(x.id)===String(pid));
+    return p ? (p.name || p.product_code || "Product") : "Product";
+  }
+
+  function showMtsOutOfStock(pid){
+    const name=productName(pid);
+    const available=getMtsStock(pid);
+    const box=E("mtsStatus");
+    const text=`Cannot add "${name}" to MTS Sale. It is out of stock (0 available).`;
+    if(box && typeof window.msg === "function"){
+      window.msg(box,text,true);
+    }else{
+      alert(text);
+    }
+  }
+
+  function isMtsProductButton(btn){
+    if(!btn || !btn.closest) return false;
+    if(!btn.closest("#mtsSale")) return false;
+    if(!btn.hasAttribute("data-product-id")) return false;
+    return !!btn.closest("#mtsProductResults");
+  }
+
+  /*
+   * Final guard around addSaleProduct.
+   * This is intentionally installed LAST because earlier page patches
+   * replace addSaleProduct several times.
+   */
+  function installAddGuard(){
+    if(typeof window.addSaleProduct !== "function") return;
+    if(window.__finalMtsZeroStockAddGuardOriginal !== window.addSaleProduct){
+      const original=window.addSaleProduct;
+      window.__finalMtsZeroStockAddGuardOriginal=original;
+      window.addSaleProduct=function(type,pid){
+        if(String(type||"").toLowerCase()==="mts"){
+          const available=getMtsStock(pid);
+          if(available<=0){
+            showMtsOutOfStock(pid);
+            return false;
+          }
+        }
+        return original.apply(this,arguments);
+      };
+    }
+  }
+
+  /*
+   * Disable zero-stock MTS search results visually as well as functionally.
+   * This prevents normal mouse/keyboard selection before the click guard.
+   */
+  function refreshMtsSearchResults(){
+    const box=E("mtsProductResults");
+    if(!box) return;
+
+    box.querySelectorAll("button[data-product-id]").forEach(btn=>{
+      const pid=btn.getAttribute("data-product-id");
+      const available=getMtsStock(pid);
+      const out=available<=0;
+
+      btn.disabled=out;
+      btn.setAttribute("aria-disabled",out?"true":"false");
+      btn.style.cursor=out?"not-allowed":"pointer";
+      btn.style.opacity=out?"0.55":"";
+
+      if(out){
+        if(!btn.dataset.mtsOutOfStockLabel){
+          btn.dataset.mtsOutOfStockLabel=btn.textContent||"Product";
+          btn.textContent=(btn.dataset.mtsOutOfStockLabel+" — Out of stock");
+        }
+        btn.title="Out of stock — cannot be added to MTS Sale";
+      }else if(btn.dataset.mtsOutOfStockLabel){
+        btn.textContent=btn.dataset.mtsOutOfStockLabel;
+        delete btn.dataset.mtsOutOfStockLabel;
+        btn.removeAttribute("title");
+      }
+    });
+  }
+
+  /* Capture phase runs before the existing MTS result click handlers. */
+  function installClickGuard(){
+    if(document.documentElement.dataset.finalMtsZeroStockClickGuard==="1") return;
+    document.documentElement.dataset.finalMtsZeroStockClickGuard="1";
+
+    document.addEventListener("click",function(e){
+      const btn=e.target && e.target.closest ? e.target.closest("button[data-product-id]") : null;
+      if(!isMtsProductButton(btn)) return;
+
+      const pid=btn.getAttribute("data-product-id");
+      const available=getMtsStock(pid);
+      if(available<=0){
+        e.preventDefault();
+        e.stopImmediatePropagation();
+        showMtsOutOfStock(pid);
+        return false;
+      }
+    },true);
+  }
+
+  function install(){
+    installAddGuard();
+    installClickGuard();
+    refreshMtsSearchResults();
+
+    const box=E("mtsProductResults");
+    if(box && !box.dataset.finalMtsZeroStockObserver){
+      box.dataset.finalMtsZeroStockObserver="1";
+      const observer=new MutationObserver(function(){
+        refreshMtsSearchResults();
+        installAddGuard();
+      });
+      observer.observe(box,{childList:true,subtree:true});
+    }
+  }
+
+  if(document.readyState==="loading"){
+    document.addEventListener("DOMContentLoaded",install,{once:true});
+  }else{
+    install();
+  }
+
+  /* Product/stock data and the MTS sale renderer load asynchronously. */
+  [100,300,700,1500,3000].forEach(ms=>setTimeout(install,ms));
+})();
+</script>
