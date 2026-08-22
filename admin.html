@@ -2453,6 +2453,22 @@ script { display:none !important; }
 }
 </style>
 
+
+<style id="initial-total-final-direct-red">
+#invoiceOverlay .mf-totals-table tr.initial > td,
+#invoicePrint .mf-totals-table tr.initial > td,
+#invoiceExportContent .mf-totals-table tr.initial > td{
+  color:#d00000!important;
+  font-weight:900!important;
+}
+#invoiceOverlay .mf-totals-table tr.initial > td:first-child,
+#invoicePrint .mf-totals-table tr.initial > td:first-child,
+#invoiceExportContent .mf-totals-table tr.initial > td:first-child{
+  color:#d00000!important;
+  font-weight:900!important;
+}
+</style>
+
 </head>
 <body>
 
@@ -5319,7 +5335,7 @@ async function recordSalePayment(id){
 function showSaleInvoice(id,size="A4"){
  window.currentInvoiceId = id;
  const s=salesRecords.find(x=>String(x.id)===String(id));if(!s)return;
- const total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
+ let total=saleTotal(s),paid=salePaid(s),balance=Math.max(0,total-paid);
  const rate=4150;
  let items=[];try{items=typeof saleItemsValue(s)==="string"?JSON.parse(saleItemsValue(s)):saleItemsValue(s)||[]}catch(_){items=[]}
  if(!Array.isArray(items))items=[];
@@ -5847,6 +5863,14 @@ async function buildInvoicePaperCanvas(size){
           color:#111 !important;
         }
 
+
+        /* Force the embedded Khmer font on the warning itself. */
+        .mf-invoice .mf-mts-risk-notice,
+        .mf-invoice .mf-mts-risk-notice .kh{
+          font-synthesis:none !important;
+          text-rendering:geometricPrecision !important;
+        }
+
         /* Keep invoice tables stable while Khmer glyphs are rasterized. */
         .mf-invoice .mf-invoice-table{
           font-size:13px !important;
@@ -5866,13 +5890,29 @@ async function buildInvoicePaperCanvas(size){
       `;
       clonedDoc.head.appendChild(style);
 
-      /* Wait until the cloned document has completed font layout. */
+      /* CRITICAL: html2canvas must not capture until the embedded Khmer
+         fonts have actually finished loading in the cloned document. */
       try{
         if(clonedDoc.fonts){
-          clonedDoc.fonts.load('400 16px "KhmerOSBattambangPDF"','សរុប ប្រាក់');
-          clonedDoc.fonts.load('400 16px "KhmerOSMuolPDF"','វិក្កយបត្រ');
+          const waits=[];
+          if(b){
+            waits.push(clonedDoc.fonts.load(
+              '400 16px "KhmerOSBattambangPDF"',
+              'សរុប ប្រាក់ ការកម្ម៉ង់ អតិថិជន'
+            ));
+          }
+          if(m){
+            waits.push(clonedDoc.fonts.load(
+              '400 16px "KhmerOSMuolPDF"',
+              'វិក្កយបត្រ'
+            ));
+          }
+          await Promise.all(waits);
+          await clonedDoc.fonts.ready;
         }
-      }catch(_){}
+      }catch(fontError){
+        console.warn("PDF Khmer font load warning:",fontError);
+      }
     }
   });
 
