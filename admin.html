@@ -6076,19 +6076,15 @@ function openPrintFromCanvas(canvas,paper,sale){
 </head>
 <body>
  <div id="paper"><img src="${img}" alt="Invoice"></div>
- <scr`+`ipt>
-   window.onload=()=>{
-     setTimeout(()=>window.print(),300);
-   };
- <\/script>
+</body>
+</html>`;
 
+ printWin.document.open();
+ printWin.document.write(html);
+ printWin.document.close();
+}
 
-
-
-
-
-
-
+</script>
 
 <script id="appointment-upcoming-refresh-final-fix-v1">
 (function(){
@@ -6152,15 +6148,6 @@ function openPrintFromCanvas(canvas,paper,sale){
     bind();setTimeout(bind,500);setTimeout(bind,1500);
   }
 })();
-</script>
-</body>
-</html>`;
-
- printWin.document.open();
- printWin.document.write(html);
- printWin.document.close();
-}
-
 </script>
 
 <script id="admin-stock-report-visibility-final">
