@@ -21455,3 +21455,239 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
   else install2();
 })();
 </script>
+
+
+<script id="purchasing-payment-status-final-fix-v1">
+(function(){
+  "use strict";
+
+  const $p = id => document.getElementById(id);
+
+  function escPay(v){
+    if(typeof window.esc2==="function") return window.esc2(v);
+    return String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
+  }
+  function attrPay(v){
+    return String(v??"").replace(/"/g,"&quot;").replace(/'/g,"&#039;");
+  }
+  function moneyPay(v){
+    const n=Number(v||0);
+    return "$"+n.toFixed(2);
+  }
+  function shortPay(v){
+    const s=String(v??"");
+    if(s.startsWith("PUR-")) return s.length>16 ? s.slice(0,12)+"…"+s.slice(-4) : s;
+    return s.length>14 ? s.slice(0,10)+"…"+s.slice(-4) : s;
+  }
+  function fmtPay(v){
+    const s=String(v||"");
+    if(!s)return "";
+    const d=new Date(s);
+    if(Number.isNaN(d.getTime()))return s.replace("T"," ").replace(/\+00:00$/,"");
+    const dd=String(d.getDate()).padStart(2,"0");
+    const mm=String(d.getMonth()+1).padStart(2,"0");
+    const yyyy=d.getFullYear();
+    const hh=String(d.getHours()).padStart(2,"0");
+    const mi=String(d.getMinutes()).padStart(2,"0");
+    return `${dd}/${mm}/${yyyy} ${hh}:${mi}`;
+  }
+  function itemsPay(r){
+    return Array.isArray(r?.items)?r.items:[];
+  }
+
+  function addPendingButton(){
+    const save=$p("savePurchasing");
+    if(!save || $p("purchasingPendingBtn")) return;
+
+    const b=document.createElement("button");
+    b.id="purchasingPendingBtn";
+    b.type="button";
+    b.textContent="Pending";
+    b.title="Save this purchase as Pending to Pay";
+    b.style.cssText="background:#1976d2;color:#fff;border:0;padding:9px 14px;border-radius:8px;font-weight:600;cursor:pointer;";
+    save.parentNode.insertBefore(b,save);
+
+    // Pending is the initial payment state. Clicking it simply makes that
+    // state explicit; Save Purchasing then stores the record as Pending.
+    b.addEventListener("click",()=>{
+      b.dataset.status="Pending";
+      b.textContent="Pending";
+      b.style.background="#1976d2";
+    });
+  }
+
+  function patchCollect(){
+    if(typeof window.collectPurchaseP!=="function" || window.collectPurchaseP.__paymentV1)return;
+    const orig=window.collectPurchaseP;
+    const wrapped=function(){
+      const payload=orig.apply(this,arguments);
+      payload.payment_status="Pending";
+      payload.arrival_status="Arriving";
+      payload.arrived_at=null;
+      payload.paid_at=null;
+      return payload;
+    };
+    wrapped.__paymentV1=true;
+    window.collectPurchaseP=wrapped;
+  }
+
+  async function payPending(id){
+    const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(id));
+    if(!r)return;
+    if(String(r.payment_status||"Pending")!=="Pending")return;
+
+    if(!confirm("Make payment for this purchasing and mark it as Arriving?"))return;
+
+    const result=await sb.from("medifella_purchases").update({
+      payment_status:"Paid",
+      paid_at:new Date().toISOString(),
+      arrival_status:"Arriving",
+      arrived_at:null
+    }).eq("id",id);
+
+    if(result.error){
+      alert("Could not make payment: "+result.error.message);
+      return;
+    }
+
+    if(typeof window.loadPurchasingManagement==="function"){
+      await window.loadPurchasingManagement();
+    }
+  }
+
+  function renderPaymentList(){
+    const box=$p("purchasingList");
+    if(!box)return;
+
+    const from=$p("purchasingFromDate")?.value||"";
+    const to=$p("purchasingToDate")?.value||"";
+    const q=($p("purchasingSearch")?.value||"").trim().toLowerCase();
+
+    const rows=(window.purchasingRecords||[]).filter(r=>{
+      const d=String(r.purchase_datetime||r.created_at||"").slice(0,10);
+      if(from && d<from)return false;
+      if(to && d>to)return false;
+      if(q && !JSON.stringify(r).toLowerCase().includes(q))return false;
+      return true;
+    });
+
+    if(!rows.length){
+      box.innerHTML='<p class="muted">No purchasing records found.</p>';
+      return;
+    }
+
+    box.innerHTML=`<div class="table-wrap"><table class="table">
+      <thead><tr>
+        <th>Purchase ID</th>
+        <th>Date &amp; Time</th>
+        <th>Purchasing Staff</th>
+        <th>Items</th>
+        <th>Total</th>
+        <th>Payment / Arrival</th>
+        <th>Action</th>
+      </tr></thead>
+      <tbody>${rows.map(r=>{
+        const paid=String(r.payment_status||"Pending")==="Paid";
+        const arrived=String(r.arrival_status||"Arriving")==="Arrived";
+
+        let statusButton;
+        if(!paid){
+          statusButton=`<button type="button" class="purchasing-pay-pending"
+             data-id="${attrPay(r.id)}"
+             style="background:#1976d2;color:#fff;border:0;padding:7px 11px;border-radius:7px;font-weight:600;cursor:pointer">
+             Pending to Pay</button>`;
+        }else if(arrived){
+          statusButton=`<button type="button" disabled
+             style="background:#2e7d32;color:#fff;border:0;padding:7px 11px;border-radius:7px;font-weight:600">
+             Arrived</button>`;
+        }else{
+          statusButton=`<button type="button" disabled
+             style="background:#1976d2;color:#fff;border:0;padding:7px 11px;border-radius:7px;font-weight:600">
+             Arriving</button>`;
+        }
+
+        return `<tr>
+          <td title="${attrPay(r.purchase_no||r.id||"")}"><strong>${escPay(shortPay(r.purchase_no||r.id||""))}</strong></td>
+          <td title="${attrPay(r.purchase_datetime||"")}">${escPay(fmtPay(r.purchase_datetime))}</td>
+          <td>${escPay(r.purchasing_staff_name||"")}</td>
+          <td><button type="button" class="light purchasing-view-payment" data-id="${attrPay(r.id)}">View</button></td>
+          <td><strong>${moneyPay(r.total)}</strong></td>
+          <td>${statusButton}</td>
+          <td><div class="actions">
+            <button type="button" class="light purchasing-edit-payment" data-id="${attrPay(r.id)}">Edit</button>
+            <button type="button" class="danger purchasing-delete-payment" data-id="${attrPay(r.id)}">Delete</button>
+          </div></td>
+        </tr>`;
+      }).join("")}</tbody></table></div>`;
+
+    box.querySelectorAll(".purchasing-pay-pending").forEach(b=>{
+      b.addEventListener("click",()=>payPending(b.dataset.id));
+    });
+
+    // Use the existing UI bridge for Edit.
+    box.querySelectorAll(".purchasing-edit-payment").forEach(b=>{
+      b.addEventListener("click",()=>{
+        if(typeof window.__purchasingEditBridge==="function")
+          window.__purchasingEditBridge(b.dataset.id);
+      });
+    });
+
+    box.querySelectorAll(".purchasing-delete-payment").forEach(b=>{
+      b.addEventListener("click",async()=>{
+        if(!confirm("Delete this purchasing record?"))return;
+        const rr=await sb.from("medifella_purchases").delete().eq("id",b.dataset.id);
+        if(rr.error){alert("Delete failed: "+rr.error.message);return}
+        if(typeof window.loadPurchasingManagement==="function")
+          await window.loadPurchasingManagement();
+      });
+    });
+
+    box.querySelectorAll(".purchasing-view-payment").forEach(b=>{
+      b.addEventListener("click",()=>{
+        const r=(window.purchasingRecords||[]).find(x=>String(x.id)===String(b.dataset.id));
+        if(typeof window.showDetails2==="function") window.showDetails2(b.dataset.id);
+        else if(typeof window.__purchasingShowDetailsBridge==="function") window.__purchasingShowDetailsBridge(b.dataset.id);
+        else {
+          const items=itemsPay(r);
+          alert(items.map(i=>`${i.product_name||"Item"} × ${i.qty||0} — ${moneyPay(i.subtotal)}`).join("\n")+"\n\nTotal: "+moneyPay(r?.total));
+        }
+      });
+    });
+  }
+
+  function install(){
+    addPendingButton();
+    patchCollect();
+
+    // Run after the existing compact Purchasing UI has rendered.
+    setTimeout(renderPaymentList,150);
+    setTimeout(renderPaymentList,600);
+    setTimeout(renderPaymentList,1200);
+
+    ["purchasingFromDate","purchasingToDate","purchasingSearch"].forEach(id=>{
+      const el=$p(id);
+      if(el && !el.dataset.paymentV1){
+        el.dataset.paymentV1="1";
+        el.addEventListener("input",()=>setTimeout(renderPaymentList,0));
+      }
+    });
+
+    // Re-apply after every normal Purchasing refresh.
+    if(typeof window.loadPurchasingManagement==="function" && !window.loadPurchasingManagement.__paymentRefreshV1){
+      const orig=window.loadPurchasingManagement;
+      const wrapped=async function(){
+        const result=await orig.apply(this,arguments);
+        addPendingButton();
+        patchCollect();
+        setTimeout(renderPaymentList,0);
+        return result;
+      };
+      wrapped.__paymentRefreshV1=true;
+      window.loadPurchasingManagement=wrapped;
+    }
+  }
+
+  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
+  else install();
+})();
+</script>
