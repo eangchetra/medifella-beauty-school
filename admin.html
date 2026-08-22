@@ -6023,15 +6023,8 @@ function openPrintFromCanvas(canvas,paper,sale){
 })();
 </script>
 
-</body>
 
-</html>`;
-
- printWin.document.open();
- printWin.document.write(html);
- printWin.document.close();
-}
-
+<script id="recovered-core-dashboard-script">
 async function printInvoice(id,size="A4"){
  const sale=salesRecords.find(x=>String(x.id)===String(id));
  if(!sale){
@@ -9076,7 +9069,9 @@ const _oldUpdateMetrics=updateMetrics; updateMetrics=function(){_oldUpdateMetric
 boot();
 
 
-<\/script>
+
+</script>
+
 <script id="dermed-final-search-only">
 (function(){
   function el(id){return document.getElementById(id)}
