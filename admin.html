@@ -21219,433 +21219,6 @@ setTimeout(repairExistingCommissionRecordsV25,5000);
 </script>
 
 
-<style id="purchasing-search-select-v15">
-.purchasing-real-search{
-  position:relative;width:100%;min-width:240px;
-}
-.purchasing-real-search-input{
-  width:100%;height:40px;box-sizing:border-box;padding:9px 12px;
-  border:1px solid #94a3b8;border-radius:8px;background:#fff;
-  font-size:14px;outline:none;
-}
-.purchasing-real-results{
-  position:fixed;display:none;z-index:2147483647;
-  width:420px;max-height:380px;overflow-y:auto;
-  background:#fff;border:1px solid #94a3b8;border-radius:10px;
-  box-shadow:0 18px 45px rgba(15,23,42,.28);
-}
-.purchasing-real-result{
-  display:block;width:100%;box-sizing:border-box;padding:11px 13px;
-  border:0;border-bottom:1px solid #e5e7eb;background:#fff;
-  text-align:left;cursor:pointer;pointer-events:auto;
-}
-.purchasing-real-result:hover{background:#eff6ff}
-.purchasing-real-result-code{font-size:11px;font-weight:800;color:#64748b}
-.purchasing-real-result-name{font-size:14px;font-weight:650;color:#111827;line-height:1.35}
-.purchasing-real-result-type{font-size:10px;color:#64748b;margin-top:4px}
-</style>
-<script id="purchasing-search-select-v15">
-(function(){
-  "use strict";
-  let activeInput=null, activeSelect=null, resultBox=null;
-
-  const esc=v=>String(v??"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#039;"}[c]));
-
-  function ensureBox(){
-    if(resultBox)return resultBox;
-    resultBox=document.createElement("div");
-    resultBox.className="purchasing-real-results";
-    document.body.appendChild(resultBox);
-    return resultBox;
-  }
-
-  function info(option){
-    const t=(option.textContent||"").trim();
-    const service=/\(Service\)\s*$/i.test(t);
-    const clean=t.replace(/\s+\(Service\)\s*$/i,"").trim();
-    const p=clean.split(" · ");
-    return {code:p.length>1?p.shift():"",name:p.join(" · ")||clean,type:service?"Service":"Product"};
-  }
-
-  function place(){
-    if(!activeInput)return;
-    const r=activeInput.getBoundingClientRect(), box=ensureBox();
-    const w=Math.max(360,Math.min(560,Math.max(r.width,420)));
-    const above=r.top-8, below=window.innerHeight-r.bottom-8;
-    const h=Math.min(380,Math.max(120,above>150?above:below));
-    const top=above>150?r.top-h-6:r.bottom+6;
-    box.style.width=w+"px";
-    box.style.left=Math.max(8,Math.min(r.left,window.innerWidth-w-8))+"px";
-    box.style.top=Math.max(8,Math.min(top,window.innerHeight-h-8))+"px";
-    box.style.maxHeight=h+"px";
-  }
-
-  function close(){
-    if(resultBox)resultBox.style.display="none";
-    activeInput=null; activeSelect=null;
-  }
-
-  function choose(option){
-    if(!option || !activeSelect || !activeInput)return;
-
-    // Select the exact option already used by the Purchasing row.
-    activeSelect.value=option.value;
-    activeSelect.dispatchEvent(new Event("change",{bubbles:true}));
-
-    // Let the original Purchasing calculation code run.
-    const row=activeSelect.closest(".purchasing-item-row");
-    if(row && typeof window.updateRowP==="function"){
-      try{window.updateRowP(row)}catch(_){}
-    }
-    if(typeof window.calcAllP==="function"){
-      try{window.calcAllP()}catch(_){}
-    }
-
-    activeInput.value=option.textContent.trim();
-    close();
-    activeInput?.focus?.();
-  }
-
-  function show(input,select){
-    activeInput=input; activeSelect=select;
-    const q=input.value.trim().toLowerCase();
-    const opts=[...select.options].filter(o=>o.value);
-    const matches=opts.filter(o=>(o.textContent||"").toLowerCase().includes(q));
-    const box=ensureBox();
-
-    box.innerHTML="";
-    if(!matches.length){
-      box.innerHTML='<div style="padding:15px;text-align:center;color:#64748b">No product or service found</div>';
-    }else{
-      matches.slice(0,100).forEach(o=>{
-        const x=info(o);
-        const b=document.createElement("button");
-        b.type="button";
-        b.className="purchasing-real-result";
-        b.innerHTML=`<div class="purchasing-real-result-code">${esc(x.code)}</div>
-          <div class="purchasing-real-result-name">${esc(x.name)}</div>
-          <div class="purchasing-real-result-type">${x.type}</div>`;
-        b.addEventListener("pointerdown",e=>{
-          e.preventDefault();e.stopPropagation();choose(o);
-        },{passive:false});
-        b.addEventListener("click",e=>{
-          e.preventDefault();e.stopPropagation();choose(o);
-        });
-        box.appendChild(b);
-      });
-    }
-    place();
-    box.style.display="block";
-  }
-
-  function build(select){
-    if(!select || !select.classList.contains("purchasing-item-select"))return;
-    if(select.dataset.realSearchV15)return;
-    select.dataset.realSearchV15="1";
-    select.style.display="none";
-
-    const wrap=document.createElement("div");
-    wrap.className="purchasing-real-search";
-    const input=document.createElement("input");
-    input.type="text";
-    input.className="purchasing-real-search-input";
-    input.placeholder="Search product or service...";
-    input.autocomplete="off";
-
-    const current=()=>{
-      const o=select.options[select.selectedIndex];
-      return o?.value?(o.textContent||"").trim():"";
-    };
-    input.value=current();
-    wrap.appendChild(input);
-    select.parentNode.insertBefore(wrap,select);
-
-    input.addEventListener("focus",()=>show(input,select));
-    input.addEventListener("input",()=>show(input,select));
-    input.addEventListener("keydown",e=>{
-      if(e.key==="Escape"){e.preventDefault();input.value=current();close();}
-      if(e.key==="Enter"){
-        const first=ensureBox().querySelector(".purchasing-real-result");
-        if(first){e.preventDefault();first.click();}
-      }
-    });
-    select.addEventListener("change",()=>{if(document.activeElement!==input)input.value=current();});
-  }
-
-  function install(){
-    document.querySelectorAll("#purchasingItemsBody select.purchasing-item-select").forEach(build);
-    const body=document.getElementById("purchasingItemsBody");
-    if(body&&!body.dataset.realSearchObserverV15){
-      body.dataset.realSearchObserverV15="1";
-      new MutationObserver(()=>setTimeout(()=>{
-        document.querySelectorAll("#purchasingItemsBody select.purchasing-item-select").forEach(build);
-      },0)).observe(body,{childList:true,subtree:true});
-    }
-    if(!document.documentElement.dataset.realSearchGlobalV15){
-      document.documentElement.dataset.realSearchGlobalV15="1";
-      document.addEventListener("mousedown",e=>{
-        if(resultBox && resultBox.style.display!=="none" &&
-           !e.target.closest(".purchasing-real-results") &&
-           e.target!==activeInput)close();
-      },true);
-      window.addEventListener("resize",place);
-      window.addEventListener("scroll",place,true);
-    }
-  }
-
-  if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
-  else install();
-  setTimeout(install,300);
-  setTimeout(install,900);
-})();
-</script>
-
-
-<style id="purchasing-search-final-v16">
-.purchasing-final-search-results{
-  position:fixed !important;
-  z-index:2147483647 !important;
-  display:none;
-  background:#fff !important;
-  border:1px solid #94a3b8 !important;
-  border-radius:10px !important;
-  box-shadow:0 18px 45px rgba(15,23,42,.30) !important;
-  overflow-y:auto !important;
-  pointer-events:auto !important;
-}
-.purchasing-final-search-result{
-  display:block !important;
-  width:100% !important;
-  padding:12px 14px !important;
-  box-sizing:border-box !important;
-  border:0 !important;
-  border-bottom:1px solid #e5e7eb !important;
-  background:#fff !important;
-  text-align:left !important;
-  cursor:pointer !important;
-  pointer-events:auto !important;
-}
-.purchasing-final-search-result:hover{background:#eff6ff !important}
-</style>
-<script id="purchasing-search-final-v16">
-(function(){
-"use strict";
-
-let input=null, select=null, results=null;
-
-function box(){
-  if(results)return results;
-  results=document.createElement("div");
-  results.className="purchasing-final-search-results";
-  document.body.appendChild(results);
-  return results;
-}
-
-function position(){
-  if(!input || !results)return;
-  const r=input.getBoundingClientRect();
-  const w=Math.max(380,Math.min(600,Math.max(420,r.width)));
-  const h=Math.min(420,Math.max(120,window.innerHeight-r.bottom-12));
-  results.style.width=w+"px";
-  results.style.left=Math.max(8,Math.min(r.left,window.innerWidth-w-8))+"px";
-  results.style.top=Math.max(8,r.bottom+5)+"px";
-  results.style.maxHeight=h+"px";
-}
-
-function closeResults(){
-  if(results)results.style.display="none";
-}
-
-function sourceFromValue(v){
-  const parts=String(v||"").split(":");
-  const kind=parts[0], id=parts.slice(1).join(":");
-  if(kind==="product"){
-    return (Array.isArray(window.products)?window.products:[]).find(x=>String(x.id)===id) || null;
-  }
-  if(kind==="service"){
-    return (Array.isArray(window.services)?window.services:[]).find(x=>String(x.id)===id) || null;
-  }
-  return null;
-}
-
-function priceOf(x){
-  return Number(x?.cost ?? x?.unit_cost ?? x?.purchase_price ?? x?.price ?? 0) || 0;
-}
-
-function selectOption(option){
-  if(!option || !select || !input)return;
-
-  const value=String(option.value);
-
-  // Set the actual hidden SELECT using the native setter.
-  const setter=Object.getOwnPropertyDescriptor(
-    HTMLSelectElement.prototype,"value"
-  )?.set;
-  if(setter)setter.call(select,value);
-  else select.value=value;
-
-  // Fire the real change event used by the original Purchasing row.
-  select.dispatchEvent(new Event("change",{bubbles:true}));
-
-  const row=select.closest(".purchasing-item-row");
-  const src=sourceFromValue(value);
-
-  // Direct fallback: update the visible fields too, so selection does not
-  // depend on any search-patch-specific function.
-  if(row && src){
-    const unit=row.querySelector(".purchasing-unit");
-    const type=row.querySelector(".purchasing-type");
-
-    if(unit && !unit.dataset.userEdited){
-      unit.value=priceOf(src).toFixed(2);
-    }
-
-    if(type){
-      const isMachine=String(src.type||src.product_type||src.category||"")
-        .toLowerCase().includes("machine");
-      type.value = value.startsWith("service:") ? "Other" : (isMachine ? "Machine" : "Product");
-      type.dispatchEvent(new Event("change",{bubbles:true}));
-    }
-
-    const qty=Number(row.querySelector(".purchasing-qty")?.value||0);
-    const unitPrice=Number(row.querySelector(".purchasing-unit")?.value||0);
-    const dt=row.querySelector(".purchasing-discount-type")?.value||"USD";
-    const dv=Number(row.querySelector(".purchasing-discount")?.value||0);
-    const base=qty*unitPrice;
-    const discount=dt==="%" ? base*Math.min(100,dv)/100 : Math.min(base,dv);
-    const subtotal=Math.max(0,base-discount);
-    const sub=row.querySelector(".purchasing-subtotal");
-    if(sub)sub.value=subtotal.toFixed(2);
-
-    const total=[...document.querySelectorAll("#purchasingItemsBody .purchasing-subtotal")]
-      .reduce((a,e)=>a+(Number(e.value)||0),0);
-    const grand=document.getElementById("purchasingGrandTotal");
-    if(grand)grand.textContent=total.toFixed(2);
-  }
-
-  input.value=(option.textContent||"").trim();
-  closeResults();
-  setTimeout(()=>input && input.focus(),0);
-}
-
-function show(){
-  if(!input || !select)return;
-  const q=input.value.trim().toLowerCase();
-  const opts=[...select.options].filter(o=>o.value);
-  const matches=opts.filter(o=>(o.textContent||"").toLowerCase().includes(q));
-  const b=box();
-
-  b.innerHTML="";
-  if(!matches.length){
-    const empty=document.createElement("div");
-    empty.style.cssText="padding:16px;text-align:center;color:#64748b";
-    empty.textContent="No product or service found";
-    b.appendChild(empty);
-  }else{
-    matches.slice(0,100).forEach(option=>{
-      const item=document.createElement("div");
-      item.className="purchasing-final-search-result";
-      item.setAttribute("role","option");
-
-      const txt=(option.textContent||"").trim();
-      const parts=txt.split(" · ");
-      const code=parts.length>1?parts[0]:"";
-      const name=parts.length>1?parts.slice(1).join(" · "):txt;
-      item.innerHTML=
-        `<div style="font-size:11px;font-weight:800;color:#64748b">${String(code).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>`+
-        `<div style="font-size:14px;font-weight:650;color:#111827;line-height:1.4">${String(name).replace(/&/g,"&amp;").replace(/</g,"&lt;")}</div>`;
-
-      // Use multiple native mouse events. No preventDefault on the first
-      // event, so Safari can complete the interaction normally.
-      const activate=e=>{
-        e.preventDefault();
-        e.stopPropagation();
-        selectOption(option);
-      };
-      item.onmousedown=activate;
-      item.onmouseup=activate;
-      item.onclick=activate;
-      item.ontouchend=activate;
-
-      b.appendChild(item);
-    });
-  }
-
-  position();
-  b.style.display="block";
-}
-
-function build(sel){
-  if(!sel || !sel.classList.contains("purchasing-item-select"))return;
-  if(sel.dataset.finalSearchV16)return;
-  sel.dataset.finalSearchV16="1";
-
-  sel.style.display="none";
-
-  const wrap=document.createElement("div");
-  wrap.style.cssText="width:100%;position:relative";
-  const inp=document.createElement("input");
-  inp.type="text";
-  inp.className="purchasing-final-search-input";
-  inp.placeholder="Search product or service...";
-  inp.autocomplete="off";
-  inp.style.cssText="width:100%;height:40px;box-sizing:border-box;padding:9px 12px;border:1px solid #94a3b8;border-radius:8px;background:#fff;font-size:14px;outline:none";
-
-  const current=()=>{
-    const o=sel.options[sel.selectedIndex];
-    return o?.value ? (o.textContent||"").trim() : "";
-  };
-  inp.value=current();
-
-  wrap.appendChild(inp);
-  sel.parentNode.insertBefore(wrap,sel);
-
-  inp.addEventListener("focus",function(){
-    input=inp; select=sel; show();
-  });
-  inp.addEventListener("input",function(){
-    input=inp; select=sel; show();
-  });
-  inp.addEventListener("keydown",function(e){
-    if(e.key==="Escape"){e.preventDefault();closeResults();inp.value=current();return;}
-    if(e.key==="Enter"){
-      const first=box().querySelector(".purchasing-final-search-result");
-      if(first){e.preventDefault();first.click();}
-    }
-  });
-}
-
-function install(){
-  document.querySelectorAll("#purchasingItemsBody select.purchasing-item-select").forEach(build);
-  const body=document.getElementById("purchasingItemsBody");
-  if(body && !body.dataset.finalSearchObserverV16){
-    body.dataset.finalSearchObserverV16="1";
-    new MutationObserver(()=>setTimeout(()=>{
-      document.querySelectorAll("#purchasingItemsBody select.purchasing-item-select").forEach(build);
-    },0)).observe(body,{childList:true,subtree:true});
-  }
-}
-
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});
-else install();
-setTimeout(install,300);
-setTimeout(install,1000);
-
-document.addEventListener("mousedown",function(e){
-  if(results && results.style.display!=="none" &&
-     !e.target.closest(".purchasing-final-search-results") &&
-     e.target!==input){
-    closeResults();
-  }
-},true);
-
-window.addEventListener("resize",position);
-window.addEventListener("scroll",position,true);
-
-})();
-</script>
-
-
 <script id="appointments-all-entrypoints-final-v17">
 (function(){
   "use strict";
@@ -21735,39 +21308,6 @@ if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",
 })();
 </script>
 
-<style id="purchasing-search-authoritative-v18">
-.purchasing-auth-results{position:fixed!important;z-index:2147483647!important;display:none;background:#fff;border:1px solid #94a3b8;border-radius:10px;box-shadow:0 18px 45px rgba(15,23,42,.28);max-height:360px;overflow:auto;width:460px}
-.purchasing-auth-result{display:block;width:100%;padding:12px 14px;border:0;border-bottom:1px solid #e5e7eb;background:#fff;text-align:left;cursor:pointer}
-.purchasing-auth-result:hover{background:#eff6ff}
-</style>
-<script id="purchasing-search-authoritative-v18">
-(function(){
-"use strict";
-let box=null,activeInput=null,activeSelect=null;
-function getBox(){if(box)return box;box=document.createElement("div");box.className="purchasing-auth-results";document.body.appendChild(box);return box}
-function place(){if(!activeInput)return;const r=activeInput.getBoundingClientRect(),b=getBox();b.style.left=Math.max(8,r.left)+"px";b.style.top=Math.max(8,r.bottom+5)+"px";b.style.width=Math.max(420,r.width)+"px"}
-function close(){if(box)box.style.display="none"}
-function build(sel){
- if(!sel||!sel.classList.contains("purchasing-item-select")||sel.dataset.authV18)return;
- sel.dataset.authV18="1";sel.style.display="none";
- const wrap=document.createElement("div");wrap.style.width="100%";
- const input=document.createElement("input");input.type="text";input.placeholder="Search product or service...";input.style.cssText="width:100%;height:40px;box-sizing:border-box;padding:9px 12px;border:1px solid #94a3b8;border-radius:8px;font-size:14px";
- const cur=()=>{const o=sel.options[sel.selectedIndex];return o?.value?(o.textContent||"").trim():""};
- input.value=cur();wrap.appendChild(input);sel.parentNode.insertBefore(wrap,sel);
- function show(){activeInput=input;activeSelect=sel;const q=input.value.trim().toLowerCase(),b=getBox();b.innerHTML="";
-  [...sel.options].filter(o=>o.value&&(o.textContent||"").toLowerCase().includes(q)).slice(0,100).forEach(o=>{
-   const x=document.createElement("button");x.type="button";x.className="purchasing-auth-result";x.innerHTML=`<b>${(o.textContent||"").split(" · ")[0]}</b><br>${(o.textContent||"").split(" · ").slice(1).join(" · ")||o.textContent}`;
-   x.onclick=e=>{e.preventDefault();e.stopPropagation();sel.value=o.value;sel.dispatchEvent(new Event("change",{bubbles:true}));input.value=o.textContent.trim();close();input.focus()};
-   b.appendChild(x);
-  });place();b.style.display="block"}
- input.onfocus=show;input.oninput=show;input.onkeydown=e=>{if(e.key==="Escape"){close();input.value=cur()}if(e.key==="Enter"){const f=getBox().querySelector(".purchasing-auth-result");if(f){e.preventDefault();f.click()}}};
- sel.addEventListener("change",()=>{if(document.activeElement!==input)input.value=cur()});
-}
-function install(){document.querySelectorAll("#purchasingItemsBody select.purchasing-item-select").forEach(build);const body=document.getElementById("purchasingItemsBody");if(body&&!body.dataset.authObsV18){body.dataset.authObsV18="1";new MutationObserver(()=>setTimeout(install,0)).observe(body,{childList:true,subtree:true})}}
-if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();setTimeout(install,300);setTimeout(install,900);
-})();
-</script>
-
 <script id="appointments-authoritative-v18">
 (function(){
 "use strict";
@@ -21790,5 +21330,235 @@ function install(){
  if(save&&!save.dataset.authV18){save.dataset.authV18="1";save.onclick=saveMain}
 }
 if(document.readyState==="loading")document.addEventListener("DOMContentLoaded",install,{once:true});else install();[300,1000,2000].forEach(x=>setTimeout(install,x));
+})();
+</script>
+
+
+<style id="purchasing-search-single-clean">
+.purchasing-single-search{position:relative;width:100%}
+.purchasing-single-input{
+  width:100%;height:40px;box-sizing:border-box;padding:9px 12px;
+  border:1px solid #94a3b8;border-radius:8px;background:#fff;
+  font-size:14px;outline:none;
+}
+.purchasing-single-input:focus{
+  border-color:#0f766e;
+  box-shadow:0 0 0 3px rgba(15,118,110,.12);
+}
+#purchasingSingleResults{
+  position:fixed;display:none;z-index:2147483647;
+  background:#fff;border:1px solid #94a3b8;border-radius:10px;
+  box-shadow:0 18px 45px rgba(15,23,42,.30);
+  max-height:420px;overflow-y:auto;
+}
+.purchasing-single-result{
+  display:block;width:100%;box-sizing:border-box;
+  padding:12px 14px;border:0;border-bottom:1px solid #e5e7eb;
+  background:#fff;text-align:left;cursor:pointer;
+}
+.purchasing-single-result:hover,
+.purchasing-single-result:focus{background:#eff6ff;outline:none}
+.purchasing-single-code{font-size:11px;font-weight:800;color:#64748b}
+.purchasing-single-name{font-size:14px;font-weight:650;color:#111827;line-height:1.4}
+.purchasing-single-kind{font-size:10px;color:#64748b;margin-top:4px}
+</style>
+<script id="purchasing-search-single-clean">
+(function(){
+"use strict";
+
+let resultsBox=null, activeInput=null, activeSelect=null;
+
+function getResults(){
+  if(!resultsBox){
+    resultsBox=document.createElement("div");
+    resultsBox.id="purchasingSingleResults";
+    document.body.appendChild(resultsBox);
+  }
+  return resultsBox;
+}
+
+function placeResults(){
+  if(!activeInput || !resultsBox)return;
+  const r=activeInput.getBoundingClientRect();
+  const w=Math.max(380,Math.min(620,Math.max(r.width,440)));
+  const below=window.innerHeight-r.bottom-10;
+  const above=r.top-10;
+  const h=Math.min(420,Math.max(140,Math.max(below,above)));
+  const top=(below>=180) ? r.bottom+6 : Math.max(8,r.top-h-6);
+  resultsBox.style.width=w+"px";
+  resultsBox.style.left=Math.max(8,Math.min(r.left,window.innerWidth-w-8))+"px";
+  resultsBox.style.top=top+"px";
+  resultsBox.style.maxHeight=h+"px";
+}
+
+function closeResults(){
+  if(resultsBox)resultsBox.style.display="none";
+  activeInput=null;
+  activeSelect=null;
+}
+
+function optionLabel(option){
+  return (option?.textContent||"").trim();
+}
+
+function selectResult(option){
+  if(!option || !activeSelect || !activeInput)return;
+
+  // Directly select the real option belonging to this Purchasing row.
+  activeSelect.value=option.value;
+  activeSelect.dispatchEvent(new Event("change",{bubbles:true}));
+
+  // The original Purchasing Management handler fills price/type/subtotal.
+  const row=activeSelect.closest(".purchasing-item-row");
+  if(row && typeof window.updateRowP==="function"){
+    try{window.updateRowP(row)}catch(err){console.error(err)}
+  }
+  if(typeof window.calcAllP==="function"){
+    try{window.calcAllP()}catch(err){console.error(err)}
+  }
+
+  activeInput.value=optionLabel(option);
+  closeResults();
+}
+
+function showResults(input,select){
+  activeInput=input;
+  activeSelect=select;
+
+  const q=input.value.trim().toLowerCase();
+  const options=[...select.options].filter(o=>o.value);
+  const matches=options.filter(o=>optionLabel(o).toLowerCase().includes(q));
+  const box=getResults();
+  box.innerHTML="";
+
+  if(!matches.length){
+    const empty=document.createElement("div");
+    empty.textContent="No product or service found";
+    empty.style.cssText="padding:16px;text-align:center;color:#64748b";
+    box.appendChild(empty);
+  }else{
+    matches.slice(0,100).forEach(option=>{
+      const item=document.createElement("button");
+      item.type="button";
+      item.className="purchasing-single-result";
+
+      const label=optionLabel(option);
+      const service=/\(Service\)\s*$/i.test(label);
+      const clean=label.replace(/\s+\(Service\)\s*$/i,"");
+      const parts=clean.split(" · ");
+      const code=parts.length>1?parts.shift():"";
+      const name=parts.join(" · ")||clean;
+
+      const c=document.createElement("div");
+      c.className="purchasing-single-code";
+      c.textContent=code;
+
+      const n=document.createElement("div");
+      n.className="purchasing-single-name";
+      n.textContent=name;
+
+      const k=document.createElement("div");
+      k.className="purchasing-single-kind";
+      k.textContent=service?"Service":"Product";
+
+      item.append(c,n,k);
+
+      // One direct click handler. No delegated pointer/mousedown handlers.
+      item.addEventListener("click",function(e){
+        e.preventDefault();
+        e.stopPropagation();
+        selectResult(option);
+      });
+
+      box.appendChild(item);
+    });
+  }
+
+  placeResults();
+  box.style.display="block";
+}
+
+function buildSearch(select){
+  if(!select || !select.classList.contains("purchasing-item-select"))return;
+  if(select.dataset.singleSearchInstalled==="1")return;
+  select.dataset.singleSearchInstalled="1";
+
+  select.style.display="none";
+
+  const wrap=document.createElement("div");
+  wrap.className="purchasing-single-search";
+
+  const input=document.createElement("input");
+  input.type="text";
+  input.className="purchasing-single-input";
+  input.placeholder="Search product or service...";
+  input.autocomplete="off";
+
+  const current=()=>{
+    const o=select.options[select.selectedIndex];
+    return o?.value?optionLabel(o):"";
+  };
+  input.value=current();
+
+  wrap.appendChild(input);
+  select.parentNode.insertBefore(wrap,select);
+
+  input.addEventListener("focus",()=>showResults(input,select));
+  input.addEventListener("input",()=>showResults(input,select));
+  input.addEventListener("keydown",e=>{
+    if(e.key==="Escape"){
+      e.preventDefault();
+      input.value=current();
+      closeResults();
+    }else if(e.key==="Enter"){
+      const first=getResults().querySelector(".purchasing-single-result");
+      if(first){
+        e.preventDefault();
+        first.click();
+      }
+    }
+  });
+
+  select.addEventListener("change",()=>{
+    if(document.activeElement!==input)input.value=current();
+  });
+}
+
+function install(){
+  document.querySelectorAll("#purchasingItemsBody select.purchasing-item-select")
+    .forEach(buildSearch);
+
+  const body=document.getElementById("purchasingItemsBody");
+  if(body && !body.dataset.singleSearchObserver){
+    body.dataset.singleSearchObserver="1";
+    new MutationObserver(()=>{
+      document.querySelectorAll("#purchasingItemsBody select.purchasing-item-select")
+        .forEach(buildSearch);
+    }).observe(body,{childList:true,subtree:true});
+  }
+}
+
+function start(){
+  install();
+  setTimeout(install,200);
+  setTimeout(install,700);
+  setTimeout(install,1500);
+}
+
+if(document.readyState==="loading")
+  document.addEventListener("DOMContentLoaded",start,{once:true});
+else start();
+
+document.addEventListener("mousedown",function(e){
+  if(resultsBox && resultsBox.style.display!=="none" &&
+     !e.target.closest("#purchasingSingleResults") &&
+     e.target!==activeInput){
+    closeResults();
+  }
+},true);
+
+window.addEventListener("resize",placeResults);
+window.addEventListener("scroll",placeResults,true);
+
 })();
 </script>
